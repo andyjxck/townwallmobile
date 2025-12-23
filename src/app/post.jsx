@@ -93,8 +93,8 @@ export default function PostScreen() {
             const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
             const filePath = `${fileName}`;
 
-            // Use XMLHttpRequest to get a blob from local URI - the most robust way in RN
-            const imageBlob = await new Promise((resolve, reject) => {
+            // Use XMLHttpRequest to get an ArrayBuffer from local URI - very robust in RN
+            const arrayBuffer = await new Promise((resolve, reject) => {
               const xhr = new XMLHttpRequest();
               xhr.onload = function () {
                 resolve(xhr.response);
@@ -103,14 +103,14 @@ export default function PostScreen() {
                 console.error("XHR Error:", e);
                 reject(new TypeError("Network request failed"));
               };
-              xhr.responseType = "blob";
+              xhr.responseType = "arraybuffer";
               xhr.open("GET", image.uri, true);
               xhr.send(null);
             });
 
             const { error: uploadError } = await supabase.storage
               .from('posts')
-              .upload(filePath, imageBlob, {
+              .upload(filePath, arrayBuffer, {
                 contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
                 cacheControl: '3600',
                 upsert: false
