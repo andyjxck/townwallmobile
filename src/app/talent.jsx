@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Modal, Image, Platform, FlatList } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, Music, Youtube, Globe, Info, Plus, ExternalLink, ShieldCheck, Instagram } from 'lucide-react-native';
+import { ChevronLeft, Music, Youtube, Globe, Info, Plus, ExternalLink, ShieldCheck, Instagram, CheckCircle2, Star } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '@/utils/supabase';
 import { getStoredUser } from '@/utils/user';
 import * as Haptics from 'expo-haptics';
@@ -136,32 +137,66 @@ export default function LocalTalent() {
   };
 
   const renderTalentCard = ({ item }) => (
-    <View style={styles.card}>
+    <LinearGradient
+      colors={['#1a1a1a', '#0a0a0a']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.card}
+    >
       <View style={styles.cardHeader}>
-        <View style={styles.avatarPlaceholder}>
-          <Text style={styles.avatarText}>{item.name?.charAt(0) || '?'}</Text>
+        <View style={styles.avatarContainer}>
+          <LinearGradient
+            colors={['#333', '#111']}
+            style={styles.avatarPlaceholder}
+          >
+            <Text style={styles.avatarText}>{item.name?.charAt(0) || '?'}</Text>
+          </LinearGradient>
+          <View style={styles.verifiedBadge}>
+            <CheckCircle2 size={12} color="#000" fill="#10B981" />
+          </View>
         </View>
+        
         <View style={styles.headerInfo}>
-          <Text style={styles.talentName}>{item.name}</Text>
+          <View style={styles.nameRow}>
+            <Text style={styles.talentName}>{item.name}</Text>
+            <View style={styles.featuredTag}>
+              <Text style={styles.featuredTagText}>FEATURED</Text>
+            </View>
+          </View>
           <Text style={styles.talentCategory}>{item.category || 'Talent'}</Text>
         </View>
-          <TouchableOpacity style={styles.platformIcon} onPress={() => {}}>
-            {item.platform === 'Youtube' && <Youtube size={20} color="#FF0000" />}
-            {item.platform === 'Spotify' && <Music size={20} color="#1DB954" />}
-            {item.platform === 'Instagram' && <Instagram size={20} color="#E4405F" />}
-            {item.platform === 'TikTok' && <Music size={20} color="#69C9D0" />}
-            {(item.platform === 'Website' || !['Youtube', 'Spotify', 'Instagram', 'TikTok'].includes(item.platform)) && <Globe size={20} color="#FFFFFF" />}
-          </TouchableOpacity>
+
+        <TouchableOpacity style={styles.platformIcon} onPress={() => Alert.alert("Opening", `Opening ${item.link}`)}>
+          {item.platform === 'Youtube' && <Youtube size={22} color="#FF0000" />}
+          {item.platform === 'Spotify' && <Music size={22} color="#1DB954" />}
+          {item.platform === 'Instagram' && <Instagram size={22} color="#E4405F" />}
+          {item.platform === 'TikTok' && <Music size={22} color="#69C9D0" />}
+          {(item.platform === 'Website' || !['Youtube', 'Spotify', 'Instagram', 'TikTok'].includes(item.platform)) && <Globe size={22} color="#FFFFFF" />}
+        </TouchableOpacity>
       </View>
       
-      <Text style={styles.cardTitle}>{item.title}</Text>
-      {item.description ? <Text style={styles.cardDescription} numberOfLines={3}>{item.description}</Text> : null}
+      <View style={styles.cardContent}>
+        <Text style={styles.cardTitle}>{item.title}</Text>
+        {item.description ? (
+          <Text style={styles.cardDescription} numberOfLines={3}>
+            {item.description}
+          </Text>
+        ) : null}
+      </View>
       
-      <TouchableOpacity style={styles.viewButton} onPress={() => Alert.alert("Opening", `Opening ${item.link}`)}>
-        <Text style={styles.viewButtonText}>View Project</Text>
-        <ExternalLink size={14} color="#000000" />
+      <TouchableOpacity 
+        style={styles.viewButton} 
+        onPress={() => Alert.alert("Opening", `Opening ${item.link}`)}
+      >
+        <LinearGradient
+          colors={['#FFFFFF', '#E0E0E0']}
+          style={styles.viewButtonGradient}
+        >
+          <Text style={styles.viewButtonText}>VIEW PROJECT</Text>
+          <ExternalLink size={14} color="#000000" strokeWidth={3} />
+        </LinearGradient>
       </TouchableOpacity>
-    </View>
+    </LinearGradient>
   );
 
   return (
@@ -348,75 +383,125 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   card: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 20,
+    borderRadius: 24,
+    marginBottom: 24,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: 'rgba(255,255,255,0.12)',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.4,
+    shadowRadius: 15,
+    elevation: 10,
   },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    padding: 20,
+    paddingBottom: 15,
+  },
+  avatarContainer: {
+    position: 'relative',
+    marginRight: 15,
   },
   avatarPlaceholder: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   avatarText: {
     color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 22,
+    fontWeight: '900',
+  },
+  verifiedBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    backgroundColor: '#000',
+    borderRadius: 10,
+    padding: 1,
   },
   headerInfo: {
     flex: 1,
   },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   talentName: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  talentCategory: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  platformIcon: {
-    padding: 8,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 12,
-  },
-  cardTitle: {
     color: '#FFFFFF',
     fontSize: 18,
     fontWeight: '900',
-    marginBottom: 8,
+    letterSpacing: 0.3,
+  },
+  featuredTag: {
+    backgroundColor: 'rgba(255,215,0,0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,215,0,0.3)',
+  },
+  featuredTagText: {
+    color: '#FFD700',
+    fontSize: 8,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  talentCategory: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  platformIcon: {
+    width: 44,
+    height: 44,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  cardContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  cardTitle: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '900',
+    lineHeight: 28,
+    marginBottom: 10,
   },
   cardDescription: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 16,
+    color: 'rgba(255,255,255,0.55)',
+    fontSize: 15,
+    lineHeight: 22,
+    fontWeight: '500',
   },
   viewButton: {
-    backgroundColor: '#FFFFFF',
+    marginTop: 5,
+  },
+  viewButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 12,
-    gap: 8,
+    paddingVertical: 18,
+    gap: 10,
   },
   viewButtonText: {
     color: '#000000',
-    fontSize: 14,
-    fontWeight: '800',
+    fontSize: 15,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
   fab: {
     position: 'absolute',
