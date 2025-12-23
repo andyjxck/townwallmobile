@@ -163,32 +163,54 @@ function PostItem({ item, deviceId, onReaction, onComment }) {
       ) : (
         <View>
           <View style={{ flexDirection: 'row', gap: 12 }}>
-            <TouchableOpacity
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setExpanded(!expanded);
-              }}
-              activeOpacity={0.8}
-              style={{ flex: 1 }}
-            >
-              <View style={styles.postHeader}>
-                <Text style={[styles.zoneText, { color: 'rgba(255, 255, 255, 0.5)' }]}>
-                  {item.rzones?.name}
-                </Text>
-                <Text style={[styles.timeText, { color: 'rgba(255, 255, 255, 0.3)' }]}>
-                  · {timeAgo}
-                </Text>
-                {item.rtags?.name && (
-                  <Text style={[styles.tagText, { color: 'rgba(255, 255, 255, 0.3)' }]}>
-                    · {item.rtags.name}
-                  </Text>
-                )}
-              </View>
+              <TouchableOpacity
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setExpanded(!expanded);
+                }}
+                activeOpacity={0.8}
+                style={{ flex: 1 }}
+              >
+                <View style={[styles.postHeader, { gap: 8 }]}>
+                  {!item.is_anonymous && (item.rusers?.avatar_url || item.rusers?.emoji_icon) ? (
+                    item.rusers.avatar_url ? (
+                      <Image 
+                        source={{ uri: item.rusers.avatar_url }} 
+                        style={{ width: 24, height: 24, borderRadius: 12 }} 
+                      />
+                    ) : (
+                      <Text style={{ fontSize: 16 }}>{item.rusers.emoji_icon}</Text>
+                    )
+                  ) : (
+                    <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' }}>
+                      <User size={14} color="rgba(255,255,255,0.4)" />
+                    </View>
+                  )}
+                  
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Text style={[styles.zoneText, { color: '#FFFFFF' }]}>
+                        {!item.is_anonymous && item.rusers?.username ? item.rusers.username : "Anonymous"}
+                      </Text>
+                      <Text style={[styles.timeText, { color: 'rgba(255, 255, 255, 0.3)' }]}>
+                        · {item.rzones?.name}
+                      </Text>
+                      <Text style={[styles.timeText, { color: 'rgba(255, 255, 255, 0.3)' }]}>
+                        · {timeAgo}
+                      </Text>
+                    </View>
+                    {item.rtags?.name && (
+                      <Text style={[styles.tagText, { color: 'rgba(255, 255, 255, 0.3)', marginTop: 1 }]}>
+                        #{item.rtags.name.replace(/\s+/g, '')}
+                      </Text>
+                    )}
+                  </View>
+                </View>
 
-              <Text style={[styles.postTitle, { color: '#FFFFFF', opacity: shouldBlur ? 0.6 : 1 }]}>
-                {item.title || "Untitled Post"}
-              </Text>
-            </TouchableOpacity>
+                <Text style={[styles.postTitle, { color: '#FFFFFF', opacity: shouldBlur ? 0.6 : 1 }]}>
+                  {item.title || "Untitled Post"}
+                </Text>
+              </TouchableOpacity>
 
             {images.length > 0 && (
               <TouchableOpacity 
@@ -444,15 +466,15 @@ export default function UniversalFeed() {
 
   const fetchPosts = useCallback(async () => {
     try {
-      let query = supabase
-        .from('rposts')
-        .select(`
-          *,
-          rtags (name),
-          rzones (name),
-          rusers (username),
-          rreactions (reaction_type, device_id)
-        `);
+        let query = supabase
+          .from('rposts')
+          .select(`
+            *,
+            rtags (name),
+            rzones (name),
+            rusers (username, emoji_icon, avatar_url),
+            rreactions (reaction_type, device_id)
+          `);
 
       if (selectedZone) query = query.eq('zone_id', selectedZone);
       if (selectedTag) query = query.eq('tag_id', selectedTag);

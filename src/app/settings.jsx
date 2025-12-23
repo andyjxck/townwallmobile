@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { View, Text, TouchableOpacity, ScrollView, Alert, StyleSheet } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -7,6 +7,8 @@ import { ChevronLeft, LogOut, Shield, Info, Bell, MapPin } from "lucide-react-na
 import { useTheme } from "../utils/theme";
 import { useAuth } from "../utils/auth/useAuth";
 import * as Haptics from "expo-haptics";
+
+import { getStoredUser, logoutUser, initUser } from "../utils/user";
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -37,7 +39,9 @@ export default function SettingsScreen() {
           text: "Sign Out", 
           style: "destructive",
           onPress: async () => {
+            await logoutUser();
             await signOut();
+            await initUser(); // Re-init as anonymous
             router.replace("/onboarding/welcome");
           }
         }

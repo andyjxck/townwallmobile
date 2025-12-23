@@ -14,7 +14,8 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { X, ChevronRight, Image as ImageIcon, Trash2 } from "lucide-react-native";
+import { X, ChevronRight, Image as ImageIcon, Trash2, Shield, User } from "lucide-react-native";
+import { getStoredUser } from "../utils/user";
 import { getDeviceId } from "../utils/deviceId";
 import { supabase } from "../utils/supabase";
 import * as Haptics from "expo-haptics";
@@ -33,9 +34,12 @@ export default function PostScreen() {
   const [deviceId, setDeviceId] = useState(null);
     const [step, setStep] = useState('write'); // 'write' | 'zone' | 'tag' | 'success'
     const [images, setImages] = useState([]);
+    const [isAnonymous, setIsAnonymous] = useState(true);
+    const [user, setUser] = useState(null);
   
     useEffect(() => {
       getDeviceId().then(setDeviceId);
+      getStoredUser().then(setUser);
       fetchData();
       requestPermissions();
     }, []);
@@ -124,17 +128,18 @@ export default function PostScreen() {
         imageUrls.push(publicUrlData.publicUrl);
       }
 
-      const { error } = await supabase.from('rposts').insert({
-        title: title.trim(),
-        text: text.trim(),
-        zone_id: selectedZone.id,
-        tag_id: selectedTag.id,
-        device_id: deviceId,
-        is_anonymous: true,
-        image_url: imageUrls.length > 0 ? imageUrls[0] : null,
-        image_urls: imageUrls,
-        expires_at: new Date(Date.now() + 86400000).toISOString(), // 24 hours
-      });
+        const { error } = await supabase.from('rposts').insert({
+          title: title.trim(),
+          text: text.trim(),
+          zone_id: selectedZone.id,
+          tag_id: selectedTag.id,
+          device_id: deviceId,
+          user_id: user?.id,
+          is_anonymous: isAnonymous,
+          image_url: imageUrls.length > 0 ? imageUrls[0] : null,
+          image_urls: imageUrls,
+          expires_at: new Date(Date.now() + 86400000).toISOString(), // 24 hours
+        });
 
       if (error) throw error;
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -214,22 +219,49 @@ export default function PostScreen() {
                 <ChevronRight size={12} color="rgba(255,255,255,0.3)" />
               </TouchableOpacity>
 
-              <TouchableOpacity
-                onPress={() => setStep('tag')}
-                style={{
-                  backgroundColor: 'rgba(255,255,255,0.05)',
-                  paddingHorizontal: 12,
-                  paddingVertical: 6,
-                  borderRadius: 15,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 5
-                }}
-              >
-                <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>{selectedTag?.name || 'Select Tag'}</Text>
-                <ChevronRight size={12} color="rgba(255,255,255,0.3)" />
-              </TouchableOpacity>
-            </View>
+                <TouchableOpacity
+                  onPress={() => setStep('tag')}
+                  style={{
+                    backgroundColor: 'rgba(255,255,255,0.05)',
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    borderRadius: 15,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 5
+                  }}
+                >
+                  <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>{selectedTag?.name || 'Select Tag'}</Text>
+                  <ChevronRight size={12} color="rgba(255,255,255,0.3)" />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setIsAnonymous(!isAnonymous);
+                  }}
+                  style={{
+                    backgroundColor: isAnonymous ? 'rgba(255,255,255,0.05)' : 'rgba(74, 222, 128, 0.1)',
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    borderRadius: 15,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 5,
+                    borderWidth: 1,
+                    borderColor: isAnonymous ? 'transparent' : 'rgba(74, 222, 128, 0.4)'
+                  }}
+                >
+                  {isAnonymous ? (
+                    <Shield size={12} color="rgba(255,255,255,0.4)" />
+                  ) : (
+                    <User size={12} color="#4ADE80" />
+                  )}
+                  <Text style={{ color: isAnonymous ? 'rgba(255,255,255,0.6)' : '#4ADE80', fontSize: 12 }}>
+                    {isAnonymous ? 'Anonymous' : (user?.username || 'Public')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
 
             <TextInput
               autoFocus
