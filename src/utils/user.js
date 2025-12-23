@@ -47,6 +47,19 @@ export const getStoredUser = async () => {
 };
 
 export const logoutUser = async () => {
+  try {
+    const userData = await getStoredUser();
+    if (userData && userData.id) {
+      // Disassociate this device from the user on logout
+      // so the next initUser creates a fresh anonymous profile
+      await supabase
+        .from('rusers')
+        .update({ device_id: null })
+        .eq('id', userData.id);
+    }
+  } catch (e) {
+    console.error("Error during logout disassociation:", e);
+  }
   await AsyncStorage.removeItem(USER_DATA_KEY);
   await supabase.auth.signOut();
 };

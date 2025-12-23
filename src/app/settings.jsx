@@ -164,6 +164,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
+  infoText: {
+    color: 'rgba(255,255,255,0.3)',
+    fontSize: 12,
+    fontWeight: '600',
+    paddingHorizontal: 20,
+    marginTop: -5,
+    marginBottom: 10,
+  },
   signOutButton: {
     flexDirection: 'row',
     alignItems: 'center',

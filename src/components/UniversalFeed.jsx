@@ -251,14 +251,14 @@ function PostItem({ item, deviceId, onReaction, onComment }) {
                 {item.text}
               </Text>
               
-                <View style={styles.postFooter}>
-                  <Text style={[styles.footerText, { color: 'rgba(255, 255, 255, 0.4)' }]}>
-                    Posted by {item.rusers?.username || "Anonymous"}
-                  </Text>
-                  <Text style={[styles.footerText, { color: 'rgba(255, 255, 255, 0.4)' }]}>
-                    {fullDate}
-                  </Text>
-                </View>
+                  <View style={styles.postFooter}>
+                    <Text style={[styles.footerText, { color: 'rgba(255, 255, 255, 0.4)' }]}>
+                      Posted by {!item.is_anonymous && item.rusers?.username ? item.rusers.username : "Anonymous"}
+                    </Text>
+                    <Text style={[styles.footerText, { color: 'rgba(255, 255, 255, 0.4)' }]}>
+                      {fullDate}
+                    </Text>
+                  </View>
 
                 {/* Comments Section */}
                 <View style={styles.commentsSection}>
