@@ -34,6 +34,20 @@ function PostItem({ item, deviceId, onReaction }) {
   const [expanded, setExpanded] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [showFullImage, setShowFullImage] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  const images = item.image_urls || (item.image_url ? [item.image_url] : []);
+  const hasMultipleImages = images.length > 1;
+
+  useEffect(() => {
+    if (!hasMultipleImages) return;
+
+    const interval = setInterval(() => {
+      setCurrentImageIndex((prev) => (prev + 1) % images.length);
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [hasMultipleImages, images.length]);
 
   const reactions = item.rreactions || [];
   const helpfulCount = reactions.filter(r => r.reaction_type === 'helpful').length;
@@ -102,19 +116,35 @@ function PostItem({ item, deviceId, onReaction }) {
               </Text>
             </TouchableOpacity>
 
-            {item.image_url && (
+            {images.length > 0 && (
               <TouchableOpacity 
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                   setShowFullImage(true);
                 }}
                 activeOpacity={0.9}
+                style={{ position: 'relative' }}
               >
                 <Image
-                  source={{ uri: item.image_url }}
+                  source={{ uri: images[currentImageIndex] }}
                   style={{ width: 80, height: 80, borderRadius: 8 }}
                   contentFit="cover"
                 />
+                {hasMultipleImages && (
+                  <View style={{
+                    position: 'absolute',
+                    bottom: 4,
+                    right: 4,
+                    backgroundColor: 'rgba(0,0,0,0.6)',
+                    paddingHorizontal: 4,
+                    paddingVertical: 2,
+                    borderRadius: 4,
+                  }}>
+                    <Text style={{ color: '#FFFFFF', fontSize: 8, fontWeight: '700' }}>
+                      {currentImageIndex + 1}/{images.length}
+                    </Text>
+                  </View>
+                )}
               </TouchableOpacity>
             )}
           </View>
@@ -136,21 +166,21 @@ function PostItem({ item, deviceId, onReaction }) {
             </View>
           )}
 
-          <Modal visible={showFullImage} transparent animationType="fade">
-            <View style={styles.fullImageContainer}>
-              <TouchableOpacity 
-                style={styles.closeImageButton}
-                onPress={() => setShowFullImage(false)}
-              >
-                <X color="#FFFFFF" size={32} />
-              </TouchableOpacity>
-              <Image
-                source={{ uri: item.image_url }}
-                style={styles.fullImage}
-                contentFit="contain"
-              />
-            </View>
-          </Modal>
+            <Modal visible={showFullImage} transparent animationType="fade">
+              <View style={styles.fullImageContainer}>
+                <TouchableOpacity 
+                  style={styles.closeImageButton}
+                  onPress={() => setShowFullImage(false)}
+                >
+                  <X color="#FFFFFF" size={32} />
+                </TouchableOpacity>
+                <Image
+                  source={{ uri: images[currentImageIndex] }}
+                  style={styles.fullImage}
+                  contentFit="contain"
+                />
+              </View>
+            </Modal>
         </View>
       )}
 

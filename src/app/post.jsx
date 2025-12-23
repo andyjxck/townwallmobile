@@ -31,8 +31,8 @@ export default function PostScreen() {
   const [selectedTag, setSelectedTag] = useState(null);
   const [loading, setLoading] = useState(false);
   const [deviceId, setDeviceId] = useState(null);
-  const [step, setStep] = useState('write'); // 'write' | 'zone' | 'tag' | 'success'
-    const [image, setImage] = useState(null);
+    const [step, setStep] = useState('write'); // 'write' | 'zone' | 'tag' | 'success'
+    const [images, setImages] = useState([]);
   
     useEffect(() => {
       getDeviceId().then(setDeviceId);
@@ -68,13 +68,12 @@ export default function PostScreen() {
         
         const result = await ImagePicker.launchImageLibraryAsync({
           mediaTypes: ['images'],
-          allowsEditing: true,
-          aspect: [1, 1],
+          allowsMultipleSelection: true,
           quality: 0.8,
         });
   
         if (!result.canceled && result.assets && result.assets.length > 0) {
-          setImage(result.assets[0]);
+          setImages([...images, ...result.assets]);
         }
       } catch (error) {
         console.error("ImagePicker Error:", error);
@@ -87,42 +86,42 @@ export default function PostScreen() {
     setLoading(true);
 
     try {
-        let imageUrl = null;
-          if (image) {
-            const fileExt = image.uri.split('.').pop()?.toLowerCase() || 'jpg';
-            const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
-            const filePath = `${fileName}`;
+      const imageUrls = [];
+      
+      for (const img of images) {
+        const fileExt = img.uri.split('.').pop()?.toLowerCase() || 'jpg';
+        const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
+        const filePath = `${fileName}`;
 
-            // Use XMLHttpRequest to get an ArrayBuffer from local URI - very robust in RN
-            const arrayBuffer = await new Promise((resolve, reject) => {
-              const xhr = new XMLHttpRequest();
-              xhr.onload = function () {
-                resolve(xhr.response);
-              };
-              xhr.onerror = function (e) {
-                console.error("XHR Error:", e);
-                reject(new TypeError("Network request failed"));
-              };
-              xhr.responseType = "arraybuffer";
-              xhr.open("GET", image.uri, true);
-              xhr.send(null);
-            });
+        const arrayBuffer = await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.onload = function () {
+            resolve(xhr.response);
+          };
+          xhr.onerror = function (e) {
+            console.error("XHR Error:", e);
+            reject(new TypeError("Network request failed"));
+          };
+          xhr.responseType = "arraybuffer";
+          xhr.open("GET", img.uri, true);
+          xhr.send(null);
+        });
 
-            const { error: uploadError } = await supabase.storage
-              .from('posts')
-              .upload(filePath, arrayBuffer, {
-                contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
-                cacheControl: '3600',
-                upsert: false
-              });
+        const { error: uploadError } = await supabase.storage
+          .from('posts')
+          .upload(filePath, arrayBuffer, {
+            contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
+            cacheControl: '3600',
+            upsert: false
+          });
 
-            if (uploadError) throw uploadError;
+        if (uploadError) throw uploadError;
 
-          const { data: publicUrlData } = supabase.storage
+        const { data: publicUrlData } = supabase.storage
           .from('posts')
           .getPublicUrl(filePath);
         
-        imageUrl = publicUrlData.publicUrl;
+        imageUrls.push(publicUrlData.publicUrl);
       }
 
       const { error } = await supabase.from('rposts').insert({
@@ -132,7 +131,8 @@ export default function PostScreen() {
         tag_id: selectedTag.id,
         device_id: deviceId,
         is_anonymous: true,
-        image_url: imageUrl,
+        image_url: imageUrls.length > 0 ? imageUrls[0] : null,
+        image_urls: imageUrls,
         expires_at: new Date(Date.now() + 86400000).toISOString(), // 24 hours
       });
 
@@ -263,47 +263,55 @@ export default function PostScreen() {
               }}
             />
 
-            {image && (
-              <View style={{ position: 'relative', marginTop: 20, width: 150, height: 150 }}>
-                <Image 
-                  source={{ uri: image.uri }} 
-                  style={{ width: 150, height: 150, borderRadius: 10 }} 
-                />
-                <TouchableOpacity 
-                  onPress={() => setImage(null)}
-                  style={{ 
-                    position: 'absolute', 
-                    top: -10, 
-                    right: -10, 
-                    backgroundColor: '#EF4444', 
-                    padding: 8, 
-                    borderRadius: 20 
-                  }}
-                >
-                  <Trash2 size={16} color="#FFFFFF" />
-                </TouchableOpacity>
-              </View>
-            )}
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 10, marginTop: 20 }}
+            >
+              {images.map((img, index) => (
+                <View key={index} style={{ position: 'relative', width: 120, height: 120 }}>
+                  <Image 
+                    source={{ uri: img.uri }} 
+                    style={{ width: 120, height: 120, borderRadius: 10 }} 
+                  />
+                  <TouchableOpacity 
+                    onPress={() => {
+                      const newImages = [...images];
+                      newImages.splice(index, 1);
+                      setImages(newImages);
+                    }}
+                    style={{ 
+                      position: 'absolute', 
+                      top: -5, 
+                      right: -5, 
+                      backgroundColor: '#EF4444', 
+                      padding: 5, 
+                      borderRadius: 15 
+                    }}
+                  >
+                    <Trash2 size={12} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </View>
+              ))}
 
-            {!image && (
               <TouchableOpacity 
                 onPress={pickImage}
                 style={{ 
-                  flexDirection: 'row', 
-                  alignItems: 'center', 
-                  gap: 10, 
-                  marginTop: 20,
+                  width: 120,
+                  height: 120,
                   backgroundColor: 'rgba(255,255,255,0.05)',
-                  alignSelf: 'flex-start',
-                  paddingHorizontal: 15,
-                  paddingVertical: 10,
-                  borderRadius: 20
+                  borderRadius: 10,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  borderWidth: 1,
+                  borderStyle: 'dashed',
+                  borderColor: 'rgba(255,255,255,0.2)'
                 }}
               >
-                <ImageIcon size={20} color="rgba(255,255,255,0.6)" />
-                <Text style={{ color: 'rgba(255,255,255,0.6)', fontWeight: '600' }}>ADD IMAGE</Text>
+                <ImageIcon size={24} color="rgba(255,255,255,0.3)" />
+                <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10, marginTop: 5, fontWeight: '600' }}>ADD IMAGE</Text>
               </TouchableOpacity>
-            )}
+            </ScrollView>
 
             <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 12, marginTop: 20 }}>
               {text.length} characters
