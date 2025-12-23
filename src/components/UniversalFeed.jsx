@@ -25,16 +25,23 @@ import { useTheme } from "../utils/theme";
 
 function PostItem({ item, index }) {
   const { colors } = useTheme();
-  const router = useRouter();
+  const [expanded, setExpanded] = useState(false);
   const timeAgo = getTimeAgo(new Date(item.created_at));
+  const fullDate = new Date(item.created_at).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
 
   return (
     <TouchableOpacity
       onPress={() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        router.push(`/post/${item.id}`);
+        setExpanded(!expanded);
       }}
-      activeOpacity={0.7}
+      activeOpacity={0.8}
       style={styles.postContainer}
     >
       <View style={styles.postHeader}>
@@ -51,9 +58,26 @@ function PostItem({ item, index }) {
         )}
       </View>
 
-      <Text style={[styles.postTitle, { color: '#FFFFFF' }]} numberOfLines={2}>
-        {item.title || item.text}
+      <Text style={[styles.postTitle, { color: '#FFFFFF' }]}>
+        {item.title || "Untitled Post"}
       </Text>
+
+      {expanded && (
+        <View style={styles.expandedContent}>
+          <Text style={[styles.postBody, { color: 'rgba(255, 255, 255, 0.8)' }]}>
+            {item.text}
+          </Text>
+          
+          <View style={styles.postFooter}>
+            <Text style={[styles.footerText, { color: 'rgba(255, 255, 255, 0.4)' }]}>
+              Posted by {item.rusers?.username || "Anonymous"}
+            </Text>
+            <Text style={[styles.footerText, { color: 'rgba(255, 255, 255, 0.4)' }]}>
+              {fullDate}
+            </Text>
+          </View>
+        </View>
+      )}
     </TouchableOpacity>
   );
 }
@@ -92,7 +116,8 @@ export default function UniversalFeed() {
         .select(`
           *,
           rtags (name),
-          rzones (name)
+          rzones (name),
+          rusers (username)
         `);
 
       if (selectedZone) query = query.eq('zone_id', selectedZone);
@@ -315,6 +340,26 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     lineHeight: 24,
+  },
+  expandedContent: {
+    marginTop: 12,
+  },
+  postBody: {
+    fontSize: 15,
+    lineHeight: 22,
+    marginBottom: 16,
+  },
+  postFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 12,
+    borderTopWidth: 0.5,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  footerText: {
+    fontSize: 12,
+    fontWeight: '500',
   },
   loadingContainer: {
     flex: 1,
