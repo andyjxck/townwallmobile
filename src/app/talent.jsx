@@ -136,68 +136,80 @@ export default function LocalTalent() {
     }
   };
 
-  const renderTalentCard = ({ item }) => (
-    <View style={styles.card}>
-      <LinearGradient
-        colors={['#1a1a1a', '#000000']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
-        style={styles.cardGradient}
-      >
-        <View style={styles.cardHeader}>
-          <View style={styles.avatarContainer}>
-            <LinearGradient
-              colors={['#444', '#111']}
-              style={styles.avatarPlaceholder}
-            >
-              <Text style={styles.avatarText}>{item.name?.charAt(0) || '?'}</Text>
-            </LinearGradient>
-            <View style={styles.verifiedBadge}>
-              <CheckCircle2 size={14} color="#000" fill="#10B981" />
-            </View>
-          </View>
-          
-          <View style={styles.headerInfo}>
-            <View style={styles.nameRow}>
-              <Text style={styles.talentName}>{item.name}</Text>
-              <View style={styles.featuredBadge}>
-                <Star size={10} color="#FFD700" fill="#FFD700" />
-                <Text style={styles.featuredBadgeText}>FEATURED</Text>
-              </View>
-            </View>
-            <View style={styles.categoryRow}>
-              <Text style={styles.talentCategory}>{item.category || 'Talent'}</Text>
-              <View style={styles.dot} />
-              <View style={styles.platformBadge}>
-                {item.platform === 'Youtube' && <Youtube size={12} color="#FFFFFF" />}
-                {item.platform === 'Spotify' && <Music size={12} color="#FFFFFF" />}
-                {item.platform === 'Instagram' && <Instagram size={12} color="#FFFFFF" />}
-                {item.platform === 'TikTok' && <Music size={12} color="#FFFFFF" />}
-                <Text style={styles.platformBadgeText}>{item.platform}</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-        
-        <View style={styles.cardContent}>
-          <Text style={styles.cardTitle}>{item.title}</Text>
-          {item.description ? (
-            <Text style={styles.cardDescription}>
-              {item.description}
-            </Text>
-          ) : null}
-        </View>
-        
-        <TouchableOpacity 
-          style={styles.actionArea} 
-          onPress={() => Alert.alert("Opening", `Opening ${item.link}`)}
+  const renderTalentCard = ({ item }) => {
+    const getCategoryColor = (cat) => {
+      switch (cat) {
+        case 'Musician': return ['#4F46E5', '#000000'];
+        case 'YouTuber': return ['#EF4444', '#000000'];
+        case 'Artist': return ['#EC4899', '#000000'];
+        case 'Developer': return ['#10B981', '#000000'];
+        default: return ['#262626', '#000000'];
+      }
+    };
+
+    return (
+      <View style={styles.card}>
+        <LinearGradient
+          colors={getCategoryColor(item.category)}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.cardGradient}
         >
-          <Text style={styles.actionText}>VIEW PROJECT</Text>
-          <ExternalLink size={16} color="#FFFFFF" />
-        </TouchableOpacity>
-      </LinearGradient>
-    </View>
-  );
+          <View style={styles.cardOverlay}>
+            <View style={styles.cardHeader}>
+              <View style={styles.avatarContainer}>
+                <Image 
+                  source={{ uri: `https://avatar.vercel.sh/${item.name}.png` }} 
+                  style={styles.avatarImage} 
+                />
+                <View style={styles.verifiedBadge}>
+                  <CheckCircle2 size={12} color="#000" fill="#10B981" />
+                </View>
+              </View>
+              
+              <View style={styles.headerInfo}>
+                <View style={styles.nameRow}>
+                  <Text style={styles.talentName}>{item.name}</Text>
+                  <View style={styles.premiumTag}>
+                    <Text style={styles.premiumTagText}>FEATURED</Text>
+                  </View>
+                </View>
+                <Text style={styles.talentCategory}>{item.category || 'Talent'}</Text>
+              </View>
+
+              <View style={styles.platformIconCircle}>
+                {item.platform === 'Youtube' && <Youtube size={16} color="#FFF" />}
+                {item.platform === 'Spotify' && <Music size={16} color="#FFF" />}
+                {item.platform === 'Instagram' && <Instagram size={16} color="#FFF" />}
+                {item.platform === 'TikTok' && <Music size={16} color="#FFF" />}
+                {item.platform === 'Website' && <Globe size={16} color="#FFF" />}
+              </View>
+            </View>
+            
+            <View style={styles.cardContent}>
+              <Text style={styles.cardTitle}>{item.title}</Text>
+              {item.description ? (
+                <Text style={styles.cardDescription} numberOfLines={2}>
+                  {item.description}
+                </Text>
+              ) : null}
+            </View>
+            
+            <TouchableOpacity 
+              activeOpacity={0.8}
+              style={styles.premiumAction} 
+              onPress={() => Alert.alert("Opening", `Opening ${item.link}`)}
+            >
+              <BlurView intensity={20} tint="light" style={styles.actionBlur}>
+                <Text style={styles.actionText}>EXPLORE WORK</Text>
+                <ExternalLink size={14} color="#FFFFFF" />
+              </BlurView>
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
+      </View>
+    );
+  };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -379,47 +391,44 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   listContent: {
-    paddingTop: 10,
     paddingBottom: 100,
   },
   card: {
+    width: '100%',
     backgroundColor: '#000000',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.08)',
+    overflow: 'hidden',
   },
   cardGradient: {
-    paddingVertical: 25,
+    width: '100%',
+    minHeight: 280,
+  },
+  cardOverlay: {
+    flex: 1,
+    padding: 24,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'space-between',
   },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    marginBottom: 20,
   },
   avatarContainer: {
     position: 'relative',
     marginRight: 16,
   },
-  avatarPlaceholder: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
-  },
-  avatarText: {
-    color: '#FFFFFF',
-    fontSize: 24,
-    fontWeight: '900',
+  avatarImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   verifiedBadge: {
     position: 'absolute',
     bottom: -2,
     right: -2,
-    backgroundColor: '#000',
-    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
     padding: 2,
   },
   headerInfo: {
@@ -428,97 +437,80 @@ const styles = StyleSheet.create({
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
     gap: 8,
   },
   talentName: {
     color: '#FFFFFF',
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '900',
     letterSpacing: -0.5,
   },
-  featuredBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,215,0,0.1)',
+  premiumTag: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 2,
     borderRadius: 4,
-    gap: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(255,215,0,0.2)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.3)',
   },
-  featuredBadgeText: {
-    color: '#FFD700',
-    fontSize: 9,
+  premiumTagText: {
+    color: '#FFFFFF',
+    fontSize: 8,
     fontWeight: '900',
-    letterSpacing: 0.5,
-  },
-  categoryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
+    letterSpacing: 1,
   },
   talentCategory: {
-    color: 'rgba(255,255,255,0.5)',
+    color: 'rgba(255,255,255,0.7)',
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '600',
+    marginTop: 2,
   },
-  dot: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    marginHorizontal: 8,
-  },
-  platformBadge: {
-    flexDirection: 'row',
+  platformIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  platformBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '800',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   cardContent: {
-    paddingHorizontal: 20,
-    marginBottom: 25,
+    marginTop: 20,
+    marginBottom: 20,
   },
   cardTitle: {
     color: '#FFFFFF',
-    fontSize: 26,
+    fontSize: 32,
     fontWeight: '900',
-    lineHeight: 32,
-    marginBottom: 12,
-    letterSpacing: -0.5,
+    lineHeight: 38,
+    letterSpacing: -1,
   },
   cardDescription: {
-    color: 'rgba(255,255,255,0.6)',
+    color: 'rgba(255,255,255,0.8)',
     fontSize: 16,
     lineHeight: 24,
+    marginTop: 8,
     fontWeight: '500',
   },
-  actionArea: {
+  premiumAction: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginTop: 'auto',
+  },
+  actionBlur: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    marginHorizontal: 20,
-    padding: 18,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    gap: 10,
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
   actionText: {
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '900',
-    letterSpacing: 1,
+    letterSpacing: 2,
   },
   fab: {
     position: 'absolute',
