@@ -8,14 +8,16 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { X, ChevronRight } from "lucide-react-native";
+import { X, ChevronRight, Image as ImageIcon, Trash2 } from "lucide-react-native";
 import { getDeviceId } from "../utils/deviceId";
 import { supabase } from "../utils/supabase";
 import * as Haptics from "expo-haptics";
+import * as ImagePicker from "expo-image-picker";
 
 export default function PostScreen() {
   const insets = useSafeAreaInsets();
@@ -29,6 +31,7 @@ export default function PostScreen() {
   const [loading, setLoading] = useState(false);
   const [deviceId, setDeviceId] = useState(null);
   const [step, setStep] = useState('write'); // 'write' | 'zone' | 'tag' | 'success'
+  const [image, setImage] = useState(null);
 
   useEffect(() => {
     getDeviceId().then(setDeviceId);
@@ -47,12 +50,47 @@ export default function PostScreen() {
     }
   };
 
+  const pickImage = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      setImage(result.assets[0]);
+    }
+  };
+
   const handlePost = async () => {
     if (!title || !text || !selectedZone || !selectedTag || !deviceId) return;
     setLoading(true);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     try {
+      let imageUrl = null;
+      if (image) {
+        const fileExt = image.uri.split('.').pop();
+        const fileName = `${Math.random()}.${fileExt}`;
+        const filePath = `${fileName}`;
+
+        const response = await fetch(image.uri);
+        const blob = await response.blob();
+
+        const { error: uploadError } = await supabase.storage
+          .from('posts')
+          .upload(filePath, blob);
+
+        if (uploadError) throw uploadError;
+
+        const { data: publicUrlData } = supabase.storage
+          .from('posts')
+          .getPublicUrl(filePath);
+        
+        imageUrl = publicUrlData.publicUrl;
+      }
+
       const { error } = await supabase.from('rposts').insert({
         title: title.trim(),
         text: text.trim(),
@@ -60,10 +98,12 @@ export default function PostScreen() {
         tag_id: selectedTag.id,
         device_id: deviceId,
         is_anonymous: true,
+        image_url: imageUrl,
         expires_at: new Date(Date.now() + 86400000).toISOString(), // 24 hours
       });
 
       if (error) throw error;
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setStep('success');
     } catch (error) {
       console.error("Error creating post:", error);
@@ -188,7 +228,50 @@ export default function PostScreen() {
                 textAlignVertical: 'top',
               }}
             />
-            <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 12, marginTop: 10 }}>
+
+            {image && (
+              <View style={{ position: 'relative', marginTop: 20, width: 150, height: 150 }}>
+                <Image 
+                  source={{ uri: image.uri }} 
+                  style={{ width: 150, height: 150, borderRadius: 10 }} 
+                />
+                <TouchableOpacity 
+                  onPress={() => setImage(null)}
+                  style={{ 
+                    position: 'absolute', 
+                    top: -10, 
+                    right: -10, 
+                    backgroundColor: '#EF4444', 
+                    padding: 8, 
+                    borderRadius: 20 
+                  }}
+                >
+                  <Trash2 size={16} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {!image && (
+              <TouchableOpacity 
+                onPress={pickImage}
+                style={{ 
+                  flexDirection: 'row', 
+                  alignItems: 'center', 
+                  gap: 10, 
+                  marginTop: 20,
+                  backgroundColor: 'rgba(255,255,255,0.05)',
+                  alignSelf: 'flex-start',
+                  paddingHorizontal: 15,
+                  paddingVertical: 10,
+                  borderRadius: 20
+                }}
+              >
+                <ImageIcon size={20} color="rgba(255,255,255,0.6)" />
+                <Text style={{ color: 'rgba(255,255,255,0.6)', fontWeight: '600' }}>ADD IMAGE</Text>
+              </TouchableOpacity>
+            )}
+
+            <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 12, marginTop: 20 }}>
               {text.length} characters
             </Text>
           </ScrollView>

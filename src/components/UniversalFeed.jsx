@@ -7,6 +7,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   StyleSheet,
+  Modal,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -21,15 +22,18 @@ import {
   Eye,
   Flag,
   AlertTriangle,
+  X,
 } from "lucide-react-native";
 import { getDeviceId } from "../utils/deviceId";
 import { supabase } from "../utils/supabase";
 import * as Haptics from "expo-haptics";
 import { useTheme } from "../utils/theme";
+import { Image } from "expo-image";
 
 function PostItem({ item, deviceId, onReaction }) {
   const [expanded, setExpanded] = useState(false);
   const [revealed, setRevealed] = useState(false);
+  const [showFullImage, setShowFullImage] = useState(false);
 
   const reactions = item.rreactions || [];
   const helpfulCount = reactions.filter(r => r.reaction_type === 'helpful').length;
@@ -69,30 +73,51 @@ function PostItem({ item, deviceId, onReaction }) {
           </Text>
         </TouchableOpacity>
       ) : (
-        <TouchableOpacity
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            setExpanded(!expanded);
-          }}
-          activeOpacity={0.8}
-        >
-          <View style={styles.postHeader}>
-            <Text style={[styles.zoneText, { color: 'rgba(255, 255, 255, 0.5)' }]}>
-              {item.rzones?.name}
-            </Text>
-            <Text style={[styles.timeText, { color: 'rgba(255, 255, 255, 0.3)' }]}>
-              · {timeAgo}
-            </Text>
-            {item.rtags?.name && (
-              <Text style={[styles.tagText, { color: 'rgba(255, 255, 255, 0.3)' }]}>
-                · {item.rtags.name}
+        <View>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <TouchableOpacity
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setExpanded(!expanded);
+              }}
+              activeOpacity={0.8}
+              style={{ flex: 1 }}
+            >
+              <View style={styles.postHeader}>
+                <Text style={[styles.zoneText, { color: 'rgba(255, 255, 255, 0.5)' }]}>
+                  {item.rzones?.name}
+                </Text>
+                <Text style={[styles.timeText, { color: 'rgba(255, 255, 255, 0.3)' }]}>
+                  · {timeAgo}
+                </Text>
+                {item.rtags?.name && (
+                  <Text style={[styles.tagText, { color: 'rgba(255, 255, 255, 0.3)' }]}>
+                    · {item.rtags.name}
+                  </Text>
+                )}
+              </View>
+
+              <Text style={[styles.postTitle, { color: '#FFFFFF', opacity: shouldBlur ? 0.6 : 1 }]}>
+                {item.title || "Untitled Post"}
               </Text>
+            </TouchableOpacity>
+
+            {item.image_url && (
+              <TouchableOpacity 
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  setShowFullImage(true);
+                }}
+                activeOpacity={0.9}
+              >
+                <Image
+                  source={{ uri: item.image_url }}
+                  style={{ width: 80, height: 80, borderRadius: 8 }}
+                  contentFit="cover"
+                />
+              </TouchableOpacity>
             )}
           </View>
-
-          <Text style={[styles.postTitle, { color: '#FFFFFF', opacity: shouldBlur ? 0.6 : 1 }]}>
-            {item.title || "Untitled Post"}
-          </Text>
 
           {expanded && (
             <View style={styles.expandedContent}>
@@ -110,7 +135,23 @@ function PostItem({ item, deviceId, onReaction }) {
               </View>
             </View>
           )}
-        </TouchableOpacity>
+
+          <Modal visible={showFullImage} transparent animationType="fade">
+            <View style={styles.fullImageContainer}>
+              <TouchableOpacity 
+                style={styles.closeImageButton}
+                onPress={() => setShowFullImage(false)}
+              >
+                <X color="#FFFFFF" size={32} />
+              </TouchableOpacity>
+              <Image
+                source={{ uri: item.image_url }}
+                style={styles.fullImage}
+                contentFit="contain"
+              />
+            </View>
+          </Modal>
+        </View>
       )}
 
       {/* Action Row */}
@@ -528,6 +569,23 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.5,
     shadowRadius: 20,
     elevation: 10,
+  },
+  fullImageContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeImageButton: {
+    position: 'absolute',
+    top: 50,
+    right: 25,
+    zIndex: 10,
+    padding: 10,
+  },
+  fullImage: {
+    width: '100%',
+    height: '100%',
   },
 });
 
