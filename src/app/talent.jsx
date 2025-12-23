@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Modal, Image, Platform, FlatList } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, Music, Youtube, Globe, Info, Plus, ExternalLink, ShieldCheck } from 'lucide-react-native';
+import { ChevronLeft, Music, Youtube, Globe, Info, Plus, ExternalLink, ShieldCheck, Instagram } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/utils/supabase';
 import { getStoredUser } from '@/utils/user';
@@ -16,14 +16,14 @@ export default function LocalTalent() {
   const [submitting, setSubmitting] = useState(false);
   const [talents, setTalents] = useState([]);
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({
-    name: '',
-    title: '',
-    platform: 'Youtube',
-    link: '',
-    description: '',
-    category: 'Musician'
-  });
+    const [form, setForm] = useState({
+      name: '',
+      title: '',
+      platform: 'Youtube',
+      link: '',
+      description: '',
+      category: 'YouTuber'
+    });
 
   useEffect(() => {
     fetchTalents();
@@ -145,11 +145,13 @@ export default function LocalTalent() {
           <Text style={styles.talentName}>{item.name}</Text>
           <Text style={styles.talentCategory}>{item.category || 'Talent'}</Text>
         </View>
-        <TouchableOpacity style={styles.platformIcon} onPress={() => {}}>
-          {item.platform === 'Youtube' && <Youtube size={20} color="#FF0000" />}
-          {item.platform === 'Spotify' && <Music size={20} color="#1DB954" />}
-          {item.platform === 'Website' && <Globe size={20} color="#FFFFFF" />}
-        </TouchableOpacity>
+          <TouchableOpacity style={styles.platformIcon} onPress={() => {}}>
+            {item.platform === 'Youtube' && <Youtube size={20} color="#FF0000" />}
+            {item.platform === 'Spotify' && <Music size={20} color="#1DB954" />}
+            {item.platform === 'Instagram' && <Instagram size={20} color="#E4405F" />}
+            {item.platform === 'TikTok' && <Music size={20} color="#69C9D0" />}
+            {(item.platform === 'Website' || !['Youtube', 'Spotify', 'Instagram', 'TikTok'].includes(item.platform)) && <Globe size={20} color="#FFFFFF" />}
+          </TouchableOpacity>
       </View>
       
       <Text style={styles.cardTitle}>{item.title}</Text>
@@ -238,38 +240,40 @@ export default function LocalTalent() {
                 onChangeText={(t) => setForm({ ...form, title: t })}
               />
 
-              <Text style={styles.label}>CATEGORY</Text>
-              <View style={styles.platformRow}>
-                {['Musician', 'Artist', 'Developer', 'Other'].map((c) => (
-                  <TouchableOpacity
-                    key={c}
-                    onPress={() => setForm({ ...form, category: c })}
-                    style={[styles.miniButton, form.category === c && styles.activeMiniButton]}
-                  >
-                    <Text style={[styles.miniButtonText, { color: form.category === c ? "#000000" : "#FFFFFF" }]}>
-                      {c}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+                <Text style={styles.label}>CATEGORY</Text>
+                <View style={styles.platformRow}>
+                  {['YouTuber', 'Podcaster', 'Musician', 'Artist', 'Developer', 'Other'].map((c) => (
+                    <TouchableOpacity
+                      key={c}
+                      onPress={() => setForm({ ...form, category: c })}
+                      style={[styles.miniButton, form.category === c && styles.activeMiniButton]}
+                    >
+                      <Text style={[styles.miniButtonText, { color: form.category === c ? "#000000" : "#FFFFFF" }]}>
+                        {c}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
 
-              <Text style={styles.label}>PLATFORM</Text>
-              <View style={styles.platformRow}>
-                {['Youtube', 'Spotify', 'Website'].map((p) => (
-                  <TouchableOpacity
-                    key={p}
-                    onPress={() => setForm({ ...form, platform: p })}
-                    style={[styles.platformButton, form.platform === p && styles.activePlatform]}
-                  >
-                    {p === 'Youtube' && <Youtube size={14} color={form.platform === p ? "#000000" : "#FFFFFF"} />}
-                    {p === 'Spotify' && <Music size={14} color={form.platform === p ? "#000000" : "#FFFFFF"} />}
-                    {p === 'Website' && <Globe size={14} color={form.platform === p ? "#000000" : "#FFFFFF"} />}
-                    <Text style={[styles.platformText, { color: form.platform === p ? "#000000" : "#FFFFFF" }]}>
-                      {p}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+                <Text style={styles.label}>PLATFORM</Text>
+                <View style={styles.platformRow}>
+                  {['Youtube', 'Spotify', 'Instagram', 'TikTok', 'Website'].map((p) => (
+                    <TouchableOpacity
+                      key={p}
+                      onPress={() => setForm({ ...form, platform: p })}
+                      style={[styles.platformButton, form.platform === p && styles.activePlatform]}
+                    >
+                      {p === 'Youtube' && <Youtube size={14} color={form.platform === p ? "#000000" : "#FFFFFF"} />}
+                      {p === 'Spotify' && <Music size={14} color={form.platform === p ? "#000000" : "#FFFFFF"} />}
+                      {p === 'Instagram' && <Instagram size={14} color={form.platform === p ? "#000000" : "#FFFFFF"} />}
+                      {p === 'TikTok' && <Music size={14} color={form.platform === p ? "#000000" : "#FFFFFF"} />}
+                      {p === 'Website' && <Globe size={14} color={form.platform === p ? "#000000" : "#FFFFFF"} />}
+                      <Text style={[styles.platformText, { color: form.platform === p ? "#000000" : "#FFFFFF" }]}>
+                        {p}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
 
               <Text style={styles.label}>LINK (URL)</Text>
               <TextInput
