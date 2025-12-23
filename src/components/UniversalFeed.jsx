@@ -35,23 +35,23 @@ function PostItem({ item, index }) {
         router.push(`/post/${item.id}`);
       }}
       activeOpacity={0.7}
-      style={[styles.postContainer, { borderBottomColor: colors.separator }]}
+      style={styles.postContainer}
     >
       <View style={styles.postHeader}>
-        <Text style={[styles.zoneText, { color: colors.textSecondary }]}>
+        <Text style={[styles.zoneText, { color: 'rgba(255, 255, 255, 0.5)' }]}>
           {item.rzones?.name}
         </Text>
-        <Text style={[styles.timeText, { color: colors.textTertiary }]}>
+        <Text style={[styles.timeText, { color: 'rgba(255, 255, 255, 0.3)' }]}>
           · {timeAgo}
         </Text>
         {item.rtags?.name && (
-          <Text style={[styles.tagText, { color: colors.textTertiary }]}>
+          <Text style={[styles.tagText, { color: 'rgba(255, 255, 255, 0.3)' }]}>
             · {item.rtags.name}
           </Text>
         )}
       </View>
 
-      <Text style={[styles.postTitle, { color: colors.text }]} numberOfLines={2}>
+      <Text style={[styles.postTitle, { color: '#FFFFFF' }]} numberOfLines={2}>
         {item.title || item.text}
       </Text>
     </TouchableOpacity>
@@ -277,8 +277,6 @@ const styles = StyleSheet.create({
   },
   filterSection: {
     paddingBottom: 10,
-    borderBottomWidth: 0.5,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
   },
   filterList: {
     paddingHorizontal: 20,
@@ -293,8 +291,7 @@ const styles = StyleSheet.create({
   },
   postContainer: {
     paddingHorizontal: 20,
-    paddingVertical: 20,
-    borderBottomWidth: 0.5,
+    paddingVertical: 18,
   },
   postHeader: {
     flexDirection: "row",

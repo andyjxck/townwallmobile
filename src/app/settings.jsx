@@ -14,6 +14,18 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { signOut } = useAuth();
 
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+
+  const toggleNotifications = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setNotificationsEnabled(!notificationsEnabled);
+  };
+
+  const showLegal = (title, content) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Alert.alert(title, content);
+  };
+
   const handleSignOut = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     Alert.alert(
@@ -52,13 +64,13 @@ export default function SettingsScreen() {
           <Text style={styles.sectionLabel}>PREFERENCES</Text>
           <SettingsItem 
             icon={<MapPin size={20} color="rgba(255,255,255,0.4)" />}
-            title="Default Zone"
-            onPress={() => {}}
+            title="Change Default Zone"
+            onPress={() => router.push("/onboarding/zones")}
           />
           <SettingsItem 
-            icon={<Bell size={20} color="rgba(255,255,255,0.4)" />}
-            title="Notifications"
-            onPress={() => {}}
+            icon={<Bell size={20} color={notificationsEnabled ? "#4ADE80" : "rgba(255,255,255,0.4)"} />}
+            title={notificationsEnabled ? "Notifications On" : "Notifications Off"}
+            onPress={toggleNotifications}
           />
         </View>
 
@@ -67,12 +79,12 @@ export default function SettingsScreen() {
           <SettingsItem 
             icon={<Shield size={20} color="rgba(255,255,255,0.4)" />}
             title="Privacy Policy"
-            onPress={() => {}}
+            onPress={() => showLegal("Privacy Policy", "We value your privacy. Your data is never sold or shared with third parties.")}
           />
           <SettingsItem 
             icon={<Info size={20} color="rgba(255,255,255,0.4)" />}
             title="Community Guidelines"
-            onPress={() => {}}
+            onPress={() => showLegal("Guidelines", "Be respectful. No hate speech. No spam. Redditch is for everyone.")}
           />
         </View>
 
@@ -87,7 +99,7 @@ export default function SettingsScreen() {
         </View>
 
         <Text style={styles.versionText}>
-          REDDITCH'D v1.0.4{"\n"}
+          REDDITCH'D v1.0.5{"\n"}
           MADE IN REDDITCH
         </Text>
       </ScrollView>
