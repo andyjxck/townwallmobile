@@ -28,6 +28,12 @@ import {
     ChevronRight,
     User,
     Send,
+    Menu,
+    Music,
+    Briefcase,
+    Shield,
+    HelpCircle,
+    MessageCircle,
   } from "lucide-react-native";
 import { getDeviceId } from "../utils/deviceId";
 import { supabase } from "../utils/supabase";
@@ -451,11 +457,22 @@ export default function UniversalFeed() {
   const [selectedZone, setSelectedZone] = useState(null);
   const [selectedTag, setSelectedTag] = useState(null);
   const [sortBy, setSortBy] = useState('newest');
+  const [showMenu, setShowMenu] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     getDeviceId().then(setDeviceId);
     fetchFilterData();
+    checkAdmin();
   }, []);
+
+  const checkAdmin = async () => {
+    const user = await getStoredUser();
+    if (user) {
+      const { data } = await supabase.from('rusers').select('is_admin').eq('id', user.id).single();
+      setIsAdmin(!!data?.is_admin);
+    }
+  };
 
   const fetchFilterData = async () => {
     const { data: zData } = await supabase.from('rzones').select('*').order('name');
@@ -533,16 +550,19 @@ export default function UniversalFeed() {
     <View style={[styles.container, { backgroundColor: '#000000' }]}>
       <StatusBar style="light" />
       
-      <View style={{ paddingTop: insets.top }}>
-        <View style={styles.header}>
-          <Text style={[styles.logo, { color: '#FFFFFF' }]}>REDDITCH'D</Text>
-            <View style={styles.headerActions}>
-              <TouchableOpacity 
-                style={styles.iconButton}
-                onPress={() => router.push("/profile")}
-              >
-                <User size={22} color="#FFFFFF" />
-              </TouchableOpacity>
+        <View style={{ paddingTop: insets.top }}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => setShowMenu(true)} style={styles.iconButton}>
+              <Menu size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+            <Text style={[styles.logo, { color: '#FFFFFF' }]}>REDDITCH'D</Text>
+              <View style={styles.headerActions}>
+                <TouchableOpacity 
+                  style={styles.iconButton}
+                  onPress={() => router.push("/profile")}
+                >
+                  <User size={22} color="#FFFFFF" />
+                </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.iconButton}
                 onPress={() => {
@@ -662,6 +682,86 @@ export default function UniversalFeed() {
       >
         <Plus size={32} color="#000000" strokeWidth={3} />
       </TouchableOpacity>
+
+      {/* Services Menu Modal */}
+      <Modal
+        visible={showMenu}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowMenu(false)}
+      >
+        <View style={styles.menuOverlay}>
+          <View style={[styles.menuContent, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 20 }]}>
+            <View style={styles.menuHeader}>
+              <Text style={styles.menuTitle}>SERVICES</Text>
+              <TouchableOpacity onPress={() => setShowMenu(false)} style={styles.menuCloseButton}>
+                <X size={28} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.menuGrid}>
+              <TouchableOpacity 
+                style={styles.menuItem} 
+                onPress={() => { setShowMenu(false); router.push("/talent"); }}
+              >
+                <View style={[styles.menuIconContainer, { backgroundColor: 'rgba(168, 85, 247, 0.1)' }]}>
+                  <Music size={24} color="#A855F7" />
+                </View>
+                <Text style={styles.menuItemLabel}>Local Talent</Text>
+                <Text style={styles.menuItemPrice}>£0.99</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.menuItem} 
+                onPress={() => { setShowMenu(false); router.push("/businesses"); }}
+              >
+                <View style={[styles.menuIconContainer, { backgroundColor: 'rgba(59, 130, 246, 0.1)' }]}>
+                  <Briefcase size={24} color="#3B82F6" />
+                </View>
+                <Text style={styles.menuItemLabel}>Businesses</Text>
+                <Text style={styles.menuItemPrice}>£3.99</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.menuItem} 
+                onPress={() => { setShowMenu(false); router.push("/councillor"); }}
+              >
+                <View style={[styles.menuIconContainer, { backgroundColor: 'rgba(245, 158, 11, 0.1)' }]}>
+                  <MessageCircle size={24} color="#F59E0B" />
+                </View>
+                <Text style={styles.menuItemLabel}>Councillor</Text>
+                <Text style={styles.menuItemStatus}>SOON</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.menuItem} 
+                onPress={() => { setShowMenu(false); router.push("/help"); }}
+              >
+                <View style={[styles.menuIconContainer, { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
+                  <HelpCircle size={24} color="#10B981" />
+                </View>
+                <Text style={styles.menuItemLabel}>Help / Contact</Text>
+              </TouchableOpacity>
+
+              {isAdmin && (
+                <TouchableOpacity 
+                  style={styles.menuItem} 
+                  onPress={() => { setShowMenu(false); router.push("/admin"); }}
+                >
+                  <View style={[styles.menuIconContainer, { backgroundColor: 'rgba(239, 68, 68, 0.1)' }]}>
+                    <Shield size={24} color="#EF4444" />
+                  </View>
+                  <Text style={styles.menuItemLabel}>Moderation</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <View style={styles.menuFooter}>
+              <Text style={styles.menuFooterText}>REDDITCH'D v1.0.0</Text>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -904,6 +1004,82 @@ const styles = StyleSheet.create({
       width: 8,
       height: 8,
       borderRadius: 4,
+    },
+    menuOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.95)',
+    },
+    menuContent: {
+      flex: 1,
+      paddingHorizontal: 30,
+    },
+    menuHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 40,
+    },
+    menuTitle: {
+      color: '#FFFFFF',
+      fontSize: 28,
+      fontWeight: '900',
+      letterSpacing: 4,
+    },
+    menuCloseButton: {
+      padding: 5,
+    },
+    menuGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 20,
+    },
+    menuItem: {
+      width: (Dimensions.get('window').width - 80) / 2,
+      backgroundColor: 'rgba(255,255,255,0.05)',
+      borderRadius: 20,
+      padding: 20,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.1)',
+    },
+    menuIconContainer: {
+      width: 50,
+      height: 50,
+      borderRadius: 15,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    menuItemLabel: {
+      color: '#FFFFFF',
+      fontSize: 14,
+      fontWeight: '700',
+      textAlign: 'center',
+    },
+    menuItemPrice: {
+      color: 'rgba(255,255,255,0.4)',
+      fontSize: 12,
+      fontWeight: '600',
+      marginTop: 4,
+    },
+    menuItemStatus: {
+      color: '#F59E0B',
+      fontSize: 10,
+      fontWeight: '900',
+      marginTop: 4,
+    },
+    menuFooter: {
+      position: 'absolute',
+      bottom: 50,
+      left: 0,
+      right: 0,
+      alignItems: 'center',
+    },
+    menuFooterText: {
+      color: 'rgba(255,255,255,0.2)',
+      fontSize: 12,
+      fontWeight: '600',
+      letterSpacing: 2,
     },
   });
 
