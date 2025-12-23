@@ -23,13 +23,19 @@
       ],
       "package": "xyz.create.CreateExpoEnvironment"
     },
-    "plugins": [
-      [
-        "expo-router",
-        {
-          "sitemap": false
-        }
-      ],
+      "plugins": [
+        [
+          "expo-image-picker",
+          {
+            "photosPermission": "Allow $(PRODUCT_NAME) to access your photos"
+          }
+        ],
+        [
+          "expo-router",
+          {
+            "sitemap": false
+          }
+        ],
       [
         "expo-splash-screen",
         {

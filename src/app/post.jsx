@@ -32,14 +32,25 @@ export default function PostScreen() {
   const [loading, setLoading] = useState(false);
   const [deviceId, setDeviceId] = useState(null);
   const [step, setStep] = useState('write'); // 'write' | 'zone' | 'tag' | 'success'
-  const [image, setImage] = useState(null);
+    const [image, setImage] = useState(null);
+  
+    useEffect(() => {
+      getDeviceId().then(setDeviceId);
+      fetchData();
+      requestPermissions();
+    }, []);
+  
+    const requestPermissions = async () => {
+      if (Platform.OS !== 'web') {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          // Silent fail or alert? Let's alert to help user
+          // alert('Sorry, we need camera roll permissions to make this work!');
+        }
+      }
+    };
 
-  useEffect(() => {
-    getDeviceId().then(setDeviceId);
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+    const fetchData = async () => {
     const { data: zData } = await supabase.from('rzones').select('*').order('name');
     const { data: tData } = await supabase.from('rtags').select('*').order('name');
     setZones(zData || []);
@@ -51,19 +62,25 @@ export default function PostScreen() {
     }
   };
 
-  const pickImage = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaType.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-
-    if (!result.canceled) {
-      setImage(result.assets[0]);
-    }
-  };
+    const pickImage = async () => {
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ['images'],
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.8,
+        });
+  
+        if (!result.canceled && result.assets && result.assets.length > 0) {
+          setImage(result.assets[0]);
+        }
+      } catch (error) {
+        console.error("ImagePicker Error:", error);
+        alert("Could not open image library.");
+      }
+    };
 
   const handlePost = async () => {
     if (!title || !text || !selectedZone || !selectedTag || !deviceId) return;
