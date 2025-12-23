@@ -23,7 +23,9 @@ import {
   User as UserIcon 
 } from "lucide-react-native";
 import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system";
 import * as Haptics from "expo-haptics";
+import { decode } from "base64-arraybuffer";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const EMOJIS = ["👤", "🦊", "🐯", "🐼", "🦁", "🐨", "🐸", "🤖", "👻", "👽"];
@@ -113,18 +115,21 @@ export default function Profile() {
     if (!result.canceled) {
       setLoading(true);
       try {
-        const image = result.assets[0];
-        const fileName = `${user.id}_avatar_${Date.now()}.jpg`;
-        const formData = new FormData();
-        formData.append('file', {
-          uri: image.uri,
-          name: fileName,
-          type: 'image/jpeg',
-        });
+          const image = result.assets[0];
+          const fileName = `${user.id}_avatar_${Date.now()}.jpg`;
+          
+          // Read the file as base64 and decode to ArrayBuffer for Supabase Storage
+          const base64 = await FileSystem.readAsStringAsync(image.uri, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+          const arrayBuffer = decode(base64);
 
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('avatars')
-          .upload(fileName, formData);
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('avatars')
+            .upload(fileName, arrayBuffer, {
+              contentType: 'image/jpeg',
+              upsert: true
+            });
 
         if (uploadError) throw uploadError;
 
