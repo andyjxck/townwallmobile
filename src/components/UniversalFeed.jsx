@@ -17,15 +17,32 @@ import {
   ArrowUp,
   ArrowDown,
   Search,
+  ThumbsUp,
+  Eye,
+  Flag,
+  AlertTriangle,
 } from "lucide-react-native";
 import { getDeviceId } from "../utils/deviceId";
 import { supabase } from "../utils/supabase";
 import * as Haptics from "expo-haptics";
 import { useTheme } from "../utils/theme";
 
-function PostItem({ item, index }) {
-  const { colors } = useTheme();
+function PostItem({ item, deviceId, onReaction }) {
   const [expanded, setExpanded] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+
+  const reactions = item.rreactions || [];
+  const helpfulCount = reactions.filter(r => r.reaction_type === 'helpful').length;
+  const seenCount = reactions.filter(r => r.reaction_type === 'seen').length;
+  const fakeCount = reactions.filter(r => r.reaction_type === 'fake').length;
+  
+  const userReactions = {
+    helpful: reactions.some(r => r.reaction_type === 'helpful' && r.device_id === deviceId),
+    seen: reactions.some(r => r.reaction_type === 'seen' && r.device_id === deviceId),
+    fake: reactions.some(r => r.reaction_type === 'fake' && r.device_id === deviceId),
+  };
+
+  const shouldBlur = fakeCount > (helpfulCount + seenCount) * 0.5 && fakeCount > 0;
   const timeAgo = getTimeAgo(new Date(item.created_at));
   const fullDate = new Date(item.created_at).toLocaleDateString('en-GB', {
     day: 'numeric',
@@ -36,49 +53,111 @@ function PostItem({ item, index }) {
   });
 
   return (
-    <TouchableOpacity
-      onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        setExpanded(!expanded);
-      }}
-      activeOpacity={0.8}
-      style={styles.postContainer}
-    >
-      <View style={styles.postHeader}>
-        <Text style={[styles.zoneText, { color: 'rgba(255, 255, 255, 0.5)' }]}>
-          {item.rzones?.name}
-        </Text>
-        <Text style={[styles.timeText, { color: 'rgba(255, 255, 255, 0.3)' }]}>
-          · {timeAgo}
-        </Text>
-        {item.rtags?.name && (
-          <Text style={[styles.tagText, { color: 'rgba(255, 255, 255, 0.3)' }]}>
-            · {item.rtags.name}
+    <View style={styles.postContainer}>
+      {shouldBlur && !revealed ? (
+        <TouchableOpacity
+          onPress={() => {
+            setRevealed(true);
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          }}
+          activeOpacity={0.8}
+          style={styles.blurBanner}
+        >
+          <AlertTriangle size={16} color="#EF4444" />
+          <Text style={styles.blurText}>
+            Potentially misleading content. Tap to reveal.
           </Text>
-        )}
-      </View>
-
-      <Text style={[styles.postTitle, { color: '#FFFFFF' }]}>
-        {item.title || "Untitled Post"}
-      </Text>
-
-      {expanded && (
-        <View style={styles.expandedContent}>
-          <Text style={[styles.postBody, { color: 'rgba(255, 255, 255, 0.8)' }]}>
-            {item.text}
-          </Text>
-          
-          <View style={styles.postFooter}>
-            <Text style={[styles.footerText, { color: 'rgba(255, 255, 255, 0.4)' }]}>
-              Posted by {item.rusers?.username || "Anonymous"}
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setExpanded(!expanded);
+          }}
+          activeOpacity={0.8}
+        >
+          <View style={styles.postHeader}>
+            <Text style={[styles.zoneText, { color: 'rgba(255, 255, 255, 0.5)' }]}>
+              {item.rzones?.name}
             </Text>
-            <Text style={[styles.footerText, { color: 'rgba(255, 255, 255, 0.4)' }]}>
-              {fullDate}
+            <Text style={[styles.timeText, { color: 'rgba(255, 255, 255, 0.3)' }]}>
+              · {timeAgo}
             </Text>
+            {item.rtags?.name && (
+              <Text style={[styles.tagText, { color: 'rgba(255, 255, 255, 0.3)' }]}>
+                · {item.rtags.name}
+              </Text>
+            )}
           </View>
-        </View>
+
+          <Text style={[styles.postTitle, { color: '#FFFFFF', opacity: shouldBlur ? 0.6 : 1 }]}>
+            {item.title || "Untitled Post"}
+          </Text>
+
+          {expanded && (
+            <View style={styles.expandedContent}>
+              <Text style={[styles.postBody, { color: 'rgba(255, 255, 255, 0.8)' }]}>
+                {item.text}
+              </Text>
+              
+              <View style={styles.postFooter}>
+                <Text style={[styles.footerText, { color: 'rgba(255, 255, 255, 0.4)' }]}>
+                  Posted by {item.rusers?.username || "Anonymous"}
+                </Text>
+                <Text style={[styles.footerText, { color: 'rgba(255, 255, 255, 0.4)' }]}>
+                  {fullDate}
+                </Text>
+              </View>
+            </View>
+          )}
+        </TouchableOpacity>
       )}
-    </TouchableOpacity>
+
+      {/* Action Row */}
+      <View style={styles.actionRow}>
+        <TouchableOpacity
+          onPress={() => onReaction(item.id, "helpful", userReactions.helpful)}
+          style={styles.actionButton}
+        >
+          <ThumbsUp
+            size={18}
+            color={userReactions.helpful ? "#4ADE80" : "rgba(255,255,255,0.4)"}
+            fill={userReactions.helpful ? "#4ADE80" : "transparent"}
+          />
+          <Text style={[styles.actionCount, { color: userReactions.helpful ? "#4ADE80" : "rgba(255,255,255,0.4)" }]}>
+            {helpfulCount || 0}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => onReaction(item.id, "seen", userReactions.seen)}
+          style={styles.actionButton}
+        >
+          <Eye
+            size={18}
+            color={userReactions.seen ? "#60A5FA" : "rgba(255,255,255,0.4)"}
+            fill={userReactions.seen ? "#60A5FA" : "transparent"}
+          />
+          <Text style={[styles.actionCount, { color: userReactions.seen ? "#60A5FA" : "rgba(255,255,255,0.4)" }]}>
+            {seenCount || 0}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => onReaction(item.id, "fake", userReactions.fake)}
+          style={styles.actionButton}
+        >
+          <Flag
+            size={18}
+            color={userReactions.fake ? "#EF4444" : "rgba(255,255,255,0.4)"}
+            fill={userReactions.fake ? "#EF4444" : "transparent"}
+          />
+          <Text style={[styles.actionCount, { color: userReactions.fake ? "#EF4444" : "rgba(255,255,255,0.4)" }]}>
+            {fakeCount || 0}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 }
 
@@ -117,7 +196,8 @@ export default function UniversalFeed() {
           *,
           rtags (name),
           rzones (name),
-          rusers (username)
+          rusers (username),
+          rreactions (reaction_type, device_id)
         `);
 
       if (selectedZone) query = query.eq('zone_id', selectedZone);
@@ -143,6 +223,29 @@ export default function UniversalFeed() {
   const onRefresh = () => {
     setRefreshing(true);
     fetchPosts();
+  };
+
+  const handleReaction = async (postId, reactionType, currentlyReacted) => {
+    if (!deviceId) return;
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    try {
+      if (currentlyReacted) {
+        await supabase
+          .from('rreactions')
+          .delete()
+          .match({ post_id: postId, reaction_type: reactionType, device_id: deviceId });
+      } else {
+        await supabase
+          .from('rreactions')
+          .insert({ post_id: postId, reaction_type: reactionType, device_id: deviceId });
+      }
+
+      fetchPosts();
+    } catch (error) {
+      console.error("Error updating reaction:", error);
+    }
   };
 
   const clearFilters = () => {
@@ -235,8 +338,12 @@ export default function UniversalFeed() {
       ) : (
         <FlatList
           data={posts}
-          renderItem={({ item, index }) => (
-            <PostItem item={item} index={index} />
+          renderItem={({ item }) => (
+            <PostItem 
+              item={item} 
+              deviceId={deviceId} 
+              onReaction={handleReaction} 
+            />
           )}
           keyExtractor={(item) => item.id.toString()}
           refreshControl={
@@ -360,6 +467,38 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 12,
     fontWeight: '500',
+  },
+  actionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 20,
+    marginTop: 12,
+  },
+  actionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  actionCount: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  blurBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(239, 68, 68, 0.08)",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "rgba(239, 68, 68, 0.2)",
+    marginBottom: 8,
+    gap: 10,
+  },
+  blurText: {
+    color: "#EF4444",
+    fontSize: 13,
+    fontWeight: "600",
   },
   loadingContainer: {
     flex: 1,
