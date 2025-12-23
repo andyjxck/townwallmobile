@@ -19,26 +19,87 @@ import {
   ArrowUp,
   ArrowDown,
   Search,
-  ThumbsUp,
-  Eye,
-  Flag,
-  AlertTriangle,
-  X,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react-native";
+    ThumbsUp,
+    Eye,
+    Flag,
+    AlertTriangle,
+    X,
+    ChevronLeft,
+    ChevronRight,
+    User,
+    Send,
+  } from "lucide-react-native";
 import { getDeviceId } from "../utils/deviceId";
 import { supabase } from "../utils/supabase";
 import * as Haptics from "expo-haptics";
 import { useTheme } from "../utils/theme";
 import { Image } from "expo-image";
+import { getStoredUser } from "../utils/user";
+import { TextInput } from "react-native-gesture-handler";
 
-function PostItem({ item, deviceId, onReaction }) {
+function PostItem({ item, deviceId, onReaction, onComment }) {
   const [expanded, setExpanded] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [showFullImage, setShowFullImage] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [commentText, setCommentText] = useState("");
+  const [comments, setComments] = useState([]);
+  const [loadingComments, setLoadingComments] = useState(false);
   const flatListRef = useRef(null);
+
+  useEffect(() => {
+    if (expanded) {
+      fetchComments();
+    }
+  }, [expanded]);
+
+  const fetchComments = async () => {
+    setLoadingComments(true);
+    try {
+      const { data } = await supabase
+        .from('rcomments')
+        .select(`
+          *,
+          rusers (username, emoji_icon, avatar_url)
+        `)
+        .eq('post_id', item.id)
+        .order('created_at', { ascending: true });
+      setComments(data || []);
+    } catch (error) {
+      console.error("Error fetching comments:", error);
+    } finally {
+      setLoadingComments(false);
+    }
+  };
+
+  const handleSendComment = async () => {
+    if (!commentText.trim()) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    try {
+      const user = await getStoredUser();
+      const { data, error } = await supabase
+        .from('rcomments')
+        .insert({
+          post_id: item.id,
+          user_id: user?.id,
+          text: commentText.trim(),
+          device_id: deviceId
+        })
+        .select(`
+          *,
+          rusers (username, emoji_icon, avatar_url)
+        `)
+        .single();
+      
+      if (error) throw error;
+      setComments([...comments, data]);
+      setCommentText("");
+      if (onComment) onComment(item.id);
+    } catch (error) {
+      console.error("Error sending comment:", error);
+    }
+  };
 
   const images = item.image_urls || (item.image_url ? [item.image_url] : []);
   const hasMultipleImages = images.length > 1;
@@ -73,7 +134,7 @@ function PostItem({ item, deviceId, onReaction }) {
     fake: reactions.some(r => r.reaction_type === 'fake' && r.device_id === deviceId),
   };
 
-  const shouldBlur = fakeCount > (helpfulCount + seenCount) * 0.5 && fakeCount > 0;
+    const shouldBlur = fakeCount > 5 && fakeCount > (helpfulCount + seenCount);
   const timeAgo = getTimeAgo(new Date(item.created_at));
   const fullDate = new Date(item.created_at).toLocaleDateString('en-GB', {
     day: 'numeric',
@@ -168,15 +229,52 @@ function PostItem({ item, deviceId, onReaction }) {
                 {item.text}
               </Text>
               
-              <View style={styles.postFooter}>
-                <Text style={[styles.footerText, { color: 'rgba(255, 255, 255, 0.4)' }]}>
-                  Posted by {item.rusers?.username || "Anonymous"}
-                </Text>
-                <Text style={[styles.footerText, { color: 'rgba(255, 255, 255, 0.4)' }]}>
-                  {fullDate}
-                </Text>
+                <View style={styles.postFooter}>
+                  <Text style={[styles.footerText, { color: 'rgba(255, 255, 255, 0.4)' }]}>
+                    Posted by {item.rusers?.username || "Anonymous"}
+                  </Text>
+                  <Text style={[styles.footerText, { color: 'rgba(255, 255, 255, 0.4)' }]}>
+                    {fullDate}
+                  </Text>
+                </View>
+
+                {/* Comments Section */}
+                <View style={styles.commentsSection}>
+                  <Text style={styles.commentsHeader}>REPLIES</Text>
+                  {loadingComments ? (
+                    <ActivityIndicator size="small" color="rgba(255,255,255,0.2)" />
+                  ) : comments.length > 0 ? (
+                    comments.map((c) => (
+                      <View key={c.id} style={styles.commentItem}>
+                        <Text style={styles.commentUser}>
+                          {c.rusers?.emoji_icon} @{c.rusers?.username || "Anon"}
+                        </Text>
+                        <Text style={styles.commentText}>{c.text}</Text>
+                      </View>
+                    ))
+                  ) : (
+                    <Text style={styles.noComments}>No replies yet. Be the first!</Text>
+                  )}
+
+                  <View style={styles.commentInputRow}>
+                    <TextInput
+                      style={styles.commentInput}
+                      placeholder="Write a reply..."
+                      placeholderTextColor="rgba(255,255,255,0.3)"
+                      value={commentText}
+                      onChangeText={setCommentText}
+                      multiline
+                    />
+                    <TouchableOpacity 
+                      style={styles.sendButton} 
+                      onPress={handleSendComment}
+                      disabled={!commentText.trim()}
+                    >
+                      <Send size={18} color={commentText.trim() ? "#FFFFFF" : "rgba(255,255,255,0.2)"} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
               </View>
-            </View>
           )}
 
             <Modal visible={showFullImage} transparent animationType="fade">
@@ -416,10 +514,16 @@ export default function UniversalFeed() {
       <View style={{ paddingTop: insets.top }}>
         <View style={styles.header}>
           <Text style={[styles.logo, { color: '#FFFFFF' }]}>REDDITCH'D</Text>
-          <View style={styles.headerActions}>
-            <TouchableOpacity 
-              style={styles.iconButton}
-              onPress={() => {
+            <View style={styles.headerActions}>
+              <TouchableOpacity 
+                style={styles.iconButton}
+                onPress={() => router.push("/profile")}
+              >
+                <User size={22} color="#FFFFFF" />
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.iconButton}
+                onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 setSortBy(s => s === 'newest' ? 'oldest' : 'newest');
               }}
@@ -668,6 +772,59 @@ const styles = StyleSheet.create({
   clearButton: {
     marginTop: 20,
     padding: 10,
+  },
+  commentsSection: {
+    marginTop: 20,
+    paddingTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.05)",
+  },
+  commentsHeader: {
+    color: "rgba(255,255,255,0.3)",
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 1,
+    marginBottom: 15,
+  },
+  commentItem: {
+    marginBottom: 12,
+  },
+  commentUser: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "700",
+    marginBottom: 2,
+  },
+  commentText: {
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 14,
+    lineHeight: 18,
+  },
+  noComments: {
+    color: "rgba(255,255,255,0.2)",
+    fontSize: 13,
+    fontStyle: "italic",
+    marginBottom: 15,
+  },
+  commentInputRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginTop: 10,
+    gap: 10,
+  },
+  commentInput: {
+    flex: 1,
+    color: "#FFFFFF",
+    fontSize: 14,
+    maxHeight: 80,
+    paddingTop: 4,
+  },
+  sendButton: {
+    padding: 4,
   },
   fab: {
     position: "absolute",
