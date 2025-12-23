@@ -63,34 +63,30 @@ export default function SettingsScreen() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}>
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>PREFERENCES</Text>
-          <SettingsItem 
-            icon={<MapPin size={20} color="rgba(255,255,255,0.4)" />}
-            title="Change Default Zone"
-            onPress={() => router.push("/onboarding/zones")}
-          />
-          <SettingsItem 
-            icon={<Bell size={20} color={notificationsEnabled ? "#4ADE80" : "rgba(255,255,255,0.4)"} />}
-            title={notificationsEnabled ? "Notifications On" : "Notifications Off"}
-            onPress={toggleNotifications}
-          />
-        </View>
+        <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}>
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>PREFERENCES</Text>
+            <SettingsItem 
+              icon={<Bell size={20} color={notificationsEnabled ? "#4ADE80" : "rgba(255,255,255,0.4)"} />}
+              title={notificationsEnabled ? "Notifications On" : "Notifications Off"}
+              onPress={toggleNotifications}
+            />
+            <Text style={styles.infoText}>We'll link notifications soon</Text>
+          </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>LEGAL & ABOUT</Text>
-          <SettingsItem 
-            icon={<Shield size={20} color="rgba(255,255,255,0.4)" />}
-            title="Privacy Policy"
-            onPress={() => showLegal("Privacy Policy", "We value your privacy. Your data is never sold or shared with third parties.")}
-          />
-          <SettingsItem 
-            icon={<Info size={20} color="rgba(255,255,255,0.4)" />}
-            title="Community Guidelines"
-            onPress={() => showLegal("Guidelines", "Be respectful. No hate speech. No spam. Redditch is for everyone.")}
-          />
-        </View>
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>LEGAL & ABOUT</Text>
+            <SettingsItem 
+              icon={<Shield size={20} color="rgba(255,255,255,0.4)" />}
+              title="Privacy Policy"
+              onPress={() => showLegal("Privacy Policy", "Privacy policy and community guidelines will be coming soon")}
+            />
+            <SettingsItem 
+              icon={<Info size={20} color="rgba(255,255,255,0.4)" />}
+              title="Community Guidelines"
+              onPress={() => showLegal("Guidelines", "Privacy policy and community guidelines will be coming soon")}
+            />
+          </View>
 
         <View style={styles.section}>
           <TouchableOpacity 

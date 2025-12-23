@@ -104,9 +104,9 @@ export default function Profile() {
     }
   };
 
-  const handlePickImage = async () => {
+    const handlePickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.5,
@@ -120,7 +120,7 @@ export default function Profile() {
           
           // Read the file as base64 and decode to ArrayBuffer for Supabase Storage
           const base64 = await FileSystem.readAsStringAsync(image.uri, {
-            encoding: FileSystem.EncodingType.Base64,
+            encoding: "base64",
           });
           const arrayBuffer = decode(base64);
 
