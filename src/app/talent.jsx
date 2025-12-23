@@ -137,66 +137,66 @@ export default function LocalTalent() {
   };
 
   const renderTalentCard = ({ item }) => (
-    <LinearGradient
-      colors={['#1a1a1a', '#0a0a0a']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.card}
-    >
-      <View style={styles.cardHeader}>
-        <View style={styles.avatarContainer}>
-          <LinearGradient
-            colors={['#333', '#111']}
-            style={styles.avatarPlaceholder}
-          >
-            <Text style={styles.avatarText}>{item.name?.charAt(0) || '?'}</Text>
-          </LinearGradient>
-          <View style={styles.verifiedBadge}>
-            <CheckCircle2 size={12} color="#000" fill="#10B981" />
+    <View style={styles.card}>
+      <LinearGradient
+        colors={['#1a1a1a', '#000000']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={styles.cardGradient}
+      >
+        <View style={styles.cardHeader}>
+          <View style={styles.avatarContainer}>
+            <LinearGradient
+              colors={['#444', '#111']}
+              style={styles.avatarPlaceholder}
+            >
+              <Text style={styles.avatarText}>{item.name?.charAt(0) || '?'}</Text>
+            </LinearGradient>
+            <View style={styles.verifiedBadge}>
+              <CheckCircle2 size={14} color="#000" fill="#10B981" />
+            </View>
+          </View>
+          
+          <View style={styles.headerInfo}>
+            <View style={styles.nameRow}>
+              <Text style={styles.talentName}>{item.name}</Text>
+              <View style={styles.featuredBadge}>
+                <Star size={10} color="#FFD700" fill="#FFD700" />
+                <Text style={styles.featuredBadgeText}>FEATURED</Text>
+              </View>
+            </View>
+            <View style={styles.categoryRow}>
+              <Text style={styles.talentCategory}>{item.category || 'Talent'}</Text>
+              <View style={styles.dot} />
+              <View style={styles.platformBadge}>
+                {item.platform === 'Youtube' && <Youtube size={12} color="#FFFFFF" />}
+                {item.platform === 'Spotify' && <Music size={12} color="#FFFFFF" />}
+                {item.platform === 'Instagram' && <Instagram size={12} color="#FFFFFF" />}
+                {item.platform === 'TikTok' && <Music size={12} color="#FFFFFF" />}
+                <Text style={styles.platformBadgeText}>{item.platform}</Text>
+              </View>
+            </View>
           </View>
         </View>
         
-        <View style={styles.headerInfo}>
-          <View style={styles.nameRow}>
-            <Text style={styles.talentName}>{item.name}</Text>
-            <View style={styles.featuredTag}>
-              <Text style={styles.featuredTagText}>FEATURED</Text>
-            </View>
-          </View>
-          <Text style={styles.talentCategory}>{item.category || 'Talent'}</Text>
+        <View style={styles.cardContent}>
+          <Text style={styles.cardTitle}>{item.title}</Text>
+          {item.description ? (
+            <Text style={styles.cardDescription}>
+              {item.description}
+            </Text>
+          ) : null}
         </View>
-
-        <TouchableOpacity style={styles.platformIcon} onPress={() => Alert.alert("Opening", `Opening ${item.link}`)}>
-          {item.platform === 'Youtube' && <Youtube size={22} color="#FF0000" />}
-          {item.platform === 'Spotify' && <Music size={22} color="#1DB954" />}
-          {item.platform === 'Instagram' && <Instagram size={22} color="#E4405F" />}
-          {item.platform === 'TikTok' && <Music size={22} color="#69C9D0" />}
-          {(item.platform === 'Website' || !['Youtube', 'Spotify', 'Instagram', 'TikTok'].includes(item.platform)) && <Globe size={22} color="#FFFFFF" />}
-        </TouchableOpacity>
-      </View>
-      
-      <View style={styles.cardContent}>
-        <Text style={styles.cardTitle}>{item.title}</Text>
-        {item.description ? (
-          <Text style={styles.cardDescription} numberOfLines={3}>
-            {item.description}
-          </Text>
-        ) : null}
-      </View>
-      
-      <TouchableOpacity 
-        style={styles.viewButton} 
-        onPress={() => Alert.alert("Opening", `Opening ${item.link}`)}
-      >
-        <LinearGradient
-          colors={['#FFFFFF', '#E0E0E0']}
-          style={styles.viewButtonGradient}
+        
+        <TouchableOpacity 
+          style={styles.actionArea} 
+          onPress={() => Alert.alert("Opening", `Opening ${item.link}`)}
         >
-          <Text style={styles.viewButtonText}>VIEW PROJECT</Text>
-          <ExternalLink size={14} color="#000000" strokeWidth={3} />
-        </LinearGradient>
-      </TouchableOpacity>
-    </LinearGradient>
+          <Text style={styles.actionText}>VIEW PROJECT</Text>
+          <ExternalLink size={16} color="#FFFFFF" />
+        </TouchableOpacity>
+      </LinearGradient>
+    </View>
   );
 
   return (
@@ -379,43 +379,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   listContent: {
-    padding: 20,
+    paddingTop: 10,
     paddingBottom: 100,
   },
   card: {
-    borderRadius: 24,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.4,
-    shadowRadius: 15,
-    elevation: 10,
+    backgroundColor: '#000000',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+  },
+  cardGradient: {
+    paddingVertical: 25,
   },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
-    paddingBottom: 15,
+    paddingHorizontal: 20,
+    marginBottom: 20,
   },
   avatarContainer: {
     position: 'relative',
-    marginRight: 15,
+    marginRight: 16,
   },
   avatarPlaceholder: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   avatarText: {
     color: '#FFFFFF',
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '900',
   },
   verifiedBadge: {
@@ -423,8 +419,8 @@ const styles = StyleSheet.create({
     bottom: -2,
     right: -2,
     backgroundColor: '#000',
-    borderRadius: 10,
-    padding: 1,
+    borderRadius: 12,
+    padding: 2,
   },
   headerInfo: {
     flex: 1,
@@ -432,74 +428,95 @@ const styles = StyleSheet.create({
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 8,
   },
   talentName: {
     color: '#FFFFFF',
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '900',
-    letterSpacing: 0.3,
+    letterSpacing: -0.5,
   },
-  featuredTag: {
-    backgroundColor: 'rgba(255,215,0,0.15)',
+  featuredBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,215,0,0.1)',
     paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,215,0,0.3)',
+    paddingVertical: 3,
+    borderRadius: 4,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255,215,0,0.2)',
   },
-  featuredTagText: {
+  featuredBadgeText: {
     color: '#FFD700',
-    fontSize: 8,
+    fontSize: 9,
     fontWeight: '900',
     letterSpacing: 0.5,
   },
+  categoryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
   talentCategory: {
     color: 'rgba(255,255,255,0.5)',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
-    marginTop: 2,
   },
-  platformIcon: {
-    width: 44,
-    height: 44,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 14,
-    justifyContent: 'center',
+  dot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    marginHorizontal: 8,
+  },
+  platformBadge: {
+    flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  platformBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
   },
   cardContent: {
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    marginBottom: 25,
   },
   cardTitle: {
     color: '#FFFFFF',
-    fontSize: 22,
+    fontSize: 26,
     fontWeight: '900',
-    lineHeight: 28,
-    marginBottom: 10,
+    lineHeight: 32,
+    marginBottom: 12,
+    letterSpacing: -0.5,
   },
   cardDescription: {
-    color: 'rgba(255,255,255,0.55)',
-    fontSize: 15,
-    lineHeight: 22,
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 16,
+    lineHeight: 24,
     fontWeight: '500',
   },
-  viewButton: {
-    marginTop: 5,
-  },
-  viewButtonGradient: {
+  actionArea: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 18,
-    gap: 10,
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    marginHorizontal: 20,
+    padding: 18,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
-  viewButtonText: {
-    color: '#000000',
-    fontSize: 15,
+  actionText: {
+    color: '#FFFFFF',
+    fontSize: 14,
     fontWeight: '900',
     letterSpacing: 1,
   },
