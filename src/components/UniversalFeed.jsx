@@ -1,14 +1,15 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
   FlatList,
   TouchableOpacity,
   RefreshControl,
-  ActivityIndicator,
-  StyleSheet,
-  Modal,
-} from "react-native";
+    ActivityIndicator,
+    StyleSheet,
+    Modal,
+    Dimensions,
+  } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
@@ -23,6 +24,8 @@ import {
   Flag,
   AlertTriangle,
   X,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react-native";
 import { getDeviceId } from "../utils/deviceId";
 import { supabase } from "../utils/supabase";
@@ -35,19 +38,29 @@ function PostItem({ item, deviceId, onReaction }) {
   const [revealed, setRevealed] = useState(false);
   const [showFullImage, setShowFullImage] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const flatListRef = useRef(null);
 
   const images = item.image_urls || (item.image_url ? [item.image_url] : []);
   const hasMultipleImages = images.length > 1;
 
   useEffect(() => {
-    if (!hasMultipleImages) return;
+    if (showFullImage && flatListRef.current && hasMultipleImages) {
+      // Small delay to ensure FlatList is mounted
+      setTimeout(() => {
+        flatListRef.current?.scrollToIndex({ index: currentImageIndex, animated: false });
+      }, 100);
+    }
+  }, [showFullImage]);
+
+  useEffect(() => {
+    if (!hasMultipleImages || showFullImage) return;
 
     const interval = setInterval(() => {
       setCurrentImageIndex((prev) => (prev + 1) % images.length);
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [hasMultipleImages, images.length]);
+  }, [hasMultipleImages, images.length, showFullImage]);
 
   const reactions = item.rreactions || [];
   const helpfulCount = reactions.filter(r => r.reaction_type === 'helpful').length;
@@ -174,11 +187,83 @@ function PostItem({ item, deviceId, onReaction }) {
                 >
                   <X color="#FFFFFF" size={32} />
                 </TouchableOpacity>
-                <Image
-                  source={{ uri: images[currentImageIndex] }}
-                  style={styles.fullImage}
-                  contentFit="contain"
-                />
+
+                {hasMultipleImages ? (
+                  <>
+                    <FlatList
+                      ref={flatListRef}
+                      data={images}
+                      horizontal
+                      pagingEnabled
+                      showsHorizontalScrollIndicator={false}
+                      onMomentumScrollEnd={(e) => {
+                        const index = Math.round(e.nativeEvent.contentOffset.x / Dimensions.get('window').width);
+                        setCurrentImageIndex(index);
+                      }}
+                      getItemLayout={(_, index) => ({
+                        length: Dimensions.get('window').width,
+                        offset: Dimensions.get('window').width * index,
+                        index,
+                      })}
+                      renderItem={({ item: imgUri }) => (
+                        <View style={{ width: Dimensions.get('window').width, height: '100%', justifyContent: 'center' }}>
+                          <Image
+                            source={{ uri: imgUri }}
+                            style={styles.fullImage}
+                            contentFit="contain"
+                          />
+                        </View>
+                      )}
+                      keyExtractor={(i) => i}
+                    />
+                    
+                    {/* Navigation Arrows */}
+                    <View style={styles.navOverlay}>
+                      <TouchableOpacity 
+                        style={[styles.navButton, currentImageIndex === 0 && { opacity: 0 }]}
+                        disabled={currentImageIndex === 0}
+                        onPress={() => {
+                          const newIndex = Math.max(0, currentImageIndex - 1);
+                          setCurrentImageIndex(newIndex);
+                          flatListRef.current?.scrollToIndex({ index: newIndex, animated: true });
+                        }}
+                      >
+                        <ChevronLeft color="#FFFFFF" size={40} />
+                      </TouchableOpacity>
+
+                      <TouchableOpacity 
+                        style={[styles.navButton, currentImageIndex === images.length - 1 && { opacity: 0 }]}
+                        disabled={currentImageIndex === images.length - 1}
+                        onPress={() => {
+                          const newIndex = Math.min(images.length - 1, currentImageIndex + 1);
+                          setCurrentImageIndex(newIndex);
+                          flatListRef.current?.scrollToIndex({ index: newIndex, animated: true });
+                        }}
+                      >
+                        <ChevronRight color="#FFFFFF" size={40} />
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Pagination Dots */}
+                    <View style={styles.paginationDots}>
+                      {images.map((_, i) => (
+                        <View 
+                          key={i} 
+                          style={[
+                            styles.dot, 
+                            { backgroundColor: i === currentImageIndex ? '#FFFFFF' : 'rgba(255,255,255,0.3)' }
+                          ]} 
+                        />
+                      ))}
+                    </View>
+                  </>
+                ) : (
+                  <Image
+                    source={{ uri: images[0] }}
+                    style={styles.fullImage}
+                    contentFit="contain"
+                  />
+                )}
               </View>
             </Modal>
         </View>
@@ -613,11 +698,35 @@ const styles = StyleSheet.create({
     zIndex: 10,
     padding: 10,
   },
-  fullImage: {
-    width: '100%',
-    height: '100%',
-  },
-});
+    fullImage: {
+      width: '100%',
+      height: '100%',
+    },
+    navOverlay: {
+      position: 'absolute',
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      width: '100%',
+      paddingHorizontal: 20,
+      pointerEvents: 'box-none',
+    },
+    navButton: {
+      backgroundColor: 'rgba(0,0,0,0.3)',
+      borderRadius: 25,
+      padding: 5,
+    },
+    paginationDots: {
+      position: 'absolute',
+      bottom: 60,
+      flexDirection: 'row',
+      gap: 8,
+    },
+    dot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+    },
+  });
 
 function getTimeAgo(date) {
   const seconds = Math.floor((new Date() - date) / 1000);
