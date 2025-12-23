@@ -88,24 +88,35 @@ export default function PostScreen() {
 
     try {
         let imageUrl = null;
-        if (image) {
-          const fileExt = image.uri.split('.').pop()?.toLowerCase() || 'jpg';
-          const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
-          const filePath = `${fileName}`;
+          if (image) {
+            const fileExt = image.uri.split('.').pop()?.toLowerCase() || 'jpg';
+            const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
+            const filePath = `${fileName}`;
 
-          // Use Blob instead of FormData for better React Native compatibility
-          const response = await fetch(image.uri);
-          const blob = await response.blob();
-
-          const { error: uploadError } = await supabase.storage
-            .from('posts')
-            .upload(filePath, blob, {
-              contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
-              cacheControl: '3600',
-              upsert: false
+            // Use XMLHttpRequest to get a blob from local URI - the most robust way in RN
+            const imageBlob = await new Promise((resolve, reject) => {
+              const xhr = new XMLHttpRequest();
+              xhr.onload = function () {
+                resolve(xhr.response);
+              };
+              xhr.onerror = function (e) {
+                console.error("XHR Error:", e);
+                reject(new TypeError("Network request failed"));
+              };
+              xhr.responseType = "blob";
+              xhr.open("GET", image.uri, true);
+              xhr.send(null);
             });
 
-          if (uploadError) throw uploadError;
+            const { error: uploadError } = await supabase.storage
+              .from('posts')
+              .upload(filePath, imageBlob, {
+                contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
+                cacheControl: '3600',
+                upsert: false
+              });
+
+            if (uploadError) throw uploadError;
 
           const { data: publicUrlData } = supabase.storage
           .from('posts')
