@@ -20,17 +20,25 @@ import {
   Clock,
   AlertTriangle,
 } from "lucide-react-native";
-import { getDeviceId } from "@/utils/deviceId";
+import { getDeviceId } from "../utils/deviceId";
+import { supabase } from "../utils/supabase";
 import * as Haptics from "expo-haptics";
 
 function PostItem({ item, deviceId, onReaction }) {
   const [revealed, setRevealed] = useState(false);
-  const helpfulCount = item.reaction_counts?.helpful || 0;
-  const seenCount = item.reaction_counts?.seen || 0;
-  const fakeCount = item.reaction_counts?.fake || 0;
-  const userReactions = item.user_reactions || {};
+  
+  const reactions = item.rreactions || [];
+  const helpfulCount = reactions.filter(r => r.reaction_type === 'helpful').length;
+  const seenCount = reactions.filter(r => r.reaction_type === 'seen').length;
+  const fakeCount = reactions.filter(r => r.reaction_type === 'fake').length;
+  
+  const userReactions = {
+    helpful: reactions.some(r => r.reaction_type === 'helpful' && r.device_id === deviceId),
+    seen: reactions.some(r => r.reaction_type === 'seen' && r.device_id === deviceId),
+    fake: reactions.some(r => r.reaction_type === 'fake' && r.device_id === deviceId),
+  };
 
-  const shouldBlur = fakeCount > (helpfulCount + seenCount) * 0.5;
+  const shouldBlur = fakeCount > (helpfulCount + seenCount) * 0.5 && fakeCount > 0;
   const timeAgo = getTimeAgo(new Date(item.created_at));
   const isExpiring =
     item.expires_at &&
@@ -51,7 +59,7 @@ function PostItem({ item, deviceId, onReaction }) {
       >
         <View
           style={{
-            backgroundColor: getTagColor(item.tag_name),
+            backgroundColor: getTagColor(item.rtags?.name),
             paddingHorizontal: 10,
             paddingVertical: 4,
             borderRadius: 4,
@@ -59,11 +67,11 @@ function PostItem({ item, deviceId, onReaction }) {
           }}
         >
           <Text style={{ color: "#000000", fontSize: 11, fontWeight: "600" }}>
-            {item.tag_name}
+            {item.rtags?.name || 'General'}
           </Text>
         </View>
         <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 12 }}>
-          {item.is_anonymous ? "Anonymous" : item.username}
+          {item.is_anonymous ? "Anonymous" : "User"}
         </Text>
         <Text
           style={{
@@ -142,7 +150,7 @@ function PostItem({ item, deviceId, onReaction }) {
                 marginLeft: 8,
               }}
             >
-              Community flagged - tap to reveal
+              This post is being fact-checked. Tap to reveal.
             </Text>
           </View>
         </Pressable>
@@ -251,10 +259,27 @@ export default function ZoneFeed({ zoneSlug, zoneName }) {
 
   const fetchPosts = useCallback(async () => {
     try {
-      const response = await fetch(`/api/posts?zone=${zoneSlug}`);
-      if (!response.ok) throw new Error("Failed to fetch posts");
-      const data = await response.json();
-      setPosts(data.posts || []);
+      // Get zone ID first
+      const { data: zoneData } = await supabase
+        .from('rzones')
+        .select('id')
+        .eq('slug', zoneSlug)
+        .single();
+      
+      if (!zoneData) return;
+
+      const { data, error } = await supabase
+        .from('rposts')
+        .select(`
+          *,
+          rtags (name),
+          rreactions (reaction_type, device_id)
+        `)
+        .eq('zone_id', zoneData.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setPosts(data || []);
     } catch (error) {
       console.error("Error fetching posts:", error);
     } finally {
@@ -278,13 +303,16 @@ export default function ZoneFeed({ zoneSlug, zoneName }) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     try {
-      const response = await fetch("/api/reactions", {
-        method: currentlyReacted ? "DELETE" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ postId, reactionType, deviceId }),
-      });
-
-      if (!response.ok) throw new Error("Failed to update reaction");
+      if (currentlyReacted) {
+        await supabase
+          .from('rreactions')
+          .delete()
+          .match({ post_id: postId, reaction_type: reactionType, device_id: deviceId });
+      } else {
+        await supabase
+          .from('rreactions')
+          .insert({ post_id: postId, reaction_type: reactionType, device_id: deviceId });
+      }
 
       fetchPosts();
     } catch (error) {
@@ -350,7 +378,7 @@ export default function ZoneFeed({ zoneSlug, zoneName }) {
               What's happening around you
             </Text>
           </View>
-          <TouchableOpacity onPress={() => router.push("/(tabs)/settings")}>
+          <TouchableOpacity onPress={() => router.push("/settings")}>
             <Settings size={24} color="rgba(255,255,255,0.6)" />
           </TouchableOpacity>
         </View>
@@ -396,7 +424,7 @@ export default function ZoneFeed({ zoneSlug, zoneName }) {
       <TouchableOpacity
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          router.push("/(tabs)/post");
+          router.push("/post");
         }}
         style={{
           position: "absolute",

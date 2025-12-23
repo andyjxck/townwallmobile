@@ -14,53 +14,63 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 import { X, Check, ChevronDown } from "lucide-react-native";
-import { getDeviceId } from "@/utils/deviceId";
+import { getDeviceId } from "../../utils/deviceId";
+import { supabase } from "../../utils/supabase";
 import * as Haptics from "expo-haptics";
 
-const ZONES = [
-  { id: 1, name: "Astwood Bank & Feckenham", slug: "astwood-feckenham" },
-  { id: 2, name: "Batchley & Brockhill", slug: "batchley-brockhill" },
-  { id: 3, name: "Central", slug: "central" },
-  { id: 4, name: "Greenlands & Lakeside", slug: "greenlands-lakeside" },
-  { id: 5, name: "Headless Cross & Oakenshaw", slug: "headless-oakenshaw" },
-  { id: 6, name: "Matchborough & Woodrow", slug: "matchborough-woodrow" },
-  { id: 7, name: "North", slug: "north" },
-  { id: 8, name: "Webheath & Callow Hill", slug: "webheath-callow" },
-  { id: 9, name: "Winyates", slug: "winyates" },
-];
-
-const TAGS = [
-  { id: 1, name: "General", color: "#94A3B8" },
-  { id: 2, name: "Traffic", color: "#F59E0B" },
-  { id: 3, name: "Lost & Found", color: "#8B5CF6" },
-  { id: 4, name: "Complaint", color: "#EF4444" },
-  { id: 5, name: "Incident", color: "#DC2626" },
-  { id: 6, name: "Warning", color: "#EA580C" },
-  { id: 7, name: "Event", color: "#06B6D4" },
-  { id: 8, name: "Shop / Business", color: "#10B981" },
-  { id: 9, name: "Question", color: "#60A5FA" },
-];
+const TAG_COLORS = {
+  General: "#94A3B8",
+  Traffic: "#F59E0B",
+  "Lost & Found": "#8B5CF6",
+  Complaint: "#EF4444",
+  Incident: "#DC2626",
+  Warning: "#EA580C",
+  Event: "#06B6D4",
+  "Shop / Business": "#10B981",
+  Question: "#60A5FA",
+};
 
 export default function PostScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [text, setText] = useState("");
+  const [zones, setZones] = useState([]);
+  const [tags, setTags] = useState([]);
   const [selectedZone, setSelectedZone] = useState(null);
   const [selectedTag, setSelectedTag] = useState(null);
   const [showZonePicker, setShowZonePicker] = useState(false);
   const [showTagPicker, setShowTagPicker] = useState(false);
   const [deviceId, setDeviceId] = useState(null);
   const [posting, setPosting] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getDeviceId().then(setDeviceId);
+    async function init() {
+      try {
+        const id = await getDeviceId();
+        setDeviceId(id);
+
+        const [zonesRes, tagsRes] = await Promise.all([
+          supabase.from("rzones").select("*").order("name"),
+          supabase.from("rtags").select("*").order("name"),
+        ]);
+
+        if (zonesRes.data) setZones(zonesRes.data);
+        if (tagsRes.data) setTags(tagsRes.data);
+      } catch (error) {
+        console.error("Error initializing post screen:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    init();
   }, []);
 
   const handlePost = async () => {
     if (!text.trim() || !selectedZone || !selectedTag || !deviceId) {
       Alert.alert(
         "Missing information",
-        "Please select a zone, tag, and write your post",
+        "Please select a zone, tag, and write your post"
       );
       return;
     }
@@ -69,39 +79,20 @@ export default function PostScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
-      const response = await fetch("/api/posts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          zoneId: selectedZone.id,
-          tagId: selectedTag.id,
-          text: text.trim(),
-          deviceId,
-          isAnonymous: true,
-        }),
-      });
+      // Set expiration to 24 hours from now
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 24);
 
-      if (!response.ok) throw new Error("Failed to create post");
+      const { data, error } = await supabase.from("rposts").insert({
+        zone_id: selectedZone.id,
+        tag_id: selectedTag.id,
+        text: text.trim(),
+        device_id: deviceId,
+        is_anonymous: true,
+        expires_at: expiresAt.toISOString(),
+      }).select().single();
 
-      const data = await response.json();
-
-      if (data.status === "rejected") {
-        Alert.alert(
-          "Post not allowed",
-          data.reason || "Your post could not be published",
-        );
-        setPosting(false);
-        return;
-      }
-
-      if (data.status === "held") {
-        Alert.alert(
-          "Under review",
-          "Your post is being reviewed by our team and will be published shortly",
-          [{ text: "OK", onPress: () => router.back() }],
-        );
-        return;
-      }
+      if (error) throw error;
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();
@@ -113,8 +104,15 @@ export default function PostScreen() {
   };
 
   const charCount = text.length;
-  const isValid =
-    text.trim() && selectedZone && selectedTag && charCount <= 240;
+  const isValid = text.trim() && selectedZone && selectedTag && charCount <= 240;
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: "#000000", justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="rgba(255,255,255,0.3)" />
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: "#000000" }}>
@@ -235,7 +233,7 @@ export default function PostScreen() {
             {selectedTag && (
               <View
                 style={{
-                  backgroundColor: selectedTag.color,
+                  backgroundColor: TAG_COLORS[selectedTag.name] || "#94A3B8",
                   paddingHorizontal: 10,
                   paddingVertical: 4,
                   borderRadius: 4,
@@ -342,7 +340,7 @@ export default function PostScreen() {
               </Text>
             </View>
             <ScrollView style={{ maxHeight: 400 }}>
-              {ZONES.map((zone) => (
+              {zones.map((zone) => (
                 <TouchableOpacity
                   key={zone.id}
                   onPress={() => {
@@ -406,7 +404,7 @@ export default function PostScreen() {
               </Text>
             </View>
             <ScrollView style={{ maxHeight: 400 }}>
-              {TAGS.map((tag) => (
+              {tags.map((tag) => (
                 <TouchableOpacity
                   key={tag.id}
                   onPress={() => {
@@ -427,7 +425,7 @@ export default function PostScreen() {
                   <View style={{ flexDirection: "row", alignItems: "center" }}>
                     <View
                       style={{
-                        backgroundColor: tag.color,
+                        backgroundColor: TAG_COLORS[tag.name] || "#94A3B8",
                         paddingHorizontal: 12,
                         paddingVertical: 6,
                         borderRadius: 6,
