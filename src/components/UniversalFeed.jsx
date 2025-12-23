@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Pressable,
   Dimensions,
+  StyleSheet,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -21,17 +22,25 @@ import {
   Clock,
   AlertTriangle,
   ChevronDown,
-    Filter,
-    ArrowUp,
-    ArrowDown,
-  } from "lucide-react-native";
+  Filter,
+  ArrowUp,
+  ArrowDown,
+  MapPin,
+  Tag as TagIcon,
+  Search,
+} from "lucide-react-native";
 import { getDeviceId } from "../utils/deviceId";
 import { supabase } from "../utils/supabase";
 import * as Haptics from "expo-haptics";
+import { BlurView } from "expo-blur";
+import { LinearGradient } from "expo-linear-gradient";
+import { MotiView, AnimatePresence } from "moti";
+import { useTheme, getTagColor } from "../utils/theme";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
-function PostItem({ item, deviceId, onReaction }) {
+function PostItem({ item, deviceId, onReaction, index }) {
+  const { colors } = useTheme();
   const [revealed, setRevealed] = useState(false);
   
   const reactions = item.rreactions || [];
@@ -47,47 +56,35 @@ function PostItem({ item, deviceId, onReaction }) {
 
   const shouldBlur = fakeCount > (helpfulCount + seenCount) * 0.5 && fakeCount > 0;
   const timeAgo = getTimeAgo(new Date(item.created_at));
+  const tagColor = getTagColor(item.rtags?.name, colors);
 
   return (
-    <View
-      style={{
-        paddingHorizontal: 20,
-        paddingVertical: 20,
-      }}
+    <MotiView
+      from={{ opacity: 0, translateY: 20 }}
+      animate={{ opacity: 1, translateY: 0 }}
+      transition={{ type: 'timing', duration: 500, delay: index * 50 }}
+      style={[styles.postContainer, { backgroundColor: colors.surface + '80' }]}
     >
-      <View
-        style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}
-      >
-        <View
-          style={{
-            backgroundColor: getTagColor(item.rtags?.name),
-            paddingHorizontal: 8,
-            paddingVertical: 2,
-            borderRadius: 4,
-            marginRight: 8,
-          }}
-        >
-          <Text style={{ color: "#000000", fontSize: 10, fontWeight: "700", textTransform: 'uppercase' }}>
+      <View style={styles.postHeader}>
+        <View style={[styles.tagBadge, { backgroundColor: tagColor }]}>
+          <TagIcon size={10} color={colors.text} style={{ marginRight: 4 }} />
+          <Text style={[styles.tagText, { color: colors.text }]}>
             {item.rtags?.name || 'General'}
           </Text>
         </View>
-        <Text style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, fontWeight: '500' }}>
-          {item.rzones?.name}
-        </Text>
-        <Text
-          style={{
-            color: "rgba(255,255,255,0.2)",
-            fontSize: 12,
-            marginLeft: 6,
-          }}
-        >
+        <View style={styles.zoneBadge}>
+          <MapPin size={10} color={colors.textSecondary} style={{ marginRight: 4 }} />
+          <Text style={[styles.zoneText, { color: colors.textSecondary }]}>
+            {item.rzones?.name}
+          </Text>
+        </View>
+        <Text style={[styles.timeText, { color: colors.textTertiary }]}>
           · {timeAgo}
         </Text>
         {item.is_resolved && (
-          <View style={{ marginLeft: "auto" }}>
-            <Text style={{ color: "#4ADE80", fontSize: 11, fontWeight: "600" }}>
-              RESOLVED
-            </Text>
+          <View style={styles.resolvedBadge}>
+            <View style={styles.resolvedDot} />
+            <Text style={styles.resolvedText}>RESOLVED</Text>
           </View>
         )}
       </View>
@@ -98,89 +95,62 @@ function PostItem({ item, deviceId, onReaction }) {
             setRevealed(true);
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
           }}
-          style={{
-            backgroundColor: "rgba(255, 255, 255, 0.03)",
-            paddingVertical: 24,
-            paddingHorizontal: 16,
-            borderRadius: 12,
-            marginBottom: 12,
-            alignItems: 'center',
-          }}
+          style={styles.blurContainer}
         >
-          <AlertTriangle size={20} color="rgba(255,255,255,0.4)" />
-          <Text
-            style={{
-              color: "rgba(255,255,255,0.4)",
-              fontSize: 14,
-              marginTop: 8,
-              textAlign: 'center'
-            }}
-          >
-            This post is being fact-checked. Tap to reveal.
+          <BlurView intensity={20} style={StyleSheet.absoluteFill} tint="dark" />
+          <AlertTriangle size={24} color={colors.textTertiary} />
+          <Text style={[styles.blurText, { color: colors.textSecondary }]}>
+            Flagged for fact-checking. Tap to reveal.
           </Text>
         </Pressable>
       ) : (
-        <Text
-          style={{
-            color: "#FFFFFF",
-            fontSize: 17,
-            lineHeight: 25,
-            marginBottom: 16,
-            fontWeight: '400',
-          }}
-        >
+        <Text style={[styles.postText, { color: colors.text }]}>
           {item.text}
         </Text>
       )}
 
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+      <View style={styles.reactionRow}>
         <ReactionButton
-          icon={<ThumbsUp size={16} color={userReactions.helpful ? "#FFFFFF" : "rgba(255,255,255,0.3)"} />}
+          icon={<ThumbsUp size={14} color={userReactions.helpful ? "#FFFFFF" : colors.textSecondary} />}
           count={helpfulCount}
           active={userReactions.helpful}
           onPress={() => onReaction(item.id, "helpful", userReactions.helpful)}
         />
         <ReactionButton
-          icon={<Eye size={16} color={userReactions.seen ? "#FFFFFF" : "rgba(255,255,255,0.3)"} />}
+          icon={<Eye size={14} color={userReactions.seen ? "#FFFFFF" : colors.textSecondary} />}
           count={seenCount}
           active={userReactions.seen}
           onPress={() => onReaction(item.id, "seen", userReactions.seen)}
         />
         <ReactionButton
-          icon={<Flag size={16} color={userReactions.fake ? "#FFFFFF" : "rgba(255,255,255,0.3)"} />}
+          icon={<Flag size={14} color={userReactions.fake ? "#FFFFFF" : colors.textSecondary} />}
           count={fakeCount}
           active={userReactions.fake}
           onPress={() => onReaction(item.id, "fake", userReactions.fake)}
         />
       </View>
-    </View>
+    </MotiView>
   );
 }
 
 function ReactionButton({ icon, count, active, onPress }) {
+  const { colors } = useTheme();
   return (
     <TouchableOpacity
       onPress={onPress}
-      activeOpacity={0.7}
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        backgroundColor: active ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.05)",
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 20,
-      }}
+      activeOpacity={0.6}
+      style={[
+        styles.reactionButton,
+        { 
+          backgroundColor: active ? 'rgba(255,255,255,0.2)' : colors.reactionDefault,
+          borderColor: active ? 'rgba(255,255,255,0.1)' : 'transparent',
+          borderWidth: 1,
+        }
+      ]}
     >
       {icon}
       {count > 0 && (
-        <Text
-          style={{
-            color: active ? "#FFFFFF" : "rgba(255,255,255,0.5)",
-            fontSize: 12,
-            marginLeft: 6,
-            fontWeight: "600",
-          }}
-        >
+        <Text style={[styles.reactionCount, { color: active ? '#FFFFFF' : colors.textSecondary }]}>
           {count}
         </Text>
       )}
@@ -191,6 +161,7 @@ function ReactionButton({ icon, count, active, onPress }) {
 export default function UniversalFeed() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { colors } = useTheme();
   const [posts, setPosts] = useState([]);
   const [zones, setZones] = useState([]);
   const [tags, setTags] = useState([]);
@@ -200,7 +171,7 @@ export default function UniversalFeed() {
   
   const [selectedZone, setSelectedZone] = useState(null);
   const [selectedTag, setSelectedTag] = useState(null);
-  const [sortBy, setSortBy] = useState('newest'); // 'newest' | 'oldest'
+  const [sortBy, setSortBy] = useState('newest');
 
   useEffect(() => {
     getDeviceId().then(setDeviceId);
@@ -271,89 +242,104 @@ export default function UniversalFeed() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#000000" }}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar style="light" />
+      <LinearGradient
+        colors={[colors.background, '#0f0f1a', colors.background]}
+        style={StyleSheet.absoluteFill}
+      />
 
-      {/* Headerless Filter Bar */}
-      <View style={{ paddingTop: insets.top + 10, paddingBottom: 10 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 15 }}>
-          <Text style={{ color: '#FFFFFF', fontSize: 24, fontWeight: '800', letterSpacing: -1 }}>REDDITCH'D</Text>
-          <View style={{ flexDirection: 'row', gap: 15 }}>
-            <TouchableOpacity onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setSortBy(s => s === 'newest' ? 'oldest' : 'newest');
-            }}>
+      <View style={{ paddingTop: insets.top, zIndex: 10 }}>
+        <View style={styles.header}>
+          <Text style={[styles.logo, { color: colors.text }]}>FEED</Text>
+          <View style={styles.headerActions}>
+            <TouchableOpacity 
+              style={[styles.iconButton, { backgroundColor: colors.reactionDefault }]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setSortBy(s => s === 'newest' ? 'oldest' : 'newest');
+              }}
+            >
               {sortBy === 'newest' ? (
-                <ArrowDown size={20} color="#FFFFFF" />
+                <ArrowDown size={18} color={colors.text} />
               ) : (
-                <ArrowUp size={20} color="#FFFFFF" />
+                <ArrowUp size={18} color={colors.text} />
               )}
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push("/settings")}>
-              <Settings size={20} color="rgba(255,255,255,0.6)" />
+            <TouchableOpacity 
+              style={[styles.iconButton, { backgroundColor: colors.reactionDefault }]}
+              onPress={() => router.push("/settings")}
+            >
+              <Settings size={18} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
         </View>
 
-        <FlatList
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}
-          data={[{ id: null, name: 'All Zones' }, ...zones]}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              onPress={() => setSelectedZone(item.id)}
-              style={{
-                paddingHorizontal: 14,
-                paddingVertical: 7,
-                borderRadius: 20,
-                backgroundColor: selectedZone === item.id ? '#FFFFFF' : 'rgba(255,255,255,0.05)',
-              }}
-            >
-              <Text style={{ color: selectedZone === item.id ? '#000000' : 'rgba(255,255,255,0.6)', fontSize: 13, fontWeight: '600' }}>
-                {item.name}
-              </Text>
-            </TouchableOpacity>
-          )}
-          keyExtractor={item => `zone-${item.id}`}
-        />
+        <View style={styles.filterSection}>
+          <FlatList
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterList}
+            data={[{ id: null, name: 'All' }, ...zones]}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                onPress={() => setSelectedZone(item.id)}
+                style={[
+                  styles.filterPill,
+                  { backgroundColor: selectedZone === item.id ? colors.text : colors.reactionDefault }
+                ]}
+              >
+                <Text style={[
+                  styles.filterText,
+                  { color: selectedZone === item.id ? colors.background : colors.textSecondary }
+                ]}>
+                  {item.name}
+                </Text>
+              </TouchableOpacity>
+            )}
+            keyExtractor={item => `zone-${item.id}`}
+          />
 
-        <FlatList
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 20, gap: 8, marginTop: 10 }}
-          data={[{ id: null, name: 'All Tags' }, ...tags]}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              onPress={() => setSelectedTag(item.id)}
-              style={{
-                paddingHorizontal: 14,
-                paddingVertical: 7,
-                borderRadius: 20,
-                borderWidth: 1,
-                borderColor: selectedTag === item.id ? 'rgba(255,255,255,0.3)' : 'transparent',
-                backgroundColor: selectedTag === item.id ? 'transparent' : 'rgba(255,255,255,0.03)',
-              }}
-            >
-              <Text style={{ color: selectedTag === item.id ? '#FFFFFF' : 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: '500' }}>
-                {item.name}
-              </Text>
-            </TouchableOpacity>
-          )}
-          keyExtractor={item => `tag-${item.id}`}
-        />
+          <FlatList
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={[styles.filterList, { marginTop: 8 }]}
+            data={[{ id: null, name: 'Everyone' }, ...tags]}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                onPress={() => setSelectedTag(item.id)}
+                style={[
+                  styles.tagPill,
+                  { 
+                    backgroundColor: selectedTag === item.id ? 'transparent' : colors.reactionDefault,
+                    borderColor: selectedTag === item.id ? colors.textTertiary : 'transparent'
+                  }
+                ]}
+              >
+                <Text style={[
+                  styles.tagPillText,
+                  { color: selectedTag === item.id ? colors.text : colors.textTertiary }
+                ]}>
+                  #{item.name?.toLowerCase().replace(/\s+/g, '') || 'all'}
+                </Text>
+              </TouchableOpacity>
+            )}
+            keyExtractor={item => `tag-${item.id}`}
+          />
+        </View>
       </View>
 
       {loading && !refreshing ? (
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-          <ActivityIndicator color="rgba(255,255,255,0.3)" />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator color={colors.textSecondary} />
         </View>
       ) : (
         <FlatList
           data={posts}
-          renderItem={({ item }) => (
+          renderItem={({ item, index }) => (
             <PostItem
               item={item}
+              index={index}
               deviceId={deviceId}
               onReaction={handleReaction}
             />
@@ -363,46 +349,243 @@ export default function UniversalFeed() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor="rgba(255,255,255,0.3)"
+              tintColor={colors.textTertiary}
             />
           }
-          contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
+          contentContainerStyle={{ 
+            paddingBottom: insets.bottom + 100,
+            paddingHorizontal: 16,
+            paddingTop: 10
+          }}
           ListEmptyComponent={
-            <View style={{ paddingVertical: 100, alignItems: "center", paddingHorizontal: 40 }}>
-              <Text style={{ color: "rgba(255,255,255,0.3)", fontSize: 16, textAlign: 'center' }}>
-                No posts found with these filters.
+            <View style={styles.emptyContainer}>
+              <Search size={48} color={colors.textTertiary} style={{ marginBottom: 16 }} />
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                Nothing found here yet.
               </Text>
-              <TouchableOpacity onPress={clearFilters} style={{ marginTop: 15 }}>
-                <Text style={{ color: "#FFFFFF", fontWeight: '600' }}>Clear all filters</Text>
+              <TouchableOpacity onPress={clearFilters} style={styles.clearButton}>
+                <Text style={[styles.clearButtonText, { color: colors.text }]}>Reset filters</Text>
               </TouchableOpacity>
             </View>
           }
         />
       )}
 
-      {/* Flush Floating Post Button */}
       <TouchableOpacity
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
           router.push("/post");
         }}
-        style={{
-          position: "absolute",
-          bottom: insets.bottom + 20,
-          right: 20,
-          width: 50,
-          height: 50,
-          borderRadius: 25,
-          backgroundColor: "#FFFFFF",
-          justifyContent: "center",
-          alignItems: "center",
-        }}
+        activeOpacity={0.8}
+        style={styles.fab}
       >
-        <Plus size={24} color="#000000" strokeWidth={3} />
+        <LinearGradient
+          colors={['#ffffff', '#e0e0e0']}
+          style={StyleSheet.absoluteFill}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        />
+        <Plus size={28} color="#000000" strokeWidth={2.5} />
       </TouchableOpacity>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  logo: {
+    fontSize: 22,
+    fontWeight: '900',
+    letterSpacing: 2,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  iconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  filterSection: {
+    paddingBottom: 12,
+  },
+  filterList: {
+    paddingHorizontal: 20,
+    gap: 8,
+  },
+  filterPill: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  filterText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  tagPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  tagPillText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  postContainer: {
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  postHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  tagBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginRight: 8,
+  },
+  tagText: {
+    fontSize: 10,
+    fontWeight: "800",
+    textTransform: 'uppercase',
+  },
+  zoneBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 6,
+  },
+  zoneText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  timeText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  resolvedBadge: {
+    marginLeft: 'auto',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(74, 222, 128, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  resolvedDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#4ADE80',
+    marginRight: 5,
+  },
+  resolvedText: {
+    color: "#4ADE80",
+    fontSize: 9,
+    fontWeight: "800",
+  },
+  postText: {
+    fontSize: 16,
+    lineHeight: 24,
+    marginBottom: 20,
+    fontWeight: '400',
+    letterSpacing: 0.2,
+  },
+  blurContainer: {
+    height: 100,
+    borderRadius: 16,
+    marginBottom: 20,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  blurText: {
+    fontSize: 13,
+    marginTop: 8,
+    textAlign: 'center',
+    paddingHorizontal: 20,
+    fontWeight: '500',
+  },
+  reactionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  reactionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 14,
+  },
+  reactionCount: {
+    fontSize: 11,
+    marginLeft: 6,
+    fontWeight: "700",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  emptyContainer: {
+    paddingVertical: 100,
+    alignItems: "center",
+    paddingHorizontal: 40,
+  },
+  emptyText: {
+    fontSize: 15,
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  clearButton: {
+    marginTop: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  clearButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  fab: {
+    position: "absolute",
+    bottom: 30,
+    right: 24,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    overflow: 'hidden',
+  },
+});
 
 function getTimeAgo(date) {
   const seconds = Math.floor((new Date() - date) / 1000);
@@ -410,20 +593,6 @@ function getTimeAgo(date) {
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
   if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
   if (seconds < 604800) return `${Math.floor(seconds / 86400)}d`;
-  return `${Math.floor(seconds / 604800)}w`;
-}
-
-function getTagColor(tagName) {
-  const colors = {
-    General: "#FFFFFF",
-    Traffic: "#F59E0B",
-    "Lost & Found": "#8B5CF6",
-    Complaint: "#EF4444",
-    Incident: "#DC2626",
-    Warning: "#EA580C",
-    Event: "#06B6D4",
-    "Shop / Business": "#10B981",
-    Question: "#60A5FA",
-  };
-  return colors[tagName] || "#FFFFFF";
+  if (seconds < 2592000) return `${Math.floor(seconds / 604800)}w`;
+  return `${Math.floor(seconds / 2592000)}mo`;
 }
