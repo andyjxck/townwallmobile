@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  StyleSheet,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -53,10 +54,11 @@ export default function PostScreen() {
   const pickImage = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ImagePicker.MediaType.Images,
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
+      base64: true,
     });
 
     if (!result.canceled) {
@@ -69,20 +71,29 @@ export default function PostScreen() {
     setLoading(true);
 
     try {
-      let imageUrl = null;
-      if (image) {
-        const fileExt = image.uri.split('.').pop();
-        const fileName = `${Math.random()}.${fileExt}`;
-        const filePath = `${fileName}`;
+        let imageUrl = null;
+        if (image) {
+          const fileExt = image.uri.split('.').pop()?.toLowerCase() || 'jpg';
+          const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
+          const filePath = `${fileName}`;
 
-        const response = await fetch(image.uri);
-        const blob = await response.blob();
+          let uploadBody;
+          if (image.base64) {
+            // Using Buffer since it's polyfilled in index.tsx
+            uploadBody = Buffer.from(image.base64, 'base64');
+          } else {
+            const response = await fetch(image.uri);
+            uploadBody = await response.blob();
+          }
 
-        const { error: uploadError } = await supabase.storage
-          .from('posts')
-          .upload(filePath, blob);
+          const { error: uploadError } = await supabase.storage
+            .from('posts')
+            .upload(filePath, uploadBody, {
+              contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
+              upsert: false
+            });
 
-        if (uploadError) throw uploadError;
+          if (uploadError) throw uploadError;
 
         const { data: publicUrlData } = supabase.storage
           .from('posts')
@@ -279,7 +290,7 @@ export default function PostScreen() {
 
       {/* Zone Picker Overlay */}
       {step === 'zone' && (
-        <View style={{ ...View.absoluteFillObject, backgroundColor: '#000000', paddingTop: insets.top }}>
+        <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: '#000000', paddingTop: insets.top }}>
           <View style={{ padding: 20, flexDirection: 'row', justifyContent: 'space-between' }}>
             <Text style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '700' }}>SELECT ZONE</Text>
             <TouchableOpacity onPress={() => setStep('write')}>
@@ -309,7 +320,7 @@ export default function PostScreen() {
 
       {/* Tag Picker Overlay */}
       {step === 'tag' && (
-        <View style={{ ...View.absoluteFillObject, backgroundColor: '#000000', paddingTop: insets.top }}>
+        <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: '#000000', paddingTop: insets.top }}>
           <View style={{ padding: 20, flexDirection: 'row', justifyContent: 'space-between' }}>
             <Text style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '700' }}>SELECT TAG</Text>
             <TouchableOpacity onPress={() => setStep('write')}>
