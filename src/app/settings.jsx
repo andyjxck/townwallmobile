@@ -1,198 +1,175 @@
 import React from "react";
-import { View, Text, TouchableOpacity, ScrollView } from "react-native";
+import { View, Text, TouchableOpacity, ScrollView, Alert, StyleSheet } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { router } from "expo-router";
-import { ChevronLeft, ChevronRight } from "lucide-react-native";
-import {
-  useFonts,
-  Inter_400Regular,
-  Inter_600SemiBold,
-} from "@expo-google-fonts/inter";
-import { InstrumentSans_500Medium } from "@expo-google-fonts/instrument-sans";
-import { useTheme } from "@/utils/theme";
+import { useRouter } from "expo-router";
+import { ChevronLeft, LogOut, Shield, Info, Bell, MapPin } from "lucide-react-native";
+import { useTheme } from "../utils/theme";
+import { useAuth } from "../utils/auth/useAuth";
+import * as Haptics from "expo-haptics";
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
+  const router = useRouter();
+  const { signOut } = useAuth();
 
-  const [fontsLoaded] = useFonts({
-    Inter_400Regular,
-    Inter_600SemiBold,
-    InstrumentSans_500Medium,
-  });
-
-  if (!fontsLoaded) {
-    return null;
-  }
+  const handleSignOut = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Alert.alert(
+      "Sign Out",
+      "Are you sure you want to sign out?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Sign Out", 
+          style: "destructive",
+          onPress: async () => {
+            await signOut();
+            router.replace("/onboarding/welcome");
+          }
+        }
+      ]
+    );
+  };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <StatusBar style={isDark ? "light" : "dark"} />
+    <View style={[styles.container, { backgroundColor: '#000000' }]}>
+      <StatusBar style="light" />
 
-      <View
-        style={{
-          paddingTop: insets.top + 16,
-          paddingHorizontal: 20,
-          paddingBottom: 12,
-          flexDirection: "row",
-          alignItems: "center",
-        }}
-      >
-        <TouchableOpacity onPress={() => router.back()}>
-          <ChevronLeft size={28} color={colors.text} />
-        </TouchableOpacity>
-
-        <Text
-          style={{
-            fontFamily: "Inter_600SemiBold",
-            fontSize: 17,
-            color: colors.text,
-            marginLeft: 12,
-          }}
-        >
-          Settings
-        </Text>
+      <View style={{ paddingTop: insets.top + 10 }}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <ChevronLeft size={28} color="#FFFFFF" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>SETTINGS</Text>
+          <View style={{ width: 28 }} />
+        </View>
       </View>
 
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{
-          paddingBottom: insets.bottom + 24,
-        }}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={{ paddingTop: 24 }}>
-          <SectionHeader title="General" colors={colors} />
-
-          <SettingsItem
-            title="Home Zone"
-            subtitle="Change your default zone"
-            colors={colors}
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}>
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>PREFERENCES</Text>
+          <SettingsItem 
+            icon={<MapPin size={20} color="rgba(255,255,255,0.4)" />}
+            title="Default Zone"
             onPress={() => {}}
           />
-
-          <SettingsItem
+          <SettingsItem 
+            icon={<Bell size={20} color="rgba(255,255,255,0.4)" />}
             title="Notifications"
-            subtitle="Manage alert preferences"
-            colors={colors}
             onPress={() => {}}
           />
-
-          <SectionHeader title="About" colors={colors} />
-
-          <SettingsItem
-            title="How It Works"
-            subtitle="Learn about reactions and moderation"
-            colors={colors}
-            onPress={() => {}}
-          />
-
-          <SettingsItem
-            title="Community Guidelines"
-            subtitle="What's allowed and what's not"
-            colors={colors}
-            onPress={() => {}}
-          />
-
-          <SettingsItem
-            title="Privacy"
-            subtitle="How we handle your data"
-            colors={colors}
-            onPress={() => {}}
-          />
-
-          <View style={{ paddingHorizontal: 20, marginTop: 32 }}>
-            <Text
-              style={{
-                fontFamily: "Inter_400Regular",
-                fontSize: 13,
-                color: colors.textTertiary,
-                textAlign: "center",
-              }}
-            >
-              Redditch'd v1.0{"\n"}
-              What's happening around Redditch
-            </Text>
-          </View>
         </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>LEGAL & ABOUT</Text>
+          <SettingsItem 
+            icon={<Shield size={20} color="rgba(255,255,255,0.4)" />}
+            title="Privacy Policy"
+            onPress={() => {}}
+          />
+          <SettingsItem 
+            icon={<Info size={20} color="rgba(255,255,255,0.4)" />}
+            title="Community Guidelines"
+            onPress={() => {}}
+          />
+        </View>
+
+        <View style={styles.section}>
+          <TouchableOpacity 
+            onPress={handleSignOut}
+            style={styles.signOutButton}
+          >
+            <LogOut size={20} color="#FF453A" />
+            <Text style={styles.signOutText}>SIGN OUT</Text>
+          </TouchableOpacity>
+        </View>
+
+        <Text style={styles.versionText}>
+          REDDITCH'D v1.0.4{"\n"}
+          MADE IN REDDITCH
+        </Text>
       </ScrollView>
     </View>
   );
 }
 
-function SectionHeader({ title, colors }) {
+function SettingsItem({ icon, title, onPress }) {
   return (
-    <View
-      style={{
-        paddingHorizontal: 20,
-        paddingTop: 24,
-        paddingBottom: 8,
-      }}
-    >
-      <Text
-        style={{
-          fontFamily: "Inter_600SemiBold",
-          fontSize: 13,
-          color: colors.textSecondary,
-          textTransform: "uppercase",
-          letterSpacing: 0.5,
-        }}
-      >
-        {title}
-      </Text>
-    </View>
+    <TouchableOpacity onPress={onPress} style={styles.item}>
+      <View style={styles.itemLeft}>
+        {icon}
+        <Text style={styles.itemTitle}>{title}</Text>
+      </View>
+    </TouchableOpacity>
   );
 }
 
-function SettingsItem({ title, subtitle, colors, onPress }) {
-  return (
-    <>
-      <TouchableOpacity
-        onPress={onPress}
-        style={{
-          paddingHorizontal: 20,
-          paddingVertical: 16,
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
-        <View style={{ flex: 1 }}>
-          <Text
-            style={{
-              fontFamily: "Inter_400Regular",
-              fontSize: 17,
-              color: colors.text,
-              marginBottom: 2,
-            }}
-          >
-            {title}
-          </Text>
-
-          {subtitle && (
-            <Text
-              style={{
-                fontFamily: "Inter_400Regular",
-                fontSize: 14,
-                color: colors.textSecondary,
-              }}
-            >
-              {subtitle}
-            </Text>
-          )}
-        </View>
-
-        <ChevronRight size={20} color={colors.textTertiary} />
-      </TouchableOpacity>
-
-      <View
-        style={{
-          height: 1,
-          backgroundColor: colors.separator,
-          marginHorizontal: 20,
-        }}
-      />
-    </>
-  );
-}
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderBottomWidth: 0.5,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
+  },
+  headerTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  section: {
+    marginTop: 30,
+  },
+  sectionLabel: {
+    color: 'rgba(255,255,255,0.3)',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1,
+    paddingHorizontal: 20,
+    marginBottom: 10,
+  },
+  item: {
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+    borderBottomWidth: 0.5,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  itemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 15,
+  },
+  itemTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  signOutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 15,
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+  },
+  signOutText: {
+    color: '#FF453A',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  versionText: {
+    textAlign: 'center',
+    color: 'rgba(255,255,255,0.2)',
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 50,
+    lineHeight: 18,
+  }
+});

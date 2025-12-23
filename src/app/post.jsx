@@ -20,6 +20,7 @@ import * as Haptics from "expo-haptics";
 export default function PostScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const [title, setTitle] = useState("");
   const [text, setText] = useState("");
   const [zones, setZones] = useState([]);
   const [tags, setTags] = useState([]);
@@ -47,12 +48,13 @@ export default function PostScreen() {
   };
 
   const handlePost = async () => {
-    if (!text || !selectedZone || !selectedTag || !deviceId) return;
+    if (!title || !text || !selectedZone || !selectedTag || !deviceId) return;
     setLoading(true);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     try {
       const { error } = await supabase.from('rposts').insert({
+        title: title.trim(),
         text: text.trim(),
         zone_id: selectedZone.id,
         tag_id: selectedTag.id,
@@ -119,63 +121,77 @@ export default function PostScreen() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 20 }}>
-          {/* Quick Info Bar */}
-          <View style={{ flexDirection: 'row', gap: 10, marginBottom: 20 }}>
-            <TouchableOpacity
-              onPress={() => setStep('zone')}
-              style={{
-                backgroundColor: 'rgba(255,255,255,0.05)',
-                paddingHorizontal: 12,
-                paddingVertical: 6,
-                borderRadius: 15,
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 5
-              }}
-            >
-              <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>{selectedZone?.name || 'Select Zone'}</Text>
-              <ChevronRight size={12} color="rgba(255,255,255,0.3)" />
-            </TouchableOpacity>
+          <ScrollView contentContainerStyle={{ paddingHorizontal: 20 }}>
+            {/* Quick Info Bar */}
+            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 20 }}>
+              <TouchableOpacity
+                onPress={() => setStep('zone')}
+                style={{
+                  backgroundColor: 'rgba(255,255,255,0.05)',
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  borderRadius: 15,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 5
+                }}
+              >
+                <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>{selectedZone?.name || 'Select Zone'}</Text>
+                <ChevronRight size={12} color="rgba(255,255,255,0.3)" />
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={() => setStep('tag')}
-              style={{
-                backgroundColor: 'rgba(255,255,255,0.05)',
-                paddingHorizontal: 12,
-                paddingVertical: 6,
-                borderRadius: 15,
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 5
-              }}
-            >
-              <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>{selectedTag?.name || 'Select Tag'}</Text>
-              <ChevronRight size={12} color="rgba(255,255,255,0.3)" />
-            </TouchableOpacity>
-          </View>
+              <TouchableOpacity
+                onPress={() => setStep('tag')}
+                style={{
+                  backgroundColor: 'rgba(255,255,255,0.05)',
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  borderRadius: 15,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 5
+                }}
+              >
+                <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>{selectedTag?.name || 'Select Tag'}</Text>
+                <ChevronRight size={12} color="rgba(255,255,255,0.3)" />
+              </TouchableOpacity>
+            </View>
 
-          <TextInput
-            autoFocus
-            multiline
-            placeholder="What's happening?"
-            placeholderTextColor="rgba(255,255,255,0.2)"
-            value={text}
-            onChangeText={setText}
-            maxLength={240}
-            style={{
-              color: '#FFFFFF',
-              fontSize: 24,
-              fontWeight: '500',
-              lineHeight: 32,
-              minHeight: 200,
-              textAlignVertical: 'top',
-            }}
-          />
-          <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 12, marginTop: 10 }}>
-            {text.length} / 240
-          </Text>
-        </ScrollView>
+            <TextInput
+              autoFocus
+              placeholder="Title"
+              placeholderTextColor="rgba(255,255,255,0.2)"
+              value={title}
+              onChangeText={setTitle}
+              maxLength={100}
+              style={{
+                color: '#FFFFFF',
+                fontSize: 28,
+                fontWeight: '800',
+                marginBottom: 10,
+              }}
+            />
+
+            <TextInput
+              multiline
+              placeholder="What's happening?"
+              placeholderTextColor="rgba(255,255,255,0.2)"
+              value={text}
+              onChangeText={setText}
+              maxLength={2000}
+              style={{
+                color: '#FFFFFF',
+                fontSize: 18,
+                fontWeight: '400',
+                lineHeight: 26,
+                minHeight: 150,
+                textAlignVertical: 'top',
+              }}
+            />
+            <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 12, marginTop: 10 }}>
+              {text.length} characters
+            </Text>
+          </ScrollView>
       </View>
 
       {/* Zone Picker Overlay */}
