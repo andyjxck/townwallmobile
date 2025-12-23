@@ -21,9 +21,10 @@ import {
   Clock,
   AlertTriangle,
   ChevronDown,
-  Filter,
-  ArrowUpDown,
-} from "lucide-react-native";
+    Filter,
+    ArrowUp,
+    ArrowDown,
+  } from "lucide-react-native";
 import { getDeviceId } from "../utils/deviceId";
 import { supabase } from "../utils/supabase";
 import * as Haptics from "expo-haptics";
@@ -224,10 +225,10 @@ export default function UniversalFeed() {
           rreactions (reaction_type, device_id)
         `);
 
-      if (selectedZone) query = query.eq('zone_id', selectedZone);
-      if (selectedTag) query = query.tag_id ? query.eq('tag_id', selectedTag) : query; // safety check for tag column
+        if (selectedZone) query = query.eq('zone_id', selectedZone);
+        if (selectedTag) query = query.eq('tag_id', selectedTag);
 
-      query = query.order('created_at', { ascending: sortBy === 'oldest' });
+        query = query.order('created_at', { ascending: sortBy === 'oldest' });
 
       const { data, error } = await query;
       if (error) throw error;
@@ -278,8 +279,15 @@ export default function UniversalFeed() {
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 15 }}>
           <Text style={{ color: '#FFFFFF', fontSize: 24, fontWeight: '800', letterSpacing: -1 }}>REDDITCH'D</Text>
           <View style={{ flexDirection: 'row', gap: 15 }}>
-            <TouchableOpacity onPress={() => setSortBy(s => s === 'newest' ? 'oldest' : 'newest')}>
-              <ArrowUpDown size={20} color="rgba(255,255,255,0.6)" />
+            <TouchableOpacity onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setSortBy(s => s === 'newest' ? 'oldest' : 'newest');
+            }}>
+              {sortBy === 'newest' ? (
+                <ArrowDown size={20} color="#FFFFFF" />
+              ) : (
+                <ArrowUp size={20} color="#FFFFFF" />
+              )}
             </TouchableOpacity>
             <TouchableOpacity onPress={() => router.push("/settings")}>
               <Settings size={20} color="rgba(255,255,255,0.6)" />
