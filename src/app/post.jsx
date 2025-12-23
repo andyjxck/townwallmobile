@@ -53,13 +53,12 @@ export default function PostScreen() {
 
   const pickImage = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaType.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-      base64: true,
-    });
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaType.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
 
     if (!result.canceled) {
       setImage(result.assets[0]);
@@ -77,21 +76,16 @@ export default function PostScreen() {
           const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
           const filePath = `${fileName}`;
 
-          let uploadBody;
-          if (image.base64) {
-            // Using Buffer since it's polyfilled in index.tsx
-            uploadBody = Buffer.from(image.base64, 'base64');
-          } else {
-            const response = await fetch(image.uri);
-            uploadBody = await response.blob();
-          }
+          const formData = new FormData();
+          formData.append('file', {
+            uri: image.uri,
+            name: fileName,
+            type: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
+          });
 
           const { error: uploadError } = await supabase.storage
             .from('posts')
-            .upload(filePath, uploadBody, {
-              contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
-              upsert: false
-            });
+            .upload(filePath, formData);
 
           if (uploadError) throw uploadError;
 
