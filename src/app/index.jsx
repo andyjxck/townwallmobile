@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Redirect } from "expo-router";
 import { isOnboardingComplete } from "@/utils/onboarding";
+import UniversalFeed from "@/components/UniversalFeed";
+import Welcome from "./onboarding/welcome";
 
 export default function Index() {
   const [isComplete, setIsComplete] = useState(null);
@@ -14,8 +15,8 @@ export default function Index() {
   }
 
   if (isComplete) {
-    return <Redirect href="/(tabs)/central" />;
+    return <UniversalFeed />;
   }
 
-  return <Redirect href="/onboarding/welcome" />;
+  return <Welcome />;
 }

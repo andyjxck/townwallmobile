@@ -17,6 +17,7 @@
     "@react-navigation/bottom-tabs": "^7.2.0",
     "@react-navigation/native": "^7.0.14",
     "@shopify/react-native-skia": "2.2.12",
+    "@supabase/supabase-js": "^2.89.0",
     "@tanstack/react-query": "^5.72.2",
     "@teovilla/react-native-web-maps": "^0.9.5",
     "@uploadcare/upload-client": "6.14.3",
@@ -101,4 +102,3 @@
   },
   "private": true
 }
-
