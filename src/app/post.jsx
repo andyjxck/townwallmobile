@@ -93,20 +93,21 @@ export default function PostScreen() {
           const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
           const filePath = `${fileName}`;
 
-          const formData = new FormData();
-          formData.append('file', {
-            uri: image.uri,
-            name: fileName,
-            type: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
-          });
+          // Use Blob instead of FormData for better React Native compatibility
+          const response = await fetch(image.uri);
+          const blob = await response.blob();
 
           const { error: uploadError } = await supabase.storage
             .from('posts')
-            .upload(filePath, formData);
+            .upload(filePath, blob, {
+              contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
+              cacheControl: '3600',
+              upsert: false
+            });
 
           if (uploadError) throw uploadError;
 
-        const { data: publicUrlData } = supabase.storage
+          const { data: publicUrlData } = supabase.storage
           .from('posts')
           .getPublicUrl(filePath);
         
