@@ -45,6 +45,7 @@ import { getStoredUser } from "../utils/user";
 import { TextInput } from "react-native-gesture-handler";
 import NotificationPanel from "./NotificationPanel";
 import { fetchNotifications } from "@/utils/notifications";
+import { LinearGradient } from "expo-linear-gradient";
 
 function PostItem({ item, deviceId, onReaction, onComment }) {
   const [expanded, setExpanded] = useState(false);
@@ -596,12 +597,16 @@ export default function UniversalFeed() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: '#000000' }]}>
+    <View style={styles.container}>
+      <LinearGradient
+        colors={['#0F172A', '#000000', '#000000']}
+        style={StyleSheet.absoluteFill}
+      />
       <StatusBar style="light" />
       
         <View style={{ paddingTop: insets.top }}>
           <View style={styles.header}>
-            <Text style={[styles.logo, { color: '#FFFFFF' }]}>REDDITCH'D</Text>
+            <Text style={[styles.logo, { color: '#FFFFFF' }]}>TOWN WALL</Text>
             <View style={styles.headerActions}>
               <TouchableOpacity onPress={() => setShowMenu(!showMenu)} style={styles.iconButton}>
                 <Menu size={24} color="#FFFFFF" />
@@ -612,41 +617,15 @@ export default function UniversalFeed() {
           {/* Dropdown Menu */}
           {showMenu && (
             <View style={[styles.dropdownContainer, { top: insets.top + 55 }]}>
-              <TouchableOpacity 
-                style={styles.dropdownItem} 
-                onPress={() => { setShowMenu(false); router.push("/profile"); }}
-              >
-                <User size={18} color="#FFFFFF" />
-                <Text style={styles.dropdownText}>PROFILE</Text>
-              </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.dropdownItem} 
+                  onPress={() => { setShowMenu(false); router.push("/profile"); }}
+                >
+                  <User size={18} color="#FFFFFF" />
+                  <Text style={styles.dropdownText}>PROFILE</Text>
+                </TouchableOpacity>
 
-              <TouchableOpacity 
-                style={styles.dropdownItem} 
-                onPress={() => { 
-                  setShowMenu(false); 
-                  setShowNotifications(true);
-                  setUnreadCount(0);
-                }}
-              >
-                <View style={{ position: 'relative' }}>
-                  <Bell size={18} color="#FFFFFF" />
-                  {unreadCount > 0 && <View style={styles.dropdownBadge} />}
-                </View>
-                <Text style={styles.dropdownText}>NOTIFICATIONS</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={styles.dropdownItem} 
-                onPress={() => { 
-                  setShowMenu(false);
-                  setSortBy(s => s === 'newest' ? 'oldest' : 'newest');
-                }}
-              >
-                {sortBy === 'newest' ? <ArrowDown size={18} color="#FFFFFF" /> : <ArrowUp size={18} color="#FFFFFF" />}
-                <Text style={styles.dropdownText}>SORT: {sortBy.toUpperCase()}</Text>
-              </TouchableOpacity>
-
-              <View style={styles.dropdownDivider} />
+                <View style={styles.dropdownDivider} />
 
               <TouchableOpacity 
                 style={styles.dropdownItem} 
@@ -685,27 +664,41 @@ export default function UniversalFeed() {
           )}
 
           <View style={styles.filterSection}>
-          <FlatList
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filterList}
-            data={[{ id: null, name: 'ALL ZONES' }, ...zones]}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                onPress={() => setSelectedZone(item.id)}
-                style={styles.filterPill}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingRight: 20 }}>
+              <FlatList
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.filterList}
+                data={[{ id: null, name: 'ALL ZONES' }, ...zones]}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    onPress={() => setSelectedZone(item.id)}
+                    style={styles.filterPill}
+                  >
+                    <Text style={[
+                      styles.filterText,
+                      { color: selectedZone === item.id ? '#FFFFFF' : 'rgba(255,255,255,0.4)', 
+                        fontWeight: selectedZone === item.id ? '800' : '400' }
+                    ]}>
+                      {item.name.toUpperCase()}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                keyExtractor={item => `zone-${item.id}`}
+              />
+              
+              <TouchableOpacity 
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setSortBy(s => s === 'newest' ? 'oldest' : 'newest');
+                }}
+                style={{ marginLeft: 10 }}
               >
-                <Text style={[
-                  styles.filterText,
-                  { color: selectedZone === item.id ? '#FFFFFF' : 'rgba(255,255,255,0.4)', 
-                    fontWeight: selectedZone === item.id ? '800' : '400' }
-                ]}>
-                  {item.name.toUpperCase()}
+                <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '900', letterSpacing: 1 }}>
+                  {sortBy.toUpperCase()} ↓
                 </Text>
               </TouchableOpacity>
-            )}
-            keyExtractor={item => `zone-${item.id}`}
-          />
+            </View>
 
           <FlatList
             horizontal
@@ -817,22 +810,23 @@ export default function UniversalFeed() {
       padding: 5,
     position: 'relative',
   },
-  dropdownContainer: {
-    position: 'absolute',
-    right: 20,
-    width: 200,
-    backgroundColor: '#111111',
-    borderRadius: 16,
-    padding: 10,
-    zIndex: 1000,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    elevation: 20,
-  },
+    dropdownContainer: {
+      position: 'absolute',
+      right: 20,
+      width: 220,
+      backgroundColor: '#0F172A',
+      borderRadius: 20,
+      padding: 8,
+      zIndex: 1000,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.08)',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 20 },
+      shadowOpacity: 0.6,
+      shadowRadius: 30,
+      elevation: 20,
+    },
+
   dropdownItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -895,15 +889,18 @@ export default function UniversalFeed() {
     fontSize: 12,
     letterSpacing: 0.5,
   },
-  postContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 18,
-  },
-  postHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-  },
+    postContainer: {
+      paddingHorizontal: 20,
+      paddingVertical: 20,
+      backgroundColor: 'rgba(255,255,255,0.02)',
+      marginBottom: 1,
+    },
+    postHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: 10,
+    },
+
   zoneText: {
     fontSize: 11,
     fontWeight: '700',
@@ -930,33 +927,34 @@ export default function UniversalFeed() {
     lineHeight: 22,
     marginBottom: 16,
   },
-  postFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 12,
-    borderTopWidth: 0.5,
-    borderTopColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  footerText: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  actionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 20,
-    marginTop: 12,
-  },
-  actionButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  actionCount: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
+    postFooter: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingTop: 12,
+    },
+    footerText: {
+      fontSize: 11,
+      fontWeight: '600',
+      letterSpacing: 0.5,
+      textTransform: 'uppercase',
+    },
+    actionRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 24,
+      marginTop: 16,
+    },
+    actionButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    actionCount: {
+      fontSize: 13,
+      fontWeight: "800",
+    },
+
   blurBanner: {
     flexDirection: "row",
     alignItems: "center",

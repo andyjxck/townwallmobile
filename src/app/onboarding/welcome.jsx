@@ -1,10 +1,11 @@
 import React from "react";
-import { View, Text, TouchableOpacity } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { MapPin, ThumbsUp, Flag, Clock } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
+import { LinearGradient } from "expo-linear-gradient";
 
 export default function WelcomeScreen() {
   const insets = useSafeAreaInsets();
@@ -17,6 +18,10 @@ export default function WelcomeScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: "#000000" }}>
+      <LinearGradient
+        colors={['#0F172A', '#000000']}
+        style={StyleSheet.absoluteFill}
+      />
       <StatusBar style="light" />
 
       <View
@@ -28,21 +33,22 @@ export default function WelcomeScreen() {
             style={{
               color: "#FFFFFF",
               fontSize: 48,
-              fontWeight: "800",
-              letterSpacing: -1.5,
-              marginBottom: 12,
+              fontWeight: "900",
+              letterSpacing: -2,
+              marginBottom: 8,
             }}
           >
-            Redditch'd
+            Town Wall
           </Text>
           <Text
             style={{
-              color: "rgba(255,255,255,0.6)",
+              color: "rgba(255,255,255,0.5)",
               fontSize: 18,
+              fontWeight: "500",
               lineHeight: 26,
             }}
           >
-            What's happening around Redditch
+            What's happening in your community
           </Text>
         </View>
 
