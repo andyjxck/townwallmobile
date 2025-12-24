@@ -9,7 +9,7 @@
     "newArchEnabled": true,
       "ios": {
         "supportsTablet": true,
-        "bundleIdentifier": "com.andyjxck.townwall",
+        "bundleIdentifier": "com.andysocial.townwall",
         "infoPlist": {
           "ITSAppUsesNonExemptEncryption": false
         }
@@ -23,7 +23,7 @@
           "android.permission.RECORD_AUDIO",
           "android.permission.MODIFY_AUDIO_SETTINGS"
         ],
-        "package": "com.andyjxck.townwall"
+        "package": "com.andysocial.townwall"
       },
       "plugins": [
         [
