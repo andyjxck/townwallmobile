@@ -25,6 +25,7 @@ import {
     Eye,
     Flag,
     AlertTriangle,
+    Zap,
     X,
     ChevronLeft,
     ChevronRight,
@@ -160,6 +161,17 @@ function PostItem({ item, deviceId, onReaction, onComment, onDelete, user }) {
 
   return (
     <View style={styles.postContainer}>
+      {user?.id === item.user_id && (
+        <TouchableOpacity
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            onDelete(item.id);
+          }}
+          style={styles.deleteButton}
+        >
+          <Trash2 size={16} color="rgba(239, 68, 68, 0.4)" />
+        </TouchableOpacity>
+      )}
       {shouldBlur && !revealed ? (
         <TouchableOpacity
           onPress={() => {
@@ -171,7 +183,7 @@ function PostItem({ item, deviceId, onReaction, onComment, onDelete, user }) {
         >
           <AlertTriangle size={16} color="#EF4444" />
           <Text style={styles.blurText}>
-            Potentially misleading content. Tap to reveal.
+            Reported as misleading by the community. Tap to reveal.
           </Text>
         </TouchableOpacity>
       ) : (
@@ -257,21 +269,8 @@ function PostItem({ item, deviceId, onReaction, onComment, onDelete, user }) {
                       </View>
                     )}
                   </TouchableOpacity>
-                )}
-
-                {user?.id === item.user_id && (
-                  <TouchableOpacity
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                      onDelete(item.id);
-                    }}
-                    style={{ padding: 4 }}
-                  >
-                    <Trash2 size={16} color="rgba(239, 68, 68, 0.5)" />
-                  </TouchableOpacity>
-                )}
+                </View>
               </View>
-            </View>
 
           {expanded && (
             <View style={styles.expandedContent}>
@@ -433,33 +432,33 @@ function PostItem({ item, deviceId, onReaction, onComment, onDelete, user }) {
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={() => onReaction(item.id, "seen", userReactions.seen)}
-          style={styles.actionButton}
-        >
-          <Eye
-            size={18}
-            color={userReactions.seen ? "#60A5FA" : "rgba(255,255,255,0.4)"}
-            fill={userReactions.seen ? "#60A5FA" : "transparent"}
-          />
-          <Text style={[styles.actionCount, { color: userReactions.seen ? "#60A5FA" : "rgba(255,255,255,0.4)" }]}>
-            {seenCount || 0}
-          </Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => onReaction(item.id, "seen", userReactions.seen)}
+            style={styles.actionButton}
+          >
+            <Zap
+              size={18}
+              color={userReactions.seen ? "#F59E0B" : "rgba(255,255,255,0.4)"}
+              fill={userReactions.seen ? "#F59E0B" : "transparent"}
+            />
+            <Text style={[styles.actionCount, { color: userReactions.seen ? "#F59E0B" : "rgba(255,255,255,0.4)" }]}>
+              {seenCount || 0}
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={() => onReaction(item.id, "fake", userReactions.fake)}
-          style={styles.actionButton}
-        >
-          <Flag
-            size={18}
-            color={userReactions.fake ? "#EF4444" : "rgba(255,255,255,0.4)"}
-            fill={userReactions.fake ? "#EF4444" : "transparent"}
-          />
-          <Text style={[styles.actionCount, { color: userReactions.fake ? "#EF4444" : "rgba(255,255,255,0.4)" }]}>
-            {fakeCount || 0}
-          </Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => onReaction(item.id, "fake", userReactions.fake)}
+            style={styles.actionButton}
+          >
+            <AlertTriangle
+              size={18}
+              color={userReactions.fake ? "#EF4444" : "rgba(255,255,255,0.4)"}
+              fill={userReactions.fake ? "#EF4444" : "transparent"}
+            />
+            <Text style={[styles.actionCount, { color: userReactions.fake ? "#EF4444" : "rgba(255,255,255,0.4)" }]}>
+              {fakeCount || 0}
+            </Text>
+          </TouchableOpacity>
       </View>
     </View>
   );
@@ -965,6 +964,14 @@ export default function UniversalFeed() {
       paddingVertical: 20,
       backgroundColor: 'rgba(255,255,255,0.02)',
       marginBottom: 1,
+      position: 'relative',
+    },
+    deleteButton: {
+      position: 'absolute',
+      top: 12,
+      right: 12,
+      zIndex: 10,
+      padding: 8,
     },
     postHeader: {
       flexDirection: "row",
