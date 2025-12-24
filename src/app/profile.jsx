@@ -350,7 +350,7 @@ export default function Profile() {
                   onPress={() => handleSelectEmoji(emoji)}
                   style={styles.emojiButton}
                 >
-                  <Text style={styles.emojiText}>{emoji}</Text>
+                  <Text style={emojiText}>{emoji}</Text>
                 </TouchableOpacity>
               ))}
             </View>

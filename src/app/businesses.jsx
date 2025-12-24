@@ -11,7 +11,6 @@ import * as ImagePicker from 'expo-image-picker';
 import { decode } from 'base64-arraybuffer';
 
 import { LinearGradient } from 'expo-linear-gradient';
-import { supabase } from '@/utils/supabase';
 
 export default function LocalBusinesses() {
   const insets = useSafeAreaInsets();
