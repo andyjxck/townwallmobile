@@ -601,55 +601,90 @@ export default function UniversalFeed() {
       
         <View style={{ paddingTop: insets.top }}>
           <View style={styles.header}>
-            <TouchableOpacity onPress={() => setShowMenu(true)} style={styles.iconButton}>
-              <Menu size={24} color="#FFFFFF" />
-            </TouchableOpacity>
             <Text style={[styles.logo, { color: '#FFFFFF' }]}>REDDITCH'D</Text>
-              <View style={styles.headerActions}>
+            <View style={styles.headerActions}>
+              <TouchableOpacity onPress={() => setShowMenu(!showMenu)} style={styles.iconButton}>
+                <Menu size={24} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Dropdown Menu */}
+          {showMenu && (
+            <View style={[styles.dropdownContainer, { top: insets.top + 55 }]}>
               <TouchableOpacity 
-                style={styles.iconButton}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                style={styles.dropdownItem} 
+                onPress={() => { setShowMenu(false); router.push("/profile"); }}
+              >
+                <User size={18} color="#FFFFFF" />
+                <Text style={styles.dropdownText}>PROFILE</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.dropdownItem} 
+                onPress={() => { 
+                  setShowMenu(false); 
                   setShowNotifications(true);
-                  setUnreadCount(0); // Optimistically clear
+                  setUnreadCount(0);
                 }}
               >
-                <Bell size={22} color="#FFFFFF" />
-                {unreadCount > 0 && (
-                  <View style={styles.badge}>
-                    <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
-                  </View>
-                )}
+                <View style={{ position: 'relative' }}>
+                  <Bell size={18} color="#FFFFFF" />
+                  {unreadCount > 0 && <View style={styles.dropdownBadge} />}
+                </View>
+                <Text style={styles.dropdownText}>NOTIFICATIONS</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.iconButton}
-                onPress={() => router.push("/profile")}
-              >
-                <User size={22} color="#FFFFFF" />
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.iconButton}
-                onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setSortBy(s => s === 'newest' ? 'oldest' : 'newest');
-              }}
-            >
-              {sortBy === 'newest' ? (
-                <ArrowDown size={20} color="#FFFFFF" />
-              ) : (
-                <ArrowUp size={20} color="#FFFFFF" />
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.iconButton}
-              onPress={() => router.push("/settings")}
-            >
-              <Settings size={20} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
-        </View>
 
-        <View style={styles.filterSection}>
+              <TouchableOpacity 
+                style={styles.dropdownItem} 
+                onPress={() => { 
+                  setShowMenu(false);
+                  setSortBy(s => s === 'newest' ? 'oldest' : 'newest');
+                }}
+              >
+                {sortBy === 'newest' ? <ArrowDown size={18} color="#FFFFFF" /> : <ArrowUp size={18} color="#FFFFFF" />}
+                <Text style={styles.dropdownText}>SORT: {sortBy.toUpperCase()}</Text>
+              </TouchableOpacity>
+
+              <View style={styles.dropdownDivider} />
+
+              <TouchableOpacity 
+                style={styles.dropdownItem} 
+                onPress={() => { setShowMenu(false); router.push("/talent"); }}
+              >
+                <Music size={18} color="#A855F7" />
+                <Text style={styles.dropdownText}>LOCAL TALENT</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.dropdownItem} 
+                onPress={() => { setShowMenu(false); router.push("/businesses"); }}
+              >
+                <Briefcase size={18} color="#3B82F6" />
+                <Text style={styles.dropdownText}>BUSINESSES</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.dropdownItem} 
+                onPress={() => { setShowMenu(false); router.push("/help"); }}
+              >
+                <HelpCircle size={18} color="#10B981" />
+                <Text style={styles.dropdownText}>HELP / CONTACT</Text>
+              </TouchableOpacity>
+
+              {isAdmin && (
+                <TouchableOpacity 
+                  style={styles.dropdownItem} 
+                  onPress={() => { setShowMenu(false); router.push("/admin"); }}
+                >
+                  <Shield size={18} color="#EF4444" />
+                  <Text style={styles.dropdownText}>MODERATION</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
+          <View style={styles.filterSection}>
           <FlatList
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -747,98 +782,18 @@ export default function UniversalFeed() {
         <Plus size={32} color="#000000" strokeWidth={3} />
       </TouchableOpacity>
 
-      <NotificationPanel 
-        visible={showNotifications} 
-        onClose={() => {
-          setShowNotifications(false);
-          loadUnreadCount();
-        }} 
-      />
+        <NotificationPanel 
+          visible={showNotifications} 
+          onClose={() => {
+            setShowNotifications(false);
+            loadUnreadCount();
+          }} 
+        />
+      </View>
+    );
+  }
 
-      {/* Services Menu Modal */}
-      <Modal
-        visible={showMenu}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowMenu(false)}
-      >
-        <View style={styles.menuOverlay}>
-          <View style={[styles.menuContent, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 20 }]}>
-            <View style={styles.menuHeader}>
-              <Text style={styles.menuTitle}>SERVICES</Text>
-              <TouchableOpacity onPress={() => setShowMenu(false)} style={styles.menuCloseButton}>
-                <X size={28} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.menuGrid}>
-              <TouchableOpacity 
-                style={styles.menuItem} 
-                onPress={() => { setShowMenu(false); router.push("/talent"); }}
-              >
-                <View style={[styles.menuIconContainer, { backgroundColor: 'rgba(168, 85, 247, 0.1)' }]}>
-                  <Music size={24} color="#A855F7" />
-                </View>
-                <Text style={styles.menuItemLabel}>Local Talent</Text>
-                <Text style={styles.menuItemPrice}>£0.99</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={styles.menuItem} 
-                onPress={() => { setShowMenu(false); router.push("/businesses"); }}
-              >
-                <View style={[styles.menuIconContainer, { backgroundColor: 'rgba(59, 130, 246, 0.1)' }]}>
-                  <Briefcase size={24} color="#3B82F6" />
-                </View>
-                <Text style={styles.menuItemLabel}>Businesses</Text>
-                <Text style={styles.menuItemPrice}>£3.99</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={styles.menuItem} 
-                onPress={() => { setShowMenu(false); router.push("/councillor"); }}
-              >
-                <View style={[styles.menuIconContainer, { backgroundColor: 'rgba(245, 158, 11, 0.1)' }]}>
-                  <MessageCircle size={24} color="#F59E0B" />
-                </View>
-                <Text style={styles.menuItemLabel}>Councillor</Text>
-                <Text style={styles.menuItemStatus}>SOON</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={styles.menuItem} 
-                onPress={() => { setShowMenu(false); router.push("/help"); }}
-              >
-                <View style={[styles.menuIconContainer, { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
-                  <HelpCircle size={24} color="#10B981" />
-                </View>
-                <Text style={styles.menuItemLabel}>Help / Contact</Text>
-              </TouchableOpacity>
-
-              {isAdmin && (
-                <TouchableOpacity 
-                  style={styles.menuItem} 
-                  onPress={() => { setShowMenu(false); router.push("/admin"); }}
-                >
-                  <View style={[styles.menuIconContainer, { backgroundColor: 'rgba(239, 68, 68, 0.1)' }]}>
-                    <Shield size={24} color="#EF4444" />
-                  </View>
-                  <Text style={styles.menuItemLabel}>Moderation</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-
-            <View style={styles.menuFooter}>
-              <Text style={styles.menuFooterText}>REDDITCH'D v1.0.0</Text>
-            </View>
-          </View>
-        </View>
-      </Modal>
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
+  const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -860,9 +815,54 @@ const styles = StyleSheet.create({
   },
     iconButton: {
       padding: 5,
-      position: 'relative',
-    },
-    badge: {
+    position: 'relative',
+  },
+  dropdownContainer: {
+    position: 'absolute',
+    right: 20,
+    width: 200,
+    backgroundColor: '#111111',
+    borderRadius: 16,
+    padding: 10,
+    zIndex: 1000,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 20,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    gap: 12,
+  },
+  dropdownText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  dropdownBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#EF4444',
+    borderWidth: 1,
+    borderColor: '#111111',
+  },
+  dropdownDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    marginVertical: 8,
+  },
+  badge: {
       position: 'absolute',
       top: 0,
       right: 0,

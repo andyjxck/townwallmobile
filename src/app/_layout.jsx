@@ -57,14 +57,13 @@ export default function RootLayout() {
             <Stack.Screen
               name="post"
               options={{
-                presentation: "modal",
-                animation: "slide_from_bottom",
-              }}
-            />
-            <Stack.Screen name="settings" />
-          </Stack>
-        </SafeAreaProvider>
-      </GestureHandlerRootView>
-    </QueryClientProvider>
-  );
-}
+                  presentation: "modal",
+                  animation: "slide_from_bottom",
+                }}
+              />
+            </Stack>
+          </SafeAreaProvider>
+        </GestureHandlerRootView>
+      </QueryClientProvider>
+    );
+  }

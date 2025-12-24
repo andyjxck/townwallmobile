@@ -48,40 +48,33 @@ export default function HelpContact() {
       .on('postgres_changes', 
         { 
           event: 'INSERT', 
-          table: 'rhelp_messages',
-          filter: `sender_id=eq.${currentUser.id}`
+          table: 'rhelp_messages'
         }, 
         payload => {
-          setMessages(prev => {
-            if (prev.find(m => m.id === payload.new.id)) return prev;
-            return [...prev, payload.new];
-          });
-        }
-      )
-      .on('postgres_changes', 
-        { 
-          event: 'INSERT', 
-          table: 'rhelp_messages',
-          filter: `receiver_id=eq.${currentUser.id}`
-        }, 
-        payload => {
-          setMessages(prev => {
-            if (prev.find(m => m.id === payload.new.id)) return prev;
-            if (payload.new.status === 'resolved' || payload.new.content.includes("Please rate 1-5")) {
-              setShowRating(true);
-            }
-            return [...prev, payload.new];
-          });
+          const newMsg = payload.new;
+          // Filter in JS to ensure privacy and fix "showing up in every chat" issue
+          if (newMsg.sender_id === currentUser.id || newMsg.receiver_id === currentUser.id) {
+            setMessages(prev => {
+              if (prev.find(m => m.id === newMsg.id)) return prev;
+              
+              if (newMsg.receiver_id === currentUser.id) {
+                if (newMsg.status === 'resolved' || newMsg.content.includes("Please rate 1-5")) {
+                  setShowRating(true);
+                }
+              }
+              return [...prev, newMsg];
+            });
+          }
         }
       )
       .on('postgres_changes',
         {
           event: 'UPDATE',
-          table: 'rhelp_messages',
-          filter: `receiver_id=eq.${currentUser.id}`
+          table: 'rhelp_messages'
         },
         payload => {
-          if (payload.new.status === 'resolved') {
+          const newMsg = payload.new;
+          if (newMsg.receiver_id === currentUser.id && newMsg.status === 'resolved') {
             setShowRating(true);
             initChat();
           }
@@ -219,86 +212,81 @@ export default function HelpContact() {
         keyExtractor={(item) => item.id.toString()}
         contentContainerStyle={styles.chatContent}
         onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-          renderItem={({ item }) => {
-            const isMine = !item.is_from_admin;
-            const isResolved = item.status === 'resolved';
-            return (
-              <View style={[
-                styles.messageBubble, 
-                isMine ? styles.myMessage : styles.theirMessage,
-                isResolved && { borderLeftWidth: 4, borderLeftColor: '#10B981' }
-              ]}>
-                {!isMine && <Text style={styles.adminLabel}>ADMIN SUPPORT</Text>}
-                <Text style={[styles.messageText, { color: isMine ? '#000000' : '#FFFFFF' }]}>
-                  {item.content}
-                </Text>
-                <Text style={[styles.messageTime, { color: isMine ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.4)' }]}>
-                  {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </Text>
+        renderItem={({ item }) => {
+          const isMine = !item.is_from_admin;
+          const isResolved = item.status === 'resolved';
+          return (
+            <View style={[
+              styles.messageBubble, 
+              isMine ? styles.myMessage : styles.theirMessage,
+              isResolved && { borderLeftWidth: 4, borderLeftColor: '#10B981' }
+            ]}>
+              {!isMine && <Text style={styles.adminLabel}>ADMIN SUPPORT</Text>}
+              <Text style={[styles.messageText, { color: isMine ? '#000000' : '#FFFFFF' }]}>
+                {item.content}
+              </Text>
+              <Text style={[styles.messageTime, { color: isMine ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.4)' }]}>
+                {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </Text>
+            </View>
+          );
+        }}
+        ListFooterComponent={
+          showRating ? (
+            <View style={styles.inChatRatingContainer}>
+              <View style={styles.ratingCard}>
+                <Text style={styles.ratingTitle}>HOW WAS OUR SUPPORT?</Text>
+                <Text style={styles.ratingSubtitle}>Please rate your experience 1-5</Text>
+                
+                <View style={styles.starsContainer}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <TouchableOpacity 
+                      key={star} 
+                      onPress={() => {
+                        setRating(star);
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                      }}
+                      style={styles.starButton}
+                    >
+                      <Text style={[styles.starText, rating >= star && styles.starActive]}>
+                        {rating >= star ? '★' : '☆'}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <TextInput
+                  style={styles.ratingInput}
+                  placeholder="Leave a comment (optional)..."
+                  placeholderTextColor="rgba(255,255,255,0.3)"
+                  value={comment}
+                  onChangeText={setComment}
+                  multiline
+                />
+
+                <View style={styles.ratingButtons}>
+                  <TouchableOpacity 
+                    style={[styles.submitButton, rating === 0 && { opacity: 0.5 }]} 
+                    onPress={submitReview}
+                    disabled={rating === 0 || isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <ActivityIndicator size="small" color="#000000" />
+                    ) : (
+                      <Text style={styles.submitButtonText}>SUBMIT REVIEW</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
               </View>
-            );
-          }}
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>Send a message to start a conversation with our team.</Text>
           </View>
         }
       />
-
-      {showRating && (
-        <View style={styles.ratingOverlay}>
-          <View style={styles.ratingCard}>
-            <Text style={styles.ratingTitle}>HOW WAS OUR SUPPORT?</Text>
-            <Text style={styles.ratingSubtitle}>Please rate your experience 1-5</Text>
-            
-            <View style={styles.starsContainer}>
-              {[1, 2, 3, 4, 5].map((star) => (
-                <TouchableOpacity 
-                  key={star} 
-                  onPress={() => {
-                    setRating(star);
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  }}
-                  style={styles.starButton}
-                >
-                  <Text style={[styles.starText, rating >= star && styles.starActive]}>
-                    {rating >= star ? '★' : '☆'}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <TextInput
-              style={styles.ratingInput}
-              placeholder="Leave a comment (optional)..."
-              placeholderTextColor="rgba(255,255,255,0.3)"
-              value={comment}
-              onChangeText={setComment}
-              multiline
-            />
-
-            <View style={styles.ratingButtons}>
-              <TouchableOpacity 
-                style={styles.cancelButton} 
-                onPress={() => setShowRating(false)}
-              >
-                <Text style={styles.cancelButtonText}>NOT NOW</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.submitButton, rating === 0 && { opacity: 0.5 }]} 
-                onPress={submitReview}
-                disabled={rating === 0 || isSubmitting}
-              >
-                {isSubmitting ? (
-                  <ActivityIndicator size="small" color="#000000" />
-                ) : (
-                  <Text style={styles.submitButtonText}>SUBMIT</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      )}
 
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
@@ -399,13 +387,10 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginBottom: 4,
   },
-  ratingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 100,
+  inChatRatingContainer: {
     padding: 20,
+    marginTop: 10,
+    marginBottom: 20,
   },
   ratingCard: {
     backgroundColor: '#111111',
