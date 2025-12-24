@@ -150,61 +150,33 @@ export default function LocalTalent() {
   };
 
   const renderTalentCard = ({ item }) => {
-    const getCategoryColor = (cat) => {
-      switch (cat) {
-        case 'Musician': return ['#4F46E5', '#000000'];
-        case 'YouTuber': return ['#EF4444', '#000000'];
-        case 'Artist': return ['#EC4899', '#000000'];
-        case 'Developer': return ['#10B981', '#000000'];
-        default: return ['#262626', '#000000'];
-      }
-    };
-
     return (
-      <View style={styles.flushListing}>
-        <LinearGradient
-          colors={getCategoryColor(item.category)}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.flushGradient}
-        >
-          <View style={styles.flushContent}>
-            <View style={styles.topRow}>
-              <View style={styles.talentInfoMain}>
-                <View style={styles.badgeRow}>
-                  <Text style={styles.categoryLabel}>{item.category?.toUpperCase() || 'TALENT'}</Text>
-                  <View style={styles.dotSeparator} />
-                  <Text style={styles.featuredBadge}>FEATURED</Text>
-                </View>
-                <Text style={styles.flushName}>{item.name}</Text>
-              </View>
-              
-              <View style={styles.avatarWrapper}>
-                <Image 
-                  source={{ uri: `https://avatar.vercel.sh/${item.name}.png` }} 
-                  style={styles.flushAvatar} 
-                />
-              </View>
-            </View>
-
-            <View style={styles.titleSection}>
-              <Text style={styles.flushTitle}>{item.title}</Text>
-              {item.description ? (
-                <Text style={styles.flushDescription}>{item.description}</Text>
-              ) : null}
-            </View>
-
-            <TouchableOpacity 
-              activeOpacity={0.7}
-              style={styles.flushAction}
-              onPress={() => handleOpenLink(item.link)}
-            >
-              <Text style={styles.flushActionText}>VIEW WORK</Text>
-              <ExternalLink size={18} color="#FFFFFF" strokeWidth={2.5} />
-            </TouchableOpacity>
+      <TouchableOpacity 
+        activeOpacity={0.7}
+        onPress={() => handleOpenLink(item.link)}
+        style={styles.talentItem}
+      >
+        <View style={styles.talentRow}>
+          <View style={styles.talentMain}>
+            <Text style={styles.categoryText}>{item.category?.toUpperCase() || 'TALENT'}</Text>
+            <Text style={styles.talentNameText}>{item.name}</Text>
+            <Text style={styles.talentTitleText}>{item.title}</Text>
+            {item.description ? (
+              <Text style={styles.talentDescText} numberOfLines={2}>{item.description}</Text>
+            ) : null}
           </View>
-        </LinearGradient>
-      </View>
+          
+          <View style={styles.talentSide}>
+            <Image 
+              source={{ uri: `https://avatar.vercel.sh/${item.name}.png` }} 
+              style={styles.minimalAvatar} 
+            />
+            <View style={styles.linkCircle}>
+              <ExternalLink size={14} color="#000000" strokeWidth={3} />
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
     );
   };
 
@@ -212,10 +184,10 @@ export default function LocalTalent() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <ChevronLeft color="#FFFFFF" size={28} />
+          <ChevronLeft color="#FFFFFF" size={24} strokeWidth={2} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>LOCAL TALENT</Text>
-        <View style={{ width: 28 }} />
+        <View style={{ width: 24 }} />
       </View>
 
       {loading ? (
@@ -390,116 +362,82 @@ const styles = StyleSheet.create({
   listContent: {
     paddingBottom: 120,
   },
-  flushListing: {
-    width: '100%',
+  talentItem: {
+    paddingHorizontal: 20,
+    paddingVertical: 32,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
+    borderBottomColor: 'rgba(255,255,255,0.08)',
   },
-  flushGradient: {
-    width: '100%',
-    minHeight: 380,
-  },
-  flushContent: {
-    flex: 1,
-    padding: 30,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'space-between',
-  },
-  topRow: {
+  talentRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
-  talentInfoMain: {
+  talentMain: {
     flex: 1,
-    marginRight: 20,
+    paddingRight: 20,
   },
-  badgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  categoryText: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 2,
     marginBottom: 8,
   },
-  categoryLabel: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 2,
-  },
-  dotSeparator: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    marginHorizontal: 8,
-  },
-  featuredBadge: {
-    color: '#FBBF24',
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 2,
-  },
-  flushName: {
-    color: '#FFFFFF',
-    fontSize: 24,
-    fontWeight: '900',
-    letterSpacing: -0.5,
-  },
-  avatarWrapper: {
-    padding: 2,
-    borderRadius: 35,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
-  flushAvatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-  },
-  titleSection: {
-    marginVertical: 30,
-  },
-  flushTitle: {
-    color: '#FFFFFF',
-    fontSize: 42,
-    fontWeight: '900',
-    lineHeight: 46,
-    letterSpacing: -2,
-  },
-  flushDescription: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 17,
-    lineHeight: 24,
-    marginTop: 15,
-    fontWeight: '400',
-  },
-  flushAction: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.1)',
-    paddingTop: 20,
-  },
-  flushActionText: {
+  talentNameText: {
     color: '#FFFFFF',
     fontSize: 14,
-    fontWeight: '900',
-    letterSpacing: 3,
+    fontWeight: '400',
+    letterSpacing: 1,
+    marginBottom: 4,
+    opacity: 0.7,
+  },
+  talentTitleText: {
+    color: '#FFFFFF',
+    fontSize: 26,
+    fontWeight: '300',
+    lineHeight: 32,
+    letterSpacing: -0.5,
+  },
+  talentDescText: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 15,
+    lineHeight: 22,
+    marginTop: 12,
+    fontWeight: '400',
+  },
+  talentSide: {
+    alignItems: 'center',
+    gap: 12,
+  },
+  minimalAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  linkCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   fab: {
     position: 'absolute',
     right: 20,
     backgroundColor: '#FFFFFF',
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 5,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.5,
+    shadowRadius: 15,
+    elevation: 10,
   },
   emptyState: {
     alignItems: 'center',
@@ -520,116 +458,116 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
   },
-  modalContent: {
-    backgroundColor: '#121212',
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    padding: 24,
-    maxHeight: '90%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  modalTitle: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '900',
-  },
-  closeText: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  priceTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 24,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.2)',
-  },
-  priceText: {
-    color: '#10B981',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  label: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 1,
-    marginBottom: 8,
-    marginTop: 4,
-  },
-  input: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 15,
-    padding: 16,
-    color: '#FFFFFF',
-    fontSize: 16,
-    marginBottom: 16,
-  },
-  textArea: {
-    height: 100,
-    textAlignVertical: 'top',
-  },
-  platformRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 16,
-    flexWrap: 'wrap',
-  },
-  platformButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    gap: 6,
-    minWidth: '30%',
-  },
-  miniButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  activeMiniButton: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#FFFFFF',
-  },
-  activePlatform: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#FFFFFF',
-  },
-  platformText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  miniButtonText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  submitButton: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 15,
-    padding: 20,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  submitButtonText: {
-    color: '#000000',
-    fontSize: 16,
-    fontWeight: '900',
-  },
+    modalContent: {
+      backgroundColor: '#000000',
+      borderTopLeftRadius: 40,
+      borderTopRightRadius: 40,
+      padding: 30,
+      maxHeight: '92%',
+      borderTopWidth: 1,
+      borderTopColor: 'rgba(255,255,255,0.1)',
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 32,
+    },
+    modalTitle: {
+      color: '#FFFFFF',
+      fontSize: 24,
+      fontWeight: '300',
+      letterSpacing: -0.5,
+    },
+    closeText: {
+      color: 'rgba(255,255,255,0.4)',
+      fontSize: 14,
+      fontWeight: '500',
+    },
+    priceTag: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(255, 255, 255, 0.03)',
+      padding: 16,
+      borderRadius: 16,
+      marginBottom: 32,
+      gap: 10,
+    },
+    priceText: {
+      color: 'rgba(255, 255, 255, 0.6)',
+      fontSize: 13,
+      fontWeight: '400',
+    },
+    label: {
+      color: 'rgba(255,255,255,0.3)',
+      fontSize: 10,
+      fontWeight: '800',
+      letterSpacing: 2,
+      marginBottom: 12,
+      marginTop: 20,
+    },
+    input: {
+      borderBottomWidth: 1,
+      borderBottomColor: 'rgba(255,255,255,0.1)',
+      paddingVertical: 12,
+      color: '#FFFFFF',
+      fontSize: 17,
+      marginBottom: 10,
+    },
+    textArea: {
+      minHeight: 80,
+      textAlignVertical: 'top',
+    },
+    platformRow: {
+      flexDirection: 'row',
+      gap: 10,
+      marginBottom: 10,
+      flexWrap: 'wrap',
+    },
+    platformButton: {
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderRadius: 100,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.1)',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    miniButton: {
+      paddingHorizontal: 18,
+      paddingVertical: 12,
+      borderRadius: 100,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.1)',
+    },
+    activeMiniButton: {
+      backgroundColor: '#FFFFFF',
+      borderColor: '#FFFFFF',
+    },
+    activePlatform: {
+      backgroundColor: '#FFFFFF',
+      borderColor: '#FFFFFF',
+    },
+    platformText: {
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    miniButtonText: {
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    submitButton: {
+      backgroundColor: '#FFFFFF',
+      borderRadius: 100,
+      padding: 20,
+      alignItems: 'center',
+      marginTop: 40,
+    },
+    submitButtonText: {
+      color: '#000000',
+      fontSize: 15,
+      fontWeight: '700',
+      letterSpacing: 1,
+    },
 });
