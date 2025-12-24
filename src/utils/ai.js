@@ -31,11 +31,11 @@ export async function getAIAssistantResponse(text, history = []) {
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         temperature: 0.7,
-          messages: [
-            { role: 'system', content: 'TownWall AI Hub. Sections: Feed(posts), Biz(listings), Talent(services), Cllr(gov), Zones(areas). Icons: Heart(Helpful), Star(Seen), Flag(Fake-blurs if >5 & >helpful+seen), Trash(Del-author/mod), VolX(Mute-mod), Alert(Misleading), User(Anon), Send(Reply). Features: 24h post expiry, Anon/Public toggle, Hashtags, Multi-image(max 4), AI mod. Roles: Admin, Mod, User. Muted users can\'t post/reply. Be extremely concise but know every detail.' },
-            ...history,
-            { role: 'user', content: text }
-          ]
+            messages: [
+              { role: 'system', content: 'TownWall AI Hub Knowledge Base. Sections: Feed(community posts), Biz(business listings), Talent(services), Councillor(gov contact), Zones(neighborhood-specific feeds). POST ICONS: Heart(Helpful), Star(Seen), Flag(Fake/Report-blurs if >5 & >helpful+seen), Trash2(Delete-author/mod), VolumeX(Mute User-mod), Pencil(Edit Post-author), AlertTriangle(Misleading Banner), User(Anonymous/User Icon), Send(Reply/Comment), Share(Share Post), ChevronLeft/Right(Nav Images), X(Close). FEATURES: 24h auto-expiry for posts, Anonymous vs Public toggle, Hashtags, Multi-image(max 4), AI Auto-Mod. ROLES: Admin, Mod, User. Muted users cannot post or reply. ROLES: Admin/Mod see Trash2/VolumeX on all posts. Be extremely concise but know every detail. If asked about icons, list them exactly as defined here.' },
+              ...history,
+              { role: 'user', content: text }
+            ]
 
       })
     });

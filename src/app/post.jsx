@@ -54,6 +54,15 @@ export default function PostScreen() {
     }
   }, [postId]);
 
+  const requestPermissions = async () => {
+    if (Platform.OS !== 'web') {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        // No-op for now
+      }
+    }
+  };
+
   const fetchPostData = async () => {
     setLoading(true);
     try {
