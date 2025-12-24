@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert, ActivityIndicator, ScrollView, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
 import { 
   ChevronLeft, 
@@ -11,7 +11,10 @@ import {
   Briefcase, 
   MessageSquare, 
   Bot, 
-  Flag 
+  Flag,
+  Send,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/utils/supabase';
@@ -33,6 +36,10 @@ export default function ModerationAdmin() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [activeTab, setActiveTab] = useState('talent');
   const [data, setData] = useState([]);
+  const [expandedChatId, setExpandedChatId] = useState(null);
+  const [transcripts, setTranscripts] = useState({});
+  const [replyText, setReplyText] = useState('');
+  const [replyingTo, setReplyingTo] = useState(null);
 
   useEffect(() => {
     checkAdminStatus();
@@ -92,9 +99,20 @@ export default function ModerationAdmin() {
         const { data: help, error } = await supabase
           .from('rhelp_messages')
           .select(`*, rusers!rhelp_messages_sender_id_fkey(username)`)
+          .eq('is_from_admin', false)
           .order('created_at', { ascending: false });
         if (error) throw error;
-        result = help;
+        
+        // Group by user to show "chats"
+        const uniqueChats = [];
+        const seenUsers = new Set();
+        help.forEach(msg => {
+          if (!seenUsers.has(msg.sender_id)) {
+            uniqueChats.push(msg);
+            seenUsers.add(msg.sender_id);
+          }
+        });
+        result = uniqueChats;
       } else if (activeTab === 'ai') {
         const { data: ai, error } = await supabase
           .from('rposts')
@@ -118,6 +136,47 @@ export default function ModerationAdmin() {
       Alert.alert("Error", "Failed to fetch moderation data.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchTranscript = async (userId) => {
+    try {
+      const { data: messages, error } = await supabase
+        .from('rhelp_messages')
+        .select(`*, rusers!rhelp_messages_sender_id_fkey(username)`)
+        .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+        .order('created_at', { ascending: true });
+      
+      if (error) throw error;
+      setTranscripts(prev => ({ ...prev, [userId]: messages }));
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Error", "Failed to fetch transcript.");
+    }
+  };
+
+  const handleSendReply = async (userId) => {
+    if (!replyText.trim()) return;
+    
+    try {
+      const admin = await getStoredUser();
+      const { error } = await supabase
+        .from('rhelp_messages')
+        .insert({
+          sender_id: admin.id,
+          receiver_id: userId,
+          content: replyText,
+          is_from_admin: true
+        });
+
+      if (error) throw error;
+      
+      setReplyText('');
+      fetchTranscript(userId);
+      Alert.alert("Success", "Reply sent.");
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Error", "Failed to send reply.");
     }
   };
 
@@ -197,7 +256,64 @@ export default function ModerationAdmin() {
         )}
 
         {activeTab === 'help' && (
-          <Text style={styles.messageContent}>{item.content}</Text>
+          <View>
+            <Text style={styles.messageContent}>{item.content}</Text>
+            
+            <View style={styles.helpActions}>
+              <TouchableOpacity 
+                style={styles.transcriptButton}
+                onPress={() => {
+                  if (expandedChatId === item.sender_id) {
+                    setExpandedChatId(null);
+                  } else {
+                    setExpandedChatId(item.sender_id);
+                    fetchTranscript(item.sender_id);
+                  }
+                }}
+              >
+                <Text style={styles.transcriptButtonText}>
+                  {expandedChatId === item.sender_id ? 'HIDE TRANSCRIPT' : 'SHOW TRANSCRIPT'}
+                </Text>
+                {expandedChatId === item.sender_id ? <ChevronUp size={16} color="#FBBF24" /> : <ChevronDown size={16} color="#FBBF24" />}
+              </TouchableOpacity>
+            </View>
+
+            {expandedChatId === item.sender_id && (
+              <View style={styles.transcriptContainer}>
+                {transcripts[item.sender_id]?.map((msg) => (
+                  <View key={msg.id} style={[
+                    styles.transcriptMessage,
+                    msg.is_from_admin ? styles.adminMessage : styles.userMessage
+                  ]}>
+                    <Text style={styles.transcriptSender}>
+                      {msg.is_from_admin ? 'Admin' : `@${msg.rusers?.username}`}
+                    </Text>
+                    <Text style={styles.transcriptText}>{msg.content}</Text>
+                    <Text style={styles.transcriptTime}>
+                      {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                  </View>
+                ))}
+                
+                <View style={styles.replyBox}>
+                  <TextInput
+                    style={styles.replyInput}
+                    placeholder="Type a reply..."
+                    placeholderTextColor="rgba(255,255,255,0.3)"
+                    value={replyText}
+                    onChangeText={setReplyText}
+                    multiline
+                  />
+                  <TouchableOpacity 
+                    style={styles.sendButton}
+                    onPress={() => handleSendReply(item.sender_id)}
+                  >
+                    <Send size={20} color="#000000" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          </View>
         )}
 
         {(activeTab === 'ai' || activeTab === 'news') && (
@@ -208,23 +324,25 @@ export default function ModerationAdmin() {
           </>
         )}
 
-        <View style={styles.actionRow}>
-          <TouchableOpacity 
-            style={[styles.actionButton, styles.approveButton]} 
-            onPress={() => handleAction(item.id, 'approve')}
-          >
-            <CheckCircle size={18} color="#000000" />
-            <Text style={styles.actionText}>APPROVE</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.actionButton, styles.rejectButton]} 
-            onPress={() => handleAction(item.id, 'reject')}
-          >
-            <Trash2 size={18} color="#FFFFFF" />
-            <Text style={[styles.actionText, { color: '#FFFFFF' }]}>REJECT</Text>
-          </TouchableOpacity>
-        </View>
+        {activeTab !== 'help' && (
+          <View style={styles.actionRow}>
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.approveButton]} 
+              onPress={() => handleAction(item.id, 'approve')}
+            >
+              <CheckCircle size={18} color="#000000" />
+              <Text style={styles.actionText}>APPROVE</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.rejectButton]} 
+              onPress={() => handleAction(item.id, 'reject')}
+            >
+              <Trash2 size={18} color="#FFFFFF" />
+              <Text style={[styles.actionText, { color: '#FFFFFF' }]}>REJECT</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     );
   };
@@ -428,6 +546,96 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textDecorationLine: 'underline',
     marginBottom: 20,
+  },
+  helpActions: {
+    flexDirection: 'row',
+    marginBottom: 15,
+  },
+  transcriptButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: 'rgba(251, 191, 36, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(251, 191, 36, 0.2)',
+  },
+  transcriptButtonText: {
+    color: '#FBBF24',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  transcriptContainer: {
+    marginTop: 10,
+    padding: 15,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  transcriptMessage: {
+    marginBottom: 12,
+    padding: 10,
+    borderRadius: 10,
+    maxWidth: '90%',
+  },
+  userMessage: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  adminMessage: {
+    alignSelf: 'flex-end',
+    backgroundColor: 'rgba(96, 165, 250, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(96, 165, 250, 0.2)',
+  },
+  transcriptSender: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: 'rgba(255,255,255,0.4)',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+  },
+  transcriptText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  transcriptTime: {
+    fontSize: 9,
+    color: 'rgba(255,255,255,0.2)',
+    marginTop: 4,
+    textAlign: 'right',
+  },
+  replyBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 15,
+    paddingTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.05)',
+  },
+  replyInput: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    color: '#FFFFFF',
+    fontSize: 13,
+    maxHeight: 80,
+  },
+  sendButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FBBF24',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   actionRow: {
     flexDirection: 'row',
