@@ -105,24 +105,20 @@ export default function LocalBusinesses() {
     try {
       // 1. Try Google Places API if Key is available
       const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
-      if (apiKey) {
-        // Extract Place ID or Search string from link
-        let placeId = '';
-        if (form.link.includes('place/')) {
-          // This is harder than it looks, usually requires the API to find the place from the search string
-          // We'll fallback to scraping/parsing for now as getting Place ID from URL is complex
-        }
-      }
-
-      // 2. Best-effort Scraping/Parsing
-      // We'll follow redirects if it's a short link
+      
+      // Follow redirects if it's a short link
       let finalUrl = form.link;
       if (form.link.includes('maps.app.goo.gl')) {
         const response = await fetch(form.link, { method: 'HEAD', redirect: 'follow' });
         finalUrl = response.url;
       }
 
-      const response = await fetch(finalUrl);
+      const response = await fetch(finalUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+          'Accept-Language': 'en-US,en;q=0.9',
+        }
+      });
       const html = await response.text();
 
       // Extract Name (from <title> or og:title)
@@ -132,10 +128,18 @@ export default function LocalBusinesses() {
         name = titleMatch[1].split(' - ')[0].split(' · ')[0];
       }
 
+      // Fallback extraction from URL if we hit consent wall or generic title
+      if (!name || name.includes('Before you continue') || name.includes('Google Maps') || name === 'Google') {
+        const placeMatch = finalUrl.match(/\/place\/([^\/]+)/);
+        if (placeMatch && placeMatch[1]) {
+          name = decodeURIComponent(placeMatch[1].replace(/\+/g, ' '));
+        }
+      }
+
       // Extract Address (from og:description or meta description)
       let address = '';
       const descMatch = html.match(/<meta property="og:description" content="(.*?)"/);
-      if (descMatch && descMatch[1]) {
+      if (descMatch && descMatch[1] && !descMatch[1].includes('Find local businesses')) {
         address = descMatch[1].split(' · ')[0];
       }
 
@@ -144,14 +148,20 @@ export default function LocalBusinesses() {
       const ratingMatch = html.match(/(\d\.\d) stars/);
       if (ratingMatch) rating = ratingMatch[1];
 
-      // Extract Phone Number if possible (common formats)
+      // Extract Phone Number if possible (more restrictive regex to avoid random numbers)
       let phone = '';
-      const phoneMatch = html.match(/(?:(?:\+?1\s*(?:[.-]\s*)?)?(?:\(\s*([2-9]1[02-9]|[2-9][02-8]1|[2-9][02-8][02-9])\s*\)|([2-9]1[02-9]|[2-9][02-8]1|[2-9][02-8][02-9]))\s*(?:[.-]\s*)?)?([2-9]1[02-9]|[2-9][02-9]1|[2-9][02-9]{2})\s*(?:[.-]\s*)?([0-9]{4})(?:\s*(?:x|ext\.?|#)\s*([0-9]+))?/);
-      if (phoneMatch) phone = phoneMatch[0];
+      const phoneMatch = html.match(/(?:\+?(\d{1,3}))?[-. (]*(\d{3})[-. )]*(\d{3})[-. ]*(\d{4})(?: *x(\d+))?/);
+      if (phoneMatch && !html.includes('Before you continue')) {
+        phone = phoneMatch[0];
+      }
+
+      if (name.includes('Before you continue')) {
+        Alert.alert("Link Note", "Google is asking for consent. We've extracted what we can from the URL. Please fill in any missing details!");
+      }
 
       setForm(prev => ({
         ...prev,
-        name: name || prev.name,
+        name: name && !name.includes('Before you continue') ? name : prev.name,
         address: address || prev.address,
         phone: phone || prev.phone,
         description: prev.description || (address ? `Located at ${address}` : prev.description),
@@ -159,6 +169,7 @@ export default function LocalBusinesses() {
       }));
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
       Alert.alert("Details Extracted", "We've filled in what we could find from Google Maps!");
 
     } catch (error) {
