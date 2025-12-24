@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Modal, Image, Platform, FlatList } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Modal, Image, Platform, FlatList, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, Music, Youtube, Globe, Info, Plus, ExternalLink, ShieldCheck, Instagram, CheckCircle2, Star } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -136,6 +136,19 @@ export default function LocalTalent() {
     }
   };
 
+  const handleOpenLink = async (url) => {
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
+      } else {
+        Alert.alert("Error", "Cannot open this link: " + url);
+      }
+    } catch (error) {
+      Alert.alert("Error", "An error occurred while opening the link.");
+    }
+  };
+
   const renderTalentCard = ({ item }) => {
     const getCategoryColor = (cat) => {
       switch (cat) {
@@ -148,62 +161,46 @@ export default function LocalTalent() {
     };
 
     return (
-      <View style={styles.card}>
+      <View style={styles.flushListing}>
         <LinearGradient
           colors={getCategoryColor(item.category)}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.cardGradient}
+          style={styles.flushGradient}
         >
-          <View style={styles.cardOverlay}>
-            <View style={styles.cardHeader}>
-              <View style={styles.avatarContainer}>
-                <Image 
-                  source={{ uri: `https://avatar.vercel.sh/${item.name}.png` }} 
-                  style={styles.avatarImage} 
-                />
-                <View style={styles.verifiedBadge}>
-                  <CheckCircle2 size={12} color="#000" fill="#10B981" />
+          <View style={styles.flushContent}>
+            <View style={styles.topRow}>
+              <View style={styles.talentInfoMain}>
+                <View style={styles.badgeRow}>
+                  <Text style={styles.categoryLabel}>{item.category?.toUpperCase() || 'TALENT'}</Text>
+                  <View style={styles.dotSeparator} />
+                  <Text style={styles.featuredBadge}>FEATURED</Text>
                 </View>
+                <Text style={styles.flushName}>{item.name}</Text>
               </View>
               
-              <View style={styles.headerInfo}>
-                <View style={styles.nameRow}>
-                  <Text style={styles.talentName}>{item.name}</Text>
-                  <View style={styles.premiumTag}>
-                    <Text style={styles.premiumTagText}>FEATURED</Text>
-                  </View>
-                </View>
-                <Text style={styles.talentCategory}>{item.category || 'Talent'}</Text>
-              </View>
-
-              <View style={styles.platformIconCircle}>
-                {item.platform === 'Youtube' && <Youtube size={16} color="#FFF" />}
-                {item.platform === 'Spotify' && <Music size={16} color="#FFF" />}
-                {item.platform === 'Instagram' && <Instagram size={16} color="#FFF" />}
-                {item.platform === 'TikTok' && <Music size={16} color="#FFF" />}
-                {item.platform === 'Website' && <Globe size={16} color="#FFF" />}
+              <View style={styles.avatarWrapper}>
+                <Image 
+                  source={{ uri: `https://avatar.vercel.sh/${item.name}.png` }} 
+                  style={styles.flushAvatar} 
+                />
               </View>
             </View>
-            
-            <View style={styles.cardContent}>
-              <Text style={styles.cardTitle}>{item.title}</Text>
+
+            <View style={styles.titleSection}>
+              <Text style={styles.flushTitle}>{item.title}</Text>
               {item.description ? (
-                <Text style={styles.cardDescription} numberOfLines={2}>
-                  {item.description}
-                </Text>
+                <Text style={styles.flushDescription}>{item.description}</Text>
               ) : null}
             </View>
-            
+
             <TouchableOpacity 
-              activeOpacity={0.8}
-              style={styles.premiumAction} 
-              onPress={() => Alert.alert("Opening", `Opening ${item.link}`)}
+              activeOpacity={0.7}
+              style={styles.flushAction}
+              onPress={() => handleOpenLink(item.link)}
             >
-              <BlurView intensity={20} tint="light" style={styles.actionBlur}>
-                <Text style={styles.actionText}>EXPLORE WORK</Text>
-                <ExternalLink size={14} color="#FFFFFF" />
-              </BlurView>
+              <Text style={styles.flushActionText}>VIEW WORK</Text>
+              <ExternalLink size={18} color="#FFFFFF" strokeWidth={2.5} />
             </TouchableOpacity>
           </View>
         </LinearGradient>
@@ -391,126 +388,103 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   listContent: {
-    paddingBottom: 100,
+    paddingBottom: 120,
   },
-  card: {
+  flushListing: {
     width: '100%',
-    backgroundColor: '#000000',
-    overflow: 'hidden',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
   },
-  cardGradient: {
+  flushGradient: {
     width: '100%',
-    minHeight: 280,
+    minHeight: 380,
   },
-  cardOverlay: {
+  flushContent: {
     flex: 1,
-    padding: 24,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    padding: 30,
+    backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'space-between',
   },
-  cardHeader: {
+  topRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
-  avatarContainer: {
-    position: 'relative',
-    marginRight: 16,
-  },
-  avatarImage: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
-  verifiedBadge: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    padding: 2,
-  },
-  headerInfo: {
+  talentInfoMain: {
     flex: 1,
+    marginRight: 20,
   },
-  nameRow: {
+  badgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    marginBottom: 8,
   },
-  talentName: {
+  categoryLabel: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 2,
+  },
+  dotSeparator: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    marginHorizontal: 8,
+  },
+  featuredBadge: {
+    color: '#FBBF24',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 2,
+  },
+  flushName: {
     color: '#FFFFFF',
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '900',
     letterSpacing: -0.5,
   },
-  premiumTag: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.3)',
-  },
-  premiumTagText: {
-    color: '#FFFFFF',
-    fontSize: 8,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
-  talentCategory: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 14,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  platformIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
+  avatarWrapper: {
+    padding: 2,
+    borderRadius: 35,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: 'rgba(255,255,255,0.2)',
   },
-  cardContent: {
-    marginTop: 20,
-    marginBottom: 20,
+  flushAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
   },
-  cardTitle: {
+  titleSection: {
+    marginVertical: 30,
+  },
+  flushTitle: {
     color: '#FFFFFF',
-    fontSize: 32,
+    fontSize: 42,
     fontWeight: '900',
-    lineHeight: 38,
-    letterSpacing: -1,
+    lineHeight: 46,
+    letterSpacing: -2,
   },
-  cardDescription: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 16,
+  flushDescription: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 17,
     lineHeight: 24,
-    marginTop: 8,
-    fontWeight: '500',
+    marginTop: 15,
+    fontWeight: '400',
   },
-  premiumAction: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    marginTop: 'auto',
-  },
-  actionBlur: {
+  flushAction: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    gap: 10,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.1)',
+    paddingTop: 20,
   },
-  actionText: {
+  flushActionText: {
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '900',
-    letterSpacing: 2,
+    letterSpacing: 3,
   },
   fab: {
     position: 'absolute',
