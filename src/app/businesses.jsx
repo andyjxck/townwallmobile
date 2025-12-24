@@ -93,7 +93,7 @@ export default function LocalBusinesses() {
     }
   };
 
-  const processGoogleLink = async () => {
+    const processGoogleLink = async () => {
     if (!form.link.includes('google.com/maps') && !form.link.includes('maps.app.goo.gl')) {
       Alert.alert("Link Type", "Please enter a valid Google Maps link to auto-fill details.");
       return;
@@ -105,27 +105,49 @@ export default function LocalBusinesses() {
     try {
       const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
       
-      // Follow redirects if it's a short link
       let finalUrl = form.link;
-      if (form.link.includes('maps.app.goo.gl')) {
-        const response = await fetch(form.link, { method: 'HEAD', redirect: 'follow' });
-        finalUrl = response.url;
-      }
-
       let extractedName = '';
       let extractedAddress = '';
       let extractedPhone = '';
       let extractedRating = null;
 
-      // 1. Try to get name from URL slug
+      // 1. Resolve short links safely
+      if (form.link.includes('maps.app.goo.gl')) {
+        try {
+          // Use a simple fetch to get the destination URL without following into the consent wall if possible
+          const response = await fetch(form.link, { 
+            method: 'GET', 
+            redirect: 'manual', // Stop at the first redirect
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            }
+          });
+          
+          // In some environments, redirect: manual returns the response with a status 302
+          // and the location header. In others, it might just throw or follow anyway.
+          if (response.status >= 300 && response.status < 400) {
+            const loc = response.headers.get('location');
+            if (loc) finalUrl = loc;
+          } else {
+            // Fallback: try HEAD with follow
+            const headResponse = await fetch(form.link, { method: 'HEAD', redirect: 'follow' });
+            finalUrl = headResponse.url;
+          }
+        } catch (e) {
+          console.log("Short link resolution error:", e);
+        }
+      }
+
+      // 2. Try to get name from URL slug as a hint
+      // Example: .../place/The+Coffee+Shop/@...
       const placeMatch = finalUrl.match(/\/place\/([^\/]+)/);
       if (placeMatch && placeMatch[1]) {
         extractedName = decodeURIComponent(placeMatch[1].replace(/\+/g, ' '));
       }
 
-      // 2. Use Places API if Key is available
+      // 3. Use Places API if Key is available
       if (apiKey) {
-        // We use Text Search to find the place details based on the name extracted from the URL
+        // If we extracted a name from the URL, use it. Otherwise use the whole link as query (less reliable but fallback)
         const searchQuery = encodeURIComponent(extractedName || form.link);
         const placesResponse = await fetch(
           `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${searchQuery}&key=${apiKey}`
@@ -138,59 +160,46 @@ export default function LocalBusinesses() {
           extractedAddress = place.formatted_address;
           extractedRating = place.rating?.toString();
 
-          // Get more details (like phone number) using Place Details API if we have a place_id
+          // Get more details (like phone number) using Place Details API
           if (place.place_id) {
             const detailsResponse = await fetch(
-              `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place.place_id}&fields=name,formatted_phone_number,rating,formatted_address&key=${apiKey}`
+              `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place.place_id}&fields=name,formatted_phone_number,rating,formatted_address,website&key=${apiKey}`
             );
             const detailsData = await detailsResponse.json();
             if (detailsData.result) {
               extractedPhone = detailsData.result.formatted_phone_number || '';
+              // Prefer details API name/address if available
+              if (detailsData.result.name) extractedName = detailsData.result.name;
+              if (detailsData.result.formatted_address) extractedAddress = detailsData.result.formatted_address;
             }
           }
         }
       }
 
-      // 3. Fallback to basic scraping if API failed or returned nothing
-      if (!extractedName || extractedName.includes('Before you continue')) {
-        const response = await fetch(finalUrl, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-          }
-        });
-        const html = await response.text();
-        
-        if (!extractedName) {
-          const titleMatch = html.match(/<title>(.*?)<\/title>/);
-          if (titleMatch && titleMatch[1]) {
-            extractedName = titleMatch[1].split(' - ')[0].split(' · ')[0];
-          }
-        }
-        
-        if (!extractedAddress) {
-          const descMatch = html.match(/<meta property="og:description" content="(.*?)"/);
-          if (descMatch && descMatch[1] && !descMatch[1].includes('Find local businesses')) {
-            extractedAddress = descMatch[1].split(' · ')[0];
-          }
-        }
-      }
+      // 4. Final Clean up - avoid any consent page strings
+      const isConsentString = (str) => {
+        if (!str) return true;
+        const s = str.toLowerCase();
+        return s.includes('before you continue') || s.includes('google maps') || s.includes('consent') || s.includes('cookie');
+      };
+
+      const finalName = !isConsentString(extractedName) ? extractedName : (placeMatch && placeMatch[1] ? decodeURIComponent(placeMatch[1].replace(/\+/g, ' ')) : '');
 
       setForm(prev => ({
         ...prev,
-        name: extractedName && !extractedName.includes('Before you continue') ? extractedName : prev.name,
+        name: finalName || prev.name,
         address: extractedAddress || prev.address,
         phone: extractedPhone || prev.phone,
         description: prev.description || (extractedAddress ? `Located at ${extractedAddress}` : prev.description),
-        rating: extractedRating || (Math.random() * (5.0 - 4.0) + 4.0).toFixed(1)
+        rating: extractedRating || prev.rating
       }));
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
       Alert.alert("Details Extracted", "We've filled in what we could find from Google Maps!");
 
     } catch (error) {
       console.error("Link processing error:", error);
-      Alert.alert("Error", "Could not extract details from this link. You can still fill them manually.");
+      Alert.alert("Error", "Could not extract details. Please check the link or fill manually.");
     } finally {
       setProcessingLink(false);
     }
