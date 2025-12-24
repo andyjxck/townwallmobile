@@ -112,65 +112,83 @@ export default function LocalBusinesses() {
       let extractedRating = null;
 
       // 1. Resolve short links safely
-      if (form.link.includes('maps.app.goo.gl')) {
+      if (form.link.includes('maps.app.goo.gl') || form.link.includes('goo.gl/maps')) {
         try {
-          // Use a simple fetch to get the destination URL without following into the consent wall if possible
+          // Attempt to resolve the redirect to get the full URL which contains the place name/ID
           const response = await fetch(form.link, { 
-            method: 'GET', 
-            redirect: 'manual', // Stop at the first redirect
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            }
+            method: 'HEAD', 
+            redirect: 'follow' 
           });
+          finalUrl = response.url;
           
-          // In some environments, redirect: manual returns the response with a status 302
-          // and the location header. In others, it might just throw or follow anyway.
-          if (response.status >= 300 && response.status < 400) {
-            const loc = response.headers.get('location');
-            if (loc) finalUrl = loc;
-          } else {
-            // Fallback: try HEAD with follow
-            const headResponse = await fetch(form.link, { method: 'HEAD', redirect: 'follow' });
-            finalUrl = headResponse.url;
+          // If we got redirected to a consent page, try to extract the original destination from the query params
+          if (finalUrl.includes('consent.google.com') || finalUrl.includes('google.com/search')) {
+            const urlObj = new URL(finalUrl);
+            const continueUrl = urlObj.searchParams.get('continue');
+            if (continueUrl) finalUrl = continueUrl;
           }
         } catch (e) {
           console.log("Short link resolution error:", e);
         }
       }
 
-      // 2. Try to get name from URL slug as a hint
-      // Example: .../place/The+Coffee+Shop/@...
-      const placeMatch = finalUrl.match(/\/place\/([^\/]+)/);
+      // 2. Try to extract Place ID or Name from URL
+      // Long URLs often have /place/Name/data=!4m2!3m1!1sPLACE_ID
+      const placeIdMatch = finalUrl.match(/!1s(ChI[a-zA-Z0-9_-]+)/);
+      const placeId = placeIdMatch ? placeIdMatch[1] : null;
+      
+      const placeMatch = finalUrl.match(/\/place\/([^\/|@?]+)/);
       if (placeMatch && placeMatch[1]) {
         extractedName = decodeURIComponent(placeMatch[1].replace(/\+/g, ' '));
       }
 
       // 3. Use Places API if Key is available
       if (apiKey) {
-        // If we extracted a name from the URL, use it. Otherwise use the whole link as query (less reliable but fallback)
-        const searchQuery = encodeURIComponent(extractedName || form.link);
-        const placesResponse = await fetch(
-          `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${searchQuery}&key=${apiKey}`
-        );
-        const placesData = await placesResponse.json();
+        let placesData = null;
+        
+        // Strategy A: If we have a Place ID, use Details API directly (most accurate)
+        if (placeId) {
+          const detailsResponse = await fetch(
+            `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name,formatted_phone_number,rating,formatted_address,geometry,website&key=${apiKey}`
+          );
+          const detailsData = await detailsResponse.json();
+          
+          if (detailsData.status === 'REQUEST_DENIED') {
+            console.error("Google API Key Error:", detailsData.error_message);
+            Alert.alert("API Key Restriction", "Your Google API key might have IP or Referrer restrictions. Please check your Google Cloud Console settings.");
+          }
 
-        if (placesData.results && placesData.results[0]) {
-          const place = placesData.results[0];
-          extractedName = place.name;
-          extractedAddress = place.formatted_address;
-          extractedRating = place.rating?.toString();
+          if (detailsData.result) {
+            const res = detailsData.result;
+            extractedName = res.name;
+            extractedAddress = res.formatted_address;
+            extractedPhone = res.formatted_phone_number || '';
+            extractedRating = res.rating?.toString();
+          }
+        } 
+        
+        // Strategy B: Fallback to Text Search if no results yet
+        if (!extractedAddress && (extractedName || form.link)) {
+          const searchQuery = encodeURIComponent(extractedName || form.link);
+          const searchResponse = await fetch(
+            `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${searchQuery}&key=${apiKey}`
+          );
+          const searchData = await searchResponse.json();
 
-          // Get more details (like phone number) using Place Details API
-          if (place.place_id) {
-            const detailsResponse = await fetch(
-              `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place.place_id}&fields=name,formatted_phone_number,rating,formatted_address,website&key=${apiKey}`
-            );
-            const detailsData = await detailsResponse.json();
-            if (detailsData.result) {
-              extractedPhone = detailsData.result.formatted_phone_number || '';
-              // Prefer details API name/address if available
-              if (detailsData.result.name) extractedName = detailsData.result.name;
-              if (detailsData.result.formatted_address) extractedAddress = detailsData.result.formatted_address;
+          if (searchData.results && searchData.results[0]) {
+            const place = searchData.results[0];
+            extractedName = place.name;
+            extractedAddress = place.formatted_address;
+            extractedRating = place.rating?.toString();
+
+            if (place.place_id && !extractedPhone) {
+              const detailsResponse = await fetch(
+                `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place.place_id}&fields=formatted_phone_number&key=${apiKey}`
+              );
+              const detailsData = await detailsResponse.json();
+              if (detailsData.result?.formatted_phone_number) {
+                extractedPhone = detailsData.result.formatted_phone_number;
+              }
             }
           }
         }
