@@ -25,6 +25,7 @@ import {
 } from "lucide-react-native";
 import { getDeviceId } from "../utils/deviceId";
 import { supabase } from "../utils/supabase";
+import { moderateContent } from "../utils/ai";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { getStoredUser } from "../utils/user";
@@ -65,34 +66,44 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
     }
   };
 
-  const handleSendComment = async () => {
-    if (!commentText.trim()) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    
-    try {
-      const user = await getStoredUser();
-      const { data, error } = await supabase
-        .from('rcomments')
-        .insert({
-          post_id: item.id,
-          user_id: user?.id,
-          text: commentText.trim(),
-          device_id: deviceId
-        })
-        .select(`
-          *,
-          rusers (username, emoji_icon, avatar_url)
-        `)
-        .single();
+    const handleSendComment = async () => {
+      if (!commentText.trim()) return;
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       
-      if (error) throw error;
-      setComments([...comments, data]);
-      setCommentText("");
-      if (onComment) onComment(item.id);
-    } catch (error) {
-      console.error("Error sending comment:", error);
-    }
-  };
+      try {
+        const user = await getStoredUser();
+        
+        // AI Moderation
+        const moderation = await moderateContent(commentText.trim());
+        if (moderation.status === 'rejected') {
+          alert(`Your comment was rejected by our AI moderator: ${moderation.reason}`);
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from('rcomments')
+          .insert({
+            post_id: item.id,
+            user_id: user?.id,
+            text: commentText.trim(),
+            device_id: deviceId,
+            moderation_status: moderation.status,
+            moderation_reason: moderation.reason,
+          })
+          .select(`
+            *,
+            rusers (username, emoji_icon, avatar_url)
+          `)
+          .single();
+        
+        if (error) throw error;
+        setComments([...comments, data]);
+        setCommentText("");
+        if (onComment) onComment(item.id);
+      } catch (error) {
+        console.error("Error sending comment:", error);
+      }
+    };
 
   const images = item.image_urls || (item.image_url ? [item.image_url] : []);
   const hasMultipleImages = images.length > 1;

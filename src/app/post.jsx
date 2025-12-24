@@ -18,6 +18,7 @@ import { X, ChevronRight, Image as ImageIcon, Trash2, Shield, User } from "lucid
 import { getStoredUser } from "../utils/user";
 import { getDeviceId } from "../utils/deviceId";
 import { supabase } from "../utils/supabase";
+import { moderateContent } from "../utils/ai";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 
@@ -89,79 +90,89 @@ export default function PostScreen() {
 
   const [uploadProgress, setUploadProgress] = useState(0);
 
-  const handlePost = async () => {
-    if (!text || !selectedTag || !deviceId) return;
-    setLoading(true);
-    setUploadProgress(0.1);
+    const handlePost = async () => {
+      if (!text || !selectedTag || !deviceId) return;
+      setLoading(true);
+      setUploadProgress(0.05);
 
-    try {
-      const imageUrls = [];
-      let currentIdx = 0;
-      
-      for (const img of images) {
-        setUploadProgress(0.1 + (currentIdx / images.length) * 0.8);
-        const fileExt = img.uri.split('.').pop()?.toLowerCase() || 'jpg';
-        const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
-        const filePath = `${fileName}`;
+      try {
+        // AI Moderation
+        const moderation = await moderateContent(`${title}\n${text}`);
+        if (moderation.status === 'rejected') {
+          alert(`Your post was rejected by our AI moderator: ${moderation.reason}`);
+          setLoading(false);
+          return;
+        }
 
-        const arrayBuffer = await new Promise((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          xhr.onload = function () {
-            resolve(xhr.response);
-          };
-          xhr.onerror = function (e) {
-            console.error("XHR Error:", e);
-            reject(new TypeError("Network request failed"));
-          };
-          xhr.responseType = "arraybuffer";
-          xhr.open("GET", img.uri, true);
-          xhr.send(null);
-        });
+        const imageUrls = [];
+        let currentIdx = 0;
+        
+        for (const img of images) {
+          setUploadProgress(0.1 + (currentIdx / images.length) * 0.8);
+          const fileExt = img.uri.split('.').pop()?.toLowerCase() || 'jpg';
+          const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
+          const filePath = `${fileName}`;
 
-        const { error: uploadError } = await supabase.storage
-          .from('posts')
-          .upload(filePath, arrayBuffer, {
-            contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
-            cacheControl: '3600',
-            upsert: false
+          const arrayBuffer = await new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.onload = function () {
+              resolve(xhr.response);
+            };
+            xhr.onerror = function (e) {
+              console.error("XHR Error:", e);
+              reject(new TypeError("Network request failed"));
+            };
+            xhr.responseType = "arraybuffer";
+            xhr.open("GET", img.uri, true);
+            xhr.send(null);
           });
 
-        if (uploadError) throw uploadError;
+          const { error: uploadError } = await supabase.storage
+            .from('posts')
+            .upload(filePath, arrayBuffer, {
+              contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
+              cacheControl: '3600',
+              upsert: false
+            });
 
-        const { data: publicUrlData } = supabase.storage
-          .from('posts')
-          .getPublicUrl(filePath);
-        
-        imageUrls.push(publicUrlData.publicUrl);
-        currentIdx++;
+          if (uploadError) throw uploadError;
+
+          const { data: publicUrlData } = supabase.storage
+            .from('posts')
+            .getPublicUrl(filePath);
+          
+          imageUrls.push(publicUrlData.publicUrl);
+          currentIdx++;
+        }
+
+        setUploadProgress(0.9);
+
+        const { error } = await supabase.from('rposts').insert({
+          title: title.trim() || text.substring(0, 50),
+          text: text.trim(),
+          zone_id: selectedZone?.id,
+          tag_id: selectedTag.id,
+          device_id: deviceId,
+          user_id: user?.id,
+          is_anonymous: isAnonymous,
+          image_url: imageUrls.length > 0 ? imageUrls[0] : null,
+          image_urls: imageUrls,
+          expires_at: new Date(Date.now() + 86400000).toISOString(), // 24 hours
+          moderation_status: moderation.status,
+          moderation_reason: moderation.reason,
+        });
+
+        if (error) throw error;
+        setUploadProgress(1);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setStep('success');
+      } catch (error) {
+        console.error("Error creating post:", error);
+        alert("Failed to post. Please try again.");
+      } finally {
+        setLoading(false);
       }
-
-      setUploadProgress(0.9);
-
-      const { error } = await supabase.from('rposts').insert({
-        title: title.trim() || text.substring(0, 50),
-        text: text.trim(),
-        zone_id: selectedZone?.id,
-        tag_id: selectedTag.id,
-        device_id: deviceId,
-        user_id: user?.id,
-        is_anonymous: isAnonymous,
-        image_url: imageUrls.length > 0 ? imageUrls[0] : null,
-        image_urls: imageUrls,
-        expires_at: new Date(Date.now() + 86400000).toISOString(), // 24 hours
-      });
-
-      if (error) throw error;
-      setUploadProgress(1);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setStep('success');
-    } catch (error) {
-      console.error("Error creating post:", error);
-      alert("Failed to post. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
 
   if (step === 'success') {
     return (

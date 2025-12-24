@@ -5,6 +5,7 @@ import { ChevronLeft, Send, MessageSquare } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/utils/supabase';
 import { getStoredUser } from '@/utils/user';
+import { getAIAssistantResponse } from '@/utils/ai';
 import * as Haptics from 'expo-haptics';
 
 import { LinearGradient } from "expo-linear-gradient";
@@ -154,33 +155,50 @@ export default function HelpContact() {
     }
   };
 
-  const handleSend = async () => {
-    if (!inputText.trim() || !currentUser) return;
-    
-    // If there's a resolved status, purge before sending new
-    if (messages.some(m => m.status === 'resolved')) {
-      await purgeMessages();
-    }
+    const handleSend = async () => {
+      if (!inputText.trim() || !currentUser) return;
+      
+      // If there's a resolved status, purge before sending new
+      if (messages.some(m => m.status === 'resolved')) {
+        await purgeMessages();
+      }
 
-    const text = inputText.trim();
-    setInputText('');
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      const text = inputText.trim();
+      setInputText('');
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-    try {
-      const { error } = await supabase
-        .from('rhelp_messages')
-        .insert({
-          sender_id: currentUser.id,
-          content: text,
-          is_from_admin: false
-        });
+      try {
+        const { error } = await supabase
+          .from('rhelp_messages')
+          .insert({
+            sender_id: currentUser.id,
+            content: text,
+            is_from_admin: false
+          });
 
-      if (error) throw error;
-    } catch (error) {
-      console.error(error);
-      setInputText(text); // Restore text on error
-    }
-  };
+        if (error) throw error;
+
+        // AI Assistant Response
+        const history = messages.slice(-5).map(m => ({
+          role: m.is_from_admin ? 'assistant' : 'user',
+          content: m.content
+        }));
+
+        const aiResponse = await getAIAssistantResponse(text, history);
+
+        await supabase
+          .from('rhelp_messages')
+          .insert({
+            receiver_id: currentUser.id,
+            content: aiResponse,
+            is_from_admin: true
+          });
+
+      } catch (error) {
+        console.error(error);
+        setInputText(text); // Restore text on error
+      }
+    };
 
   return (
     <View style={styles.container}>
