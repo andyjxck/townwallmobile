@@ -15,6 +15,10 @@ export default function HelpContact() {
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
+  const [showRating, setShowRating] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const setup = async () => {
@@ -63,6 +67,9 @@ export default function HelpContact() {
         payload => {
           setMessages(prev => {
             if (prev.find(m => m.id === payload.new.id)) return prev;
+            if (payload.new.status === 'resolved' || payload.new.content.includes("Please rate 1-5")) {
+              setShowRating(true);
+            }
             return [...prev, payload.new];
           });
         }
@@ -75,7 +82,7 @@ export default function HelpContact() {
         },
         payload => {
           if (payload.new.status === 'resolved') {
-            Alert.alert("Support", "This ticket has been marked as resolved by our team.");
+            setShowRating(true);
             initChat();
           }
         }
@@ -98,6 +105,11 @@ export default function HelpContact() {
 
       if (error) throw error;
       setMessages(data || []);
+      
+      // Check if already resolved
+      if (data?.some(m => m.status === 'resolved' || m.content.includes("Please rate 1-5"))) {
+        setShowRating(true);
+      }
     } catch (error) {
       console.error(error);
     } finally {
@@ -105,9 +117,56 @@ export default function HelpContact() {
     }
   };
 
+  const purgeMessages = async () => {
+    if (!currentUser) return;
+    try {
+      await supabase
+        .from('rhelp_messages')
+        .delete()
+        .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`);
+      setMessages([]);
+      setShowRating(false);
+    } catch (error) {
+      console.error("Error purging messages:", error);
+    }
+  };
+
+  const submitReview = async () => {
+    if (rating === 0) {
+      Alert.alert("Rating Required", "Please select a rating from 1 to 5 stars.");
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase
+        .from('rhelp_reviews')
+        .insert({
+          user_id: currentUser.id,
+          rating,
+          comment
+        });
+      if (error) throw error;
+      
+      await purgeMessages();
+      Alert.alert("Thank You", "Your feedback has been submitted and the chat has been cleared.");
+      setRating(0);
+      setComment('');
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Error", "Could not submit review.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleSend = async () => {
     if (!inputText.trim() || !currentUser) return;
     
+    // If there's a resolved status, purge before sending new
+    if (messages.some(m => m.status === 'resolved')) {
+      await purgeMessages();
+    }
+
     const text = inputText.trim();
     setInputText('');
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -138,7 +197,20 @@ export default function HelpContact() {
           <MessageSquare color="#60A5FA" size={20} />
           <Text style={styles.headerTitle}>CONTACT HELP</Text>
         </View>
-        <View style={{ width: 28 }} />
+        <TouchableOpacity 
+          onPress={async () => {
+            // Simulate resolution from admin
+            await supabase.from('rhelp_messages').insert({
+              receiver_id: currentUser.id,
+              content: "Resolved. Please rate 1-5 / Leave a comment",
+              is_from_admin: true,
+              status: 'resolved'
+            });
+          }}
+          style={styles.headerAction}
+        >
+          <Text style={styles.headerActionText}>RESOLVE</Text>
+        </TouchableOpacity>
       </View>
 
       <FlatList
@@ -154,7 +226,7 @@ export default function HelpContact() {
               <View style={[
                 styles.messageBubble, 
                 isMine ? styles.myMessage : styles.theirMessage,
-                isResolved && { opacity: 0.6 }
+                isResolved && { borderLeftWidth: 4, borderLeftColor: '#10B981' }
               ]}>
                 {!isMine && <Text style={styles.adminLabel}>ADMIN SUPPORT</Text>}
                 <Text style={[styles.messageText, { color: isMine ? '#000000' : '#FFFFFF' }]}>
@@ -172,6 +244,61 @@ export default function HelpContact() {
           </View>
         }
       />
+
+      {showRating && (
+        <View style={styles.ratingOverlay}>
+          <View style={styles.ratingCard}>
+            <Text style={styles.ratingTitle}>HOW WAS OUR SUPPORT?</Text>
+            <Text style={styles.ratingSubtitle}>Please rate your experience 1-5</Text>
+            
+            <View style={styles.starsContainer}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <TouchableOpacity 
+                  key={star} 
+                  onPress={() => {
+                    setRating(star);
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  }}
+                  style={styles.starButton}
+                >
+                  <Text style={[styles.starText, rating >= star && styles.starActive]}>
+                    {rating >= star ? '★' : '☆'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TextInput
+              style={styles.ratingInput}
+              placeholder="Leave a comment (optional)..."
+              placeholderTextColor="rgba(255,255,255,0.3)"
+              value={comment}
+              onChangeText={setComment}
+              multiline
+            />
+
+            <View style={styles.ratingButtons}>
+              <TouchableOpacity 
+                style={styles.cancelButton} 
+                onPress={() => setShowRating(false)}
+              >
+                <Text style={styles.cancelButtonText}>NOT NOW</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.submitButton, rating === 0 && { opacity: 0.5 }]} 
+                onPress={submitReview}
+                disabled={rating === 0 || isSubmitting}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator size="small" color="#000000" />
+                ) : (
+                  <Text style={styles.submitButtonText}>SUBMIT</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
 
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
@@ -224,6 +351,15 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 2,
   },
+  headerAction: {
+    padding: 5,
+  },
+  headerActionText: {
+    color: '#10B981',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
   backButton: {
     padding: 5,
   },
@@ -251,7 +387,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 20,
   },
-    messageTime: {
+  messageTime: {
     fontSize: 10,
     alignSelf: 'flex-end',
     marginTop: 4,
@@ -262,6 +398,91 @@ const styles = StyleSheet.create({
     color: '#60A5FA',
     letterSpacing: 1,
     marginBottom: 4,
+  },
+  ratingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 100,
+    padding: 20,
+  },
+  ratingCard: {
+    backgroundColor: '#111111',
+    width: '100%',
+    borderRadius: 24,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+  },
+  ratingTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: 1,
+    textAlign: 'center',
+  },
+  ratingSubtitle: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  starsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginVertical: 24,
+  },
+  starButton: {
+    padding: 4,
+  },
+  starText: {
+    fontSize: 40,
+    color: 'rgba(255,255,255,0.1)',
+  },
+  starActive: {
+    color: '#FBBF24',
+  },
+  ratingInput: {
+    width: '100%',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 12,
+    padding: 15,
+    color: '#FFFFFF',
+    fontSize: 14,
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  ratingButtons: {
+    flexDirection: 'row',
+    width: '100%',
+    gap: 12,
+    marginTop: 24,
+  },
+  cancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  submitButton: {
+    flex: 2,
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  submitButtonText: {
+    color: '#000000',
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
   inputContainer: {
     flexDirection: 'row',
