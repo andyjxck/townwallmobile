@@ -296,26 +296,26 @@ function PostItem({ item, deviceId, onReaction, onComment, onDelete, onShare, us
                     <Text style={styles.noComments}>No replies yet. Be the first!</Text>
                   )}
 
-                  <View style={styles.commentInputRow}>
-                    <TextInput
-                      style={styles.commentInput}
-                      placeholder="Write a reply..."
-                      placeholderTextColor="rgba(255,255,255,0.3)"
-                      value={commentText}
-                      onChangeText={setCommentText}
-                      multiline
-                    />
-                    <TouchableOpacity 
-                      style={styles.sendButton} 
-                      onPress={handleSendComment}
-                      disabled={!commentText.trim()}
-                    >
-                      <Send size={18} color={commentText.trim() ? "#FFFFFF" : "rgba(255,255,255,0.2)"} />
-                    </TouchableOpacity>
+                    <View style={styles.commentInputRow}>
+                      <TextInput
+                        style={styles.commentInput}
+                        placeholder="Write a reply..."
+                        placeholderTextColor="rgba(255,255,255,0.3)"
+                        value={commentText}
+                        onChangeText={setCommentText}
+                        multiline
+                      />
+                      <TouchableOpacity 
+                        style={styles.sendButton} 
+                        onPress={handleSendComment}
+                        disabled={!commentText.trim()}
+                      >
+                        <Send size={18} color={commentText.trim() ? "#FFFFFF" : "rgba(255,255,255,0.2)"} />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </View>
-              </View>
-          )}
+            )}
 
             <Modal visible={showFullImage} transparent animationType="fade">
               <View style={styles.fullImageContainer}>
