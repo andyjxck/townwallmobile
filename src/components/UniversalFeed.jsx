@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 import {
+  ArrowUpDown,
   Plus,
   Settings,
   ArrowUp,
@@ -605,14 +606,23 @@ export default function UniversalFeed() {
       <StatusBar style="light" />
       
         <View style={{ paddingTop: insets.top }}>
-          <View style={styles.header}>
-            <Text style={[styles.logo, { color: '#FFFFFF' }]}>TOWN WALL</Text>
-            <View style={styles.headerActions}>
-              <TouchableOpacity onPress={() => setShowMenu(!showMenu)} style={styles.iconButton}>
-                <Menu size={24} color="#FFFFFF" />
-              </TouchableOpacity>
+            <View style={styles.header}>
+              <Text style={[styles.logo, { color: '#FFFFFF' }]}>TOWN WALL</Text>
+              <View style={styles.headerActions}>
+                <TouchableOpacity 
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setSortBy(s => s === 'newest' ? 'oldest' : 'newest');
+                  }} 
+                  style={styles.iconButton}
+                >
+                  <ArrowUpDown size={20} color={sortBy === 'newest' ? "#FFFFFF" : "rgba(255,255,255,0.4)"} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setShowMenu(!showMenu)} style={styles.iconButton}>
+                  <Menu size={24} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
 
           {/* Dropdown Menu */}
           {showMenu && (
@@ -664,7 +674,7 @@ export default function UniversalFeed() {
           )}
 
           <View style={styles.filterSection}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingRight: 20 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
               <FlatList
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -686,18 +696,6 @@ export default function UniversalFeed() {
                 )}
                 keyExtractor={item => `zone-${item.id}`}
               />
-              
-              <TouchableOpacity 
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setSortBy(s => s === 'newest' ? 'oldest' : 'newest');
-                }}
-                style={{ marginLeft: 10 }}
-              >
-                <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '900', letterSpacing: 1 }}>
-                  {sortBy.toUpperCase()} ↓
-                </Text>
-              </TouchableOpacity>
             </View>
 
           <FlatList
