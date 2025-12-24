@@ -1,15 +1,16 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  RefreshControl,
-    ActivityIndicator,
-    StyleSheet,
-    Modal,
-    Dimensions,
-  } from "react-native";
+    View,
+    Text,
+    FlatList,
+    TouchableOpacity,
+    RefreshControl,
+      ActivityIndicator,
+      StyleSheet,
+      Modal,
+      Dimensions,
+      Alert,
+    } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
@@ -35,8 +36,9 @@ import {
     Shield,
     HelpCircle,
     MessageCircle,
-    Bell,
-  } from "lucide-react-native";
+      Bell,
+      Trash2,
+    } from "lucide-react-native";
 import { getDeviceId } from "../utils/deviceId";
 import { supabase } from "../utils/supabase";
 import * as Haptics from "expo-haptics";
@@ -49,7 +51,7 @@ import NotificationPanel from "./NotificationPanel";
 import { fetchNotifications } from "@/utils/notifications";
 import { LinearGradient } from "expo-linear-gradient";
 
-function PostItem({ item, deviceId, onReaction, onComment }) {
+function PostItem({ item, deviceId, onReaction, onComment, onDelete, user }) {
   const [expanded, setExpanded] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [showFullImage, setShowFullImage] = useState(false);
@@ -224,38 +226,52 @@ function PostItem({ item, deviceId, onReaction, onComment }) {
                 </Text>
               </TouchableOpacity>
 
-            {images.length > 0 && (
-              <TouchableOpacity 
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  setShowFullImage(true);
-                }}
-                activeOpacity={0.9}
-                style={{ position: 'relative' }}
-              >
-                <Image
-                  source={{ uri: images[currentImageIndex] }}
-                  style={{ width: 80, height: 80, borderRadius: 8 }}
-                  contentFit="cover"
-                />
-                {hasMultipleImages && (
-                  <View style={{
-                    position: 'absolute',
-                    bottom: 4,
-                    right: 4,
-                    backgroundColor: 'rgba(0,0,0,0.6)',
-                    paddingHorizontal: 4,
-                    paddingVertical: 2,
-                    borderRadius: 4,
-                  }}>
-                    <Text style={{ color: '#FFFFFF', fontSize: 8, fontWeight: '700' }}>
-                      {currentImageIndex + 1}/{images.length}
-                    </Text>
-                  </View>
+              <View style={{ alignItems: 'flex-end', gap: 8 }}>
+                {images.length > 0 && (
+                  <TouchableOpacity 
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                      setShowFullImage(true);
+                    }}
+                    activeOpacity={0.9}
+                    style={{ position: 'relative' }}
+                  >
+                    <Image
+                      source={{ uri: images[currentImageIndex] }}
+                      style={{ width: 80, height: 80, borderRadius: 8 }}
+                      contentFit="cover"
+                    />
+                    {hasMultipleImages && (
+                      <View style={{
+                        position: 'absolute',
+                        bottom: 4,
+                        right: 4,
+                        backgroundColor: 'rgba(0,0,0,0.6)',
+                        paddingHorizontal: 4,
+                        paddingVertical: 2,
+                        borderRadius: 4,
+                      }}>
+                        <Text style={{ color: '#FFFFFF', fontSize: 8, fontWeight: '700' }}>
+                          {currentImageIndex + 1}/{images.length}
+                        </Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
                 )}
-              </TouchableOpacity>
-            )}
-          </View>
+
+                {user?.id === item.user_id && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                      onDelete(item.id);
+                    }}
+                    style={{ padding: 4 }}
+                  >
+                    <Trash2 size={16} color="rgba(239, 68, 68, 0.5)" />
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
 
           {expanded && (
             <View style={styles.expandedContent}>
@@ -593,6 +609,36 @@ export default function UniversalFeed() {
     }
   };
 
+  const handleDeletePost = async (postId) => {
+    Alert.alert(
+      "Delete Post",
+      "Are you sure you want to delete this post? This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Delete", 
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const { error } = await supabase
+                .from('rposts')
+                .update({ is_deleted: true })
+                .eq('id', postId);
+              
+              if (error) throw error;
+              
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              fetchPosts();
+            } catch (error) {
+              console.error("Error deleting post:", error);
+              Alert.alert("Error", "Failed to delete post. Please try again.");
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const clearFilters = () => {
     setSelectedZone(null);
     setSelectedTag(null);
@@ -755,13 +801,15 @@ export default function UniversalFeed() {
       ) : (
         <FlatList
           data={posts}
-          renderItem={({ item }) => (
-            <PostItem 
-              item={item} 
-              deviceId={deviceId} 
-              onReaction={handleReaction} 
-            />
-          )}
+            renderItem={({ item }) => (
+              <PostItem 
+                item={item} 
+                deviceId={deviceId} 
+                onReaction={handleReaction} 
+                onDelete={handleDeletePost}
+                user={user}
+              />
+            )}
           keyExtractor={(item) => item.id.toString()}
           refreshControl={
             <RefreshControl
