@@ -87,14 +87,19 @@ export default function PostScreen() {
     }
   };
 
+  const [uploadProgress, setUploadProgress] = useState(0);
+
   const handlePost = async () => {
-    if (!title || !text || !selectedZone || !selectedTag || !deviceId) return;
+    if (!text || !selectedTag || !deviceId) return;
     setLoading(true);
+    setUploadProgress(0.1);
 
     try {
       const imageUrls = [];
+      let currentIdx = 0;
       
       for (const img of images) {
+        setUploadProgress(0.1 + (currentIdx / images.length) * 0.8);
         const fileExt = img.uri.split('.').pop()?.toLowerCase() || 'jpg';
         const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
         const filePath = `${fileName}`;
@@ -128,12 +133,15 @@ export default function PostScreen() {
           .getPublicUrl(filePath);
         
         imageUrls.push(publicUrlData.publicUrl);
+        currentIdx++;
       }
 
+      setUploadProgress(0.9);
+
       const { error } = await supabase.from('rposts').insert({
-        title: title.trim(),
+        title: title.trim() || text.substring(0, 50),
         text: text.trim(),
-        zone_id: selectedZone.id,
+        zone_id: selectedZone?.id,
         tag_id: selectedTag.id,
         device_id: deviceId,
         user_id: user?.id,
@@ -144,6 +152,7 @@ export default function PostScreen() {
       });
 
       if (error) throw error;
+      setUploadProgress(1);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setStep('success');
     } catch (error) {
@@ -190,21 +199,28 @@ export default function PostScreen() {
         style={{ flex: 1 }}
       >
         <View style={{ paddingTop: insets.top + 10, flex: 1 }}>
-          <View style={styles.header}>
-            <TouchableOpacity onPress={() => router.back()} style={styles.headerButton}>
-              <X size={24} color="#FFFFFF" />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>NEW POST</Text>
-            <TouchableOpacity
-              onPress={handlePost}
-              disabled={!text || !selectedTag || loading}
-              style={[styles.headerButton, { opacity: (!text || !selectedTag || loading) ? 0.3 : 1 }]}
-            >
-              <Text style={styles.postActionText}>
-                {loading ? "..." : "POST"}
-              </Text>
-            </TouchableOpacity>
-          </View>
+            <View style={styles.header}>
+              <TouchableOpacity onPress={() => router.back()} style={styles.headerButton}>
+                <X size={24} color="#FFFFFF" />
+              </TouchableOpacity>
+              <View style={{ flex: 1, alignItems: 'center' }}>
+                <Text style={styles.headerTitle}>NEW POST</Text>
+                {loading && (
+                  <View style={styles.progressContainer}>
+                    <View style={[styles.progressBar, { width: `${uploadProgress * 100}%` }]} />
+                  </View>
+                )}
+              </View>
+              <TouchableOpacity
+                onPress={handlePost}
+                disabled={!text || !selectedTag || loading}
+                style={[styles.headerButton, { opacity: (!text || !selectedTag || loading) ? 0.3 : 1 }]}
+              >
+                <Text style={styles.postActionText}>
+                  {loading ? "..." : "POST"}
+                </Text>
+              </TouchableOpacity>
+            </View>
 
           <ScrollView contentContainerStyle={styles.scrollContent}>
             <View style={styles.quickInfoRow}>
@@ -407,6 +423,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '900',
     letterSpacing: 2,
+  },
+  progressContainer: {
+    width: '100%',
+    height: 2,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    marginTop: 4,
+    borderRadius: 1,
+    overflow: 'hidden',
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#FFFFFF',
   },
   headerButton: {
     padding: 5,

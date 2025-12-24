@@ -474,6 +474,24 @@ function PostItem({ item, deviceId, onReaction, onComment, onDelete, onShare, us
   );
 }
 
+function SkeletonPost() {
+  return (
+    <View style={[styles.postContainer, { opacity: 0.5 }]}>
+      <View style={{ flexDirection: 'row', gap: 12 }}>
+        <View style={{ flex: 1 }}>
+          <View style={[styles.postHeader, { gap: 8 }]}>
+            <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.1)' }} />
+            <View style={{ height: 12, width: 100, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 4 }} />
+          </View>
+          <View style={{ height: 20, width: '80%', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 4, marginTop: 8 }} />
+          <View style={{ height: 20, width: '60%', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 4, marginTop: 4 }} />
+        </View>
+        <View style={{ width: 80, height: 80, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.1)' }} />
+      </View>
+    </View>
+  );
+}
+
 export default function UniversalFeed() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -573,11 +591,22 @@ export default function UniversalFeed() {
       if (selectedZone) query = query.eq('zone_id', selectedZone);
       if (selectedTag) query = query.eq('tag_id', selectedTag);
 
-      query = query.order('created_at', { ascending: sortBy === 'oldest' });
-
-      const { data, error } = await query;
-      if (error) throw error;
-      setPosts(data || []);
+      if (sortBy === 'popular') {
+        // We'll sort in memory since rreactions is a join
+        const { data, error } = await query;
+        if (error) throw error;
+        const sorted = (data || []).sort((a, b) => {
+          const countA = (a.rreactions || []).length;
+          const countB = (b.rreactions || []).length;
+          return countB - countA;
+        });
+        setPosts(sorted);
+      } else {
+        query = query.order('created_at', { ascending: sortBy === 'oldest' });
+        const { data, error } = await query;
+        if (error) throw error;
+        setPosts(data || []);
+      }
     } catch (error) {
       console.error("Error fetching posts:", error);
     } finally {
@@ -678,20 +707,28 @@ export default function UniversalFeed() {
         <View style={{ paddingTop: insets.top }}>
             <View style={styles.header}>
               <Text style={[styles.logo, { color: '#FFFFFF' }]}>TOWN WALL</Text>
-              <View style={styles.headerActions}>
-                <TouchableOpacity 
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setSortBy(s => s === 'newest' ? 'oldest' : 'newest');
-                  }} 
-                  style={styles.iconButton}
-                >
-                  <ArrowUpDown size={20} color={sortBy === 'newest' ? "#FFFFFF" : "rgba(255,255,255,0.4)"} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => setShowMenu(!showMenu)} style={styles.iconButton}>
-                  <Menu size={24} color="#FFFFFF" />
-                </TouchableOpacity>
-              </View>
+                <View style={styles.headerActions}>
+                  <TouchableOpacity 
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setSortBy(s => {
+                        if (s === 'newest') return 'popular';
+                        if (s === 'popular') return 'oldest';
+                        return 'newest';
+                      });
+                    }} 
+                    style={styles.iconButton}
+                  >
+                    {sortBy === 'popular' ? (
+                      <Zap size={20} color="#F59E0B" />
+                    ) : (
+                      <ArrowUpDown size={20} color={sortBy === 'newest' ? "#FFFFFF" : "rgba(255,255,255,0.4)"} />
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => setShowMenu(!showMenu)} style={styles.iconButton}>
+                    <Menu size={24} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </View>
             </View>
 
           {/* Dropdown Menu */}
@@ -819,7 +856,11 @@ export default function UniversalFeed() {
 
       {loading && !refreshing ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator color="#FFFFFF" />
+          <FlatList
+            data={[1, 2, 3, 4, 5]}
+            renderItem={() => <SkeletonPost />}
+            keyExtractor={i => i.toString()}
+          />
         </View>
       ) : (
         <FlatList

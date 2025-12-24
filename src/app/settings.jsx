@@ -3,10 +3,11 @@ import { View, Text, TouchableOpacity, ScrollView, Alert, StyleSheet } from "rea
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { ChevronLeft, LogOut, Shield, Info, Bell, MapPin } from "lucide-react-native";
+import { ChevronLeft, LogOut, Shield, Info, Bell, MapPin, Share as ShareIcon } from "lucide-react-native";
 import { useTheme } from "../utils/theme";
 import { useAuth } from "../utils/auth/useAuth";
 import * as Haptics from "expo-haptics";
+import { Share } from "react-native";
 
 import { getStoredUser, logoutUser, initUser } from "../utils/user";
 
@@ -28,6 +29,18 @@ export default function SettingsScreen() {
   const showLegal = (title, content) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Alert.alert(title, content);
+  };
+
+  const handleShareApp = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      await Share.share({
+        message: "Check out Town Wall - the digital town square for our community!",
+        url: process.env.EXPO_PUBLIC_APP_URL
+      });
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   const handleSignOut = async () => {
@@ -69,15 +82,20 @@ export default function SettingsScreen() {
         </View>
 
         <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}>
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>PREFERENCES</Text>
-            <SettingsItem 
-              icon={<Bell size={20} color={notificationsEnabled ? "#4ADE80" : "rgba(255,255,255,0.4)"} />}
-              title={notificationsEnabled ? "Notifications On" : "Notifications Off"}
-              onPress={toggleNotifications}
-            />
-            <Text style={styles.infoText}>We'll link notifications soon</Text>
-          </View>
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>PREFERENCES</Text>
+              <SettingsItem 
+                icon={<Bell size={20} color={notificationsEnabled ? "#4ADE80" : "rgba(255,255,255,0.4)"} />}
+                title={notificationsEnabled ? "Notifications On" : "Notifications Off"}
+                onPress={toggleNotifications}
+              />
+              <SettingsItem 
+                icon={<ShareIcon size={20} color="rgba(255,255,255,0.4)" />}
+                title="Share Town Wall"
+                onPress={handleShareApp}
+              />
+              <Text style={styles.infoText}>Tell your friends about us!</Text>
+            </View>
 
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>LEGAL & ABOUT</Text>

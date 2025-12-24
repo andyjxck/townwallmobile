@@ -82,14 +82,23 @@ export default function Profile() {
       
       setUser(userData);
 
-      if (userData) {
-        // Fetch stats
-        const { count: postCount } = await supabase
-          .from('rposts')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', userData.id);
-        
-        setStats({ posts: postCount || 0 });
+    if (userData) {
+          // Fetch stats
+          const { count: postCount } = await supabase
+            .from('rposts')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', userData.id);
+          
+          const { count: reactionCount } = await supabase
+            .from('rreactions')
+            .select('*, rposts!inner(user_id)', { count: 'exact', head: true })
+            .eq('rposts.user_id', userData.id);
+          
+          setStats({ 
+            posts: postCount || 0,
+            reactions: reactionCount || 0,
+            joined: new Date(userData.created_at).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
+          });
 
         // Fetch Friends
         const { data: friendData } = await supabase
@@ -381,20 +390,20 @@ export default function Profile() {
             )}
           </View>
 
-            <View style={styles.statsRow}>
-              <View style={styles.statBox}>
-                <Text style={styles.statValue}>{stats.posts}</Text>
-                <Text style={styles.statLabel}>POSTS</Text>
+              <View style={styles.statsRow}>
+                <View style={styles.statBox}>
+                  <Text style={styles.statValue}>{stats.posts}</Text>
+                  <Text style={styles.statLabel}>POSTS</Text>
+                </View>
+                <View style={styles.statBox}>
+                  <Text style={styles.statValue}>{stats.reactions}</Text>
+                  <Text style={styles.statLabel}>REACTIONS</Text>
+                </View>
+                <View style={styles.statBox}>
+                  <Text style={styles.statValue}>{stats.joined || '...'}</Text>
+                  <Text style={styles.statLabel}>JOINED</Text>
+                </View>
               </View>
-              <View style={styles.statBox}>
-                <Text style={styles.statValue}>{friends.length}</Text>
-                <Text style={styles.statLabel}>FRIENDS</Text>
-              </View>
-              <View style={styles.statBox}>
-                <Text style={styles.statValue}>{replies.length}</Text>
-                <Text style={styles.statLabel}>REPLIES</Text>
-              </View>
-            </View>
 
             {/* Tabs */}
             <View style={styles.tabContainer}>

@@ -12,6 +12,8 @@ import { decode } from 'base64-arraybuffer';
 
 import { LinearGradient } from 'expo-linear-gradient';
 
+import MapView, { Marker, Callout } from 'react-native-maps';
+
 export default function LocalBusinesses() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -20,6 +22,8 @@ export default function LocalBusinesses() {
   const [processingLink, setProcessingLink] = useState(false);
   const [businesses, setBusinesses] = useState([]);
   const [showModal, setShowModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState('list'); // 'list' or 'map'
   
   const [form, setForm] = useState({
     name: '',
@@ -284,6 +288,12 @@ export default function LocalBusinesses() {
     }
   };
 
+  const filteredBusinesses = businesses.filter(b => 
+    b.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    b.category?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    b.description?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   const renderBusinessCard = ({ item }) => {
     return (
       <TouchableOpacity 
@@ -340,6 +350,46 @@ export default function LocalBusinesses() {
     );
   };
 
+  const renderMapView = () => {
+    // Collect businesses with valid coordinates (mocked if not present for this exercise, or used if available)
+    // For now, we'll show a centered map with markers for all businesses
+    return (
+      <MapView
+        style={{ flex: 1 }}
+        initialRegion={{
+          latitude: 52.3082, // Redditch center
+          longitude: -1.9427,
+          latitudeDelta: 0.0922,
+          longitudeDelta: 0.0421,
+        }}
+        userInterfaceStyle="dark"
+      >
+        {filteredBusinesses.map((b) => (
+          <Marker
+            key={b.id}
+            coordinate={{
+              latitude: b.latitude || 52.3082 + (Math.random() - 0.5) * 0.01,
+              longitude: b.longitude || -1.9427 + (Math.random() - 0.5) * 0.01,
+            }}
+            title={b.name}
+            description={b.category}
+          >
+            <View style={{ backgroundColor: '#FFFFFF', padding: 5, borderRadius: 20, borderWidth: 2, borderColor: '#000' }}>
+               <Briefcase size={16} color="#000" />
+            </View>
+            <Callout onPress={() => handleOpenLink(b.link)}>
+              <View style={{ padding: 10, width: 200 }}>
+                <Text style={{ fontWeight: 'bold' }}>{b.name}</Text>
+                <Text style={{ fontSize: 12 }}>{b.category}</Text>
+                <Text style={{ fontSize: 10, marginTop: 5, color: '#666' }}>Tap to view on Google Maps</Text>
+              </View>
+            </Callout>
+          </Marker>
+        ))}
+      </MapView>
+    );
+  };
+
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -352,7 +402,33 @@ export default function LocalBusinesses() {
             <ChevronLeft color="#FFFFFF" size={24} strokeWidth={2} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>LOCAL BUSINESSES</Text>
-          <View style={{ width: 24 }} />
+          <TouchableOpacity 
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setViewMode(v => v === 'list' ? 'map' : 'list');
+            }}
+            style={styles.backButton}
+          >
+            <MapPin color={viewMode === 'map' ? "#4ADE80" : "#FFFFFF"} size={24} />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.searchSection}>
+          <View style={styles.searchBar}>
+            <Search size={18} color="rgba(255,255,255,0.4)" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search local businesses..."
+              placeholderTextColor="rgba(255,255,255,0.3)"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery ? (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <X size={18} color="rgba(255,255,255,0.4)" />
+              </TouchableOpacity>
+            ) : null}
+          </View>
         </View>
 
         {loading ? (
@@ -360,19 +436,21 @@ export default function LocalBusinesses() {
             <ActivityIndicator color="#FFFFFF" />
           </View>
         ) : (
-          <FlatList
-            data={businesses}
-            renderItem={renderBusinessCard}
-            keyExtractor={(item) => item.id.toString()}
-            contentContainerStyle={styles.listContent}
-            ListEmptyComponent={
-              <View style={styles.emptyState}>
-                <Briefcase size={48} color="rgba(255,255,255,0.1)" />
-                <Text style={styles.emptyText}>No businesses listed yet.</Text>
-                <Text style={styles.emptySubtext}>Promote your business here!</Text>
-              </View>
-            }
-          />
+          viewMode === 'list' ? (
+            <FlatList
+              data={filteredBusinesses}
+              renderItem={renderBusinessCard}
+              keyExtractor={(item) => item.id.toString()}
+              contentContainerStyle={styles.listContent}
+              ListEmptyComponent={
+                <View style={styles.emptyState}>
+                  <Briefcase size={48} color="rgba(255,255,255,0.1)" />
+                  <Text style={styles.emptyText}>No businesses found.</Text>
+                  <Text style={styles.emptySubtext}>Try a different search term.</Text>
+                </View>
+              }
+            />
+          ) : renderMapView()
         )}
 
         <TouchableOpacity 
@@ -524,6 +602,26 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  searchSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 44,
+    gap: 10,
+  },
+  searchInput: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontSize: 14,
   },
   headerTitle: {
     color: '#FFFFFF',

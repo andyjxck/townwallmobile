@@ -1,16 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Modal, Image, Platform, FlatList, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, Music, Youtube, Globe, Info, Plus, ExternalLink, ShieldCheck, Instagram, CheckCircle2, Star, Camera } from 'lucide-react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import { supabase } from '@/utils/supabase';
-import { getStoredUser } from '@/utils/user';
-import * as Haptics from 'expo-haptics';
-import Purchases from 'react-native-purchases';
-import { BlurView } from 'expo-blur';
-import * as ImagePicker from 'expo-image-picker';
-import { decode } from 'base64-arraybuffer';
+import { ChevronLeft, Music, Youtube, Globe, Info, Plus, ExternalLink, ShieldCheck, Instagram, CheckCircle2, Star, Camera, Search, X } from 'lucide-react-native';
 
 export default function LocalTalent() {
   const insets = useSafeAreaInsets();
@@ -19,7 +10,12 @@ export default function LocalTalent() {
   const [submitting, setSubmitting] = useState(false);
   const [talents, setTalents] = useState([]);
   const [showModal, setShowModal] = useState(false);
-    const [form, setForm] = useState({
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  
+  const categories = ['YouTuber', 'Podcaster', 'Musician', 'Artist', 'Developer', 'Photography', 'Other'];
+
+  const [form, setForm] = useState({
       name: '',
       title: '',
       platform: 'Youtube',
@@ -250,40 +246,96 @@ export default function LocalTalent() {
     );
   };
 
-    return (
-      <View style={styles.container}>
-        <LinearGradient
-          colors={['#0F172A', '#000000', '#000000']}
-          style={StyleSheet.absoluteFill}
-        />
-        <View style={{ paddingTop: insets.top, flex: 1 }}>
-          <View style={styles.header}>
-            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-              <ChevronLeft color="#FFFFFF" size={24} strokeWidth={2} />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>LOCAL TALENT</Text>
-            <View style={{ width: 24 }} />
-          </View>
+  const filteredTalents = talents.filter(t => {
+    const matchesSearch = t.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                         t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         t.description?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = !selectedCategory || t.category === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
 
-          {loading ? (
-            <View style={styles.centered}>
-              <ActivityIndicator color="#FFFFFF" />
-            </View>
-          ) : (
-            <FlatList
-              data={talents}
-              renderItem={renderTalentCard}
-              keyExtractor={(item) => item.id.toString()}
-              contentContainerStyle={styles.listContent}
-              ListEmptyComponent={
-                <View style={styles.emptyState}>
-                  <Music size={48} color="rgba(255,255,255,0.1)" />
-                  <Text style={styles.emptyText}>No talent showcased yet.</Text>
-                  <Text style={styles.emptySubtext}>Be the first to show off your skills!</Text>
-                </View>
-              }
+  return (
+    <View style={styles.container}>
+      <LinearGradient
+        colors={['#0F172A', '#000000', '#000000']}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={{ paddingTop: insets.top, flex: 1 }}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <ChevronLeft color="#FFFFFF" size={24} strokeWidth={2} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>LOCAL TALENT</Text>
+          <View style={{ width: 24 }} />
+        </View>
+
+        <View style={styles.searchSection}>
+          <View style={styles.searchBar}>
+            <Search size={18} color="rgba(255,255,255,0.4)" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search talent..."
+              placeholderTextColor="rgba(255,255,255,0.3)"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
             />
-          )}
+            {searchQuery ? (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <X size={18} color="rgba(255,255,255,0.4)" />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+          
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false} 
+            contentContainerStyle={styles.categoryScroll}
+          >
+            <TouchableOpacity 
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setSelectedCategory(null);
+              }}
+              style={[styles.categoryPill, !selectedCategory && styles.activeCategoryPill]}
+            >
+              <Text style={[styles.categoryPillText, !selectedCategory && styles.activeCategoryPillText]}>ALL</Text>
+            </TouchableOpacity>
+            {categories.map(cat => (
+              <TouchableOpacity 
+                key={cat}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setSelectedCategory(cat);
+                }}
+                style={[styles.categoryPill, selectedCategory === cat && styles.activeCategoryPill]}
+              >
+                <Text style={[styles.categoryPillText, selectedCategory === cat && styles.activeCategoryPillText]}>
+                  {cat.toUpperCase()}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        {loading ? (
+          <View style={styles.centered}>
+            <ActivityIndicator color="#FFFFFF" />
+          </View>
+        ) : (
+          <FlatList
+            data={filteredTalents}
+            renderItem={renderTalentCard}
+            keyExtractor={(item) => item.id.toString()}
+            contentContainerStyle={styles.listContent}
+            ListEmptyComponent={
+              <View style={styles.emptyState}>
+                <Music size={48} color="rgba(255,255,255,0.1)" />
+                <Text style={styles.emptyText}>No talent found.</Text>
+                <Text style={styles.emptySubtext}>Try a different search or category.</Text>
+              </View>
+            }
+          />
+        )}
 
           {/* Floating Action Button */}
           <TouchableOpacity 
@@ -433,6 +485,52 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  searchSection: {
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 12,
+    marginHorizontal: 20,
+    paddingHorizontal: 12,
+    height: 44,
+    gap: 10,
+  },
+  searchInput: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontSize: 14,
+  },
+  categoryScroll: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    gap: 10,
+  },
+  categoryPill: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  activeCategoryPill: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#FFFFFF',
+  },
+  categoryPillText: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  activeCategoryPillText: {
+    color: '#000000',
   },
   headerTitle: {
     color: '#FFFFFF',
