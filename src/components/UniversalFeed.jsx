@@ -41,12 +41,15 @@ import {
     MessageCircle,
       Bell,
       Trash2,
+      LayoutGrid,
+      Hash,
     } from "lucide-react-native";
 import { getDeviceId } from "../utils/deviceId";
 import { supabase } from "../utils/supabase";
 import * as Haptics from "expo-haptics";
 import { useTheme } from "../utils/theme";
 import { Image } from "expo-image";
+import { LinearGradient } from 'expo-linear-gradient';
 import { getStoredUser, logoutUser } from "../utils/user";
 import { useAuthStore } from "../utils/auth/store";
 import { TextInput } from "react-native-gesture-handler";
@@ -86,8 +89,10 @@ export default function UniversalFeed() {
   const [selectedZone, setSelectedZone] = useState(null);
   const [selectedTag, setSelectedTag] = useState(null);
   const [sortBy, setSortBy] = useState('newest');
-  const [showMenu, setShowMenu] = useState(false);
-  const [isModerator, setIsModerator] = useState(false);
+    const [showMenu, setShowMenu] = useState(false);
+    const [showZones, setShowZones] = useState(false);
+    const [showTags, setShowTags] = useState(false);
+    const [isModerator, setIsModerator] = useState(false);
   const user = useAuthStore(state => state.auth);
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -317,7 +322,33 @@ export default function UniversalFeed() {
       
         <View style={{ paddingTop: insets.top }}>
             <View style={styles.header}>
-              <Text style={[styles.logo, { color: '#FFFFFF' }]}>TOWN WALL</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 15 }}>
+                <Image 
+                  source={require('../../assets/images/icon.png')} 
+                  style={{ width: 32, height: 32, borderRadius: 8 }}
+                  contentFit="contain"
+                />
+                <TouchableOpacity 
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setShowZones(!showZones);
+                    setShowTags(false);
+                  }}
+                  style={{ padding: 4 }}
+                >
+                  <LayoutGrid size={22} color={showZones ? "#FFFFFF" : "rgba(255,255,255,0.4)"} />
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setShowTags(!showTags);
+                    setShowZones(false);
+                  }}
+                  style={{ padding: 4 }}
+                >
+                  <Hash size={22} color={showTags ? "#FFFFFF" : "rgba(255,255,255,0.4)"} />
+                </TouchableOpacity>
+              </View>
                 <View style={styles.headerActions}>
                   <TouchableOpacity 
                     onPress={() => {
@@ -416,53 +447,57 @@ export default function UniversalFeed() {
           )}
 
           <View style={styles.filterSection}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            {showZones && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <FlatList
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.filterList}
+                  data={[{ id: null, name: 'ALL ZONES' }, ...zones]}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      onPress={() => setSelectedZone(item.id)}
+                      style={styles.filterPill}
+                    >
+                      <Text style={[
+                        styles.filterText,
+                        { color: selectedZone === item.id ? '#FFFFFF' : 'rgba(255,255,255,0.4)', 
+                          fontWeight: selectedZone === item.id ? '800' : '400' }
+                      ]}>
+                        {item.name.toUpperCase()}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                  keyExtractor={item => `zone-${item.id}`}
+                />
+              </View>
+            )}
+
+            {showTags && (
               <FlatList
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.filterList}
-                data={[{ id: null, name: 'ALL ZONES' }, ...zones]}
+                contentContainerStyle={[styles.filterList, { marginTop: showZones ? 4 : 0 }]}
+                data={[{ id: null, name: 'EVERYTHING' }, ...tags]}
                 renderItem={({ item }) => (
                   <TouchableOpacity
-                    onPress={() => setSelectedZone(item.id)}
+                    onPress={() => setSelectedTag(item.id)}
                     style={styles.filterPill}
                   >
                     <Text style={[
                       styles.filterText,
-                      { color: selectedZone === item.id ? '#FFFFFF' : 'rgba(255,255,255,0.4)', 
-                        fontWeight: selectedZone === item.id ? '800' : '400' }
+                      { color: selectedTag === item.id ? '#FFFFFF' : 'rgba(255,255,255,0.4)',
+                        fontWeight: selectedTag === item.id ? '800' : '400',
+                        fontSize: 11 }
                     ]}>
-                      {item.name.toUpperCase()}
+                      #{item.name.toUpperCase().replace(/\s+/g, '')}
                     </Text>
                   </TouchableOpacity>
                 )}
-                keyExtractor={item => `zone-${item.id}`}
+                keyExtractor={item => `tag-${item.id}`}
               />
-            </View>
-
-          <FlatList
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={[styles.filterList, { marginTop: 4 }]}
-            data={[{ id: null, name: 'EVERYTHING' }, ...tags]}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                onPress={() => setSelectedTag(item.id)}
-                style={styles.filterPill}
-              >
-                <Text style={[
-                  styles.filterText,
-                  { color: selectedTag === item.id ? '#FFFFFF' : 'rgba(255,255,255,0.4)',
-                    fontWeight: selectedTag === item.id ? '800' : '400',
-                    fontSize: 11 }
-                ]}>
-                  #{item.name.toUpperCase().replace(/\s+/g, '')}
-                </Text>
-              </TouchableOpacity>
             )}
-            keyExtractor={item => `tag-${item.id}`}
-          />
-        </View>
+          </View>
       </View>
 
       {loading && !refreshing ? (
