@@ -21,7 +21,9 @@ import {
   Clock, 
   Search,
   User as UserIcon,
-  Shield 
+  Shield,
+  UserPlus,
+  Users
 } from "lucide-react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
@@ -29,6 +31,7 @@ import * as FileSystem from "expo-file-system";
 import * as Haptics from "expo-haptics";
 import { decode } from "base64-arraybuffer";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { TextInput } from "react-native-gesture-handler";
 
 const EMOJIS = ["👤", "🦊", "🐯", "🐼", "🦁", "🐨", "🐸", "🤖", "👻", "👽"];
 
@@ -43,6 +46,11 @@ export default function Profile() {
   const [replies, setReplies] = useState([]);
   const [lostFound, setLostFound] = useState([]);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [friendUsername, setFriendUsername] = useState("");
+  const [friends, setFriends] = useState([]);
+  const [personalFeed, setPersonalFeed] = useState([]);
+  const [addingFriend, setAddingFriend] = useState(false);
+  const [activeTab, setActiveTab] = useState("personal"); // personal, replies, lostfound
 
   useEffect(() => {
     loadData();
@@ -82,6 +90,52 @@ export default function Profile() {
           .eq('user_id', userData.id);
         
         setStats({ posts: postCount || 0 });
+
+        // Fetch Friends
+        const { data: friendData } = await supabase
+          .from('friends')
+          .select('friend_id, rusers!friends_friend_id_fkey(id, username, emoji_icon, avatar_url)')
+          .eq('user_id', userData.id)
+          .eq('status', 'accepted');
+        
+        const friendsList = friendData?.map(f => f.rusers) || [];
+        setFriends(friendsList);
+
+        // Fetch Personal Feed (Self + Friends)
+        const userIds = [userData.id, ...friendsList.map(f => f.id)];
+        
+        const { data: feedPosts } = await supabase
+          .from('rposts')
+          .select(`
+            *,
+            rusers (username, emoji_icon, avatar_url),
+            rzones (name),
+            rtags (name)
+          `)
+          .in('user_id', userIds)
+          .eq('is_deleted', false)
+          .order('created_at', { ascending: false })
+          .limit(20);
+        
+        // Also fetch replies for these users to include in the personal feed
+        const { data: feedReplies } = await supabase
+          .from('rcomments')
+          .select(`
+            *,
+            rusers (username, emoji_icon, avatar_url),
+            rposts (title, id)
+          `)
+          .in('user_id', userIds)
+          .order('created_at', { ascending: false })
+          .limit(20);
+
+        // Combine and sort
+        const combined = [
+          ...(feedPosts || []).map(p => ({ ...p, type: 'post' })),
+          ...(feedReplies || []).map(r => ({ ...r, type: 'reply' }))
+        ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+        setPersonalFeed(combined);
 
         // Fetch replies to user's posts
         const { data: userPosts } = await supabase
@@ -192,6 +246,61 @@ export default function Profile() {
     }
   };
 
+  const handleAddFriend = async () => {
+    if (!friendUsername.trim()) return;
+    if (friendUsername.trim() === user.username) {
+      Alert.alert("Error", "You cannot add yourself as a friend.");
+      return;
+    }
+
+    setAddingFriend(true);
+    try {
+      // Find user by username
+      const { data: targetUser, error: findError } = await supabase
+        .from('rusers')
+        .select('id, username')
+        .ilike('username', friendUsername.trim())
+        .single();
+      
+      if (findError || !targetUser) {
+        Alert.alert("Error", "User not found.");
+        return;
+      }
+
+      // Check if already friends
+      const { data: existing } = await supabase
+        .from('friends')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('friend_id', targetUser.id)
+        .single();
+      
+      if (existing) {
+        Alert.alert("Notice", "You are already friends with this user.");
+        return;
+      }
+
+      // Add friend
+      const { error: addError } = await supabase
+        .from('friends')
+        .insert([
+          { user_id: user.id, friend_id: targetUser.id, status: 'accepted' },
+          { user_id: targetUser.id, friend_id: user.id, status: 'accepted' } // Reciprocal for simplicity
+        ]);
+      
+      if (addError) throw addError;
+
+      Alert.alert("Success", `Added @${targetUser.username} as a friend!`);
+      setFriendUsername("");
+      loadData();
+    } catch (error) {
+      console.error("Error adding friend:", error);
+      Alert.alert("Error", "Failed to add friend.");
+    } finally {
+      setAddingFriend(false);
+    }
+  };
+
   const handleLogout = async () => {
     Alert.alert("Sign Out", "Are you sure you want to sign out?", [
       { text: "Cancel", style: "cancel" },
@@ -272,68 +381,198 @@ export default function Profile() {
             )}
           </View>
 
-          <View style={styles.statsRow}>
-            <View style={styles.statBox}>
-              <Text style={styles.statValue}>{stats.posts}</Text>
-              <Text style={styles.statLabel}>POSTS</Text>
+            <View style={styles.statsRow}>
+              <View style={styles.statBox}>
+                <Text style={styles.statValue}>{stats.posts}</Text>
+                <Text style={styles.statLabel}>POSTS</Text>
+              </View>
+              <View style={styles.statBox}>
+                <Text style={styles.statValue}>{friends.length}</Text>
+                <Text style={styles.statLabel}>FRIENDS</Text>
+              </View>
+              <View style={styles.statBox}>
+                <Text style={styles.statValue}>{replies.length}</Text>
+                <Text style={styles.statLabel}>REPLIES</Text>
+              </View>
             </View>
-            <View style={styles.statBox}>
-              <Text style={styles.statValue}>{replies.length}</Text>
-              <Text style={styles.statLabel}>REPLIES</Text>
-            </View>
-          </View>
 
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <MessageSquare size={18} color="#FFFFFF" />
-              <Text style={styles.sectionTitle}>RECENT REPLIES</Text>
+            {/* Tabs */}
+            <View style={styles.tabContainer}>
+              <TouchableOpacity 
+                style={[styles.tab, activeTab === "personal" && styles.activeTab]}
+                onPress={() => setActiveTab("personal")}
+              >
+                <Text style={[styles.tabText, activeTab === "personal" && styles.activeTabText]}>PERSONAL</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.tab, activeTab === "replies" && styles.activeTab]}
+                onPress={() => setActiveTab("replies")}
+              >
+                <Text style={[styles.tabText, activeTab === "replies" && styles.activeTabText]}>REPLIES</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.tab, activeTab === "lostfound" && styles.activeTab]}
+                onPress={() => setActiveTab("lostfound")}
+              >
+                <Text style={[styles.tabText, activeTab === "lostfound" && styles.activeTabText]}>MY L&F</Text>
+              </TouchableOpacity>
             </View>
-            {replies.length > 0 ? (
-              replies.map((reply) => (
-                <View key={reply.id} style={styles.replyCard}>
-                  <View style={styles.replyHeader}>
-                    <Text style={styles.replyUser}>
-                      {reply.rusers?.emoji_icon} @{reply.rusers?.username}
-                    </Text>
-                    <Text style={styles.replyTime}>{getTimeAgo(new Date(reply.created_at))}</Text>
+
+            {activeTab === "personal" && (
+              <View style={styles.personalSection}>
+                {/* Add Friend Row */}
+                <View style={styles.addFriendContainer}>
+                  <View style={styles.searchInputWrapper}>
+                    <Search size={16} color="rgba(255,255,255,0.4)" />
+                    <TextInput
+                      style={styles.searchInput}
+                      placeholder="Add friend by username..."
+                      placeholderTextColor="rgba(255,255,255,0.3)"
+                      value={friendUsername}
+                      onChangeText={setFriendUsername}
+                      autoCapitalize="none"
+                    />
                   </View>
-                  <Text style={styles.replyText}>{reply.text}</Text>
-                  <Text style={styles.replyTarget}>on "{reply.rposts?.title}"</Text>
+                  <TouchableOpacity 
+                    style={[styles.addButton, !friendUsername && { opacity: 0.5 }]} 
+                    onPress={handleAddFriend}
+                    disabled={!friendUsername || addingFriend}
+                  >
+                    {addingFriend ? (
+                      <ActivityIndicator size="small" color="#000000" />
+                    ) : (
+                      <UserPlus size={18} color="#000000" />
+                    )}
+                  </TouchableOpacity>
                 </View>
-              ))
-            ) : (
-              <Text style={styles.emptyText}>No replies yet.</Text>
-            )}
-          </View>
 
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Search size={18} color="#FFFFFF" />
-              <Text style={styles.sectionTitle}>ACTIVE LOST & FOUND</Text>
-            </View>
-            {lostFound.length > 0 ? (
-              lostFound.map((post) => (
-                <TouchableOpacity 
-                  key={post.id} 
-                  style={styles.postCard}
-                  onPress={() => router.push(`/?postId=${post.id}`)}
-                >
-                  <View style={styles.postInfo}>
-                    <Text style={styles.postTitle}>{post.title}</Text>
-                    <View style={styles.postMeta}>
-                      <Clock size={12} color="rgba(255,255,255,0.4)" />
-                      <Text style={styles.postTime}>{new Date(post.created_at).toLocaleDateString()}</Text>
-                    </View>
+                {/* Friends "Stories" Row */}
+                {friends.length > 0 && (
+                  <View style={styles.storiesContainer}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storiesScroll}>
+                      <TouchableOpacity style={styles.storyItem}>
+                        <View style={[styles.storyAvatar, styles.myStory]}>
+                          <Text style={styles.storyEmoji}>{user?.emoji_icon || "👤"}</Text>
+                        </View>
+                        <Text style={styles.storyName}>You</Text>
+                      </TouchableOpacity>
+                      {friends.map((friend) => (
+                        <TouchableOpacity key={friend.id} style={styles.storyItem}>
+                          <View style={styles.storyAvatar}>
+                            {friend.avatar_url ? (
+                              <Image source={{ uri: friend.avatar_url }} style={styles.storyImage} />
+                            ) : (
+                              <Text style={styles.storyEmoji}>{friend.emoji_icon || "👤"}</Text>
+                            )}
+                          </View>
+                          <Text style={styles.storyName}>{friend.username}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
                   </View>
-                  {post.image_url && (
-                    <Image source={{ uri: post.image_url }} style={styles.postThumb} />
+                )}
+
+                {/* Personal Feed */}
+                <View style={styles.feedList}>
+                  {personalFeed.length > 0 ? (
+                    personalFeed.map((item, index) => (
+                      <TouchableOpacity 
+                        key={`${item.type}-${item.id}`} 
+                        style={styles.feedItem}
+                        onPress={() => item.type === 'post' ? router.push(`/?postId=${item.id}`) : router.push(`/?postId=${item.post_id}`)}
+                      >
+                        <View style={styles.feedItemHeader}>
+                          <View style={styles.feedUser}>
+                            {item.rusers?.avatar_url ? (
+                              <Image source={{ uri: item.rusers.avatar_url }} style={styles.feedAvatar} />
+                            ) : (
+                              <Text style={styles.feedEmoji}>{item.rusers?.emoji_icon || "👤"}</Text>
+                            )}
+                            <View>
+                              <Text style={styles.feedUsername}>@{item.rusers?.username}</Text>
+                              <Text style={styles.feedMeta}>
+                                {item.type === 'post' ? 'Posted' : 'Replied'} · {getTimeAgo(new Date(item.created_at))}
+                              </Text>
+                            </View>
+                          </View>
+                        </View>
+                        <Text style={styles.feedText} numberOfLines={3}>{item.text}</Text>
+                        {item.type === 'reply' && (
+                          <View style={styles.replyContext}>
+                            <Text style={styles.replyContextText}>on "{item.rposts?.title}"</Text>
+                          </View>
+                        )}
+                        {item.image_url && (
+                          <Image source={{ uri: item.image_url }} style={styles.feedImage} />
+                        )}
+                      </TouchableOpacity>
+                    ))
+                  ) : (
+                    <View style={styles.emptyFeed}>
+                      <Users size={40} color="rgba(255,255,255,0.1)" />
+                      <Text style={styles.emptyText}>Add friends to see their posts and replies here!</Text>
+                    </View>
                   )}
-                </TouchableOpacity>
-              ))
-            ) : (
-              <Text style={styles.emptyText}>No active lost & found posts.</Text>
+                </View>
+              </View>
             )}
-          </View>
+
+            {activeTab === "replies" && (
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <MessageSquare size={18} color="#FFFFFF" />
+                  <Text style={styles.sectionTitle}>RECENT REPLIES TO YOU</Text>
+                </View>
+                {replies.length > 0 ? (
+                  replies.map((reply) => (
+                    <View key={reply.id} style={styles.replyCard}>
+                      <View style={styles.replyHeader}>
+                        <Text style={styles.replyUser}>
+                          {reply.rusers?.emoji_icon} @{reply.rusers?.username}
+                        </Text>
+                        <Text style={styles.replyTime}>{getTimeAgo(new Date(reply.created_at))}</Text>
+                      </View>
+                      <Text style={styles.replyText}>{reply.text}</Text>
+                      <Text style={styles.replyTarget}>on "{reply.rposts?.title}"</Text>
+                    </View>
+                  ))
+                ) : (
+                  <Text style={styles.emptyText}>No replies yet.</Text>
+                )}
+              </View>
+            )}
+
+            {activeTab === "lostfound" && (
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Search size={18} color="#FFFFFF" />
+                  <Text style={styles.sectionTitle}>MY LOST & FOUND</Text>
+                </View>
+                {lostFound.length > 0 ? (
+                  lostFound.map((post) => (
+                    <TouchableOpacity 
+                      key={post.id} 
+                      style={styles.postCard}
+                      onPress={() => router.push(`/?postId=${post.id}`)}
+                    >
+                      <View style={styles.postInfo}>
+                        <Text style={styles.postTitle}>{post.title}</Text>
+                        <View style={styles.postMeta}>
+                          <Clock size={12} color="rgba(255,255,255,0.4)" />
+                          <Text style={styles.postTime}>{new Date(post.created_at).toLocaleDateString()}</Text>
+                        </View>
+                      </View>
+                      {post.image_url && (
+                        <Image source={{ uri: post.image_url }} style={styles.postThumb} />
+                      )}
+                    </TouchableOpacity>
+                  ))
+                ) : (
+                  <Text style={styles.emptyText}>No active lost & found posts.</Text>
+                )}
+              </View>
+            )}
+
 
           <View style={{ height: 100 }} />
         </ScrollView>
@@ -488,6 +727,163 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     marginTop: 6,
     letterSpacing: 2,
+  },
+  tabContainer: {
+    flexDirection: "row",
+    paddingHorizontal: 20,
+    marginBottom: 25,
+    gap: 10,
+  },
+  tab: {
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  activeTab: {
+    backgroundColor: "#FFFFFF",
+  },
+  tabText: {
+    color: "rgba(255,255,255,0.4)",
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1,
+  },
+  activeTabText: {
+    color: "#000000",
+  },
+  personalSection: {
+    paddingBottom: 20,
+  },
+  addFriendContainer: {
+    flexDirection: "row",
+    paddingHorizontal: 20,
+    marginBottom: 25,
+    gap: 12,
+  },
+  searchInputWrapper: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 15,
+    paddingHorizontal: 15,
+    gap: 10,
+  },
+  searchInput: {
+    flex: 1,
+    height: 45,
+    color: "#FFFFFF",
+    fontSize: 14,
+  },
+  addButton: {
+    width: 45,
+    height: 45,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 15,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  storiesContainer: {
+    marginBottom: 30,
+  },
+  storiesScroll: {
+    paddingHorizontal: 20,
+    gap: 20,
+  },
+  storyItem: {
+    alignItems: "center",
+    gap: 8,
+  },
+  storyAvatar: {
+    width: 65,
+    height: 65,
+    borderRadius: 32.5,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#3B82F6",
+    padding: 2,
+  },
+  myStory: {
+    borderColor: "rgba(255,255,255,0.2)",
+  },
+  storyImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 30,
+  },
+  storyEmoji: {
+    fontSize: 30,
+  },
+  storyName: {
+    color: "rgba(255,255,255,0.6)",
+    fontSize: 10,
+    fontWeight: "700",
+  },
+  feedList: {
+    paddingHorizontal: 20,
+  },
+  feedItem: {
+    backgroundColor: "rgba(255,255,255,0.03)",
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 15,
+  },
+  feedItemHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  feedUser: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  feedAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+  },
+  feedEmoji: {
+    fontSize: 24,
+  },
+  feedUsername: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  feedMeta: {
+    color: "rgba(255,255,255,0.3)",
+    fontSize: 11,
+  },
+  feedText: {
+    color: "rgba(255,255,255,0.8)",
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  feedImage: {
+    width: "100%",
+    height: 200,
+    borderRadius: 15,
+    marginTop: 15,
+  },
+  replyContext: {
+    marginTop: 8,
+    paddingLeft: 10,
+    borderLeftWidth: 2,
+    borderLeftColor: "rgba(255,255,255,0.1)",
+  },
+  replyContextText: {
+    color: "rgba(255,255,255,0.3)",
+    fontSize: 12,
+    fontStyle: "italic",
+  },
+  emptyFeed: {
+    alignItems: "center",
+    paddingVertical: 50,
+    gap: 15,
   },
   section: {
     paddingHorizontal: 20,
