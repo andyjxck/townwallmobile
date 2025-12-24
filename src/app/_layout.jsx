@@ -44,18 +44,17 @@ export default function RootLayout() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
           <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              animation: "slide_from_right",
-            }}
-          >
-            <Stack.Screen name="index" />
-            <Stack.Screen name="onboarding/welcome" />
-            <Stack.Screen name="onboarding/zones" />
-            <Stack.Screen name="feed" />
-            <Stack.Screen
-              name="post"
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                animation: "slide_from_right",
+              }}
+            >
+              <Stack.Screen name="index" />
+              <Stack.Screen name="onboarding/welcome" />
+              <Stack.Screen name="onboarding/zones" />
+              <Stack.Screen
+                name="post"
               options={{
                   presentation: "modal",
                   animation: "slide_from_bottom",

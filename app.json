@@ -2,27 +2,29 @@
   "expo": {
     "name": "Town Wall",
     "version": "1.0.0",
+    "scheme": "townwall",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "ios": {
-      "supportsTablet": true,
-      "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
-      }
-    },
-    "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+      "ios": {
+        "supportsTablet": true,
+        "bundleIdentifier": "com.andyjxck.townwall",
+        "infoPlist": {
+          "ITSAppUsesNonExemptEncryption": false
+        }
       },
-      "permissions": [
-        "android.permission.RECORD_AUDIO",
-        "android.permission.MODIFY_AUDIO_SETTINGS"
-      ],
-      "package": "xyz.create.CreateExpoEnvironment"
-    },
+      "android": {
+        "adaptiveIcon": {
+          "foregroundImage": "./assets/images/adaptive-icon.png",
+          "backgroundColor": "#ffffff"
+        },
+        "permissions": [
+          "android.permission.RECORD_AUDIO",
+          "android.permission.MODIFY_AUDIO_SETTINGS"
+        ],
+        "package": "com.andyjxck.townwall"
+      },
       "plugins": [
         [
           "expo-image-picker",

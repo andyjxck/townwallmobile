@@ -40,7 +40,7 @@ export default function ZonesScreen() {
 
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await completeOnboarding(selectedZone.id);
-    router.replace("/(tabs)/central");
+    router.replace("/");
   };
 
   return (
