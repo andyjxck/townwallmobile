@@ -20,8 +20,10 @@ import {
   MessageSquare, 
   Clock, 
   Search,
-  User as UserIcon 
+  User as UserIcon,
+  Shield 
 } from "lucide-react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
 import * as Haptics from "expo-haptics";
@@ -47,13 +49,28 @@ export default function Profile() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const userData = await getStoredUser();
-      if (!userData) {
-        const freshUser = await initUser();
-        setUser(freshUser);
-      } else {
-        setUser(userData);
+      let userData = await getStoredUser();
+      
+      // Always fetch latest from DB to ensure is_admin is up to date
+      if (userData?.id) {
+        const { data: freshUser, error } = await supabase
+          .from('rusers')
+          .select('*')
+          .eq('id', userData.id)
+          .single();
+        
+        if (freshUser && !error) {
+          userData = freshUser;
+          // Update storage
+          await AsyncStorage.setItem("@redditch_user_data", JSON.stringify(freshUser));
+        }
       }
+
+      if (!userData) {
+        userData = await initUser();
+      }
+      
+      setUser(userData);
 
       if (userData) {
         // Fetch stats
@@ -228,7 +245,17 @@ export default function Profile() {
             {user?.supabase_uid ? "Authenticated Account" : "Anonymous Ghost User"}
           </Text>
 
-          {!user?.supabase_uid && (
+          {user?.is_admin && (
+            <TouchableOpacity 
+              style={[styles.authButton, { backgroundColor: '#FBBF24' }]} 
+              onPress={() => router.push("/admin")}
+            >
+              <Shield size={14} color="#000000" />
+              <Text style={[styles.authButtonText, { color: '#000000' }]}>MODERATION PANEL</Text>
+            </TouchableOpacity>
+          )}
+
+          {!user?.supabase_uid && !user?.is_admin && (
             <TouchableOpacity 
               style={styles.authButton} 
               onPress={() => router.push("/auth")}
