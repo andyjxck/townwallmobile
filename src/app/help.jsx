@@ -53,22 +53,38 @@ export default function HelpContact() {
             event: 'INSERT', 
             table: 'rhelp_messages'
           }, 
-          payload => {
-            const newMsg = payload.new;
-            // Filter in JS to ensure privacy and fix "showing up in every chat" issue
-            if (Number(newMsg.sender_id) === Number(currentUser.id) || Number(newMsg.receiver_id) === Number(currentUser.id)) {
-              setMessages(prev => {
-                if (prev.find(m => m.id === newMsg.id)) return prev;
-                
-                if (Number(newMsg.receiver_id) === Number(currentUser.id)) {
-                  if (newMsg.status === 'resolved' || newMsg.content.includes("Please rate 1-5")) {
-                    setShowRating(true);
+            payload => {
+              const newMsg = payload.new;
+              // Filter in JS to ensure privacy and fix "showing up in every chat" issue
+              if (Number(newMsg.sender_id) === Number(currentUser.id) || Number(newMsg.receiver_id) === Number(currentUser.id)) {
+                setMessages(prev => {
+                  // Already exists?
+                  if (prev.find(m => m.id === newMsg.id)) return prev;
+                  
+                  // Check for optimistic match to replace (match by content and sender)
+                  const optimisticIdx = prev.findIndex(m => 
+                    m.sender_id === newMsg.sender_id && 
+                    m.content === newMsg.content && 
+                    m.id > 1000000000000 // Date.now() timestamp
+                  );
+
+                  let newMessages;
+                  if (optimisticIdx !== -1) {
+                    newMessages = [...prev];
+                    newMessages[optimisticIdx] = newMsg;
+                  } else {
+                    newMessages = [...prev, newMsg];
                   }
-                }
-                return [...prev, newMsg];
-              });
+                  
+                  if (Number(newMsg.receiver_id) === Number(currentUser.id)) {
+                    if (newMsg.status === 'resolved' || newMsg.content.includes("Please rate 1-5")) {
+                      setShowRating(true);
+                    }
+                  }
+                  return newMessages;
+                });
+              }
             }
-          }
         )
         .on('postgres_changes',
           {
@@ -165,33 +181,40 @@ export default function HelpContact() {
   
         const text = inputText.trim();
         setInputText('');
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  
-        // Optimistic update
-        const tempId = Date.now();
-        const tempMsg = {
-          id: tempId,
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    // Optimistic update
+    const tempId = Date.now();
+    const tempMsg = {
+      id: tempId,
+      sender_id: currentUser.id,
+      content: text,
+      is_from_admin: false,
+      created_at: new Date().toISOString(),
+      status: 'open'
+    };
+    setMessages(prev => [...prev, tempMsg]);
+
+    try {
+      const { data: realMsg, error } = await supabase
+        .from('rhelp_messages')
+        .insert({
           sender_id: currentUser.id,
           content: text,
-          is_from_admin: false,
-          created_at: new Date().toISOString(),
-          status: 'open'
-        };
-        setMessages(prev => [...prev, tempMsg]);
-  
-        try {
-          const { error } = await supabase
-            .from('rhelp_messages')
-            .insert({
-              sender_id: currentUser.id,
-              content: text,
-              is_from_admin: false
-            });
-  
-          if (error) throw error;
-  
-          // AI Assistant Response
-          const history = messages.slice(-5).map(m => ({
+          is_from_admin: false
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Update optimistic message with real one
+      if (realMsg) {
+        setMessages(prev => prev.map(m => m.id === tempId ? realMsg : m));
+      }
+
+      // AI Assistant Response
+      const history = messages.slice(-5).map(m => ({
             role: m.is_from_admin ? 'assistant' : 'user',
             content: m.content
           }));
