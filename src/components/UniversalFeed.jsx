@@ -409,68 +409,66 @@ function PostItem({ item, deviceId, onReaction, onComment, onDelete, onShare, us
       )}
 
         <View style={styles.actionRow}>
-          <TouchableOpacity
-            onPress={() => onReaction(item.id, "helpful", userReactions.helpful)}
-            style={styles.actionButton}
-          >
-            <Heart
-              size={18}
-              color={userReactions.helpful ? "#F43F5E" : "rgba(255,255,255,0.4)"}
-              fill={userReactions.helpful ? "#F43F5E" : "transparent"}
-            />
-            <Text style={[styles.actionCount, { color: userReactions.helpful ? "#F43F5E" : "rgba(255,255,255,0.4)" }]}>
-              {helpfulCount || 0} Likes
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => onReaction(item.id, "seen", userReactions.seen)}
-            style={styles.actionButton}
-          >
-            <Star
-              size={18}
-              color={userReactions.seen ? "#F59E0B" : "rgba(255,255,255,0.4)"}
-              fill={userReactions.seen ? "#F59E0B" : "transparent"}
-            />
-            <Text style={[styles.actionCount, { color: userReactions.seen ? "#F59E0B" : "rgba(255,255,255,0.4)" }]}>
-              {seenCount || 0} Super Likes
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => onReaction(item.id, "fake", userReactions.fake)}
-            style={styles.actionButton}
-          >
-            <Flag
-              size={18}
-              color={userReactions.fake ? "#EF4444" : "rgba(255,255,255,0.4)"}
-              fill={userReactions.fake ? "#EF4444" : "transparent"}
-            />
-            <Text style={[styles.actionCount, { color: userReactions.fake ? "#EF4444" : "rgba(255,255,255,0.4)" }]}>
-              {fakeCount || 0} Flag (False)
-            </Text>
-          </TouchableOpacity>
-
-          {user?.id === item.user_id && (
             <TouchableOpacity
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                onDelete(item.id);
-              }}
+              onPress={() => onReaction(item.id, "helpful", userReactions.helpful)}
               style={styles.actionButton}
             >
-              <Trash2 size={18} color="rgba(239, 68, 68, 0.4)" />
-              <Text style={[styles.actionCount, { color: "rgba(255,255,255,0.4)" }]}>Trash</Text>
+              <Heart
+                size={18}
+                color={userReactions.helpful ? "#F43F5E" : "rgba(255,255,255,0.4)"}
+                fill={userReactions.helpful ? "#F43F5E" : "transparent"}
+              />
+              <Text style={[styles.actionCount, { color: userReactions.helpful ? "#F43F5E" : "rgba(255,255,255,0.4)" }]}>
+                {helpfulCount || 0}
+              </Text>
             </TouchableOpacity>
-          )}
 
-          <TouchableOpacity
-            onPress={() => onShare(item)}
-            style={styles.actionButton}
-          >
-            <ShareIcon size={18} color="rgba(255,255,255,0.4)" />
-            <Text style={[styles.actionCount, { color: "rgba(255,255,255,0.4)" }]}>Share</Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => onReaction(item.id, "seen", userReactions.seen)}
+              style={styles.actionButton}
+            >
+              <Star
+                size={18}
+                color={userReactions.seen ? "#F59E0B" : "rgba(255,255,255,0.4)"}
+                fill={userReactions.seen ? "#F59E0B" : "transparent"}
+              />
+              <Text style={[styles.actionCount, { color: userReactions.seen ? "#F59E0B" : "rgba(255,255,255,0.4)" }]}>
+                {seenCount || 0}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => onReaction(item.id, "fake", userReactions.fake)}
+              style={styles.actionButton}
+            >
+              <Flag
+                size={18}
+                color={userReactions.fake ? "#EF4444" : "rgba(255,255,255,0.4)"}
+                fill={userReactions.fake ? "#EF4444" : "transparent"}
+              />
+              <Text style={[styles.actionCount, { color: userReactions.fake ? "#EF4444" : "rgba(255,255,255,0.4)" }]}>
+                {fakeCount || 0}
+              </Text>
+            </TouchableOpacity>
+
+            {user?.id === item.user_id && (
+              <TouchableOpacity
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  onDelete(item.id);
+                }}
+                style={styles.actionButton}
+              >
+                <Trash2 size={18} color="rgba(239, 68, 68, 0.4)" />
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              onPress={() => onShare(item)}
+              style={styles.actionButton}
+            >
+              <ShareIcon size={18} color="rgba(255,255,255,0.4)" />
+            </TouchableOpacity>
         </View>
     </View>
   );
