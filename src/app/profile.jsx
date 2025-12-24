@@ -13,6 +13,7 @@ import {
 import { useRouter } from "expo-router";
 import { supabase } from "@/utils/supabase";
 import { getStoredUser, logoutUser, initUser } from "@/utils/user";
+import { getDeviceId } from "@/utils/deviceId";
 import { 
   ChevronLeft, 
   Camera, 
@@ -50,9 +51,12 @@ export default function Profile() {
   const [friends, setFriends] = useState([]);
   const [personalFeed, setPersonalFeed] = useState([]);
   const [addingFriend, setAddingFriend] = useState(false);
-  const [activeTab, setActiveTab] = useState("personal"); // personal, replies, lostfound
+  const [userPosts, setUserPosts] = useState([]);
+  const [activeTab, setActiveTab] = useState("posts"); // posts, friends, replies
+  const [deviceId, setDeviceId] = useState(null);
 
   useEffect(() => {
+    getDeviceId().then(setDeviceId);
     loadData();
   }, []);
 
@@ -61,7 +65,6 @@ export default function Profile() {
     try {
       let userData = await getStoredUser();
       
-      // Always fetch latest from DB to ensure is_admin is up to date
       if (userData?.id) {
         const { data: freshUser, error } = await supabase
           .from('rusers')
@@ -71,7 +74,6 @@ export default function Profile() {
         
         if (freshUser && !error) {
           userData = freshUser;
-          // Update storage
           await AsyncStorage.setItem("@redditch_user_data", JSON.stringify(freshUser));
         }
       }
@@ -82,23 +84,39 @@ export default function Profile() {
       
       setUser(userData);
 
-    if (userData) {
-          // Fetch stats
-          const { count: postCount } = await supabase
-            .from('rposts')
-            .select('*', { count: 'exact', head: true })
-            .eq('user_id', userData.id);
-          
-          const { count: reactionCount } = await supabase
-            .from('rreactions')
-            .select('*, rposts!inner(user_id)', { count: 'exact', head: true })
-            .eq('rposts.user_id', userData.id);
-          
-          setStats({ 
-            posts: postCount || 0,
-            reactions: reactionCount || 0,
-            joined: new Date(userData.created_at).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
-          });
+      if (userData) {
+        // Fetch stats
+        const { count: postCount } = await supabase
+          .from('rposts')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', userData.id);
+        
+        const { count: reactionCount } = await supabase
+          .from('rreactions')
+          .select('*, rposts!inner(user_id)', { count: 'exact', head: true })
+          .eq('rposts.user_id', userData.id);
+        
+        setStats({ 
+          posts: postCount || 0,
+          reactions: reactionCount || 0,
+          joined: new Date(userData.created_at).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
+        });
+
+        // Fetch user's own posts
+        const { data: myPosts } = await supabase
+          .from('rposts')
+          .select(`
+            *,
+            rusers (username, emoji_icon, avatar_url),
+            rzones (name),
+            rtags (name),
+            rreactions (reaction_type, device_id)
+          `)
+          .eq('user_id', userData.id)
+          .eq('is_deleted', false)
+          .order('created_at', { ascending: false });
+        
+        setUserPosts(myPosts || []);
 
         // Fetch Friends
         const { data: friendData } = await supabase
@@ -110,50 +128,14 @@ export default function Profile() {
         const friendsList = friendData?.map(f => f.rusers) || [];
         setFriends(friendsList);
 
-        // Fetch Personal Feed (Self + Friends)
-        const userIds = [userData.id, ...friendsList.map(f => f.id)];
-        
-        const { data: feedPosts } = await supabase
-          .from('rposts')
-          .select(`
-            *,
-            rusers (username, emoji_icon, avatar_url),
-            rzones (name),
-            rtags (name)
-          `)
-          .in('user_id', userIds)
-          .eq('is_deleted', false)
-          .order('created_at', { ascending: false })
-          .limit(20);
-        
-        // Also fetch replies for these users to include in the personal feed
-        const { data: feedReplies } = await supabase
-          .from('rcomments')
-          .select(`
-            *,
-            rusers (username, emoji_icon, avatar_url),
-            rposts (title, id)
-          `)
-          .in('user_id', userIds)
-          .order('created_at', { ascending: false })
-          .limit(20);
-
-        // Combine and sort
-        const combined = [
-          ...(feedPosts || []).map(p => ({ ...p, type: 'post' })),
-          ...(feedReplies || []).map(r => ({ ...r, type: 'reply' }))
-        ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
-        setPersonalFeed(combined);
-
         // Fetch replies to user's posts
-        const { data: userPosts } = await supabase
+        const { data: userPostIds } = await supabase
           .from('rposts')
           .select('id')
           .eq('user_id', userData.id);
         
-        if (userPosts && userPosts.length > 0) {
-          const postIds = userPosts.map(p => p.id);
+        if (userPostIds && userPostIds.length > 0) {
+          const postIds = userPostIds.map(p => p.id);
           const { data: replyData } = await supabase
             .from('rcomments')
             .select(`
@@ -162,22 +144,12 @@ export default function Profile() {
               rposts (title)
             `)
             .in('post_id', postIds)
-            .neq('user_id', userData.id) // Don't show own comments as replies
+            .neq('user_id', userData.id)
             .order('created_at', { ascending: false })
-            .limit(5);
+            .limit(10);
           
           setReplies(replyData || []);
         }
-
-        // Fetch active lost & found posts
-        const { data: lfData } = await supabase
-          .from('rposts')
-          .select('*')
-          .eq('user_id', userData.id)
-          .eq('tag_id', 3) // Lost & Found
-          .order('created_at', { ascending: false });
-        
-        setLostFound(lfData || []);
       }
     } catch (error) {
       console.error("Error loading profile:", error);
@@ -310,6 +282,53 @@ export default function Profile() {
     }
   };
 
+  const handleReaction = async (postId, reactionType, currentlyReacted) => {
+    if (!deviceId) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      if (currentlyReacted) {
+        await supabase
+          .from('rreactions')
+          .delete()
+          .match({ post_id: postId, reaction_type: reactionType, device_id: deviceId });
+      } else {
+        await supabase
+          .from('rreactions')
+          .insert({ post_id: postId, reaction_type: reactionType, device_id: deviceId });
+      }
+      loadData();
+    } catch (error) {
+      console.error("Error updating reaction:", error);
+    }
+  };
+
+  const handleDeletePost = async (postId) => {
+    Alert.alert(
+      "Delete Post",
+      "Are you sure you want to delete this post?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Delete", 
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const { error } = await supabase
+                .from('rposts')
+                .update({ is_deleted: true })
+                .eq('id', postId);
+              if (error) throw error;
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              loadData();
+            } catch (error) {
+              console.error("Error deleting post:", error);
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const handleLogout = async () => {
     Alert.alert("Sign Out", "Are you sure you want to sign out?", [
       { text: "Cancel", style: "cancel" },
@@ -349,87 +368,153 @@ export default function Profile() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false}>
-          <View style={styles.profileSection}>
-            <TouchableOpacity 
-              style={styles.avatarContainer} 
-              onPress={() => setShowEmojiPicker(true)}
-            >
-              {user?.avatar_url ? (
-                <Image source={{ uri: user.avatar_url }} style={styles.avatar} />
-              ) : (
-                <Text style={styles.emojiAvatar}>{user?.emoji_icon || "👤"}</Text>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <View style={styles.profileSection}>
+              <TouchableOpacity 
+                style={styles.avatarContainer} 
+                onPress={() => setShowEmojiPicker(true)}
+              >
+                {user?.avatar_url ? (
+                  <Image source={{ uri: user.avatar_url }} style={styles.avatar} />
+                ) : (
+                  <Text style={styles.emojiAvatar}>{user?.emoji_icon || "👤"}</Text>
+                )}
+                <View style={styles.editBadge}>
+                  <Camera size={12} color="#000000" />
+                </View>
+              </TouchableOpacity>
+
+              <Text style={styles.username}>@{user?.username}</Text>
+              
+              <View style={styles.userInfoRow}>
+                <Text style={styles.userStatus}>
+                  {user?.supabase_uid ? "Authenticated" : "Guest"}
+                </Text>
+                <View style={styles.statusDot} />
+                <Text style={styles.joinedText}>Joined {stats.joined || '...'}</Text>
+              </View>
+
+              {user?.is_admin && (
+                <TouchableOpacity 
+                  style={[styles.authButton, { backgroundColor: '#FBBF24' }]} 
+                  onPress={() => router.push("/admin")}
+                >
+                  <Shield size={14} color="#000000" />
+                  <Text style={[styles.authButtonText, { color: '#000000' }]}>MODERATION PANEL</Text>
+                </TouchableOpacity>
               )}
-              <View style={styles.editBadge}>
-                <Camera size={12} color="#000000" />
+
+              {!user?.supabase_uid && !user?.is_admin && (
+                <TouchableOpacity 
+                  style={styles.authButton} 
+                  onPress={() => router.push("/auth")}
+                >
+                    <Text style={styles.authButtonText}>CLAIM ACCOUNT</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <View style={styles.statsRow}>
+              <View style={styles.statBox}>
+                <Text style={styles.statValue}>{stats.posts}</Text>
+                <Text style={styles.statLabel}>POSTS</Text>
               </View>
-            </TouchableOpacity>
-
-            <Text style={styles.username}>@{user?.username}</Text>
-            <Text style={styles.userStatus}>
-              {user?.supabase_uid ? "Authenticated Account" : "Anonymous User"}
-            </Text>
-
-            {user?.is_admin && (
-              <TouchableOpacity 
-                style={[styles.authButton, { backgroundColor: '#FBBF24' }]} 
-                onPress={() => router.push("/admin")}
-              >
-                <Shield size={14} color="#000000" />
-                <Text style={[styles.authButtonText, { color: '#000000' }]}>MODERATION PANEL</Text>
-              </TouchableOpacity>
-            )}
-
-            {!user?.supabase_uid && !user?.is_admin && (
-              <TouchableOpacity 
-                style={styles.authButton} 
-                onPress={() => router.push("/auth")}
-              >
-                  <Text style={styles.authButtonText}>SIGN IN / CLAIM ACCOUNT</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-              <View style={styles.statsRow}>
-                <View style={styles.statBox}>
-                  <Text style={styles.statValue}>{stats.posts}</Text>
-                  <Text style={styles.statLabel}>POSTS</Text>
-                </View>
-                <View style={styles.statBox}>
-                  <Text style={styles.statValue}>{stats.reactions}</Text>
-                  <Text style={styles.statLabel}>REACTIONS</Text>
-                </View>
-                <View style={styles.statBox}>
-                  <Text style={styles.statValue}>{stats.joined || '...'}</Text>
-                  <Text style={styles.statLabel}>JOINED</Text>
-                </View>
+              <View style={styles.statBox}>
+                <Text style={styles.statValue}>{stats.reactions}</Text>
+                <Text style={styles.statLabel}>REACTIONS</Text>
               </View>
+              <View style={styles.statBox}>
+                <Text style={styles.statValue}>{friends.length}</Text>
+                <Text style={styles.statLabel}>FRIENDS</Text>
+              </View>
+            </View>
 
             {/* Tabs */}
             <View style={styles.tabContainer}>
-              <TouchableOpacity 
-                style={[styles.tab, activeTab === "personal" && styles.activeTab]}
-                onPress={() => setActiveTab("personal")}
-              >
-                <Text style={[styles.tabText, activeTab === "personal" && styles.activeTabText]}>PERSONAL</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.tab, activeTab === "replies" && styles.activeTab]}
-                onPress={() => setActiveTab("replies")}
-              >
-                <Text style={[styles.tabText, activeTab === "replies" && styles.activeTabText]}>REPLIES</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.tab, activeTab === "lostfound" && styles.activeTab]}
-                onPress={() => setActiveTab("lostfound")}
-              >
-                <Text style={[styles.tabText, activeTab === "lostfound" && styles.activeTabText]}>MY L&F</Text>
-              </TouchableOpacity>
+              {[
+                { id: 'posts', label: 'MY POSTS' },
+                { id: 'replies', label: 'REPLIES' },
+                { id: 'friends', label: 'FRIENDS' }
+              ].map(tab => (
+                <TouchableOpacity 
+                  key={tab.id}
+                  style={[styles.tab, activeTab === tab.id && styles.activeTab]}
+                  onPress={() => setActiveTab(tab.id)}
+                >
+                  <Text style={[styles.tabText, activeTab === tab.id && styles.activeTabText]}>{tab.label}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
 
-            {activeTab === "personal" && (
-              <View style={styles.personalSection}>
-                {/* Add Friend Row */}
+            {activeTab === "posts" && (
+              <View style={styles.tabContent}>
+                {userPosts.length > 0 ? (
+                  userPosts.map((post) => (
+                    <TouchableOpacity 
+                      key={post.id} 
+                      style={styles.postCardCompact}
+                      onPress={() => router.push(`/?postId=${post.id}`)}
+                    >
+                      <View style={styles.postCardHeader}>
+                        <View style={styles.postCardMeta}>
+                          <Text style={styles.postCardZone}>{post.rzones?.name}</Text>
+                          <Text style={styles.postCardTime}>· {getTimeAgo(new Date(post.created_at))}</Text>
+                        </View>
+                        <TouchableOpacity onPress={() => handleDeletePost(post.id)}>
+                          <Trash2 size={16} color="rgba(255,255,255,0.2)" />
+                        </TouchableOpacity>
+                      </View>
+                      <Text style={styles.postCardTitle} numberOfLines={2}>{post.title}</Text>
+                      {post.image_url && (
+                        <Image source={{ uri: post.image_url }} style={styles.postCardImage} />
+                      )}
+                      <View style={styles.postCardFooter}>
+                        <View style={styles.postCardStat}>
+                          <Heart size={14} color="rgba(255,255,255,0.4)" />
+                          <Text style={styles.postCardStatText}>
+                            {(post.rreactions || []).filter(r => r.reaction_type === 'helpful').length}
+                          </Text>
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  ))
+                ) : (
+                  <View style={styles.emptyContainer}>
+                    <MessageSquare size={40} color="rgba(255,255,255,0.1)" />
+                    <Text style={styles.emptyText}>You haven't posted anything yet.</Text>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {activeTab === "replies" && (
+              <View style={styles.tabContent}>
+                {replies.length > 0 ? (
+                  replies.map((reply) => (
+                    <View key={reply.id} style={styles.replyCard}>
+                      <View style={styles.replyHeader}>
+                        <Text style={styles.replyUser}>
+                          {reply.rusers?.emoji_icon} @{reply.rusers?.username}
+                        </Text>
+                        <Text style={styles.replyTime}>{getTimeAgo(new Date(reply.created_at))}</Text>
+                      </View>
+                      <Text style={styles.replyText}>{reply.text}</Text>
+                      <TouchableOpacity onPress={() => router.push(`/?postId=${reply.post_id}`)}>
+                        <Text style={styles.replyTarget}>on "{reply.rposts?.title}"</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))
+                ) : (
+                  <View style={styles.emptyContainer}>
+                    <MessageSquare size={40} color="rgba(255,255,255,0.1)" />
+                    <Text style={styles.emptyText}>No replies to your posts yet.</Text>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {activeTab === "friends" && (
+              <View style={styles.tabContent}>
                 <View style={styles.addFriendContainer}>
                   <View style={styles.searchInputWrapper}>
                     <Search size={16} color="rgba(255,255,255,0.4)" />
@@ -455,132 +540,33 @@ export default function Profile() {
                   </TouchableOpacity>
                 </View>
 
-                {/* Friends "Stories" Row */}
-                {friends.length > 0 && (
-                  <View style={styles.storiesContainer}>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storiesScroll}>
-                      <TouchableOpacity style={styles.storyItem}>
-                        <View style={[styles.storyAvatar, styles.myStory]}>
-                          <Text style={styles.storyEmoji}>{user?.emoji_icon || "👤"}</Text>
+                {friends.length > 0 ? (
+                  friends.map((friend) => (
+                    <View key={friend.id} style={styles.friendItem}>
+                      <View style={styles.friendInfo}>
+                        <View style={styles.friendAvatar}>
+                          {friend.avatar_url ? (
+                            <Image source={{ uri: friend.avatar_url }} style={styles.friendImage} />
+                          ) : (
+                            <Text style={styles.friendEmoji}>{friend.emoji_icon || "👤"}</Text>
+                          )}
                         </View>
-                        <Text style={styles.storyName}>You</Text>
+                        <Text style={styles.friendName}>@{friend.username}</Text>
+                      </View>
+                      <TouchableOpacity style={styles.friendAction}>
+                        <Users size={18} color="rgba(255,255,255,0.3)" />
                       </TouchableOpacity>
-                      {friends.map((friend) => (
-                        <TouchableOpacity key={friend.id} style={styles.storyItem}>
-                          <View style={styles.storyAvatar}>
-                            {friend.avatar_url ? (
-                              <Image source={{ uri: friend.avatar_url }} style={styles.storyImage} />
-                            ) : (
-                              <Text style={styles.storyEmoji}>{friend.emoji_icon || "👤"}</Text>
-                            )}
-                          </View>
-                          <Text style={styles.storyName}>{friend.username}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
+                    </View>
+                  ))
+                ) : (
+                  <View style={styles.emptyContainer}>
+                    <Users size={40} color="rgba(255,255,255,0.1)" />
+                    <Text style={styles.emptyText}>Add friends to see them here!</Text>
                   </View>
                 )}
-
-                {/* Personal Feed */}
-                <View style={styles.feedList}>
-                  {personalFeed.length > 0 ? (
-                    personalFeed.map((item, index) => (
-                      <TouchableOpacity 
-                        key={`${item.type}-${item.id}`} 
-                        style={styles.feedItem}
-                        onPress={() => item.type === 'post' ? router.push(`/?postId=${item.id}`) : router.push(`/?postId=${item.post_id}`)}
-                      >
-                        <View style={styles.feedItemHeader}>
-                          <View style={styles.feedUser}>
-                            {item.rusers?.avatar_url ? (
-                              <Image source={{ uri: item.rusers.avatar_url }} style={styles.feedAvatar} />
-                            ) : (
-                              <Text style={styles.feedEmoji}>{item.rusers?.emoji_icon || "👤"}</Text>
-                            )}
-                            <View>
-                              <Text style={styles.feedUsername}>@{item.rusers?.username}</Text>
-                              <Text style={styles.feedMeta}>
-                                {item.type === 'post' ? 'Posted' : 'Replied'} · {getTimeAgo(new Date(item.created_at))}
-                              </Text>
-                            </View>
-                          </View>
-                        </View>
-                        <Text style={styles.feedText} numberOfLines={3}>{item.text}</Text>
-                        {item.type === 'reply' && (
-                          <View style={styles.replyContext}>
-                            <Text style={styles.replyContextText}>on "{item.rposts?.title}"</Text>
-                          </View>
-                        )}
-                        {item.image_url && (
-                          <Image source={{ uri: item.image_url }} style={styles.feedImage} />
-                        )}
-                      </TouchableOpacity>
-                    ))
-                  ) : (
-                    <View style={styles.emptyFeed}>
-                      <Users size={40} color="rgba(255,255,255,0.1)" />
-                      <Text style={styles.emptyText}>Add friends to see their posts and replies here!</Text>
-                    </View>
-                  )}
-                </View>
               </View>
             )}
 
-            {activeTab === "replies" && (
-              <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <MessageSquare size={18} color="#FFFFFF" />
-                  <Text style={styles.sectionTitle}>RECENT REPLIES TO YOU</Text>
-                </View>
-                {replies.length > 0 ? (
-                  replies.map((reply) => (
-                    <View key={reply.id} style={styles.replyCard}>
-                      <View style={styles.replyHeader}>
-                        <Text style={styles.replyUser}>
-                          {reply.rusers?.emoji_icon} @{reply.rusers?.username}
-                        </Text>
-                        <Text style={styles.replyTime}>{getTimeAgo(new Date(reply.created_at))}</Text>
-                      </View>
-                      <Text style={styles.replyText}>{reply.text}</Text>
-                      <Text style={styles.replyTarget}>on "{reply.rposts?.title}"</Text>
-                    </View>
-                  ))
-                ) : (
-                  <Text style={styles.emptyText}>No replies yet.</Text>
-                )}
-              </View>
-            )}
-
-            {activeTab === "lostfound" && (
-              <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <Search size={18} color="#FFFFFF" />
-                  <Text style={styles.sectionTitle}>MY LOST & FOUND</Text>
-                </View>
-                {lostFound.length > 0 ? (
-                  lostFound.map((post) => (
-                    <TouchableOpacity 
-                      key={post.id} 
-                      style={styles.postCard}
-                      onPress={() => router.push(`/?postId=${post.id}`)}
-                    >
-                      <View style={styles.postInfo}>
-                        <Text style={styles.postTitle}>{post.title}</Text>
-                        <View style={styles.postMeta}>
-                          <Clock size={12} color="rgba(255,255,255,0.4)" />
-                          <Text style={styles.postTime}>{new Date(post.created_at).toLocaleDateString()}</Text>
-                        </View>
-                      </View>
-                      {post.image_url && (
-                        <Image source={{ uri: post.image_url }} style={styles.postThumb} />
-                      )}
-                    </TouchableOpacity>
-                  ))
-                ) : (
-                  <Text style={styles.emptyText}>No active lost & found posts.</Text>
-                )}
-              </View>
-            )}
 
 
           <View style={{ height: 100 }} />
@@ -592,15 +578,16 @@ export default function Profile() {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Choose Avatar</Text>
             <View style={styles.emojiGrid}>
-              {EMOJIS.map((emoji) => (
-                <TouchableOpacity 
-                  key={emoji} 
-                  onPress={() => handleSelectEmoji(emoji)}
-                  style={styles.emojiButton}
-                >
-                  <Text style={emojiText}>{emoji}</Text>
-                </TouchableOpacity>
-              ))}
+                {EMOJIS.map((emoji) => (
+                  <TouchableOpacity 
+                    key={emoji} 
+                    onPress={() => handleSelectEmoji(emoji)}
+                    style={styles.emojiButton}
+                  >
+                    <Text style={styles.emojiText}>{emoji}</Text>
+                  </TouchableOpacity>
+                ))}
+
             </View>
             <TouchableOpacity style={styles.uploadButton} onPress={handlePickImage}>
               <Camera size={18} color="#000000" />
@@ -669,6 +656,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
   },
   avatar: {
     width: 110,
@@ -688,26 +679,46 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
+    elevation: 5,
   },
   username: {
     color: "#FFFFFF",
     fontSize: 24,
     fontWeight: "900",
-    marginBottom: 4,
+    marginBottom: 8,
+  },
+  userInfoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  statusDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: "rgba(255,255,255,0.2)",
+  },
+  joinedText: {
+    color: "rgba(255,255,255,0.3)",
+    fontSize: 11,
+    fontWeight: "600",
   },
   userStatus: {
-    color: "rgba(255,255,255,0.4)",
-    fontSize: 12,
-    fontWeight: "700",
+    color: "#3B82F6",
+    fontSize: 11,
+    fontWeight: "800",
     textTransform: "uppercase",
-    letterSpacing: 1.5,
+    letterSpacing: 1,
   },
   authButton: {
     marginTop: 20,
     backgroundColor: "rgba(255,255,255,0.08)",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 25,
     borderRadius: 30,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   authButtonText: {
     color: "#FFFFFF",
@@ -717,9 +728,11 @@ const styles = StyleSheet.create({
   },
   statsRow: {
     flexDirection: "row",
-    backgroundColor: "rgba(255,255,255,0.02)",
-    paddingVertical: 25,
-    marginBottom: 30,
+    paddingVertical: 20,
+    marginBottom: 20,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: "rgba(255,255,255,0.05)",
   },
   statBox: {
     flex: 1,
@@ -727,48 +740,131 @@ const styles = StyleSheet.create({
   },
   statValue: {
     color: "#FFFFFF",
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: "900",
   },
   statLabel: {
-    color: "rgba(255,255,255,0.4)",
-    fontSize: 10,
+    color: "rgba(255,255,255,0.3)",
+    fontSize: 9,
     fontWeight: "800",
-    marginTop: 6,
-    letterSpacing: 2,
+    marginTop: 4,
+    letterSpacing: 1.5,
   },
   tabContainer: {
     flexDirection: "row",
     paddingHorizontal: 20,
-    marginBottom: 25,
+    marginBottom: 20,
     gap: 10,
   },
   tab: {
     paddingVertical: 8,
     paddingHorizontal: 15,
     borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.05)",
   },
   activeTab: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "rgba(255,255,255,0.1)",
   },
   tabText: {
-    color: "rgba(255,255,255,0.4)",
-    fontSize: 10,
+    color: "rgba(255,255,255,0.3)",
+    fontSize: 11,
     fontWeight: "900",
     letterSpacing: 1,
   },
   activeTabText: {
-    color: "#000000",
+    color: "#FFFFFF",
   },
-  personalSection: {
-    paddingBottom: 20,
+  tabContent: {
+    paddingHorizontal: 20,
+  },
+  postCardCompact: {
+    backgroundColor: "rgba(255,255,255,0.03)",
+    borderRadius: 20,
+    padding: 15,
+    marginBottom: 12,
+  },
+  postCardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  postCardMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  postCardZone: {
+    color: "#3B82F6",
+    fontSize: 10,
+    fontWeight: "800",
+  },
+  postCardTime: {
+    color: "rgba(255,255,255,0.3)",
+    fontSize: 10,
+  },
+  postCardTitle: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "700",
+    lineHeight: 20,
+    marginBottom: 10,
+  },
+  postCardImage: {
+    width: "100%",
+    height: 150,
+    borderRadius: 12,
+    marginBottom: 10,
+  },
+  postCardFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  postCardStat: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  postCardStatText: {
+    color: "rgba(255,255,255,0.4)",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  replyCard: {
+    backgroundColor: "rgba(255,255,255,0.02)",
+    borderRadius: 15,
+    padding: 15,
+    marginBottom: 10,
+  },
+  replyHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  replyUser: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  replyTime: {
+    color: "rgba(255,255,255,0.3)",
+    fontSize: 10,
+  },
+  replyText: {
+    color: "rgba(255,255,255,0.8)",
+    fontSize: 14,
+    lineHeight: 18,
+  },
+  replyTarget: {
+    color: "#3B82F6",
+    fontSize: 11,
+    marginTop: 10,
+    fontWeight: "600",
   },
   addFriendContainer: {
     flexDirection: "row",
-    paddingHorizontal: 20,
-    marginBottom: 25,
-    gap: 12,
+    marginBottom: 20,
+    gap: 10,
   },
   searchInputWrapper: {
     flex: 1,
@@ -776,205 +872,70 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.05)",
     borderRadius: 15,
-    paddingHorizontal: 15,
+    paddingHorizontal: 12,
     gap: 10,
   },
   searchInput: {
     flex: 1,
-    height: 45,
+    height: 40,
     color: "#FFFFFF",
-    fontSize: 14,
+    fontSize: 13,
   },
   addButton: {
-    width: 45,
-    height: 45,
+    width: 40,
+    height: 40,
     backgroundColor: "#FFFFFF",
-    borderRadius: 15,
+    borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
   },
-  storiesContainer: {
-    marginBottom: 30,
-  },
-  storiesScroll: {
-    paddingHorizontal: 20,
-    gap: 20,
-  },
-  storyItem: {
+  friendItem: {
+    flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    justifyContent: "space-between",
+    backgroundColor: "rgba(255,255,255,0.02)",
+    padding: 12,
+    borderRadius: 15,
+    marginBottom: 8,
   },
-  storyAvatar: {
-    width: 65,
-    height: 65,
-    borderRadius: 32.5,
+  friendInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  friendAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: "rgba(255,255,255,0.05)",
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 2,
-    borderColor: "#3B82F6",
-    padding: 2,
   },
-  myStory: {
-    borderColor: "rgba(255,255,255,0.2)",
-  },
-  storyImage: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 30,
-  },
-  storyEmoji: {
-    fontSize: 30,
-  },
-  storyName: {
-    color: "rgba(255,255,255,0.6)",
-    fontSize: 10,
-    fontWeight: "700",
-  },
-  feedList: {
-    paddingHorizontal: 20,
-  },
-  feedItem: {
-    backgroundColor: "rgba(255,255,255,0.03)",
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 15,
-  },
-  feedItemHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 12,
-  },
-  feedUser: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  feedAvatar: {
+  friendImage: {
     width: 36,
     height: 36,
     borderRadius: 18,
   },
-  feedEmoji: {
-    fontSize: 24,
+  friendEmoji: {
+    fontSize: 18,
   },
-  feedUsername: {
+  friendName: {
     color: "#FFFFFF",
     fontSize: 14,
-    fontWeight: "800",
-  },
-  feedMeta: {
-    color: "rgba(255,255,255,0.3)",
-    fontSize: 11,
-  },
-  feedText: {
-    color: "rgba(255,255,255,0.8)",
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  feedImage: {
-    width: "100%",
-    height: 200,
-    borderRadius: 15,
-    marginTop: 15,
-  },
-  replyContext: {
-    marginTop: 8,
-    paddingLeft: 10,
-    borderLeftWidth: 2,
-    borderLeftColor: "rgba(255,255,255,0.1)",
-  },
-  replyContextText: {
-    color: "rgba(255,255,255,0.3)",
-    fontSize: 12,
-    fontStyle: "italic",
-  },
-  emptyFeed: {
-    alignItems: "center",
-    paddingVertical: 50,
-    gap: 15,
-  },
-  section: {
-    paddingHorizontal: 20,
-    marginBottom: 35,
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginBottom: 15,
-  },
-  sectionTitle: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "900",
-    letterSpacing: 1.5,
-  },
-  replyCard: {
-    backgroundColor: "rgba(255,255,255,0.02)",
-    padding: 20,
-    marginBottom: 1,
-  },
-  replyHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 10,
-  },
-  replyUser: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "800",
-  },
-  replyTime: {
-    color: "rgba(255,255,255,0.3)",
-    fontSize: 11,
-  },
-  replyText: {
-    color: "rgba(255,255,255,0.8)",
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  replyTarget: {
-    color: "rgba(255,255,255,0.3)",
-    fontSize: 11,
-    marginTop: 10,
-  },
-  postCard: {
-    flexDirection: "row",
-    backgroundColor: "rgba(255,255,255,0.02)",
-    padding: 15,
-    marginBottom: 1,
-    alignItems: "center",
-  },
-  postInfo: {
-    flex: 1,
-    marginRight: 15,
-  },
-  postTitle: {
-    color: "#FFFFFF",
-    fontSize: 16,
     fontWeight: "700",
-    marginBottom: 8,
   },
-  postMeta: {
-    flexDirection: "row",
+  friendAction: {
+    padding: 8,
+  },
+  emptyContainer: {
     alignItems: "center",
-    gap: 8,
-  },
-  postTime: {
-    color: "rgba(255,255,255,0.4)",
-    fontSize: 12,
-  },
-  postThumb: {
-    width: 60,
-    height: 60,
-    borderRadius: 10,
+    paddingVertical: 40,
+    gap: 15,
   },
   emptyText: {
     color: "rgba(255,255,255,0.2)",
-    fontSize: 14,
+    fontSize: 13,
     textAlign: "center",
-    marginTop: 10,
   },
   modalOverlay: {
     position: "absolute",
