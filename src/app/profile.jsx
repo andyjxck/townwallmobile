@@ -40,6 +40,7 @@ import { Share } from "react-native";
 
 import PostItem from "../components/PostItem";
 import { LinearGradient } from "expo-linear-gradient";
+import { ShareManager } from "../components/ShareManager";
 
 export default function Profile() {
   const router = useRouter();
@@ -59,6 +60,7 @@ export default function Profile() {
   const [pendingRequests, setPendingRequests] = useState([]);
   const [activeTab, setActiveTab] = useState("posts"); // posts, friends, replies
   const [deviceId, setDeviceId] = useState(null);
+  const shareRef = useRef();
 
   useEffect(() => {
     getDeviceId().then(setDeviceId);
@@ -430,17 +432,7 @@ export default function Profile() {
   };
 
     const handleShare = async (post) => {
-      try {
-        const result = await Share.share({
-          message: `${post.title}\n\n${post.text}\n\nShared from Town Wall`,
-          url: `${process.env.EXPO_PUBLIC_APP_URL}/post/${post.id}`
-        });
-        if (result.action === Share.sharedAction) {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        }
-      } catch (error) {
-        console.error("Error sharing post:", error);
-      }
+      shareRef.current?.share(post);
     };
 
   if (loading && !user) {
@@ -705,14 +697,12 @@ export default function Profile() {
                     </View>
                   </View>
                 )}
-              </View>
-            )}
-
-
-
-          <View style={{ height: 100 }} />
+            </View>
+          )}
         </ScrollView>
       </View>
+
+      <ShareManager ref={shareRef} />
 
       {showEmojiPicker && (
         <View style={styles.modalOverlay}>

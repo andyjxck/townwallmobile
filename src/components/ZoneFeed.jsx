@@ -27,6 +27,7 @@ import * as Haptics from "expo-haptics";
 import PostItem from "./PostItem";
 import { getStoredUser } from "../utils/user";
 import { useAuthStore } from "../utils/auth/store";
+import { ShareManager } from "./ShareManager";
 
 export default function ZoneFeed({ zoneSlug, zoneName }) {
   const insets = useSafeAreaInsets();
@@ -37,6 +38,7 @@ export default function ZoneFeed({ zoneSlug, zoneName }) {
   const [deviceId, setDeviceId] = useState(null);
   const [isModerator, setIsModerator] = useState(false);
   const user = useAuthStore(state => state.auth);
+  const shareRef = useRef();
 
   useEffect(() => {
     getDeviceId().then(setDeviceId);
@@ -116,6 +118,10 @@ export default function ZoneFeed({ zoneSlug, zoneName }) {
     const handleEditPost = (post) => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       router.push(`/post?id=${post.id}`);
+    };
+
+    const handleShare = async (post) => {
+      shareRef.current?.share(post);
     };
 
     const fetchPosts = useCallback(async () => {
@@ -251,15 +257,16 @@ export default function ZoneFeed({ zoneSlug, zoneName }) {
       <FlatList
         data={posts}
         renderItem={({ item }) => (
-            <PostItem
-              item={item}
-              deviceId={deviceId}
-              onReaction={handleReaction}
-              onDelete={handleDeletePost}
-              onMute={handleMuteUser}
-              onEdit={handleEditPost}
-              user={user}
-            />
+              <PostItem
+                item={item}
+                deviceId={deviceId}
+                onReaction={handleReaction}
+                onDelete={handleDeletePost}
+                onMute={handleMuteUser}
+                onEdit={handleEditPost}
+                onShare={handleShare}
+                user={user}
+              />
         )}
         keyExtractor={(item) => item.id.toString()}
         refreshControl={
@@ -311,6 +318,8 @@ export default function ZoneFeed({ zoneSlug, zoneName }) {
       >
         <Plus size={28} color="#000000" strokeWidth={2.5} />
       </TouchableOpacity>
+
+      <ShareManager ref={shareRef} />
     </View>
   );
 }

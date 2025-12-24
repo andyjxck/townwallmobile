@@ -52,9 +52,7 @@ import { useAuthStore } from "../utils/auth/store";
 import { TextInput } from "react-native-gesture-handler";
 import NotificationPanel from "./NotificationPanel";
 import { fetchNotifications } from "@/utils/notifications";
-import { LinearGradient } from "expo-linear-gradient";
-
-import PostItem from "./PostItem";
+import { ShareManager } from "./ShareManager";
 
 function SkeletonPost() {
   return (
@@ -93,6 +91,7 @@ export default function UniversalFeed() {
   const user = useAuthStore(state => state.auth);
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const shareRef = useRef();
 
   useEffect(() => {
     getDeviceId().then(setDeviceId);
@@ -300,17 +299,7 @@ export default function UniversalFeed() {
     };
 
     const handleShare = async (post) => {
-      try {
-        const result = await Share.share({
-          message: `${post.title}\n\n${post.text}\n\nShared from Town Wall`,
-          url: `${process.env.EXPO_PUBLIC_APP_URL}/post/${post.id}`
-        });
-        if (result.action === Share.sharedAction) {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        }
-      } catch (error) {
-        console.error("Error sharing post:", error);
-      }
+      shareRef.current?.share(post);
     };
 
     const clearFilters = () => {
@@ -534,6 +523,8 @@ export default function UniversalFeed() {
       >
         <Plus size={32} color="#000000" strokeWidth={3} />
       </TouchableOpacity>
+
+      <ShareManager ref={shareRef} />
 
         <NotificationPanel 
           visible={showNotifications} 
