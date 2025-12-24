@@ -1,6 +1,9 @@
 import { usePathname, useRouter } from 'expo-router';
 import { App } from 'expo-router/build/qualified-entry';
 import React, { memo, useEffect, useState } from 'react';
+import { Platform } from 'react-native';
+import { requestTrackingPermissionsAsync } from 'expo-tracking-transparency';
+import mobileAds from 'react-native-google-mobile-ads';
 import { ErrorBoundaryWrapper } from './__create/SharedErrorBoundary';
 import './src/__create/polyfills';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -79,6 +82,24 @@ const CreateApp = () => {
   const router = useRouter();
   const pathname = usePathname();
   useHandshakeParent();
+
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+
+    (async () => {
+      const { status } = await requestTrackingPermissionsAsync();
+      if (status === 'granted') {
+        console.log('Tracking permission granted');
+      }
+      
+      try {
+        await mobileAds().initialize();
+        console.log('AdMob initialized');
+      } catch (error) {
+        console.error('AdMob initialization error:', error);
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {

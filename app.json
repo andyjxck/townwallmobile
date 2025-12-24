@@ -7,37 +7,37 @@
     "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-      "ios": {
-        "supportsTablet": true,
-        "bundleIdentifier": "com.andysocial.townwall",
-        "infoPlist": {
-          "ITSAppUsesNonExemptEncryption": false
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.andysocial.townwall",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ],
+      "package": "com.andysocial.townwall"
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow $(PRODUCT_NAME) to access your photos"
         }
-      },
-      "android": {
-        "adaptiveIcon": {
-          "foregroundImage": "./assets/images/adaptive-icon.png",
-          "backgroundColor": "#ffffff"
-        },
-        "permissions": [
-          "android.permission.RECORD_AUDIO",
-          "android.permission.MODIFY_AUDIO_SETTINGS"
-        ],
-        "package": "com.andysocial.townwall"
-      },
-      "plugins": [
-        [
-          "expo-image-picker",
-          {
-            "photosPermission": "Allow $(PRODUCT_NAME) to access your photos"
-          }
-        ],
-        [
-          "expo-router",
-          {
-            "sitemap": false
-          }
-        ],
+      ],
+      [
+        "expo-router",
+        {
+          "sitemap": false
+        }
+      ],
       [
         "expo-splash-screen",
         {
@@ -57,12 +57,28 @@
       ],
       [
         "expo-video",
-        { "supportsBackgroundPlayback": true, "supportsPictureInPicture": true }
+        {
+          "supportsBackgroundPlayback": true,
+          "supportsPictureInPicture": true
+        }
       ],
       "expo-font",
-      "expo-secure-store",
-      "expo-web-browser"
-    ],
+        "expo-secure-store",
+        "expo-web-browser",
+        [
+          "react-native-google-mobile-ads",
+          {
+            "androidAppId": "ca-app-pub-3940256099942544~3347511713",
+            "iosAppId": "ca-app-pub-3940256099942544~1458002511"
+          }
+        ],
+        [
+          "expo-tracking-transparency",
+          {
+            "userTrackingUsageDescription": "This identifier will be used to deliver personalized ads to you."
+          }
+        ]
+      ],
     "web": {
       "bundler": "metro",
       "favicon": "./assets/images/favicon.png"

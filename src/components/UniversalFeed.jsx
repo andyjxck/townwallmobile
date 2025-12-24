@@ -56,6 +56,7 @@ import { TextInput } from "react-native-gesture-handler";
 import NotificationPanel from "./NotificationPanel";
 import { fetchNotifications } from "@/utils/notifications";
 import { ShareManager } from "./ShareManager";
+import { BannerAd } from "@/components/BannerAd";
 
 function SkeletonPost() {
   return (
@@ -510,10 +511,10 @@ export default function UniversalFeed() {
         </View>
       ) : (
         <FlatList
-          data={posts}
-            renderItem={({ item }) => (
-                  <PostItem 
-                    item={item} 
+          ListHeaderComponent={<BannerAd />}
+          renderItem={({ item }) => (
+                <PostItem 
+                  item={item} 
                     deviceId={deviceId} 
                     onReaction={handleReaction} 
                     onDelete={handleDeletePost}
