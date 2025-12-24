@@ -16,7 +16,24 @@ export default function HelpContact() {
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
 
-    useEffect(() => {
+  useEffect(() => {
+    const setup = async () => {
+      let user = await getStoredUser();
+      if (!user) {
+        const { initUser } = require('@/utils/user');
+        user = await initUser();
+      }
+      
+      if (user) {
+        setCurrentUser(user);
+      } else {
+        setLoading(false);
+      }
+    };
+    setup();
+  }, []);
+
+  useEffect(() => {
     if (!currentUser) return;
     
     initChat();
@@ -71,15 +88,12 @@ export default function HelpContact() {
   }, [currentUser?.id]);
 
   const initChat = async () => {
+    if (!currentUser) return;
     try {
-      const user = await getStoredUser();
-      if (!user) return;
-      setCurrentUser(user);
-      
       const { data, error } = await supabase
         .from('rhelp_messages')
         .select('*')
-        .or(`sender_id.eq.${user?.id},receiver_id.eq.${user?.id}`)
+        .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
