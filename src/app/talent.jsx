@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Modal, Image, Platform, FlatList, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, Music, Youtube, Globe, Info, Plus, ExternalLink, ShieldCheck, Instagram, CheckCircle2, Star } from 'lucide-react-native';
+import { ChevronLeft, Music, Youtube, Globe, Info, Plus, ExternalLink, ShieldCheck, Instagram, CheckCircle2, Star, Camera } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '@/utils/supabase';
@@ -9,6 +9,8 @@ import { getStoredUser } from '@/utils/user';
 import * as Haptics from 'expo-haptics';
 import Purchases from 'react-native-purchases';
 import { BlurView } from 'expo-blur';
+import * as ImagePicker from 'expo-image-picker';
+import { decode } from 'base64-arraybuffer';
 
 export default function LocalTalent() {
   const insets = useSafeAreaInsets();
@@ -23,7 +25,8 @@ export default function LocalTalent() {
       platform: 'Youtube',
       link: '',
       description: '',
-      category: 'YouTuber'
+      category: 'YouTuber',
+      avatar: null
     });
 
   useEffect(() => {
@@ -59,6 +62,47 @@ export default function LocalTalent() {
       console.error(error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+      base64: true,
+    });
+
+    if (!result.canceled) {
+      setForm({ ...form, avatar: result.assets[0] });
+    }
+  };
+
+  const uploadImage = async (userId) => {
+    if (!form.avatar) return null;
+    
+    try {
+      const fileName = `${userId || 'anon'}_${Date.now()}.jpg`;
+      const filePath = `avatars/${fileName}`;
+      
+      const { data, error } = await supabase.storage
+        .from('talent_avatars')
+        .upload(filePath, decode(form.avatar.base64), {
+          contentType: 'image/jpeg',
+          upsert: true
+        });
+
+      if (error) throw error;
+      
+      const { data: { publicUrl } } = supabase.storage
+        .from('talent_avatars')
+        .getPublicUrl(filePath);
+        
+      return publicUrl;
+    } catch (error) {
+      console.error("Upload error:", error);
+      return null;
     }
   };
 
@@ -109,6 +153,12 @@ export default function LocalTalent() {
   const submitTalent = async (paymentStatus) => {
     try {
       const user = await getStoredUser();
+      
+      let avatarUrl = null;
+      if (form.avatar) {
+        avatarUrl = await uploadImage(user?.id);
+      }
+
       const { error } = await supabase
         .from('rtalent')
         .insert({
@@ -119,6 +169,7 @@ export default function LocalTalent() {
           link: form.link,
           description: form.description,
           category: form.category,
+          avatar_url: avatarUrl,
           payment_status: paymentStatus,
           status: 'pending' // Moderation pending
         });
@@ -127,7 +178,7 @@ export default function LocalTalent() {
       
       Alert.alert("Submitted!", "Your talent has been submitted for moderation. It will appear on the feed once approved.");
       setShowModal(false);
-      setForm({ name: '', title: '', platform: 'Youtube', link: '', description: '', category: 'Musician' });
+      setForm({ name: '', title: '', platform: 'Youtube', link: '', description: '', category: 'Musician', avatar: null });
     } catch (error) {
       console.error(error);
       Alert.alert("Error", "Failed to save your submission.");
@@ -189,7 +240,7 @@ export default function LocalTalent() {
           
           <View style={styles.talentSide}>
             <Image 
-              source={{ uri: `https://avatar.vercel.sh/${item.name}.png` }} 
+              source={{ uri: item.avatar_url || `https://avatar.vercel.sh/${item.name}.png` }} 
               style={styles.minimalAvatar} 
             />
           </View>
@@ -255,6 +306,18 @@ export default function LocalTalent() {
                 <ShieldCheck size={16} color="#10B981" />
                 <Text style={styles.priceText}>One-time payment: £0.99p (Pending Moderation)</Text>
               </View>
+
+              <Text style={styles.label}>PROFILE IMAGE</Text>
+              <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
+                {form.avatar ? (
+                  <Image source={{ uri: form.avatar.uri }} style={styles.pickedImage} />
+                ) : (
+                  <View style={styles.imagePlaceholder}>
+                    <Camera size={24} color="rgba(255,255,255,0.4)" />
+                    <Text style={styles.imagePlaceholderText}>Upload Photo</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
 
               <Text style={styles.label}>YOUR NAME</Text>
               <TextInput
@@ -618,10 +681,36 @@ const styles = StyleSheet.create({
       alignItems: 'center',
       marginTop: 40,
     },
-    submitButtonText: {
-      color: '#000000',
-      fontSize: 15,
-      fontWeight: '700',
-      letterSpacing: 1,
-    },
-});
+      submitButtonText: {
+        color: '#000000',
+        fontSize: 15,
+        fontWeight: '700',
+        letterSpacing: 1,
+      },
+      imagePicker: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+        borderStyle: 'dashed',
+        justifyContent: 'center',
+        alignItems: 'center',
+        overflow: 'hidden',
+        marginBottom: 10,
+      },
+      pickedImage: {
+        width: '100%',
+        height: '100%',
+      },
+      imagePlaceholder: {
+        alignItems: 'center',
+        gap: 4,
+      },
+      imagePlaceholderText: {
+        color: 'rgba(255,255,255,0.4)',
+        fontSize: 10,
+        fontWeight: '600',
+      },
+  });
