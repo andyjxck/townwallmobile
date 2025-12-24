@@ -49,54 +49,56 @@ export async function moderateContent(text) {
   }
 }
 
-/**
- * Gets a response from the AI assistant.
- */
-export async function getAIAssistantResponse(message, history = []) {
-  const apiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
-  
-  if (!apiKey) {
-    console.error('EXPO_PUBLIC_OPENAI_API_KEY is missing from process.env');
-    return "I'm sorry, I don't have an API key configured to help you right now. Please ensure EXPO_PUBLIC_OPENAI_API_KEY is set in your environment.";
-  }
-
-  try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a helpful AI assistant and moderator for this platform. You can answer questions, help users navigate, and explain rules.',
-          },
-          ...history,
-          {
-            role: 'user',
-            content: message,
-          },
-        ],
-      }),
-    });
-
-    const data = await response.json();
-    if (data.error) {
-      console.error('OpenAI API Error:', data.error);
-      return `I encountered an error with the AI service: ${data.error.message}`;
-    }
+  /**
+   * Gets a response from the AI assistant.
+   */
+  export async function getAIAssistantResponse(message, history = []) {
+    // Re-check key every time to handle late initialization
+    const apiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
     
-    if (!data.choices || !data.choices[0]) {
-      console.error('Unexpected OpenAI Response:', data);
-      return "I received an unexpected response from the AI service.";
+    if (!apiKey) {
+      console.error('EXPO_PUBLIC_OPENAI_API_KEY is missing from process.env');
+      return "I'm sorry, I don't have an API key configured to help you right now. Please check your environment variables.";
     }
 
-    return data.choices[0].message.content;
-  } catch (error) {
-    console.error('AI Assistant Error:', error);
-    return "I'm having some trouble connecting to the AI service. Please try again later.";
+    try {
+      console.log('Sending request to OpenAI with message:', message);
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a helpful AI assistant for this community platform. You help users with support inquiries, platform rules, and navigation. Keep responses concise and friendly.',
+            },
+            ...history,
+            {
+              role: 'user',
+              content: message,
+            },
+          ],
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (data.error) {
+        console.error('OpenAI API Error:', data.error);
+        return `I encountered an error: ${data.error.message || 'Unknown error'}`;
+      }
+      
+      if (!data.choices || !data.choices[0]) {
+        return "I received an empty response from the AI.";
+      }
+
+      return data.choices[0].message.content;
+    } catch (error) {
+      console.error('AI Assistant Fetch Error:', error);
+      return "I'm having trouble connecting to my brain right now. Please try again in a moment.";
+    }
   }
-}

@@ -45,45 +45,45 @@ export default function HelpContact() {
     
     initChat();
     
-    // Subscribe to new messages for this user
-    const subscription = supabase
-      .channel(`help_chat_${currentUser.id}`)
-      .on('postgres_changes', 
-        { 
-          event: 'INSERT', 
-          table: 'rhelp_messages'
-        }, 
-        payload => {
-          const newMsg = payload.new;
-          // Filter in JS to ensure privacy and fix "showing up in every chat" issue
-          if (newMsg.sender_id === currentUser.id || newMsg.receiver_id === currentUser.id) {
-            setMessages(prev => {
-              if (prev.find(m => m.id === newMsg.id)) return prev;
-              
-              if (newMsg.receiver_id === currentUser.id) {
-                if (newMsg.status === 'resolved' || newMsg.content.includes("Please rate 1-5")) {
-                  setShowRating(true);
+      // Subscribe to new messages for this user
+      const subscription = supabase
+        .channel(`help_chat_${currentUser.id}`)
+        .on('postgres_changes', 
+          { 
+            event: 'INSERT', 
+            table: 'rhelp_messages'
+          }, 
+          payload => {
+            const newMsg = payload.new;
+            // Filter in JS to ensure privacy and fix "showing up in every chat" issue
+            if (Number(newMsg.sender_id) === Number(currentUser.id) || Number(newMsg.receiver_id) === Number(currentUser.id)) {
+              setMessages(prev => {
+                if (prev.find(m => m.id === newMsg.id)) return prev;
+                
+                if (Number(newMsg.receiver_id) === Number(currentUser.id)) {
+                  if (newMsg.status === 'resolved' || newMsg.content.includes("Please rate 1-5")) {
+                    setShowRating(true);
+                  }
                 }
-              }
-              return [...prev, newMsg];
-            });
+                return [...prev, newMsg];
+              });
+            }
           }
-        }
-      )
-      .on('postgres_changes',
-        {
-          event: 'UPDATE',
-          table: 'rhelp_messages'
-        },
-        payload => {
-          const newMsg = payload.new;
-          if (newMsg.receiver_id === currentUser.id && newMsg.status === 'resolved') {
-            setShowRating(true);
-            initChat();
+        )
+        .on('postgres_changes',
+          {
+            event: 'UPDATE',
+            table: 'rhelp_messages'
+          },
+          payload => {
+            const newMsg = payload.new;
+            if (Number(newMsg.receiver_id) === Number(currentUser.id) && newMsg.status === 'resolved') {
+              setShowRating(true);
+              initChat();
+            }
           }
-        }
-      )
-      .subscribe();
+        )
+        .subscribe();
 
     return () => {
       subscription.unsubscribe();
@@ -155,50 +155,65 @@ export default function HelpContact() {
     }
   };
 
-    const handleSend = async () => {
-      if (!inputText.trim() || !currentUser) return;
-      
-      // If there's a resolved status, purge before sending new
-      if (messages.some(m => m.status === 'resolved')) {
-        await purgeMessages();
-      }
-
-      const text = inputText.trim();
-      setInputText('');
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
-      try {
-        const { error } = await supabase
-          .from('rhelp_messages')
-          .insert({
-            sender_id: currentUser.id,
-            content: text,
-            is_from_admin: false
-          });
-
-        if (error) throw error;
-
-        // AI Assistant Response
-        const history = messages.slice(-5).map(m => ({
-          role: m.is_from_admin ? 'assistant' : 'user',
-          content: m.content
-        }));
-
-        const aiResponse = await getAIAssistantResponse(text, history);
-
-        await supabase
-          .from('rhelp_messages')
-          .insert({
-            receiver_id: currentUser.id,
-            content: aiResponse,
-            is_from_admin: true
-          });
-
-      } catch (error) {
-        console.error(error);
-        setInputText(text); // Restore text on error
-      }
-    };
+      const handleSend = async () => {
+        if (!inputText.trim() || !currentUser) return;
+        
+        // If there's a resolved status, purge before sending new
+        if (messages.some(m => m.status === 'resolved')) {
+          await purgeMessages();
+        }
+  
+        const text = inputText.trim();
+        setInputText('');
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  
+        // Optimistic update
+        const tempId = Date.now();
+        const tempMsg = {
+          id: tempId,
+          sender_id: currentUser.id,
+          content: text,
+          is_from_admin: false,
+          created_at: new Date().toISOString(),
+          status: 'open'
+        };
+        setMessages(prev => [...prev, tempMsg]);
+  
+        try {
+          const { error } = await supabase
+            .from('rhelp_messages')
+            .insert({
+              sender_id: currentUser.id,
+              content: text,
+              is_from_admin: false
+            });
+  
+          if (error) throw error;
+  
+          // AI Assistant Response
+          const history = messages.slice(-5).map(m => ({
+            role: m.is_from_admin ? 'assistant' : 'user',
+            content: m.content
+          }));
+  
+          const aiResponse = await getAIAssistantResponse(text, history);
+  
+          await supabase
+            .from('rhelp_messages')
+            .insert({
+              receiver_id: currentUser.id,
+              content: aiResponse,
+              is_from_admin: true
+            });
+  
+        } catch (error) {
+          console.error("Error in handleSend:", error);
+          setInputText(text); // Restore text on error
+          // Remove optimistic message on error
+          setMessages(prev => prev.filter(m => m.id !== tempId));
+          Alert.alert("Error", "Message could not be sent.");
+        }
+      };
 
   return (
     <View style={styles.container}>
