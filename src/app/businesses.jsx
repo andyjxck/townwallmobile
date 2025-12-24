@@ -1,23 +1,129 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Modal, Image, Platform, FlatList, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, Briefcase, Globe, Phone, Info } from 'lucide-react-native';
+import { ChevronLeft, Globe, Info, Plus, ExternalLink, ShieldCheck, CheckCircle2, Star, Camera, MapPin, Phone, Briefcase } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BlurView } from 'expo-blur';
 import { supabase } from '@/utils/supabase';
 import { getStoredUser } from '@/utils/user';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
+import { decode } from 'base64-arraybuffer';
 
 export default function LocalBusinesses() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [processingLink, setProcessingLink] = useState(false);
+  const [businesses, setBusinesses] = useState([]);
+  const [showModal, setShowModal] = useState(false);
+  
   const [form, setForm] = useState({
     name: '',
-    category: '',
-    website: '',
+    category: 'Retail',
+    link: '',
+    address: '',
     phone: '',
-    description: ''
+    description: '',
+    avatar: null,
+    rating: null
   });
+
+  useEffect(() => {
+    fetchBusinesses();
+  }, []);
+
+  const fetchBusinesses = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('rbusinesses')
+        .select('*')
+        .eq('status', 'approved')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setBusinesses(data || []);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+      base64: true,
+    });
+
+    if (!result.canceled) {
+      setForm({ ...form, avatar: result.assets[0] });
+    }
+  };
+
+  const uploadImage = async (userId) => {
+    if (!form.avatar) return null;
+    
+    try {
+      const fileName = `${userId || 'anon'}_${Date.now()}.jpg`;
+      const filePath = `avatars/${fileName}`;
+      
+      const { data, error } = await supabase.storage
+        .from('business_avatars')
+        .upload(filePath, decode(form.avatar.base64), {
+          contentType: 'image/jpeg',
+          upsert: true
+        });
+
+      if (error) throw error;
+      
+      const { data: { publicUrl } } = supabase.storage
+        .from('business_avatars')
+        .getPublicUrl(filePath);
+        
+      return publicUrl;
+    } catch (error) {
+      console.error("Upload error:", error);
+      return null;
+    }
+  };
+
+  const processGoogleLink = async () => {
+    if (!form.link.includes('google.com/maps') && !form.link.includes('maps.app.goo.gl')) {
+      Alert.alert("Link Type", "Please enter a valid Google Maps link to auto-fill details.");
+      return;
+    }
+
+    setProcessingLink(true);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+    // Mock processing since we don't have a backend scraper/API key here
+    // In a real app, this would call an edge function that scrapes or uses Places API
+    setTimeout(() => {
+      // Try to extract some info from URL if it's a long one
+      let extractedName = '';
+      try {
+        if (form.link.includes('place/')) {
+          const parts = form.link.split('place/')[1].split('/');
+          extractedName = decodeURIComponent(parts[0].replace(/\+/g, ' '));
+        }
+      } catch (e) {}
+
+      setForm(prev => ({
+        ...prev,
+        name: extractedName || prev.name,
+        description: prev.description || "Local business found on Google Maps.",
+        rating: (Math.random() * (5.0 - 4.0) + 4.0).toFixed(1) // Mock rating
+      }));
+      
+      setProcessingLink(false);
+      Alert.alert("Link Processed", "We've extracted some details from the link!");
+    }, 1500);
+  };
 
   const handleSubmit = async () => {
     if (!form.name || !form.category) {
@@ -26,40 +132,111 @@ export default function LocalBusinesses() {
     }
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setLoading(true);
-    
-    Alert.alert(
-      "Payment Required",
-      "This costs £3.99 to showcase your business. Proceed to mock payment?",
-      [
-        { text: "Cancel", onPress: () => setLoading(false), style: "cancel" },
-        { text: "Pay £3.99", onPress: async () => {
-          try {
-            const user = await getStoredUser();
-            const { error } = await supabase
-              .from('rbusinesses')
-              .insert({
-                user_id: user?.id,
-                name: form.name,
-                category: form.category,
-                website: form.website,
-                phone: form.phone,
-                description: form.description,
-                payment_status: 'paid'
-              });
+    setSubmitting(true);
 
-            if (error) throw error;
+    try {
+      const user = await getStoredUser();
+      
+      let avatarUrl = null;
+      if (form.avatar) {
+        avatarUrl = await uploadImage(user?.id);
+      }
+
+      const { error } = await supabase
+        .from('rbusinesses')
+        .insert({
+          user_id: user?.id,
+          name: form.name,
+          category: form.category,
+          link: form.link,
+          address: form.address,
+          phone: form.phone,
+          description: form.description,
+          avatar_url: avatarUrl,
+          rating: form.rating ? parseFloat(form.rating) : null,
+          payment_status: 'mock_paid',
+          status: 'pending' 
+        });
+
+      if (error) throw error;
+      
+      Alert.alert("Submitted!", "Your business has been submitted for moderation. It will appear once approved.");
+      setShowModal(false);
+      setForm({ name: '', category: 'Retail', link: '', address: '', phone: '', description: '', avatar: null, rating: null });
+      fetchBusinesses();
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Error", "Failed to save business details.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleOpenLink = async (url) => {
+    if (!url) return;
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
+      }
+    } catch (error) {
+      Alert.alert("Error", "Cannot open link");
+    }
+  };
+
+  const renderBusinessCard = ({ item }) => {
+    return (
+      <TouchableOpacity 
+        activeOpacity={0.7}
+        onPress={() => handleOpenLink(item.link)}
+        style={styles.card}
+      >
+        <View style={styles.cardRow}>
+          <View style={styles.cardMain}>
+            <View style={styles.categoryRow}>
+              <Text style={styles.categoryText}>{item.category?.toUpperCase() || 'BUSINESS'}</Text>
+              {item.rating ? (
+                <View style={styles.ratingBadge}>
+                  <Star size={10} color="#FBBF24" fill="#FBBF24" />
+                  <Text style={styles.ratingText}>{item.rating}</Text>
+                </View>
+              ) : null}
+            </View>
             
-            Alert.alert("Success!", "Your business has been submitted and will be showcased.");
-            router.back();
-          } catch (error) {
-            console.error(error);
-            Alert.alert("Error", "Failed to save business details.");
-          } finally {
-            setLoading(false);
-          }
-        }}
-      ]
+            <Text style={styles.businessNameText}>{item.name}</Text>
+            
+            {item.address ? (
+              <View style={styles.infoRow}>
+                <MapPin size={12} color="rgba(255,255,255,0.4)" />
+                <Text style={styles.infoText} numberOfLines={1}>{item.address}</Text>
+              </View>
+            ) : null}
+
+            {item.description ? (
+              <Text style={styles.descText} numberOfLines={2}>{item.description}</Text>
+            ) : null}
+
+            <View style={styles.actionRow}>
+              <View style={styles.visitAction}>
+                <Text style={styles.visitText}>VIEW ON MAPS</Text>
+                <ExternalLink size={12} color="#FFFFFF" strokeWidth={2.5} />
+              </View>
+              {item.phone ? (
+                <TouchableOpacity onPress={() => Linking.openURL(`tel:${item.phone}`)} style={styles.phoneAction}>
+                  <Phone size={14} color="rgba(255,255,255,0.6)" />
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          </View>
+          
+          <View style={styles.cardSide}>
+            <Image 
+              source={{ uri: item.avatar_url || `https://avatar.vercel.sh/${item.name}.png` }} 
+              style={styles.businessAvatar} 
+            />
+          </View>
+        </View>
+      </TouchableOpacity>
     );
   };
 
@@ -67,83 +244,163 @@ export default function LocalBusinesses() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <ChevronLeft color="#FFFFFF" size={28} />
+          <ChevronLeft color="#FFFFFF" size={24} strokeWidth={2} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>LOCAL BUSINESSES</Text>
-        <View style={{ width: 28 }} />
+        <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.infoBox}>
-          <Info size={20} color="#60A5FA" />
-          <Text style={styles.infoText}>
-            Promote your local business to the community for just £3.99.
-          </Text>
+      {loading ? (
+        <View style={styles.centered}>
+          <ActivityIndicator color="#FFFFFF" />
         </View>
+      ) : (
+        <FlatList
+          data={businesses}
+          renderItem={renderBusinessCard}
+          keyExtractor={(item) => item.id.toString()}
+          contentContainerStyle={styles.listContent}
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Briefcase size={48} color="rgba(255,255,255,0.1)" />
+              <Text style={styles.emptyText}>No businesses listed yet.</Text>
+              <Text style={styles.emptySubtext}>Promote your business here!</Text>
+            </View>
+          }
+        />
+      )}
 
-        <View style={styles.form}>
-          <Text style={styles.label}>BUSINESS NAME</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="e.g. Redditch Coffee Co."
-            placeholderTextColor="rgba(255,255,255,0.3)"
-            value={form.name}
-            onChangeText={(t) => setForm({ ...form, name: t })}
-          />
+      <TouchableOpacity 
+        style={[styles.fab, { bottom: insets.bottom + 20 }]} 
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          setShowModal(true);
+        }}
+      >
+        <Plus color="#000000" size={32} />
+      </TouchableOpacity>
 
-          <Text style={styles.label}>CATEGORY</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="e.g. Cafe / Restaurant / Retail"
-            placeholderTextColor="rgba(255,255,255,0.3)"
-            value={form.category}
-            onChangeText={(t) => setForm({ ...form, category: t })}
-          />
+      <Modal visible={showModal} animationType="slide" transparent>
+        <BlurView intensity={100} tint="dark" style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { paddingBottom: insets.bottom + 20 }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>List Your Business</Text>
+              <TouchableOpacity onPress={() => setShowModal(false)}>
+                <Text style={styles.closeText}>Close</Text>
+              </TouchableOpacity>
+            </View>
 
-          <Text style={styles.label}>WEBSITE (OPTIONAL)</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="https://..."
-            placeholderTextColor="rgba(255,255,255,0.3)"
-            autoCapitalize="none"
-            value={form.website}
-            onChangeText={(t) => setForm({ ...form, website: t })}
-          />
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={styles.priceTag}>
+                <ShieldCheck size={16} color="#10B981" />
+                <Text style={styles.priceText}>Promote your business for £3.99</Text>
+              </View>
 
-          <Text style={styles.label}>PHONE NUMBER (OPTIONAL)</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="01234 567890"
-            placeholderTextColor="rgba(255,255,255,0.3)"
-            keyboardType="phone-pad"
-            value={form.phone}
-            onChangeText={(t) => setForm({ ...form, phone: t })}
-          />
+              <Text style={styles.label}>BUSINESS LOGO</Text>
+              <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
+                {form.avatar ? (
+                  <Image source={{ uri: form.avatar.uri }} style={styles.pickedImage} />
+                ) : (
+                  <View style={styles.imagePlaceholder}>
+                    <Camera size={24} color="rgba(255,255,255,0.4)" />
+                    <Text style={styles.imagePlaceholderText}>Upload Logo</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
 
-          <Text style={styles.label}>DESCRIPTION</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            placeholder="Describe your business and any special offers..."
-            placeholderTextColor="rgba(255,255,255,0.3)"
-            multiline
-            numberOfLines={4}
-            value={form.description}
-            onChangeText={(t) => setForm({ ...form, description: t })}
-          />
+              <Text style={styles.label}>GOOGLE MAPS LINK</Text>
+              <View style={styles.linkInputContainer}>
+                <TextInput
+                  style={[styles.input, { flex: 1, marginBottom: 0 }]}
+                  placeholder="Paste Google Maps URL..."
+                  placeholderTextColor="rgba(255,255,255,0.3)"
+                  autoCapitalize="none"
+                  value={form.link}
+                  onChangeText={(t) => setForm({ ...form, link: t })}
+                />
+                <TouchableOpacity 
+                  style={styles.processButton} 
+                  onPress={processGoogleLink}
+                  disabled={processingLink}
+                >
+                  {processingLink ? (
+                    <ActivityIndicator size="small" color="#000" />
+                  ) : (
+                    <Globe size={18} color="#000" />
+                  )}
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.hintText}>We'll try to fetch details from the link</Text>
 
-          <TouchableOpacity 
-            style={styles.submitButton} 
-            onPress={handleSubmit}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#000000" />
-            ) : (
-              <Text style={styles.submitButtonText}>PAY £3.99 & SUBMIT</Text>
-            )}
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
+              <Text style={styles.label}>BUSINESS NAME</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Redditch Coffee Co."
+                placeholderTextColor="rgba(255,255,255,0.3)"
+                value={form.name}
+                onChangeText={(t) => setForm({ ...form, name: t })}
+              />
+
+              <Text style={styles.label}>CATEGORY</Text>
+              <View style={styles.tagRow}>
+                {['Cafe', 'Restaurant', 'Retail', 'Service', 'Health', 'Other'].map((c) => (
+                  <TouchableOpacity
+                    key={c}
+                    onPress={() => setForm({ ...form, category: c })}
+                    style={[styles.tag, form.category === c && styles.activeTag]}
+                  >
+                    <Text style={[styles.tagText, { color: form.category === c ? "#000000" : "#FFFFFF" }]}>
+                      {c}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.label}>ADDRESS (OPTIONAL)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="123 High Street, Redditch"
+                placeholderTextColor="rgba(255,255,255,0.3)"
+                value={form.address}
+                onChangeText={(t) => setForm({ ...form, address: t })}
+              />
+
+              <Text style={styles.label}>PHONE (OPTIONAL)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="01234 567890"
+                placeholderTextColor="rgba(255,255,255,0.3)"
+                keyboardType="phone-pad"
+                value={form.phone}
+                onChangeText={(t) => setForm({ ...form, phone: t })}
+              />
+
+              <Text style={styles.label}>DESCRIPTION</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                placeholder="What makes your business special?"
+                placeholderTextColor="rgba(255,255,255,0.3)"
+                multiline
+                numberOfLines={4}
+                value={form.description}
+                onChangeText={(t) => setForm({ ...form, description: t })}
+              />
+
+              <TouchableOpacity 
+                style={styles.submitButton} 
+                onPress={handleSubmit}
+                disabled={submitting}
+              >
+                {submitting ? (
+                  <ActivityIndicator color="#000000" />
+                ) : (
+                  <Text style={styles.submitButtonText}>PAY £3.99 & SUBMIT</Text>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </BlurView>
+      </Modal>
     </View>
   );
 }
@@ -159,66 +416,299 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
   },
   headerTitle: {
     color: '#FFFFFF',
     fontSize: 18,
     fontWeight: '900',
-    letterSpacing: 1,
+    letterSpacing: 2,
   },
   backButton: {
     padding: 5,
   },
-  scrollContent: {
-    padding: 20,
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  infoBox: {
+  listContent: {
+    paddingBottom: 120,
+  },
+  card: {
+    paddingHorizontal: 20,
+    paddingVertical: 32,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+  },
+  cardRow: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(96, 165, 250, 0.1)',
-    padding: 15,
-    borderRadius: 12,
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  cardMain: {
+    flex: 1,
+    paddingRight: 20,
+  },
+  categoryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 12,
-    marginBottom: 25,
-    borderWidth: 1,
-    borderColor: 'rgba(96, 165, 250, 0.2)',
+    marginBottom: 8,
+  },
+  categoryText: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 2,
+  },
+  ratingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(251, 191, 36, 0.1)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  ratingText: {
+    color: '#FBBF24',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  businessNameText: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '300',
+    lineHeight: 28,
+    letterSpacing: -0.5,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 6,
   },
   infoText: {
-    color: '#60A5FA',
-    fontSize: 14,
-    flex: 1,
-    lineHeight: 20,
-  },
-  form: {
-    gap: 15,
-  },
-  label: {
     color: 'rgba(255,255,255,0.4)',
     fontSize: 12,
-    fontWeight: '800',
+  },
+  descText: {
+    color: 'rgba(255,255,255,0.45)',
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 12,
+    fontWeight: '400',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 15,
+    marginTop: 20,
+  },
+  visitAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.2)',
+    paddingBottom: 4,
+  },
+  visitText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
     letterSpacing: 1,
-    marginBottom: 5,
+  },
+  phoneAction: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cardSide: {
+    alignItems: 'center',
+  },
+  businessAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    backgroundColor: '#FFFFFF',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.5,
+    shadowRadius: 15,
+    elevation: 10,
+  },
+  emptyState: {
+    alignItems: 'center',
+    marginTop: 100,
+  },
+  emptyText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '800',
+    marginTop: 20,
+  },
+  emptySubtext: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 14,
+    marginTop: 5,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#000000',
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 40,
+    padding: 30,
+    maxHeight: '92%',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.1)',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  modalTitle: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: '300',
+    letterSpacing: -0.5,
+  },
+  closeText: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  priceTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 32,
+    gap: 10,
+  },
+  priceText: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 13,
+    fontWeight: '400',
+  },
+  label: {
+    color: 'rgba(255,255,255,0.3)',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 2,
+    marginBottom: 12,
+    marginTop: 20,
+  },
+  hintText: {
+    color: 'rgba(255,255,255,0.2)',
+    fontSize: 10,
+    marginTop: 4,
   },
   input: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 12,
-    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
+    paddingVertical: 12,
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 17,
+    marginBottom: 10,
+  },
+  linkInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  processButton: {
+    backgroundColor: '#FFFFFF',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tagRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 10,
+    flexWrap: 'wrap',
+  },
+  tag: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 100,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  activeTag: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#FFFFFF',
+  },
+  tagText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
   textArea: {
-    height: 100,
+    minHeight: 80,
     textAlignVertical: 'top',
   },
   submitButton: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 18,
+    borderRadius: 100,
+    padding: 20,
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 40,
   },
   submitButtonText: {
     color: '#000000',
-    fontSize: 16,
-    fontWeight: '900',
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  imagePicker: {
+    width: 80,
+    height: 80,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+    marginBottom: 10,
+  },
+  pickedImage: {
+    width: '100%',
+    height: '100%',
+  },
+  imagePlaceholder: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  imagePlaceholderText: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 9,
+    fontWeight: '600',
   },
 });
