@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   Pressable,
+  Alert,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -23,227 +24,9 @@ import {
 import { getDeviceId } from "../utils/deviceId";
 import { supabase } from "../utils/supabase";
 import * as Haptics from "expo-haptics";
-
-function PostItem({ item, deviceId, onReaction }) {
-  const [revealed, setRevealed] = useState(false);
-  
-  const reactions = item.rreactions || [];
-  const helpfulCount = reactions.filter(r => r.reaction_type === 'helpful').length;
-  const seenCount = reactions.filter(r => r.reaction_type === 'seen').length;
-  const fakeCount = reactions.filter(r => r.reaction_type === 'fake').length;
-  
-  const userReactions = {
-    helpful: reactions.some(r => r.reaction_type === 'helpful' && r.device_id === deviceId),
-    seen: reactions.some(r => r.reaction_type === 'seen' && r.device_id === deviceId),
-    fake: reactions.some(r => r.reaction_type === 'fake' && r.device_id === deviceId),
-  };
-
-  const shouldBlur = fakeCount > (helpfulCount + seenCount) * 0.5 && fakeCount > 0;
-  const timeAgo = getTimeAgo(new Date(item.created_at));
-  const isExpiring =
-    item.expires_at &&
-    new Date(item.expires_at) < new Date(Date.now() + 3600000);
-
-  return (
-    <View
-      style={{
-        paddingHorizontal: 20,
-        paddingVertical: 16,
-        borderBottomWidth: 0.5,
-        borderBottomColor: "rgba(255,255,255,0.06)",
-      }}
-    >
-      {/* Header */}
-      <View
-        style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}
-      >
-        <View
-          style={{
-            backgroundColor: getTagColor(item.rtags?.name),
-            paddingHorizontal: 10,
-            paddingVertical: 4,
-            borderRadius: 4,
-            marginRight: 8,
-          }}
-        >
-          <Text style={{ color: "#000000", fontSize: 11, fontWeight: "600" }}>
-            {item.rtags?.name || 'General'}
-          </Text>
-        </View>
-        <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 12 }}>
-          {item.is_anonymous ? "Anonymous" : "User"}
-        </Text>
-        <Text
-          style={{
-            color: "rgba(255,255,255,0.3)",
-            fontSize: 12,
-            marginLeft: 6,
-          }}
-        >
-          · {timeAgo}
-        </Text>
-        {isExpiring && (
-          <View
-            style={{
-              marginLeft: "auto",
-              flexDirection: "row",
-              alignItems: "center",
-            }}
-          >
-            <Clock size={12} color="rgba(255,255,255,0.4)" />
-            <Text
-              style={{
-                color: "rgba(255,255,255,0.4)",
-                fontSize: 11,
-                marginLeft: 4,
-              }}
-            >
-              Expiring soon
-            </Text>
-          </View>
-        )}
-        {item.is_resolved && (
-          <View
-            style={{
-              marginLeft: "auto",
-              flexDirection: "row",
-              alignItems: "center",
-            }}
-          >
-            <Text style={{ color: "#4ADE80", fontSize: 11, fontWeight: "600" }}>
-              ✓ Resolved
-            </Text>
-          </View>
-        )}
-      </View>
-
-      {/* Post Content */}
-      {shouldBlur && !revealed ? (
-        <Pressable
-          onPress={() => {
-            setRevealed(true);
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          }}
-          style={{
-            backgroundColor: "rgba(239, 68, 68, 0.08)",
-            paddingVertical: 20,
-            paddingHorizontal: 16,
-            borderRadius: 8,
-            borderWidth: 1,
-            borderColor: "rgba(239, 68, 68, 0.2)",
-            marginBottom: 12,
-          }}
-        >
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <AlertTriangle size={16} color="#EF4444" />
-            <Text
-              style={{
-                color: "#EF4444",
-                fontSize: 14,
-                fontWeight: "600",
-                marginLeft: 8,
-              }}
-            >
-              This post is being fact-checked. Tap to reveal.
-            </Text>
-          </View>
-        </Pressable>
-      ) : (
-        <Text
-          style={{
-            color: "#FFFFFF",
-            fontSize: 16,
-            lineHeight: 24,
-            marginBottom: 12,
-            opacity: shouldBlur && revealed ? 0.7 : 1,
-          }}
-        >
-          {item.text}
-        </Text>
-      )}
-
-      {/* Reactions */}
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 16 }}>
-        <TouchableOpacity
-          onPress={() => onReaction(item.id, "helpful", userReactions.helpful)}
-          style={{ flexDirection: "row", alignItems: "center" }}
-        >
-          <ThumbsUp
-            size={18}
-            color={userReactions.helpful ? "#4ADE80" : "rgba(255,255,255,0.4)"}
-            fill={userReactions.helpful ? "#4ADE80" : "transparent"}
-          />
-          {helpfulCount > 0 && (
-            <Text
-              style={{
-                color: userReactions.helpful
-                  ? "#4ADE80"
-                  : "rgba(255,255,255,0.5)",
-                fontSize: 13,
-                marginLeft: 6,
-                fontWeight: "600",
-              }}
-            >
-              {helpfulCount}
-            </Text>
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={() => onReaction(item.id, "seen", userReactions.seen)}
-          style={{ flexDirection: "row", alignItems: "center" }}
-        >
-          <Eye
-            size={18}
-            color={userReactions.seen ? "#60A5FA" : "rgba(255,255,255,0.4)"}
-            fill={userReactions.seen ? "#60A5FA" : "transparent"}
-          />
-          {seenCount > 0 && (
-            <Text
-              style={{
-                color: userReactions.seen ? "#60A5FA" : "rgba(255,255,255,0.5)",
-                fontSize: 13,
-                marginLeft: 6,
-                fontWeight: "600",
-              }}
-            >
-              {seenCount}
-            </Text>
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={() => onReaction(item.id, "fake", userReactions.fake)}
-          style={{ flexDirection: "row", alignItems: "center" }}
-        >
-          <Flag
-            size={18}
-            color={userReactions.fake ? "#EF4444" : "rgba(255,255,255,0.4)"}
-            fill={userReactions.fake ? "#EF4444" : "transparent"}
-          />
-          {fakeCount > 0 && (
-            <Text
-              style={{
-                color: userReactions.fake ? "#EF4444" : "rgba(255,255,255,0.5)",
-                fontSize: 13,
-                marginLeft: 6,
-                fontWeight: "600",
-              }}
-            >
-              {fakeCount}
-            </Text>
-          )}
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-}
+import PostItem from "./PostItem";
+import { getStoredUser } from "../utils/user";
+import { useAuthStore } from "../utils/auth/store";
 
 export default function ZoneFeed({ zoneSlug, zoneName }) {
   const insets = useSafeAreaInsets();
@@ -252,14 +35,86 @@ export default function ZoneFeed({ zoneSlug, zoneName }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [deviceId, setDeviceId] = useState(null);
+  const [isModerator, setIsModerator] = useState(false);
+  const user = useAuthStore(state => state.auth);
 
   useEffect(() => {
     getDeviceId().then(setDeviceId);
+    checkModerator();
   }, []);
+
+  const checkModerator = async () => {
+    const user = await getStoredUser();
+    if (user) {
+      const { data } = await supabase.from('rusers').select('is_admin, is_moderator').eq('id', user.id).single();
+      setIsModerator(!!data?.is_admin || !!data?.is_moderator);
+    }
+  };
+
+  const handleMuteUser = async (userId) => {
+    Alert.alert(
+      "Mute User",
+      "Are you sure you want to mute this user? They will no longer be able to post.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Mute", 
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const admin = await getStoredUser();
+              const { error } = await supabase
+                .from('rusers')
+                .update({ 
+                  is_muted: true,
+                  muted_at: new Date().toISOString(),
+                  muted_by: admin.supabase_uid
+                })
+                .eq('id', userId);
+              
+              if (error) throw error;
+              
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              Alert.alert("Success", "User has been muted.");
+            } catch (error) {
+              console.error("Error muting user:", error);
+              Alert.alert("Error", "Failed to mute user.");
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleDeletePost = async (postId) => {
+    Alert.alert(
+      "Delete Post",
+      "Are you sure you want to delete this post?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Delete", 
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const { error } = await supabase
+                .from('rposts')
+                .update({ is_deleted: true })
+                .eq('id', postId);
+              
+              if (error) throw error;
+              fetchPosts();
+            } catch (error) {
+              console.error(error);
+            }
+          }
+        }
+      ]
+    );
+  };
 
   const fetchPosts = useCallback(async () => {
     try {
-      // Get zone ID first
       const { data: zoneData } = await supabase
         .from('rzones')
         .select('id')
@@ -273,9 +128,12 @@ export default function ZoneFeed({ zoneSlug, zoneName }) {
         .select(`
           *,
           rtags (name),
+          rzones (name),
+          rusers (username, emoji_icon, avatar_url),
           rreactions (reaction_type, device_id)
         `)
         .eq('zone_id', zoneData.id)
+        .eq('is_deleted', false)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -392,6 +250,9 @@ export default function ZoneFeed({ zoneSlug, zoneName }) {
             item={item}
             deviceId={deviceId}
             onReaction={handleReaction}
+            onDelete={handleDeletePost}
+            onMute={handleMuteUser}
+            user={user}
           />
         )}
         keyExtractor={(item) => item.id.toString()}
@@ -446,6 +307,31 @@ export default function ZoneFeed({ zoneSlug, zoneName }) {
       </TouchableOpacity>
     </View>
   );
+}
+
+function getTimeAgo(date) {
+  const seconds = Math.floor((new Date() - date) / 1000);
+
+  if (seconds < 60) return "just now";
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+  return `${Math.floor(seconds / 604800)}w ago`;
+}
+
+function getTagColor(tagName) {
+  const colors = {
+    General: "#94A3B8",
+    Traffic: "#F59E0B",
+    "Lost & Found": "#8B5CF6",
+    Complaint: "#EF4444",
+    Incident: "#DC2626",
+    Warning: "#EA580C",
+    Event: "#06B6D4",
+    "Shop / Business": "#10B981",
+    Question: "#60A5FA",
+  };
+  return colors[tagName] || "#94A3B8";
 }
 
 function getTimeAgo(date) {

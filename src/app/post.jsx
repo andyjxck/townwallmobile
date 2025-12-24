@@ -96,6 +96,21 @@ export default function PostScreen() {
       setUploadProgress(0.05);
 
       try {
+        const user = await getStoredUser();
+        
+        // Check if muted
+        const { data: userData } = await supabase
+          .from('rusers')
+          .select('is_muted')
+          .eq('id', user?.id)
+          .single();
+        
+        if (userData?.is_muted) {
+          alert("Your account is muted. You cannot create new posts at this time.");
+          setLoading(false);
+          return;
+        }
+
         // AI Moderation
         const moderation = await moderateContent(`${title}\n${text}`);
         if (moderation.status === 'rejected') {

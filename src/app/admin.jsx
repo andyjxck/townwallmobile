@@ -165,19 +165,19 @@ export default function ModerationAdmin() {
       const user = await getStoredUser();
       const { data: userData, error } = await supabase
         .from('rusers')
-        .select('is_admin')
+        .select('is_admin, is_moderator')
         .eq('id', user?.id)
         .single();
       
       if (error) throw error;
       
-      if (!userData?.is_admin) {
+      if (!userData?.is_admin && !userData?.is_moderator) {
         Alert.alert("Access Denied", "You do not have permission to view this page.");
         router.back();
         return;
       }
       
-      setIsAdmin(true);
+      setIsAdmin(true); // Using isAdmin state to represent "Moderation Access"
     } catch (error) {
       console.error(error);
       setLoading(false);

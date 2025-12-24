@@ -89,15 +89,15 @@ export default function UniversalFeed() {
   const [selectedTag, setSelectedTag] = useState(null);
   const [sortBy, setSortBy] = useState('newest');
   const [showMenu, setShowMenu] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [isModerator, setIsModerator] = useState(false);
   const user = useAuthStore(state => state.auth);
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
-    useEffect(() => {
+  useEffect(() => {
     getDeviceId().then(setDeviceId);
     fetchFilterData();
-    checkAdmin();
+    checkModerator();
     loadUnreadCount();
 
     // Subscribe to new notifications for the current user
@@ -142,12 +142,47 @@ export default function UniversalFeed() {
     }
   };
 
-  const checkAdmin = async () => {
+  const checkModerator = async () => {
     const user = await getStoredUser();
     if (user) {
-      const { data } = await supabase.from('rusers').select('is_admin').eq('id', user.id).single();
-      setIsAdmin(!!data?.is_admin);
+      const { data } = await supabase.from('rusers').select('is_admin, is_moderator').eq('id', user.id).single();
+      setIsModerator(!!data?.is_admin || !!data?.is_moderator);
     }
+  };
+
+  const handleMuteUser = async (userId) => {
+    Alert.alert(
+      "Mute User",
+      "Are you sure you want to mute this user? They will no longer be able to post.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Mute", 
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const admin = await getStoredUser();
+              const { error } = await supabase
+                .from('rusers')
+                .update({ 
+                  is_muted: true,
+                  muted_at: new Date().toISOString(),
+                  muted_by: admin.supabase_uid
+                })
+                .eq('id', userId);
+              
+              if (error) throw error;
+              
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              Alert.alert("Success", "User has been muted.");
+            } catch (error) {
+              console.error("Error muting user:", error);
+              Alert.alert("Error", "Failed to mute user.");
+            }
+          }
+        }
+      ]
+    );
   };
 
   const fetchFilterData = async () => {
@@ -374,15 +409,15 @@ export default function UniversalFeed() {
                 <Text style={styles.dropdownText}>HELP / CONTACT</Text>
               </TouchableOpacity>
 
-              {isAdmin && (
-                <TouchableOpacity 
-                  style={styles.dropdownItem} 
-                  onPress={() => { setShowMenu(false); router.push("/admin"); }}
-                >
-                  <Shield size={18} color="#EF4444" />
-                  <Text style={styles.dropdownText}>MODERATION</Text>
-                </TouchableOpacity>
-              )}
+                {isModerator && (
+                  <TouchableOpacity 
+                    style={styles.dropdownItem} 
+                    onPress={() => { setShowMenu(false); router.push("/admin"); }}
+                  >
+                    <Shield size={18} color="#EF4444" />
+                    <Text style={styles.dropdownText}>MODERATION</Text>
+                  </TouchableOpacity>
+                )}
             </View>
           )}
 
@@ -453,6 +488,7 @@ export default function UniversalFeed() {
                   deviceId={deviceId} 
                   onReaction={handleReaction} 
                   onDelete={handleDeletePost}
+                  onMute={handleMuteUser}
                   onShare={handleShare}
                   user={user}
                 />

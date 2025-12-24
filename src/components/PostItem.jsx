@@ -22,6 +22,7 @@ import {
   User,
   Send,
   Trash2,
+  VolumeX,
 } from "lucide-react-native";
 import { getDeviceId } from "../utils/deviceId";
 import { supabase } from "../utils/supabase";
@@ -31,7 +32,7 @@ import { Image } from "expo-image";
 import { getStoredUser } from "../utils/user";
 import { TextInput } from "react-native-gesture-handler";
 
-export default function PostItem({ item, deviceId, onReaction, onComment, onDelete, onShare, user }) {
+export default function PostItem({ item, deviceId, onReaction, onComment, onDelete, onMute, onShare, user }) {
   const [expanded, setExpanded] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [showFullImage, setShowFullImage] = useState(false);
@@ -72,6 +73,18 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
       
       try {
         const user = await getStoredUser();
+        
+        // Check if muted
+        const { data: userData } = await supabase
+          .from('rusers')
+          .select('is_muted')
+          .eq('id', user?.id)
+          .single();
+        
+        if (userData?.is_muted) {
+          alert("Your account is muted. You cannot reply at this time.");
+          return;
+        }
         
         // AI Moderation
         const moderation = await moderateContent(commentText.trim());
@@ -434,7 +447,7 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
           </Text>
         </TouchableOpacity>
 
-        {user?.id === item.user_id && (
+        {(user?.id === item.user_id || user?.is_admin || user?.is_moderator) && (
           <TouchableOpacity
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -442,7 +455,19 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
             }}
             style={styles.actionButton}
           >
-            <Trash2 size={18} color="rgba(239, 68, 68, 0.4)" />
+            <Trash2 size={18} color={user?.id === item.user_id ? "rgba(239, 68, 68, 0.4)" : "#EF4444"} />
+          </TouchableOpacity>
+        )}
+
+        {(user?.is_admin || user?.is_moderator) && user?.id !== item.user_id && (
+          <TouchableOpacity
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              onMute(item.user_id);
+            }}
+            style={styles.actionButton}
+          >
+            <VolumeX size={18} color="#F59E0B" />
           </TouchableOpacity>
         )}
 
