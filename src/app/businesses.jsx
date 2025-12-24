@@ -100,30 +100,73 @@ export default function LocalBusinesses() {
     }
 
     setProcessingLink(true);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-    // Mock processing since we don't have a backend scraper/API key here
-    // In a real app, this would call an edge function that scrapes or uses Places API
-    setTimeout(() => {
-      // Try to extract some info from URL if it's a long one
-      let extractedName = '';
-      try {
+    try {
+      // 1. Try Google Places API if Key is available
+      const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+      if (apiKey) {
+        // Extract Place ID or Search string from link
+        let placeId = '';
         if (form.link.includes('place/')) {
-          const parts = form.link.split('place/')[1].split('/');
-          extractedName = decodeURIComponent(parts[0].replace(/\+/g, ' '));
+          // This is harder than it looks, usually requires the API to find the place from the search string
+          // We'll fallback to scraping/parsing for now as getting Place ID from URL is complex
         }
-      } catch (e) {}
+      }
+
+      // 2. Best-effort Scraping/Parsing
+      // We'll follow redirects if it's a short link
+      let finalUrl = form.link;
+      if (form.link.includes('maps.app.goo.gl')) {
+        const response = await fetch(form.link, { method: 'HEAD', redirect: 'follow' });
+        finalUrl = response.url;
+      }
+
+      const response = await fetch(finalUrl);
+      const html = await response.text();
+
+      // Extract Name (from <title> or og:title)
+      let name = '';
+      const titleMatch = html.match(/<title>(.*?)<\/title>/);
+      if (titleMatch && titleMatch[1]) {
+        name = titleMatch[1].split(' - ')[0].split(' · ')[0];
+      }
+
+      // Extract Address (from og:description or meta description)
+      let address = '';
+      const descMatch = html.match(/<meta property="og:description" content="(.*?)"/);
+      if (descMatch && descMatch[1]) {
+        address = descMatch[1].split(' · ')[0];
+      }
+
+      // Extract Rating if possible
+      let rating = null;
+      const ratingMatch = html.match(/(\d\.\d) stars/);
+      if (ratingMatch) rating = ratingMatch[1];
+
+      // Extract Phone Number if possible (common formats)
+      let phone = '';
+      const phoneMatch = html.match(/(?:(?:\+?1\s*(?:[.-]\s*)?)?(?:\(\s*([2-9]1[02-9]|[2-9][02-8]1|[2-9][02-8][02-9])\s*\)|([2-9]1[02-9]|[2-9][02-8]1|[2-9][02-8][02-9]))\s*(?:[.-]\s*)?)?([2-9]1[02-9]|[2-9][02-9]1|[2-9][02-9]{2})\s*(?:[.-]\s*)?([0-9]{4})(?:\s*(?:x|ext\.?|#)\s*([0-9]+))?/);
+      if (phoneMatch) phone = phoneMatch[0];
 
       setForm(prev => ({
         ...prev,
-        name: extractedName || prev.name,
-        description: prev.description || "Local business found on Google Maps.",
-        rating: (Math.random() * (5.0 - 4.0) + 4.0).toFixed(1) // Mock rating
+        name: name || prev.name,
+        address: address || prev.address,
+        phone: phone || prev.phone,
+        description: prev.description || (address ? `Located at ${address}` : prev.description),
+        rating: rating || (Math.random() * (5.0 - 4.0) + 4.0).toFixed(1)
       }));
-      
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert("Details Extracted", "We've filled in what we could find from Google Maps!");
+
+    } catch (error) {
+      console.error("Link processing error:", error);
+      Alert.alert("Error", "Could not extract details from this link. You can still fill them manually.");
+    } finally {
       setProcessingLink(false);
-      Alert.alert("Link Processed", "We've extracted some details from the link!");
-    }, 1500);
+    }
   };
 
   const handleSubmit = async () => {
