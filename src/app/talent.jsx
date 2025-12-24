@@ -149,6 +149,14 @@ export default function LocalTalent() {
     }
   };
 
+  const getPlatformIcon = (platform) => {
+    const p = platform?.toLowerCase() || '';
+    if (p.includes('youtube')) return <Youtube size={16} color="rgba(255,255,255,0.5)" />;
+    if (p.includes('spotify') || p.includes('music') || p.includes('tiktok')) return <Music size={16} color="rgba(255,255,255,0.5)" />;
+    if (p.includes('instagram')) return <Instagram size={16} color="rgba(255,255,255,0.5)" />;
+    return <Globe size={16} color="rgba(255,255,255,0.5)" />;
+  };
+
   const renderTalentCard = ({ item }) => {
     return (
       <TouchableOpacity 
@@ -158,12 +166,25 @@ export default function LocalTalent() {
       >
         <View style={styles.talentRow}>
           <View style={styles.talentMain}>
-            <Text style={styles.categoryText}>{item.category?.toUpperCase() || 'TALENT'}</Text>
+            <View style={styles.categoryRow}>
+              <Text style={styles.categoryText}>{item.category?.toUpperCase() || 'TALENT'}</Text>
+              <View style={styles.platformBadge}>
+                {getPlatformIcon(item.platform)}
+                <Text style={styles.platformLabel}>{item.platform?.toUpperCase()}</Text>
+              </View>
+            </View>
+            
             <Text style={styles.talentNameText}>{item.name}</Text>
             <Text style={styles.talentTitleText}>{item.title}</Text>
+            
             {item.description ? (
               <Text style={styles.talentDescText} numberOfLines={2}>{item.description}</Text>
             ) : null}
+
+            <View style={styles.visitAction}>
+              <Text style={styles.visitText}>VISIT {item.platform?.toUpperCase() || 'LINK'}</Text>
+              <ExternalLink size={12} color="#FFFFFF" strokeWidth={2.5} />
+            </View>
           </View>
           
           <View style={styles.talentSide}>
@@ -171,9 +192,6 @@ export default function LocalTalent() {
               source={{ uri: `https://avatar.vercel.sh/${item.name}.png` }} 
               style={styles.minimalAvatar} 
             />
-            <View style={styles.linkCircle}>
-              <ExternalLink size={14} color="#000000" strokeWidth={3} />
-            </View>
           </View>
         </View>
       </TouchableOpacity>
@@ -377,34 +395,70 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingRight: 20,
   },
+  categoryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 8,
+  },
+  platformBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  platformLabel: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
   categoryText: {
     color: 'rgba(255,255,255,0.4)',
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 2,
-    marginBottom: 8,
   },
   talentNameText: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '400',
     letterSpacing: 1,
     marginBottom: 4,
-    opacity: 0.7,
+    opacity: 0.6,
   },
   talentTitleText: {
     color: '#FFFFFF',
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: '300',
-    lineHeight: 32,
+    lineHeight: 28,
     letterSpacing: -0.5,
   },
   talentDescText: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 15,
-    lineHeight: 22,
+    color: 'rgba(255,255,255,0.45)',
+    fontSize: 14,
+    lineHeight: 20,
     marginTop: 12,
     fontWeight: '400',
+  },
+  visitAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 20,
+    alignSelf: 'flex-start',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.2)',
+    paddingBottom: 4,
+  },
+  visitText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
   },
   talentSide: {
     alignItems: 'center',
