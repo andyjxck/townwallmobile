@@ -34,6 +34,7 @@ import {
     Shield,
     HelpCircle,
     MessageCircle,
+    Bell,
   } from "lucide-react-native";
 import { getDeviceId } from "../utils/deviceId";
 import { supabase } from "../utils/supabase";
@@ -42,6 +43,8 @@ import { useTheme } from "../utils/theme";
 import { Image } from "expo-image";
 import { getStoredUser } from "../utils/user";
 import { TextInput } from "react-native-gesture-handler";
+import NotificationPanel from "./NotificationPanel";
+import { fetchNotifications } from "@/utils/notifications";
 
 function PostItem({ item, deviceId, onReaction, onComment }) {
   const [expanded, setExpanded] = useState(false);
@@ -459,12 +462,39 @@ export default function UniversalFeed() {
   const [sortBy, setSortBy] = useState('newest');
   const [showMenu, setShowMenu] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     getDeviceId().then(setDeviceId);
     fetchFilterData();
     checkAdmin();
+    loadUnreadCount();
+
+    // Subscribe to new notifications
+    const subscription = supabase
+      .channel('public:rnotifications')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'rnotifications' }, () => {
+        loadUnreadCount();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
   }, []);
+
+  const loadUnreadCount = async () => {
+    const user = await getStoredUser();
+    if (user) {
+      const { count } = await supabase
+        .from('rnotifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('is_read', false);
+      setUnreadCount(count || 0);
+    }
+  };
 
   const checkAdmin = async () => {
     const user = await getStoredUser();
@@ -557,12 +587,27 @@ export default function UniversalFeed() {
             </TouchableOpacity>
             <Text style={[styles.logo, { color: '#FFFFFF' }]}>REDDITCH'D</Text>
               <View style={styles.headerActions}>
-                <TouchableOpacity 
-                  style={styles.iconButton}
-                  onPress={() => router.push("/profile")}
-                >
-                  <User size={22} color="#FFFFFF" />
-                </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.iconButton}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setShowNotifications(true);
+                  setUnreadCount(0); // Optimistically clear
+                }}
+              >
+                <Bell size={22} color="#FFFFFF" />
+                {unreadCount > 0 && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.iconButton}
+                onPress={() => router.push("/profile")}
+              >
+                <User size={22} color="#FFFFFF" />
+              </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.iconButton}
                 onPress={() => {
@@ -683,6 +728,14 @@ export default function UniversalFeed() {
         <Plus size={32} color="#000000" strokeWidth={3} />
       </TouchableOpacity>
 
+      <NotificationPanel 
+        visible={showNotifications} 
+        onClose={() => {
+          setShowNotifications(false);
+          loadUnreadCount();
+        }} 
+      />
+
       {/* Services Menu Modal */}
       <Modal
         visible={showMenu}
@@ -786,10 +839,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 15,
   },
-  iconButton: {
-    padding: 5,
-  },
-  filterSection: {
+    iconButton: {
+      padding: 5,
+      position: 'relative',
+    },
+    badge: {
+      position: 'absolute',
+      top: 0,
+      right: 0,
+      backgroundColor: '#EF4444',
+      borderRadius: 10,
+      minWidth: 16,
+      height: 16,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 3,
+      borderWidth: 1.5,
+      borderColor: '#000000',
+    },
+    badgeText: {
+      color: '#FFFFFF',
+      fontSize: 8,
+      fontWeight: '900',
+    },
+    filterSection: {
     paddingBottom: 10,
   },
   filterList: {

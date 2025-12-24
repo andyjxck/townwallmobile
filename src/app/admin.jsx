@@ -19,6 +19,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/utils/supabase';
 import { getStoredUser } from '@/utils/user';
+import { sendNotification } from '@/utils/notifications';
 import * as Haptics from 'expo-haptics';
 
 const TABS = [
@@ -171,6 +172,14 @@ export default function ModerationAdmin() {
 
       if (error) throw error;
       
+      await sendNotification({
+        userId: userId,
+        title: 'Support Message',
+        message: `Admin replied: ${replyText.substring(0, 50)}${replyText.length > 50 ? '...' : ''}`,
+        type: 'help_chat',
+        link: '/support'
+      });
+
       setReplyText('');
       fetchTranscript(userId);
       Alert.alert("Success", "Reply sent.");
@@ -215,6 +224,31 @@ export default function ModerationAdmin() {
 
       if (error) throw error;
       
+      const item = data.find(i => i.id === itemId);
+      if (item && item.user_id) {
+        let title = '';
+        let message = '';
+        
+        if (activeTab === 'talent') {
+          title = action === 'approve' ? 'Talent Approved' : 'Talent Rejected';
+          message = action === 'approve' ? `Your talent "${item.name}" has been approved!` : `Your talent "${item.name}" was not approved.`;
+        } else if (activeTab === 'business') {
+          title = action === 'approve' ? 'Business Approved' : 'Business Rejected';
+          message = action === 'approve' ? `Your business "${item.name}" has been approved!` : `Your business "${item.name}" was not approved.`;
+        } else {
+          title = action === 'approve' ? 'Post Approved' : 'Post Rejected';
+          message = action === 'approve' ? `Your post has been approved!` : `Your post was rejected for violating guidelines.`;
+        }
+
+        await sendNotification({
+          userId: item.user_id,
+          title,
+          message,
+          type: 'moderation',
+          link: '/profile'
+        });
+      }
+
       setData(prev => prev.filter(p => p.id !== itemId));
       Alert.alert("Success", `Item has been ${action}d.`);
     } catch (error) {
