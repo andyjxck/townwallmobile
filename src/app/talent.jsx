@@ -2,6 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Modal, Image, Platform, FlatList, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, Music, Youtube, Globe, Info, Plus, ExternalLink, ShieldCheck, Instagram, CheckCircle2, Star, Camera, Search, X } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
+import * as Haptics from 'expo-haptics';
+import Purchases from 'react-native-purchases';
+import { supabase } from '@/utils/supabase';
+import { decode } from 'base64-arraybuffer';
+import * as ImagePicker from 'expo-image-picker';
+import { getStoredUser } from '@/utils/user';
 
 export default function LocalTalent() {
   const insets = useSafeAreaInsets();
