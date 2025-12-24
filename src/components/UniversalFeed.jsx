@@ -464,6 +464,7 @@ export default function UniversalFeed() {
   const [sortBy, setSortBy] = useState('newest');
   const [showMenu, setShowMenu] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [user, setUser] = useState(null);
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -475,8 +476,9 @@ export default function UniversalFeed() {
 
     // Subscribe to new notifications for the current user
     const setupNotificationSubscription = async () => {
-      const user = await getStoredUser();
-      if (!user) return;
+      const userData = await getStoredUser();
+      setUser(userData);
+      if (!userData) return;
 
       const subscription = supabase
         .channel(`notifications_${user.id}`)
@@ -634,6 +636,16 @@ export default function UniversalFeed() {
                   <User size={18} color="#FFFFFF" />
                   <Text style={styles.dropdownText}>PROFILE</Text>
                 </TouchableOpacity>
+
+                {(!user || !user.supabase_uid) && (
+                  <TouchableOpacity 
+                    style={styles.dropdownItem} 
+                    onPress={() => { setShowMenu(false); router.push("/auth?mode=login"); }}
+                  >
+                    <User size={18} color="#4ADE80" />
+                    <Text style={[styles.dropdownText, { color: '#4ADE80' }]}>SIGN IN</Text>
+                  </TouchableOpacity>
+                )}
 
                 <View style={styles.dropdownDivider} />
 

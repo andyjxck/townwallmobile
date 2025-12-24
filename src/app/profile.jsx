@@ -267,7 +267,7 @@ export default function Profile() {
                 style={styles.authButton} 
                 onPress={() => router.push("/auth")}
               >
-                <Text style={styles.authButtonText}>CLAIM ACCOUNT</Text>
+                  <Text style={styles.authButtonText}>SIGN IN / CLAIM ACCOUNT</Text>
               </TouchableOpacity>
             )}
           </View>

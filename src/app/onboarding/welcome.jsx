@@ -172,40 +172,49 @@ export default function WelcomeScreen() {
         {/* Spacer */}
         <View style={{ flex: 1 }} />
 
-        {/* Continue Button */}
-        <View style={{ paddingBottom: insets.bottom + 24 }}>
-          <TouchableOpacity
-            onPress={handleContinue}
-            style={{
-              backgroundColor: "#FFFFFF",
-              paddingVertical: 18,
-              borderRadius: 16,
-              alignItems: "center",
-            }}
-          >
-            <Text
+          {/* Continue Button */}
+          <View style={{ paddingBottom: insets.bottom + 24 }}>
+            <TouchableOpacity
+              onPress={handleContinue}
               style={{
-                color: "#000000",
-                fontSize: 17,
-                fontWeight: "700",
+                backgroundColor: "#FFFFFF",
+                paddingVertical: 18,
+                borderRadius: 16,
+                alignItems: "center",
               }}
             >
-              Get Started
-            </Text>
-          </TouchableOpacity>
+              <Text
+                style={{
+                  color: "#000000",
+                  fontSize: 17,
+                  fontWeight: "700",
+                }}
+              >
+                Get Started
+              </Text>
+            </TouchableOpacity>
 
-          <Text
-            style={{
-              color: "rgba(255,255,255,0.4)",
-              fontSize: 12,
-              textAlign: "center",
-              marginTop: 16,
-              lineHeight: 18,
-            }}
-          >
-            By continuing, you agree to our community guidelines
-          </Text>
-        </View>
+            <TouchableOpacity 
+              onPress={() => router.push("/auth?mode=login")}
+              style={{ marginTop: 20, alignItems: "center" }}
+            >
+              <Text style={{ color: "#FFFFFF", fontSize: 14, fontWeight: "600" }}>
+                Already have an account? <Text style={{ color: "#4ADE80" }}>Sign in</Text>
+              </Text>
+            </TouchableOpacity>
+
+            <Text
+              style={{
+                color: "rgba(255,255,255,0.4)",
+                fontSize: 12,
+                textAlign: "center",
+                marginTop: 24,
+                lineHeight: 18,
+              }}
+            >
+              By continuing, you agree to our community guidelines
+            </Text>
+          </View>
       </View>
     </View>
   );

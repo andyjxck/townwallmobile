@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { supabase } from "@/utils/supabase";
 import { getDeviceId } from "@/utils/deviceId";
 import { initUser } from "@/utils/user";
@@ -19,10 +19,17 @@ import * as Haptics from "expo-haptics";
 
 export default function Auth() {
   const router = useRouter();
-  const [isLogin, setIsLogin] = useState(false);
+  const params = useLocalSearchParams();
+  const [isLogin, setIsLogin] = useState(params.mode === "login");
   const [loading, setLoading] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+
+  useEffect(() => {
+    if (params.mode === "login") {
+      setIsLogin(true);
+    }
+  }, [params.mode]);
 
   const handleAuth = async () => {
     if (!username || !password) {
