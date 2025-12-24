@@ -8,8 +8,9 @@ import {
       ActivityIndicator,
       StyleSheet,
       Modal,
-      Dimensions,
-      Alert,
+    Dimensions,
+    Alert,
+    Share,
     } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -21,9 +22,10 @@ import {
   ArrowUp,
   ArrowDown,
   Search,
-    ThumbsUp,
-    Eye,
+    Heart,
+    Star,
     Flag,
+    Share as ShareIcon,
     AlertTriangle,
     Zap,
     X,
@@ -52,7 +54,7 @@ import NotificationPanel from "./NotificationPanel";
 import { fetchNotifications } from "@/utils/notifications";
 import { LinearGradient } from "expo-linear-gradient";
 
-function PostItem({ item, deviceId, onReaction, onComment, onDelete, user }) {
+function PostItem({ item, deviceId, onReaction, onComment, onDelete, onShare, user }) {
   const [expanded, setExpanded] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [showFullImage, setShowFullImage] = useState(false);
@@ -161,17 +163,6 @@ function PostItem({ item, deviceId, onReaction, onComment, onDelete, user }) {
 
   return (
     <View style={styles.postContainer}>
-      {user?.id === item.user_id && (
-        <TouchableOpacity
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            onDelete(item.id);
-          }}
-          style={styles.deleteButton}
-        >
-          <Trash2 size={16} color="rgba(239, 68, 68, 0.4)" />
-        </TouchableOpacity>
-      )}
       {shouldBlur && !revealed ? (
         <TouchableOpacity
           onPress={() => {
@@ -416,49 +407,67 @@ function PostItem({ item, deviceId, onReaction, onComment, onDelete, user }) {
         </View>
       )}
 
-      {/* Action Row */}
       <View style={styles.actionRow}>
         <TouchableOpacity
           onPress={() => onReaction(item.id, "helpful", userReactions.helpful)}
           style={styles.actionButton}
         >
-          <ThumbsUp
+          <Heart
             size={18}
-            color={userReactions.helpful ? "#4ADE80" : "rgba(255,255,255,0.4)"}
-            fill={userReactions.helpful ? "#4ADE80" : "transparent"}
+            color={userReactions.helpful ? "#F43F5E" : "rgba(255,255,255,0.4)"}
+            fill={userReactions.helpful ? "#F43F5E" : "transparent"}
           />
-          <Text style={[styles.actionCount, { color: userReactions.helpful ? "#4ADE80" : "rgba(255,255,255,0.4)" }]}>
+          <Text style={[styles.actionCount, { color: userReactions.helpful ? "#F43F5E" : "rgba(255,255,255,0.4)" }]}>
             {helpfulCount || 0}
           </Text>
         </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={() => onReaction(item.id, "seen", userReactions.seen)}
-            style={styles.actionButton}
-          >
-            <Zap
-              size={18}
-              color={userReactions.seen ? "#F59E0B" : "rgba(255,255,255,0.4)"}
-              fill={userReactions.seen ? "#F59E0B" : "transparent"}
-            />
-            <Text style={[styles.actionCount, { color: userReactions.seen ? "#F59E0B" : "rgba(255,255,255,0.4)" }]}>
-              {seenCount || 0}
-            </Text>
-          </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => onReaction(item.id, "seen", userReactions.seen)}
+          style={styles.actionButton}
+        >
+          <Star
+            size={18}
+            color={userReactions.seen ? "#F59E0B" : "rgba(255,255,255,0.4)"}
+            fill={userReactions.seen ? "#F59E0B" : "transparent"}
+          />
+          <Text style={[styles.actionCount, { color: userReactions.seen ? "#F59E0B" : "rgba(255,255,255,0.4)" }]}>
+            {seenCount || 0}
+          </Text>
+        </TouchableOpacity>
 
+        <TouchableOpacity
+          onPress={() => onReaction(item.id, "fake", userReactions.fake)}
+          style={styles.actionButton}
+        >
+          <Flag
+            size={18}
+            color={userReactions.fake ? "#EF4444" : "rgba(255,255,255,0.4)"}
+            fill={userReactions.fake ? "#EF4444" : "transparent"}
+          />
+          <Text style={[styles.actionCount, { color: userReactions.fake ? "#EF4444" : "rgba(255,255,255,0.4)" }]}>
+            {fakeCount || 0}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => onShare(item)}
+          style={styles.actionButton}
+        >
+          <ShareIcon size={18} color="rgba(255,255,255,0.4)" />
+        </TouchableOpacity>
+
+        {user?.id === item.user_id && (
           <TouchableOpacity
-            onPress={() => onReaction(item.id, "fake", userReactions.fake)}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              onDelete(item.id);
+            }}
             style={styles.actionButton}
           >
-            <AlertTriangle
-              size={18}
-              color={userReactions.fake ? "#EF4444" : "rgba(255,255,255,0.4)"}
-              fill={userReactions.fake ? "#EF4444" : "transparent"}
-            />
-            <Text style={[styles.actionCount, { color: userReactions.fake ? "#EF4444" : "rgba(255,255,255,0.4)" }]}>
-              {fakeCount || 0}
-            </Text>
+            <Trash2 size={18} color="rgba(239, 68, 68, 0.4)" />
           </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -638,7 +647,21 @@ export default function UniversalFeed() {
     );
   };
 
-  const clearFilters = () => {
+    const handleShare = async (post) => {
+      try {
+        const result = await Share.share({
+          message: `${post.title}\n\n${post.text}\n\nShared from Town Wall`,
+          url: `${process.env.EXPO_PUBLIC_APP_URL}/post/${post.id}`
+        });
+        if (result.action === Share.sharedAction) {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+      } catch (error) {
+        console.error("Error sharing post:", error);
+      }
+    };
+
+    const clearFilters = () => {
     setSelectedZone(null);
     setSelectedTag(null);
   };
@@ -801,13 +824,14 @@ export default function UniversalFeed() {
         <FlatList
           data={posts}
             renderItem={({ item }) => (
-              <PostItem 
-                item={item} 
-                deviceId={deviceId} 
-                onReaction={handleReaction} 
-                onDelete={handleDeletePost}
-                user={user}
-              />
+                <PostItem 
+                  item={item} 
+                  deviceId={deviceId} 
+                  onReaction={handleReaction} 
+                  onDelete={handleDeletePost}
+                  onShare={handleShare}
+                  user={user}
+                />
             )}
           keyExtractor={(item) => item.id.toString()}
           refreshControl={
