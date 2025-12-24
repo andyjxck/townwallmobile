@@ -55,6 +55,8 @@ export default function Profile() {
   const [personalFeed, setPersonalFeed] = useState([]);
   const [addingFriend, setAddingFriend] = useState(false);
   const [userPosts, setUserPosts] = useState([]);
+  const [friendsPosts, setFriendsPosts] = useState([]);
+  const [pendingRequests, setPendingRequests] = useState([]);
   const [activeTab, setActiveTab] = useState("posts"); // posts, friends, replies
   const [deviceId, setDeviceId] = useState(null);
 
@@ -87,50 +89,79 @@ export default function Profile() {
       
       setUser(userData);
 
-      if (userData) {
-        // Fetch stats
-        const { count: postCount } = await supabase
-          .from('rposts')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', userData.id);
-        
-        const { count: reactionCount } = await supabase
-          .from('rreactions')
-          .select('*, rposts!inner(user_id)', { count: 'exact', head: true })
-          .eq('rposts.user_id', userData.id);
-        
-        setStats({ 
-          posts: postCount || 0,
-          reactions: reactionCount || 0,
-          joined: new Date(userData.created_at).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
-        });
+        if (userData) {
+          // Fetch stats
+          const { count: postCount } = await supabase
+            .from('rposts')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', userData.id);
+          
+          const { count: reactionCount } = await supabase
+            .from('rreactions')
+            .select('*, rposts!inner(user_id)', { count: 'exact', head: true })
+            .eq('rposts.user_id', userData.id);
+          
+          setStats({ 
+            posts: postCount || 0,
+            reactions: reactionCount || 0,
+            joined: new Date(userData.created_at).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
+          });
 
-        // Fetch Friends
-        const { data: friendData } = await supabase
-          .from('friends')
-          .select('friend_id, rusers!friends_friend_id_fkey(id, username, emoji_icon, avatar_url)')
-          .eq('user_id', userData.id)
-          .eq('status', 'accepted');
-        
-        const friendsList = friendData?.map(f => f.rusers) || [];
-        setFriends(friendsList);
-        const friendIds = friendsList.map(f => f.id);
+          // Fetch Pending Requests (where current user is the friend_id)
+          const { data: requestsData } = await supabase
+            .from('friends')
+            .select('id, user_id, rusers!friends_user_id_fkey(id, username, emoji_icon, avatar_url)')
+            .eq('friend_id', userData.id)
+            .eq('status', 'pending');
+          
+          setPendingRequests(requestsData?.map(r => ({ ...r.rusers, requestId: r.id })) || []);
 
-        // Fetch user's own posts AND friends' posts
-        const { data: feedPosts } = await supabase
-          .from('rposts')
-          .select(`
-            *,
-            rusers (username, emoji_icon, avatar_url),
-            rzones (name),
-            rtags (name),
-            rreactions (reaction_type, device_id)
-          `)
-          .in('user_id', [userData.id, ...friendIds])
-          .eq('is_deleted', false)
-          .order('created_at', { ascending: false });
-        
-        setUserPosts(feedPosts || []);
+          // Fetch Friends
+          const { data: friendData } = await supabase
+            .from('friends')
+            .select('friend_id, rusers!friends_friend_id_fkey(id, username, emoji_icon, avatar_url)')
+            .eq('user_id', userData.id)
+            .eq('status', 'accepted');
+          
+          const friendsList = friendData?.map(f => f.rusers) || [];
+          setFriends(friendsList);
+          const friendIds = friendsList.map(f => f.id);
+
+          // Fetch user's own posts AND friends' posts
+          const { data: feedPosts } = await supabase
+            .from('rposts')
+            .select(`
+              *,
+              rusers (username, emoji_icon, avatar_url),
+              rzones (name),
+              rtags (name),
+              rreactions (reaction_type, device_id)
+            `)
+            .in('user_id', [userData.id, ...friendIds])
+            .eq('is_deleted', false)
+            .order('created_at', { ascending: false });
+          
+          setUserPosts(feedPosts || []);
+
+          // Fetch Friends Only posts for the dedicated feed
+          if (friendIds.length > 0) {
+            const { data: frPosts } = await supabase
+              .from('rposts')
+              .select(`
+                *,
+                rusers (username, emoji_icon, avatar_url),
+                rzones (name),
+                rtags (name),
+                rreactions (reaction_type, device_id)
+              `)
+              .in('user_id', friendIds)
+              .eq('is_deleted', false)
+              .order('created_at', { ascending: false });
+            
+            setFriendsPosts(frPosts || []);
+          } else {
+            setFriendsPosts([]);
+          }
 
         // Fetch replies to user's posts
         const { data: userPostIds } = await supabase
@@ -265,24 +296,70 @@ export default function Profile() {
         return;
       }
 
-      // Add friend
+      // Send friend request
       const { error: addError } = await supabase
         .from('friends')
         .insert([
-          { user_id: user.id, friend_id: targetUser.id, status: 'accepted' },
-          { user_id: targetUser.id, friend_id: user.id, status: 'accepted' } // Reciprocal for simplicity
+          { user_id: user.id, friend_id: targetUser.id, status: 'pending' }
         ]);
       
       if (addError) throw addError;
 
-      Alert.alert("Success", `Added @${targetUser.username} as a friend!`);
+      Alert.alert("Success", `Friend request sent to @${targetUser.username}!`);
       setFriendUsername("");
       loadData();
     } catch (error) {
       console.error("Error adding friend:", error);
-      Alert.alert("Error", "Failed to add friend.");
+      Alert.alert("Error", "Failed to send request.");
     } finally {
       setAddingFriend(false);
+    }
+  };
+
+  const handleAcceptRequest = async (requestId, requesterId) => {
+    try {
+      // Update existing request to accepted
+      const { error: updateError } = await supabase
+        .from('friends')
+        .update({ status: 'accepted' })
+        .eq('id', requestId);
+      
+      if (updateError) throw updateError;
+
+      // Add reciprocal relationship
+      const { error: reciprocalError } = await supabase
+        .from('friends')
+        .insert({
+          user_id: user.id,
+          friend_id: requesterId,
+          status: 'accepted'
+        });
+      
+      if (reciprocalError) {
+        // If reciprocal fails (e.g. already exists), we just continue
+        console.warn("Reciprocal friend entry error:", reciprocalError);
+      }
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      loadData();
+    } catch (error) {
+      console.error("Error accepting request:", error);
+      Alert.alert("Error", "Failed to accept request.");
+    }
+  };
+
+  const handleDeclineRequest = async (requestId) => {
+    try {
+      const { error } = await supabase
+        .from('friends')
+        .delete()
+        .eq('id', requestId);
+      
+      if (error) throw error;
+      loadData();
+    } catch (error) {
+      console.error("Error declining request:", error);
+      Alert.alert("Error", "Failed to decline request.");
     }
   };
 
@@ -541,28 +618,85 @@ export default function Profile() {
                   </TouchableOpacity>
                 </View>
 
-                {friends.length > 0 ? (
-                  friends.map((friend) => (
-                    <View key={friend.id} style={styles.friendItem}>
-                      <View style={styles.friendInfo}>
-                        <View style={styles.friendAvatar}>
-                          {friend.avatar_url ? (
-                            <Image source={{ uri: friend.avatar_url }} style={styles.friendImage} />
-                          ) : (
-                            <Text style={styles.friendEmoji}>{friend.emoji_icon || "👤"}</Text>
-                          )}
+                {pendingRequests.length > 0 && (
+                  <View style={styles.sectionContainer}>
+                    <Text style={styles.sectionTitle}>PENDING REQUESTS</Text>
+                    {pendingRequests.map((request) => (
+                      <View key={request.requestId} style={styles.friendItem}>
+                        <View style={styles.friendInfo}>
+                          <View style={styles.friendAvatar}>
+                            {request.avatar_url ? (
+                              <Image source={{ uri: request.avatar_url }} style={styles.friendImage} />
+                            ) : (
+                              <Text style={styles.friendEmoji}>{request.emoji_icon || "👤"}</Text>
+                            )}
+                          </View>
+                          <Text style={styles.friendName}>@{request.username}</Text>
                         </View>
-                        <Text style={styles.friendName}>@{friend.username}</Text>
+                        <View style={styles.requestActions}>
+                          <TouchableOpacity 
+                            style={styles.acceptButton}
+                            onPress={() => handleAcceptRequest(request.requestId, request.id)}
+                          >
+                            <Text style={styles.acceptButtonText}>ACCEPT</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity 
+                            style={styles.declineButton}
+                            onPress={() => handleDeclineRequest(request.requestId)}
+                          >
+                            <Trash2 size={16} color="#EF4444" />
+                          </TouchableOpacity>
+                        </View>
                       </View>
-                      <TouchableOpacity style={styles.friendAction}>
-                        <Users size={18} color="rgba(255,255,255,0.3)" />
-                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+
+                <View style={styles.sectionContainer}>
+                  <Text style={styles.sectionTitle}>MY FRIENDS</Text>
+                  {friends.length > 0 ? (
+                    friends.map((friend) => (
+                      <View key={friend.id} style={styles.friendItem}>
+                        <View style={styles.friendInfo}>
+                          <View style={styles.friendAvatar}>
+                            {friend.avatar_url ? (
+                              <Image source={{ uri: friend.avatar_url }} style={styles.friendImage} />
+                            ) : (
+                              <Text style={styles.friendEmoji}>{friend.emoji_icon || "👤"}</Text>
+                            )}
+                          </View>
+                          <Text style={styles.friendName}>@{friend.username}</Text>
+                        </View>
+                        <TouchableOpacity style={styles.friendAction}>
+                          <Users size={18} color="rgba(255,255,255,0.3)" />
+                        </TouchableOpacity>
+                      </View>
+                    ))
+                  ) : (
+                    <View style={styles.emptyContainer}>
+                      <Users size={40} color="rgba(255,255,255,0.1)" />
+                      <Text style={styles.emptyText}>Add friends to see them here!</Text>
                     </View>
-                  ))
-                ) : (
-                  <View style={styles.emptyContainer}>
-                    <Users size={40} color="rgba(255,255,255,0.1)" />
-                    <Text style={styles.emptyText}>Add friends to see them here!</Text>
+                  )}
+                </View>
+
+                {friendsPosts.length > 0 && (
+                  <View style={[styles.sectionContainer, { marginTop: 20 }]}>
+                    <Text style={styles.sectionTitle}>FRIENDS FEED</Text>
+                    <View style={{ marginHorizontal: -20 }}>
+                      {friendsPosts.map((post) => (
+                        <PostItem 
+                          key={post.id}
+                          item={post}
+                          deviceId={deviceId}
+                          onReaction={handleReaction}
+                          onDelete={handleDeletePost}
+                          onShare={handleShare}
+                          user={user}
+                          onComment={() => loadData()}
+                        />
+                      ))}
+                    </View>
                   </View>
                 )}
               </View>
@@ -874,10 +1008,39 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "700",
   },
-  friendAction: {
-    padding: 8,
-  },
-  emptyContainer: {
+    friendAction: {
+      padding: 8,
+    },
+    sectionContainer: {
+      marginBottom: 20,
+    },
+    sectionTitle: {
+      color: "rgba(255,255,255,0.2)",
+      fontSize: 10,
+      fontWeight: "900",
+      letterSpacing: 1.5,
+      marginBottom: 12,
+    },
+    requestActions: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+    },
+    acceptButton: {
+      backgroundColor: "#FFFFFF",
+      paddingVertical: 6,
+      paddingHorizontal: 12,
+      borderRadius: 8,
+    },
+    acceptButtonText: {
+      color: "#000000",
+      fontSize: 10,
+      fontWeight: "900",
+    },
+    declineButton: {
+      padding: 6,
+    },
+    emptyContainer: {
     alignItems: "center",
     paddingVertical: 40,
     gap: 15,
