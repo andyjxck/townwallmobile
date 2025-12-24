@@ -10,6 +10,9 @@ import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { decode } from 'base64-arraybuffer';
 
+import { LinearGradient } from 'expo-linear-gradient';
+import { supabase } from '@/utils/supabase';
+
 export default function LocalBusinesses() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -339,44 +342,50 @@ export default function LocalBusinesses() {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <ChevronLeft color="#FFFFFF" size={24} strokeWidth={2} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>LOCAL BUSINESSES</Text>
-        <View style={{ width: 24 }} />
-      </View>
-
-      {loading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator color="#FFFFFF" />
+    <View style={styles.container}>
+      <LinearGradient
+        colors={['#0F172A', '#000000', '#000000']}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={{ paddingTop: insets.top, flex: 1 }}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <ChevronLeft color="#FFFFFF" size={24} strokeWidth={2} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>LOCAL BUSINESSES</Text>
+          <View style={{ width: 24 }} />
         </View>
-      ) : (
-        <FlatList
-          data={businesses}
-          renderItem={renderBusinessCard}
-          keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.listContent}
-          ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <Briefcase size={48} color="rgba(255,255,255,0.1)" />
-              <Text style={styles.emptyText}>No businesses listed yet.</Text>
-              <Text style={styles.emptySubtext}>Promote your business here!</Text>
-            </View>
-          }
-        />
-      )}
 
-      <TouchableOpacity 
-        style={[styles.fab, { bottom: insets.bottom + 20 }]} 
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          setShowModal(true);
-        }}
-      >
-        <Plus color="#000000" size={32} />
-      </TouchableOpacity>
+        {loading ? (
+          <View style={styles.centered}>
+            <ActivityIndicator color="#FFFFFF" />
+          </View>
+        ) : (
+          <FlatList
+            data={businesses}
+            renderItem={renderBusinessCard}
+            keyExtractor={(item) => item.id.toString()}
+            contentContainerStyle={styles.listContent}
+            ListEmptyComponent={
+              <View style={styles.emptyState}>
+                <Briefcase size={48} color="rgba(255,255,255,0.1)" />
+                <Text style={styles.emptyText}>No businesses listed yet.</Text>
+                <Text style={styles.emptySubtext}>Promote your business here!</Text>
+              </View>
+            }
+          />
+        )}
+
+        <TouchableOpacity 
+          style={[styles.fab, { bottom: insets.bottom + 20 }]} 
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setShowModal(true);
+          }}
+        >
+          <Plus color="#000000" size={32} />
+        </TouchableOpacity>
+      </View>
 
       <Modal visible={showModal} animationType="slide" transparent>
         <BlurView intensity={100} tint="dark" style={styles.modalOverlay}>

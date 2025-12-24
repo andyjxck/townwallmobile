@@ -31,6 +31,8 @@ const TABS = [
   { id: 'news', label: 'FAKE NEWS', icon: Flag },
 ];
 
+import { LinearGradient } from "expo-linear-gradient";
+
 export default function ModerationAdmin() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -371,7 +373,7 @@ export default function ModerationAdmin() {
         <View style={styles.cardHeader}>
           <View style={styles.userRow}>
             <View style={styles.iconContainer}>
-              <Icon size={14} color="#FBBF24" />
+              <Icon size={14} color="#FFFFFF" />
             </View>
             <Text style={styles.username}>@{item.rusers?.username || 'unknown'}</Text>
           </View>
@@ -379,24 +381,24 @@ export default function ModerationAdmin() {
         </View>
 
         {activeTab === 'talent' && (
-          <>
+          <View style={styles.contentPadding}>
             <Text style={styles.title}>{item.name}</Text>
             <Text style={styles.subtitle}>{item.category} • {item.platform}</Text>
             <Text style={styles.description}>{item.description}</Text>
-          </>
+          </View>
         )}
 
         {activeTab === 'business' && (
-          <>
+          <View style={styles.contentPadding}>
             <Text style={styles.title}>{item.name}</Text>
             <Text style={styles.subtitle}>{item.category}</Text>
             <Text style={styles.description}>{item.description}</Text>
             {item.website && <Text style={styles.link}>{item.website}</Text>}
-          </>
+          </View>
         )}
 
           {activeTab === 'help' && (
-            <View>
+            <View style={styles.contentPadding}>
               <View style={styles.helpStatusRow}>
                 <Text style={styles.messageContent}>{item.content}</Text>
                 {item.status === 'resolved' && (
@@ -422,7 +424,7 @@ export default function ModerationAdmin() {
                   <Text style={styles.transcriptButtonText}>
                     {expandedChatId === item.sender_id ? 'HIDE TRANSCRIPT' : 'SHOW TRANSCRIPT'}
                   </Text>
-                  {expandedChatId === item.sender_id ? <ChevronUp size={16} color="#FBBF24" /> : <ChevronDown size={16} color="#FBBF24" />}
+                  {expandedChatId === item.sender_id ? <ChevronUp size={16} color="#FFFFFF" /> : <ChevronDown size={16} color="#FFFFFF" />}
                 </TouchableOpacity>
 
                 {item.status !== 'resolved' && (
@@ -475,11 +477,11 @@ export default function ModerationAdmin() {
         )}
 
         {(activeTab === 'ai' || activeTab === 'news') && (
-          <>
+          <View style={styles.contentPadding}>
             <Text style={styles.title}>{item.title}</Text>
             <Text style={styles.zone}>{item.rzones?.name}</Text>
             <Text style={styles.description}>{item.text}</Text>
-          </>
+          </View>
         )}
 
           {activeTab !== 'help' && (
@@ -501,7 +503,7 @@ export default function ModerationAdmin() {
               </TouchableOpacity>
 
               <TouchableOpacity 
-                style={[styles.actionButton, { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#EF4444' }]} 
+                style={[styles.actionButton, { backgroundColor: 'transparent', borderLeftWidth: 1, borderLeftColor: 'rgba(255,255,255,0.1)', borderRadius: 0 }]} 
                 onPress={() => handleDeleteContent(item, activeTab)}
               >
                 <Trash2 size={18} color="#EF4444" />
@@ -516,62 +518,65 @@ export default function ModerationAdmin() {
   if (!isAdmin) return null;
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <ChevronLeft color="#FFFFFF" size={28} />
-        </TouchableOpacity>
-        <View style={styles.headerTitleContainer}>
-          <Shield color="#FBBF24" size={20} />
+    <View style={styles.container}>
+      <LinearGradient
+        colors={['#0F172A', '#000000', '#000000']}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={{ paddingTop: insets.top, flex: 1 }}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <ChevronLeft color="#FFFFFF" size={28} />
+          </TouchableOpacity>
           <Text style={styles.headerTitle}>MODERATION</Text>
+          <TouchableOpacity onPress={fetchData} style={styles.backButton}>
+            <AlertCircle color="#FFFFFF" size={24} />
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity onPress={fetchData} style={styles.backButton}>
-          <AlertCircle color="#FFFFFF" size={24} />
-        </TouchableOpacity>
-      </View>
 
-      <View style={styles.tabContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScroll}>
-          {TABS.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <TouchableOpacity 
-                key={tab.id}
-                style={[styles.tab, isActive && styles.activeTab]}
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  setActiveTab(tab.id);
-                }}
-              >
-                <Icon size={16} color={isActive ? '#000000' : 'rgba(255,255,255,0.4)'} />
-                <Text style={[styles.tabText, isActive && styles.activeTabText]}>
-                  {tab.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
-
-      {loading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator color="#FFFFFF" />
+        <View style={styles.tabContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScroll}>
+            {TABS.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <TouchableOpacity 
+                  key={tab.id}
+                  style={[styles.tab, isActive && styles.activeTab]}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    setActiveTab(tab.id);
+                  }}
+                >
+                  <Icon size={14} color={isActive ? '#000000' : 'rgba(255,255,255,0.4)'} />
+                  <Text style={[styles.tabText, isActive && styles.activeTabText]}>
+                    {tab.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
         </View>
-      ) : (
-        <FlatList
-          data={data}
-          keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.listContent}
-          renderItem={renderItem}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <CheckCircle size={48} color="rgba(255,255,255,0.1)" />
-              <Text style={styles.emptyText}>Queue is clear!</Text>
-            </View>
-          }
-        />
-      )}
+
+        {loading ? (
+          <View style={styles.centered}>
+            <ActivityIndicator color="#FFFFFF" />
+          </View>
+        ) : (
+          <FlatList
+            data={data}
+            keyExtractor={(item) => item.id.toString()}
+            contentContainerStyle={styles.listContent}
+            renderItem={renderItem}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <CheckCircle size={48} color="rgba(255,255,255,0.1)" />
+                <Text style={styles.emptyText}>QUEUE IS CLEAR</Text>
+              </View>
+            }
+          />
+        )}
+      </View>
     </View>
   );
 }
@@ -593,14 +598,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 15,
   },
-  headerTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
   headerTitle: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '900',
     letterSpacing: 2,
   },
@@ -608,128 +608,130 @@ const styles = StyleSheet.create({
     padding: 5,
   },
   tabContainer: {
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
+    paddingVertical: 10,
   },
   tabScroll: {
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    gap: 10,
+    paddingHorizontal: 20,
+    gap: 12,
   },
   tab: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingVertical: 10,
+    borderRadius: 30,
     backgroundColor: 'rgba(255,255,255,0.05)',
-    gap: 6,
+    gap: 8,
   },
   activeTab: {
-    backgroundColor: '#FBBF24',
+    backgroundColor: '#FFFFFF',
   },
   tabText: {
     color: 'rgba(255,255,255,0.4)',
-    fontSize: 12,
-    fontWeight: '800',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
   activeTabText: {
     color: '#000000',
   },
   listContent: {
-    padding: 20,
-    gap: 15,
+    paddingBottom: 40,
   },
   card: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 15,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    marginBottom: 1,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    padding: 20,
+    paddingBottom: 10,
   },
   userRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
   iconContainer: {
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: 'rgba(251, 191, 36, 0.1)',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   username: {
-    color: '#60A5FA',
+    color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   date: {
     color: 'rgba(255,255,255,0.3)',
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '700',
+  },
+  contentPadding: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
   title: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '800',
     marginBottom: 4,
   },
   subtitle: {
     color: 'rgba(255,255,255,0.4)',
     fontSize: 12,
-    fontWeight: '600',
-    marginBottom: 10,
+    fontWeight: '700',
+    marginBottom: 12,
   },
   description: {
     color: 'rgba(255,255,255,0.7)',
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 20,
-  },
-  zone: {
-    color: '#FBBF24',
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    marginBottom: 8,
-  },
-  messageContent: {
-    color: '#FFFFFF',
     fontSize: 15,
     lineHeight: 22,
     marginBottom: 20,
   },
+  zone: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 10,
+    opacity: 0.5,
+  },
+  messageContent: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    lineHeight: 24,
+    marginBottom: 20,
+  },
   link: {
-    color: '#60A5FA',
-    fontSize: 13,
+    color: '#3B82F6',
+    fontSize: 14,
     textDecorationLine: 'underline',
     marginBottom: 20,
   },
   helpActions: {
     flexDirection: 'row',
-    marginBottom: 15,
+    marginBottom: 10,
   },
   transcriptButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: 'rgba(251, 191, 36, 0.1)',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderWidth: 1,
-    borderColor: 'rgba(251, 191, 36, 0.2)',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
-    transcriptButtonText: {
-    color: '#FBBF24',
+  transcriptButtonText: {
+    color: '#FFFFFF',
     fontSize: 11,
     fontWeight: '900',
     letterSpacing: 1,
@@ -745,31 +747,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.2)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
   },
   resolvedText: {
     color: '#10B981',
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '900',
     letterSpacing: 0.5,
   },
   transcriptContainer: {
-    marginTop: 10,
-    padding: 15,
-    borderRadius: 12,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    marginTop: 20,
+    padding: 20,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.4)',
   },
   transcriptMessage: {
-    marginBottom: 12,
-    padding: 10,
-    borderRadius: 10,
-    maxWidth: '90%',
+    marginBottom: 15,
+    padding: 12,
+    borderRadius: 15,
+    maxWidth: '85%',
   },
   userMessage: {
     alignSelf: 'flex-start',
@@ -777,86 +775,86 @@ const styles = StyleSheet.create({
   },
   adminMessage: {
     alignSelf: 'flex-end',
-    backgroundColor: 'rgba(96, 165, 250, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(96, 165, 250, 0.2)',
+    backgroundColor: '#FFFFFF',
   },
   transcriptSender: {
     fontSize: 10,
-    fontWeight: '800',
+    fontWeight: '900',
     color: 'rgba(255,255,255,0.4)',
-    marginBottom: 4,
+    marginBottom: 6,
     textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   transcriptText: {
     color: '#FFFFFF',
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 20,
   },
   transcriptTime: {
-    fontSize: 9,
+    fontSize: 10,
     color: 'rgba(255,255,255,0.2)',
-    marginTop: 4,
+    marginTop: 6,
     textAlign: 'right',
   },
   replyBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginTop: 15,
-    paddingTop: 15,
+    gap: 12,
+    marginTop: 20,
+    paddingTop: 20,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.05)',
   },
   replyInput: {
     flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 12,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
     color: '#FFFFFF',
-    fontSize: 13,
-    maxHeight: 80,
+    fontSize: 14,
+    maxHeight: 100,
   },
   sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#FBBF24',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
   actionRow: {
     flexDirection: 'row',
-    gap: 10,
+    backgroundColor: 'rgba(255,255,255,0.02)',
   },
   actionButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 10,
-    gap: 8,
+    paddingVertical: 18,
+    gap: 10,
   },
   approveButton: {
     backgroundColor: '#FFFFFF',
   },
   rejectButton: {
-    backgroundColor: '#EF4444',
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
   },
   actionText: {
     fontSize: 12,
     fontWeight: '900',
+    letterSpacing: 1,
   },
   emptyContainer: {
-    paddingVertical: 100,
+    paddingVertical: 150,
     alignItems: 'center',
-    gap: 15,
+    gap: 20,
   },
   emptyText: {
-    color: 'rgba(255,255,255,0.3)',
-    fontSize: 16,
-    fontWeight: '700',
+    color: 'rgba(255,255,255,0.2)',
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 2,
   },
 });

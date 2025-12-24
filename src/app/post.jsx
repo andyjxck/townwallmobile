@@ -21,6 +21,8 @@ import { supabase } from "../utils/supabase";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 
+import { LinearGradient } from "expo-linear-gradient";
+
 export default function PostScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -32,29 +34,29 @@ export default function PostScreen() {
   const [selectedTag, setSelectedTag] = useState(null);
   const [loading, setLoading] = useState(false);
   const [deviceId, setDeviceId] = useState(null);
-    const [step, setStep] = useState('write'); // 'write' | 'zone' | 'tag' | 'success'
-    const [images, setImages] = useState([]);
-    const [isAnonymous, setIsAnonymous] = useState(true);
-    const [user, setUser] = useState(null);
-  
-    useEffect(() => {
-      getDeviceId().then(setDeviceId);
-      getStoredUser().then(setUser);
-      fetchData();
-      requestPermissions();
-    }, []);
-  
-    const requestPermissions = async () => {
-      if (Platform.OS !== 'web') {
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== 'granted') {
-          // Silent fail or alert? Let's alert to help user
-          // alert('Sorry, we need camera roll permissions to make this work!');
-        }
-      }
-    };
+  const [step, setStep] = useState('write'); // 'write' | 'zone' | 'tag' | 'success'
+  const [images, setImages] = useState([]);
+  const [isAnonymous, setIsAnonymous] = useState(true);
+  const [user, setUser] = useState(null);
 
-    const fetchData = async () => {
+  useEffect(() => {
+    getDeviceId().then(setDeviceId);
+    getStoredUser().then(setUser);
+    fetchData();
+    requestPermissions();
+  }, []);
+
+  const requestPermissions = async () => {
+    if (Platform.OS !== 'web') {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        // Silent fail or alert? Let's alert to help user
+        // alert('Sorry, we need camera roll permissions to make this work!');
+      }
+    }
+  };
+
+  const fetchData = async () => {
     const { data: zData } = await supabase.from('rzones').select('*').order('name');
     const { data: tData } = await supabase.from('rtags').select('*').order('name');
     setZones(zData || []);
@@ -66,24 +68,24 @@ export default function PostScreen() {
     }
   };
 
-    const pickImage = async () => {
-      try {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        
-        const result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ['images'],
-          allowsMultipleSelection: true,
-          quality: 0.8,
-        });
-  
-        if (!result.canceled && result.assets && result.assets.length > 0) {
-          setImages([...images, ...result.assets]);
-        }
-      } catch (error) {
-        console.error("ImagePicker Error:", error);
-        alert("Could not open image library.");
+  const pickImage = async () => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsMultipleSelection: true,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setImages([...images, ...result.assets]);
       }
-    };
+    } catch (error) {
+      console.error("ImagePicker Error:", error);
+      alert("Could not open image library.");
+    }
+  };
 
   const handlePost = async () => {
     if (!title || !text || !selectedZone || !selectedTag || !deviceId) return;
@@ -128,18 +130,18 @@ export default function PostScreen() {
         imageUrls.push(publicUrlData.publicUrl);
       }
 
-        const { error } = await supabase.from('rposts').insert({
-          title: title.trim(),
-          text: text.trim(),
-          zone_id: selectedZone.id,
-          tag_id: selectedTag.id,
-          device_id: deviceId,
-          user_id: user?.id,
-          is_anonymous: isAnonymous,
-          image_url: imageUrls.length > 0 ? imageUrls[0] : null,
-          image_urls: imageUrls,
-          expires_at: new Date(Date.now() + 86400000).toISOString(), // 24 hours
-        });
+      const { error } = await supabase.from('rposts').insert({
+        title: title.trim(),
+        text: text.trim(),
+        zone_id: selectedZone.id,
+        tag_id: selectedTag.id,
+        device_id: deviceId,
+        user_id: user?.id,
+        is_anonymous: isAnonymous,
+        image_url: imageUrls.length > 0 ? imageUrls[0] : null,
+        image_urls: imageUrls,
+        expires_at: new Date(Date.now() + 86400000).toISOString(), // 24 hours
+      });
 
       if (error) throw error;
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -154,128 +156,100 @@ export default function PostScreen() {
 
   if (step === 'success') {
     return (
-      <View style={{ flex: 1, backgroundColor: "#000000", justifyContent: 'center', alignItems: 'center', padding: 40 }}>
+      <View style={styles.successContainer}>
+        <LinearGradient
+          colors={['#0F172A', '#000000', '#000000']}
+          style={StyleSheet.absoluteFill}
+        />
         <StatusBar style="light" />
-        <Text style={{ color: '#FFFFFF', fontSize: 32, fontWeight: '800', marginBottom: 16, textAlign: 'center' }}>POSTED</Text>
-        <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 16, textAlign: 'center', marginBottom: 40 }}>
-          Your message is now live in {selectedZone?.name}.
-        </Text>
-        <TouchableOpacity
-          onPress={() => router.replace("/")}
-          style={{
-            backgroundColor: '#FFFFFF',
-            paddingHorizontal: 40,
-            paddingVertical: 15,
-            borderRadius: 30,
-          }}
-        >
-          <Text style={{ color: '#000000', fontWeight: '700' }}>DONE</Text>
-        </TouchableOpacity>
+        <View style={styles.successContent}>
+          <Text style={styles.successTitle}>POSTED</Text>
+          <Text style={styles.successSubtitle}>
+            Your message is now live in {selectedZone?.name}.
+          </Text>
+          <TouchableOpacity
+            onPress={() => router.replace("/")}
+            style={styles.doneButton}
+          >
+            <Text style={styles.doneButtonText}>DONE</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={{ flex: 1, backgroundColor: "#000000" }}
-    >
+    <View style={styles.container}>
+      <LinearGradient
+        colors={['#0F172A', '#000000', '#000000']}
+        style={StyleSheet.absoluteFill}
+      />
       <StatusBar style="light" />
-      <View style={{ paddingTop: insets.top + 10, flex: 1 }}>
-        {/* Header */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 20 }}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <X size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={handlePost}
-            disabled={!text || !selectedTag || loading}
-            style={{
-              opacity: (!text || !selectedTag || loading) ? 0.3 : 1
-            }}
-          >
-            <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '700' }}>
-              {loading ? "..." : "POST"}
-            </Text>
-          </TouchableOpacity>
-        </View>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+      >
+        <View style={{ paddingTop: insets.top + 10, flex: 1 }}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.headerButton}>
+              <X size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>NEW POST</Text>
+            <TouchableOpacity
+              onPress={handlePost}
+              disabled={!text || !selectedTag || loading}
+              style={[styles.headerButton, { opacity: (!text || !selectedTag || loading) ? 0.3 : 1 }]}
+            >
+              <Text style={styles.postActionText}>
+                {loading ? "..." : "POST"}
+              </Text>
+            </TouchableOpacity>
+          </View>
 
-          <ScrollView contentContainerStyle={{ paddingHorizontal: 20 }}>
-            {/* Quick Info Bar */}
-            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 20 }}>
+          <ScrollView contentContainerStyle={styles.scrollContent}>
+            <View style={styles.quickInfoRow}>
               <TouchableOpacity
                 onPress={() => setStep('zone')}
-                style={{
-                  backgroundColor: 'rgba(255,255,255,0.05)',
-                  paddingHorizontal: 12,
-                  paddingVertical: 6,
-                  borderRadius: 15,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 5
-                }}
+                style={styles.pillButton}
               >
-                <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>{selectedZone?.name || 'Select Zone'}</Text>
+                <Text style={styles.pillText}>{selectedZone?.name?.toUpperCase() || 'SELECT ZONE'}</Text>
                 <ChevronRight size={12} color="rgba(255,255,255,0.3)" />
               </TouchableOpacity>
 
-                <TouchableOpacity
-                  onPress={() => setStep('tag')}
-                  style={{
-                    backgroundColor: 'rgba(255,255,255,0.05)',
-                    paddingHorizontal: 12,
-                    paddingVertical: 6,
-                    borderRadius: 15,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 5
-                  }}
-                >
-                  <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>{selectedTag?.name || 'Select Tag'}</Text>
-                  <ChevronRight size={12} color="rgba(255,255,255,0.3)" />
-                </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setStep('tag')}
+                style={styles.pillButton}
+              >
+                <Text style={styles.pillText}>{selectedTag?.name?.toUpperCase() || 'SELECT TAG'}</Text>
+                <ChevronRight size={12} color="rgba(255,255,255,0.3)" />
+              </TouchableOpacity>
 
-                <TouchableOpacity
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setIsAnonymous(!isAnonymous);
-                  }}
-                  style={{
-                    backgroundColor: isAnonymous ? 'rgba(255,255,255,0.05)' : 'rgba(74, 222, 128, 0.1)',
-                    paddingHorizontal: 12,
-                    paddingVertical: 6,
-                    borderRadius: 15,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 5,
-                    borderWidth: 1,
-                    borderColor: isAnonymous ? 'transparent' : 'rgba(74, 222, 128, 0.4)'
-                  }}
-                >
-                  {isAnonymous ? (
-                    <Shield size={12} color="rgba(255,255,255,0.4)" />
-                  ) : (
-                    <User size={12} color="#4ADE80" />
-                  )}
-                  <Text style={{ color: isAnonymous ? 'rgba(255,255,255,0.6)' : '#4ADE80', fontSize: 12 }}>
-                    {isAnonymous ? 'Anonymous' : (user?.username || 'Public')}
-                  </Text>
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setIsAnonymous(!isAnonymous);
+                }}
+                style={[styles.pillButton, !isAnonymous && styles.pillActive]}
+              >
+                {isAnonymous ? (
+                  <Shield size={12} color="rgba(255,255,255,0.4)" />
+                ) : (
+                  <User size={12} color="#000000" />
+                )}
+                <Text style={[styles.pillText, !isAnonymous && { color: '#000000' }]}>
+                  {isAnonymous ? 'ANONYMOUS' : (user?.username?.toUpperCase() || 'PUBLIC')}
+                </Text>
+              </TouchableOpacity>
+            </View>
 
             <TextInput
               autoFocus
-              placeholder="Title"
+              placeholder="Post Title"
               placeholderTextColor="rgba(255,255,255,0.2)"
               value={title}
               onChangeText={setTitle}
               maxLength={100}
-              style={{
-                color: '#FFFFFF',
-                fontSize: 28,
-                fontWeight: '800',
-                marginBottom: 10,
-              }}
+              style={styles.titleInput}
             />
 
             <TextInput
@@ -285,131 +259,278 @@ export default function PostScreen() {
               value={text}
               onChangeText={setText}
               maxLength={2000}
-              style={{
-                color: '#FFFFFF',
-                fontSize: 18,
-                fontWeight: '400',
-                lineHeight: 26,
-                minHeight: 150,
-                textAlignVertical: 'top',
-              }}
+              style={styles.bodyInput}
             />
 
             <ScrollView 
               horizontal 
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 10, marginTop: 20 }}
+              contentContainerStyle={styles.imageGrid}
             >
               {images.map((img, index) => (
-                <View key={index} style={{ position: 'relative', width: 120, height: 120 }}>
-                  <Image 
-                    source={{ uri: img.uri }} 
-                    style={{ width: 120, height: 120, borderRadius: 10 }} 
-                  />
+                <View key={index} style={styles.imageWrapper}>
+                  <Image source={{ uri: img.uri }} style={styles.previewImage} />
                   <TouchableOpacity 
                     onPress={() => {
                       const newImages = [...images];
                       newImages.splice(index, 1);
                       setImages(newImages);
                     }}
-                    style={{ 
-                      position: 'absolute', 
-                      top: -5, 
-                      right: -5, 
-                      backgroundColor: '#EF4444', 
-                      padding: 5, 
-                      borderRadius: 15 
-                    }}
+                    style={styles.removeImageButton}
                   >
-                    <Trash2 size={12} color="#FFFFFF" />
+                    <X size={12} color="#FFFFFF" />
                   </TouchableOpacity>
                 </View>
               ))}
 
               <TouchableOpacity 
                 onPress={pickImage}
-                style={{ 
-                  width: 120,
-                  height: 120,
-                  backgroundColor: 'rgba(255,255,255,0.05)',
-                  borderRadius: 10,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  borderWidth: 1,
-                  borderStyle: 'dashed',
-                  borderColor: 'rgba(255,255,255,0.2)'
-                }}
+                style={styles.addImageButton}
               >
                 <ImageIcon size={24} color="rgba(255,255,255,0.3)" />
-                <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10, marginTop: 5, fontWeight: '600' }}>ADD IMAGE</Text>
+                <Text style={styles.addImageText}>ADD IMAGE</Text>
               </TouchableOpacity>
             </ScrollView>
-
-            <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 12, marginTop: 20 }}>
-              {text.length} characters
-            </Text>
-          </ScrollView>
-      </View>
-
-      {/* Zone Picker Overlay */}
-      {step === 'zone' && (
-        <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: '#000000', paddingTop: insets.top }}>
-          <View style={{ padding: 20, flexDirection: 'row', justifyContent: 'space-between' }}>
-            <Text style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '700' }}>SELECT ZONE</Text>
-            <TouchableOpacity onPress={() => setStep('write')}>
-              <X size={24} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
-          <ScrollView>
-            {zones.map(z => (
-              <TouchableOpacity
-                key={z.id}
-                onPress={() => {
-                  setSelectedZone(z);
-                  setStep('write');
-                }}
-                style={{
-                  padding: 20,
-                  borderBottomWidth: 0.5,
-                  borderBottomColor: 'rgba(255,255,255,0.05)'
-                }}
-              >
-                <Text style={{ color: selectedZone?.id === z.id ? '#FFFFFF' : 'rgba(255,255,255,0.5)', fontSize: 18 }}>{z.name}</Text>
-              </TouchableOpacity>
-            ))}
           </ScrollView>
         </View>
-      )}
 
-      {/* Tag Picker Overlay */}
-      {step === 'tag' && (
-        <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: '#000000', paddingTop: insets.top }}>
-          <View style={{ padding: 20, flexDirection: 'row', justifyContent: 'space-between' }}>
-            <Text style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '700' }}>SELECT TAG</Text>
-            <TouchableOpacity onPress={() => setStep('write')}>
-              <X size={24} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
-          <ScrollView>
-            {tags.map(t => (
-              <TouchableOpacity
-                key={t.id}
-                onPress={() => {
-                  setSelectedTag(t);
-                  setStep('write');
-                }}
-                style={{
-                  padding: 20,
-                  borderBottomWidth: 0.5,
-                  borderBottomColor: 'rgba(255,255,255,0.05)'
-                }}
-              >
-                <Text style={{ color: selectedTag?.id === t.id ? '#FFFFFF' : 'rgba(255,255,255,0.5)', fontSize: 18 }}>{t.name}</Text>
+        {/* Zone Picker Overlay */}
+        {step === 'zone' && (
+          <View style={[styles.overlay, { paddingTop: insets.top }]}>
+            <View style={styles.overlayHeader}>
+              <Text style={styles.overlayTitle}>SELECT ZONE</Text>
+              <TouchableOpacity onPress={() => setStep('write')}>
+                <X size={24} color="#FFFFFF" />
               </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      )}
-    </KeyboardAvoidingView>
+            </View>
+            <ScrollView>
+              {zones.map(z => (
+                <TouchableOpacity
+                  key={z.id}
+                  onPress={() => {
+                    setSelectedZone(z);
+                    setStep('write');
+                  }}
+                  style={styles.overlayItem}
+                >
+                  <Text style={[styles.overlayItemText, selectedZone?.id === z.id && styles.overlayItemActive]}>
+                    {z.name.toUpperCase()}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* Tag Picker Overlay */}
+        {step === 'tag' && (
+          <View style={[styles.overlay, { paddingTop: insets.top }]}>
+            <View style={styles.overlayHeader}>
+              <Text style={styles.overlayTitle}>SELECT TAG</Text>
+              <TouchableOpacity onPress={() => setStep('write')}>
+                <X size={24} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView>
+              {tags.map(t => (
+                <TouchableOpacity
+                  key={t.id}
+                  onPress={() => {
+                    setSelectedTag(t);
+                    setStep('write');
+                  }}
+                  style={styles.overlayItem}
+                >
+                  <Text style={[styles.overlayItemText, selectedTag?.id === t.id && styles.overlayItemActive]}>
+                    #{t.name.toUpperCase().replace(/\s+/g, '')}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+      </KeyboardAvoidingView>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
+  successContainer: {
+    flex: 1,
+    backgroundColor: "#000000",
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  successContent: {
+    alignItems: 'center',
+  },
+  successTitle: {
+    color: '#FFFFFF',
+    fontSize: 32,
+    fontWeight: '900',
+    marginBottom: 16,
+    textAlign: 'center',
+    letterSpacing: 2,
+  },
+  successSubtitle: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 40,
+    lineHeight: 24,
+  },
+  doneButton: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 50,
+    paddingVertical: 18,
+    borderRadius: 30,
+  },
+  doneButtonText: {
+    color: '#000000',
+    fontWeight: '900',
+    letterSpacing: 2,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+  },
+  headerTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '900',
+    letterSpacing: 2,
+  },
+  headerButton: {
+    padding: 5,
+    minWidth: 40,
+  },
+  postActionText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+  },
+  quickInfoRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 30,
+    flexWrap: 'wrap',
+  },
+  pillButton: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  pillActive: {
+    backgroundColor: '#FFFFFF',
+  },
+  pillText: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  titleInput: {
+    color: '#FFFFFF',
+    fontSize: 28,
+    fontWeight: '900',
+    marginBottom: 15,
+    letterSpacing: -0.5,
+  },
+  bodyInput: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '400',
+    lineHeight: 28,
+    minHeight: 200,
+    textAlignVertical: 'top',
+  },
+  imageGrid: {
+    gap: 12,
+    marginTop: 30,
+  },
+  imageWrapper: {
+    position: 'relative',
+    width: 140,
+    height: 140,
+  },
+  previewImage: {
+    width: 140,
+    height: 140,
+    borderRadius: 15,
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addImageButton: {
+    width: 140,
+    height: 140,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  addImageText: {
+    color: 'rgba(255,255,255,0.3)',
+    fontSize: 10,
+    marginTop: 8,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#000000',
+  },
+  overlayHeader: {
+    padding: 25,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  overlayTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: 2,
+  },
+  overlayItem: {
+    paddingHorizontal: 25,
+    paddingVertical: 20,
+  },
+  overlayItemText: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  overlayItemActive: {
+    color: '#FFFFFF',
+  },
+});

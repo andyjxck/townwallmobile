@@ -32,6 +32,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const EMOJIS = ["👤", "🦊", "🐯", "🐼", "🦁", "🐨", "🐸", "🤖", "👻", "👽"];
 
+import { LinearGradient } from "expo-linear-gradient";
+
 export default function Profile() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -213,123 +215,129 @@ export default function Profile() {
   }
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <ChevronLeft color="#FFFFFF" size={28} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Profile</Text>
-        <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-          <LogOut color="#EF4444" size={22} />
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={styles.profileSection}>
-          <TouchableOpacity 
-            style={styles.avatarContainer} 
-            onPress={() => setShowEmojiPicker(true)}
-          >
-            {user?.avatar_url ? (
-              <Image source={{ uri: user.avatar_url }} style={styles.avatar} />
-            ) : (
-              <Text style={styles.emojiAvatar}>{user?.emoji_icon || "👤"}</Text>
-            )}
-            <View style={styles.editBadge}>
-              <Camera size={12} color="#000000" />
-            </View>
+    <View style={styles.container}>
+      <LinearGradient
+        colors={['#0F172A', '#000000', '#000000']}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={{ paddingTop: insets.top, flex: 1 }}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <ChevronLeft color="#FFFFFF" size={28} />
           </TouchableOpacity>
-
-          <Text style={styles.username}>@{user?.username}</Text>
-          <Text style={styles.userStatus}>
-            {user?.supabase_uid ? "Authenticated Account" : "Anonymous Ghost User"}
-          </Text>
-
-          {user?.is_admin && (
-            <TouchableOpacity 
-              style={[styles.authButton, { backgroundColor: '#FBBF24' }]} 
-              onPress={() => router.push("/admin")}
-            >
-              <Shield size={14} color="#000000" />
-              <Text style={[styles.authButtonText, { color: '#000000' }]}>MODERATION PANEL</Text>
-            </TouchableOpacity>
-          )}
-
-          {!user?.supabase_uid && !user?.is_admin && (
-            <TouchableOpacity 
-              style={styles.authButton} 
-              onPress={() => router.push("/auth")}
-            >
-              <Text style={styles.authButtonText}>CLAIM ACCOUNT</Text>
-            </TouchableOpacity>
-          )}
+          <Text style={styles.headerTitle}>PROFILE</Text>
+          <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+            <LogOut color="#EF4444" size={22} />
+          </TouchableOpacity>
         </View>
 
-        <View style={styles.statsRow}>
-          <View style={styles.statBox}>
-            <Text style={styles.statValue}>{stats.posts}</Text>
-            <Text style={styles.statLabel}>POSTS</Text>
-          </View>
-          <View style={[styles.statBox, { borderLeftWidth: 1, borderLeftColor: 'rgba(255,255,255,0.1)' }]}>
-            <Text style={styles.statValue}>{replies.length}</Text>
-            <Text style={styles.statLabel}>REPLIES</Text>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <MessageSquare size={18} color="#FFFFFF" />
-            <Text style={styles.sectionTitle}>Recent Replies</Text>
-          </View>
-          {replies.length > 0 ? (
-            replies.map((reply) => (
-              <View key={reply.id} style={styles.replyCard}>
-                <View style={styles.replyHeader}>
-                  <Text style={styles.replyUser}>
-                    {reply.rusers?.emoji_icon} @{reply.rusers?.username}
-                  </Text>
-                  <Text style={styles.replyTime}>{getTimeAgo(new Date(reply.created_at))}</Text>
-                </View>
-                <Text style={styles.replyText}>{reply.text}</Text>
-                <Text style={styles.replyTarget}>on "{reply.rposts?.title}"</Text>
+        <ScrollView showsVerticalScrollIndicator={false}>
+          <View style={styles.profileSection}>
+            <TouchableOpacity 
+              style={styles.avatarContainer} 
+              onPress={() => setShowEmojiPicker(true)}
+            >
+              {user?.avatar_url ? (
+                <Image source={{ uri: user.avatar_url }} style={styles.avatar} />
+              ) : (
+                <Text style={styles.emojiAvatar}>{user?.emoji_icon || "👤"}</Text>
+              )}
+              <View style={styles.editBadge}>
+                <Camera size={12} color="#000000" />
               </View>
-            ))
-          ) : (
-            <Text style={styles.emptyText}>No replies yet.</Text>
-          )}
-        </View>
+            </TouchableOpacity>
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Search size={18} color="#FFFFFF" />
-            <Text style={styles.sectionTitle}>Active Lost & Found</Text>
-          </View>
-          {lostFound.length > 0 ? (
-            lostFound.map((post) => (
+            <Text style={styles.username}>@{user?.username}</Text>
+            <Text style={styles.userStatus}>
+              {user?.supabase_uid ? "Authenticated Account" : "Anonymous User"}
+            </Text>
+
+            {user?.is_admin && (
               <TouchableOpacity 
-                key={post.id} 
-                style={styles.postCard}
-                onPress={() => router.push(`/?postId=${post.id}`)}
+                style={[styles.authButton, { backgroundColor: '#FBBF24' }]} 
+                onPress={() => router.push("/admin")}
               >
-                <View style={styles.postInfo}>
-                  <Text style={styles.postTitle}>{post.title}</Text>
-                  <View style={styles.postMeta}>
-                    <Clock size={12} color="rgba(255,255,255,0.4)" />
-                    <Text style={styles.postTime}>{new Date(post.created_at).toLocaleDateString()}</Text>
-                  </View>
-                </View>
-                {post.image_url && (
-                  <Image source={{ uri: post.image_url }} style={styles.postThumb} />
-                )}
+                <Shield size={14} color="#000000" />
+                <Text style={[styles.authButtonText, { color: '#000000' }]}>MODERATION PANEL</Text>
               </TouchableOpacity>
-            ))
-          ) : (
-            <Text style={styles.emptyText}>No active lost & found posts.</Text>
-          )}
-        </View>
+            )}
 
-        <View style={{ height: 100 }} />
-      </ScrollView>
+            {!user?.supabase_uid && !user?.is_admin && (
+              <TouchableOpacity 
+                style={styles.authButton} 
+                onPress={() => router.push("/auth")}
+              >
+                <Text style={styles.authButtonText}>CLAIM ACCOUNT</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={styles.statsRow}>
+            <View style={styles.statBox}>
+              <Text style={styles.statValue}>{stats.posts}</Text>
+              <Text style={styles.statLabel}>POSTS</Text>
+            </View>
+            <View style={styles.statBox}>
+              <Text style={styles.statValue}>{replies.length}</Text>
+              <Text style={styles.statLabel}>REPLIES</Text>
+            </View>
+          </View>
+
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <MessageSquare size={18} color="#FFFFFF" />
+              <Text style={styles.sectionTitle}>RECENT REPLIES</Text>
+            </View>
+            {replies.length > 0 ? (
+              replies.map((reply) => (
+                <View key={reply.id} style={styles.replyCard}>
+                  <View style={styles.replyHeader}>
+                    <Text style={styles.replyUser}>
+                      {reply.rusers?.emoji_icon} @{reply.rusers?.username}
+                    </Text>
+                    <Text style={styles.replyTime}>{getTimeAgo(new Date(reply.created_at))}</Text>
+                  </View>
+                  <Text style={styles.replyText}>{reply.text}</Text>
+                  <Text style={styles.replyTarget}>on "{reply.rposts?.title}"</Text>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.emptyText}>No replies yet.</Text>
+            )}
+          </View>
+
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Search size={18} color="#FFFFFF" />
+              <Text style={styles.sectionTitle}>ACTIVE LOST & FOUND</Text>
+            </View>
+            {lostFound.length > 0 ? (
+              lostFound.map((post) => (
+                <TouchableOpacity 
+                  key={post.id} 
+                  style={styles.postCard}
+                  onPress={() => router.push(`/?postId=${post.id}`)}
+                >
+                  <View style={styles.postInfo}>
+                    <Text style={styles.postTitle}>{post.title}</Text>
+                    <View style={styles.postMeta}>
+                      <Clock size={12} color="rgba(255,255,255,0.4)" />
+                      <Text style={styles.postTime}>{new Date(post.created_at).toLocaleDateString()}</Text>
+                    </View>
+                  </View>
+                  {post.image_url && (
+                    <Image source={{ uri: post.image_url }} style={styles.postThumb} />
+                  )}
+                </TouchableOpacity>
+              ))
+            ) : (
+              <Text style={styles.emptyText}>No active lost & found posts.</Text>
+            )}
+          </View>
+
+          <View style={{ height: 100 }} />
+        </ScrollView>
+      </View>
 
       {showEmojiPicker && (
         <View style={styles.modalOverlay}>
@@ -392,7 +400,8 @@ const styles = StyleSheet.create({
   headerTitle: {
     color: "#FFFFFF",
     fontSize: 18,
-    fontWeight: "800",
+    fontWeight: "900",
+    letterSpacing: 2,
   },
   backButton: {
     padding: 5,
@@ -405,69 +414,63 @@ const styles = StyleSheet.create({
     paddingVertical: 30,
   },
   avatarContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    backgroundColor: "rgba(255,255,255,0.03)",
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 20,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
   },
   avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 110,
+    height: 110,
+    borderRadius: 55,
   },
   emojiAvatar: {
-    fontSize: 50,
+    fontSize: 55,
   },
   editBadge: {
     position: "absolute",
-    bottom: 0,
-    right: 0,
+    bottom: 5,
+    right: 5,
     backgroundColor: "#FFFFFF",
     width: 28,
     height: 28,
     borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 2,
-    borderColor: "#000000",
   },
   username: {
     color: "#FFFFFF",
-    fontSize: 22,
-    fontWeight: "800",
+    fontSize: 24,
+    fontWeight: "900",
     marginBottom: 4,
   },
   userStatus: {
     color: "rgba(255,255,255,0.4)",
-    fontSize: 13,
-    fontWeight: "600",
+    fontSize: 12,
+    fontWeight: "700",
     textTransform: "uppercase",
-    letterSpacing: 1,
+    letterSpacing: 1.5,
   },
   authButton: {
     marginTop: 20,
-    backgroundColor: "rgba(255,255,255,0.1)",
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 30,
   },
   authButtonText: {
     color: "#FFFFFF",
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 1,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1.5,
   },
   statsRow: {
     flexDirection: "row",
-    backgroundColor: "rgba(255,255,255,0.03)",
-    marginHorizontal: 20,
-    borderRadius: 16,
-    paddingVertical: 20,
+    backgroundColor: "rgba(255,255,255,0.02)",
+    paddingVertical: 25,
     marginBottom: 30,
   },
   statBox: {
@@ -476,46 +479,46 @@ const styles = StyleSheet.create({
   },
   statValue: {
     color: "#FFFFFF",
-    fontSize: 24,
-    fontWeight: "800",
+    fontSize: 28,
+    fontWeight: "900",
   },
   statLabel: {
     color: "rgba(255,255,255,0.4)",
     fontSize: 10,
-    fontWeight: "700",
-    marginTop: 4,
-    letterSpacing: 1,
+    fontWeight: "800",
+    marginTop: 6,
+    letterSpacing: 2,
   },
   section: {
     paddingHorizontal: 20,
-    marginBottom: 30,
+    marginBottom: 35,
   },
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 12,
     marginBottom: 15,
   },
   sectionTitle: {
     color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "700",
+    fontSize: 14,
+    fontWeight: "900",
+    letterSpacing: 1.5,
   },
   replyCard: {
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 10,
+    backgroundColor: "rgba(255,255,255,0.02)",
+    padding: 20,
+    marginBottom: 1,
   },
   replyHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 8,
+    marginBottom: 10,
   },
   replyUser: {
     color: "#FFFFFF",
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: "800",
   },
   replyTime: {
     color: "rgba(255,255,255,0.3)",
@@ -523,49 +526,47 @@ const styles = StyleSheet.create({
   },
   replyText: {
     color: "rgba(255,255,255,0.8)",
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 15,
+    lineHeight: 22,
   },
   replyTarget: {
     color: "rgba(255,255,255,0.3)",
     fontSize: 11,
-    marginTop: 8,
-    fontStyle: "italic",
+    marginTop: 10,
   },
   postCard: {
     flexDirection: "row",
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 10,
+    backgroundColor: "rgba(255,255,255,0.02)",
+    padding: 15,
+    marginBottom: 1,
     alignItems: "center",
   },
   postInfo: {
     flex: 1,
-    marginRight: 10,
+    marginRight: 15,
   },
   postTitle: {
     color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "600",
-    marginBottom: 6,
+    fontSize: 16,
+    fontWeight: "700",
+    marginBottom: 8,
   },
   postMeta: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 8,
   },
   postTime: {
     color: "rgba(255,255,255,0.4)",
     fontSize: 12,
   },
   postThumb: {
-    width: 50,
-    height: 50,
-    borderRadius: 8,
+    width: 60,
+    height: 60,
+    borderRadius: 10,
   },
   emptyText: {
-    color: "rgba(255,255,255,0.3)",
+    color: "rgba(255,255,255,0.2)",
     fontSize: 14,
     textAlign: "center",
     marginTop: 10,
@@ -576,36 +577,41 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.8)",
+    backgroundColor: "rgba(0,0,0,0.9)",
     justifyContent: "center",
     alignItems: "center",
     zIndex: 100,
   },
   modalContent: {
-    backgroundColor: "#1A1A1A",
-    width: "80%",
-    borderRadius: 24,
-    padding: 25,
+    backgroundColor: "#0F172A",
+    width: "85%",
+    borderRadius: 30,
+    padding: 30,
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
   },
   modalTitle: {
     color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "800",
-    marginBottom: 20,
+    fontSize: 20,
+    fontWeight: "900",
+    marginBottom: 25,
+    letterSpacing: 1,
   },
   emojiGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "center",
-    gap: 15,
-    marginBottom: 25,
+    gap: 20,
+    marginBottom: 30,
   },
   emojiButton: {
-    width: 50,
-    height: 50,
+    width: 60,
+    height: 60,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 15,
   },
   emojiText: {
     fontSize: 32,
@@ -614,19 +620,19 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#FFFFFF",
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    gap: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 25,
+    borderRadius: 15,
+    gap: 12,
     marginBottom: 20,
     width: "100%",
     justifyContent: "center",
   },
   uploadButtonText: {
     color: "#000000",
-    fontSize: 13,
-    fontWeight: "800",
-    letterSpacing: 1,
+    fontSize: 12,
+    fontWeight: "900",
+    letterSpacing: 2,
   },
   closeModal: {
     padding: 10,
@@ -634,6 +640,7 @@ const styles = StyleSheet.create({
   closeModalText: {
     color: "rgba(255,255,255,0.4)",
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: "800",
+    letterSpacing: 1,
   },
 });

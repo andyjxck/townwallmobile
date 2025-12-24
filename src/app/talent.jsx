@@ -250,48 +250,55 @@ export default function LocalTalent() {
     );
   };
 
-  return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <ChevronLeft color="#FFFFFF" size={24} strokeWidth={2} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>LOCAL TALENT</Text>
-        <View style={{ width: 24 }} />
-      </View>
-
-      {loading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator color="#FFFFFF" />
-        </View>
-      ) : (
-        <FlatList
-          data={talents}
-          renderItem={renderTalentCard}
-          keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.listContent}
-          ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <Music size={48} color="rgba(255,255,255,0.1)" />
-              <Text style={styles.emptyText}>No talent showcased yet.</Text>
-              <Text style={styles.emptySubtext}>Be the first to show off your skills!</Text>
-            </View>
-          }
+    return (
+      <View style={styles.container}>
+        <LinearGradient
+          colors={['#0F172A', '#000000', '#000000']}
+          style={StyleSheet.absoluteFill}
         />
-      )}
+        <View style={{ paddingTop: insets.top, flex: 1 }}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+              <ChevronLeft color="#FFFFFF" size={24} strokeWidth={2} />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>LOCAL TALENT</Text>
+            <View style={{ width: 24 }} />
+          </View>
 
-      {/* Floating Action Button */}
-      <TouchableOpacity 
-        style={[styles.fab, { bottom: insets.bottom + 20 }]} 
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          setShowModal(true);
-        }}
-      >
-        <Plus color="#000000" size={32} />
-      </TouchableOpacity>
+          {loading ? (
+            <View style={styles.centered}>
+              <ActivityIndicator color="#FFFFFF" />
+            </View>
+          ) : (
+            <FlatList
+              data={talents}
+              renderItem={renderTalentCard}
+              keyExtractor={(item) => item.id.toString()}
+              contentContainerStyle={styles.listContent}
+              ListEmptyComponent={
+                <View style={styles.emptyState}>
+                  <Music size={48} color="rgba(255,255,255,0.1)" />
+                  <Text style={styles.emptyText}>No talent showcased yet.</Text>
+                  <Text style={styles.emptySubtext}>Be the first to show off your skills!</Text>
+                </View>
+              }
+            />
+          )}
 
-      {/* Submission Modal */}
+          {/* Floating Action Button */}
+          <TouchableOpacity 
+            style={[styles.fab, { bottom: insets.bottom + 20 }]} 
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setShowModal(true);
+            }}
+          >
+            <Plus color="#000000" size={32} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Submission Modal */}
+
       <Modal visible={showModal} animationType="slide" transparent>
         <BlurView intensity={100} tint="dark" style={styles.modalOverlay}>
           <View style={[styles.modalContent, { paddingBottom: insets.bottom + 20 }]}>

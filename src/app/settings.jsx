@@ -10,6 +10,8 @@ import * as Haptics from "expo-haptics";
 
 import { getStoredUser, logoutUser, initUser } from "../utils/user";
 
+import { LinearGradient } from "expo-linear-gradient";
+
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
@@ -50,10 +52,14 @@ export default function SettingsScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: '#000000' }]}>
+    <View style={styles.container}>
+      <LinearGradient
+        colors={['#0F172A', '#000000', '#000000']}
+        style={StyleSheet.absoluteFill}
+      />
       <StatusBar style="light" />
 
-      <View style={{ paddingTop: insets.top + 10 }}>
+      <View style={{ paddingTop: insets.top + 10, flex: 1 }}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()}>
             <ChevronLeft size={28} color="#FFFFFF" />
@@ -61,7 +67,6 @@ export default function SettingsScreen() {
           <Text style={styles.headerTitle}>SETTINGS</Text>
           <View style={{ width: 28 }} />
         </View>
-      </View>
 
         <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}>
           <View style={styles.section}>
@@ -88,21 +93,22 @@ export default function SettingsScreen() {
             />
           </View>
 
-        <View style={styles.section}>
-          <TouchableOpacity 
-            onPress={handleSignOut}
-            style={styles.signOutButton}
-          >
-            <LogOut size={20} color="#FF453A" />
-            <Text style={styles.signOutText}>SIGN OUT</Text>
-          </TouchableOpacity>
-        </View>
+          <View style={styles.section}>
+            <TouchableOpacity 
+              onPress={handleSignOut}
+              style={styles.signOutButton}
+            >
+              <LogOut size={20} color="#EF4444" />
+              <Text style={styles.signOutText}>SIGN OUT</Text>
+            </TouchableOpacity>
+          </View>
 
-        <Text style={styles.versionText}>
-          REDDITCH'D v1.0.5{"\n"}
-          MADE IN REDDITCH
-        </Text>
-      </ScrollView>
+          <Text style={styles.versionText}>
+            TOWN WALL v1.0.5{"\n"}
+            MADE WITH ❤️ FOR THE COMMUNITY
+          </Text>
+        </ScrollView>
+      </View>
     </View>
   );
 }

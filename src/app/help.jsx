@@ -7,6 +7,8 @@ import { supabase } from '@/utils/supabase';
 import { getStoredUser } from '@/utils/user';
 import * as Haptics from 'expo-haptics';
 
+import { LinearGradient } from "expo-linear-gradient";
+
 export default function HelpContact() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -181,135 +183,138 @@ export default function HelpContact() {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <ChevronLeft color="#FFFFFF" size={28} />
-        </TouchableOpacity>
-        <View style={styles.headerTitleContainer}>
-          <MessageSquare color="#60A5FA" size={20} />
-          <Text style={styles.headerTitle}>CONTACT HELP</Text>
-        </View>
-        <TouchableOpacity 
-          onPress={async () => {
-            // Simulate resolution from admin
-            await supabase.from('rhelp_messages').insert({
-              receiver_id: currentUser.id,
-              content: "Resolved. Please rate 1-5 / Leave a comment",
-              is_from_admin: true,
-              status: 'resolved'
-            });
-          }}
-          style={styles.headerAction}
-        >
-          <Text style={styles.headerActionText}>RESOLVE</Text>
-        </TouchableOpacity>
-      </View>
-
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        keyExtractor={(item) => item.id.toString()}
-        contentContainerStyle={styles.chatContent}
-        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-        renderItem={({ item }) => {
-          const isMine = !item.is_from_admin;
-          const isResolved = item.status === 'resolved';
-          return (
-            <View style={[
-              styles.messageBubble, 
-              isMine ? styles.myMessage : styles.theirMessage,
-              isResolved && { borderLeftWidth: 4, borderLeftColor: '#10B981' }
-            ]}>
-              {!isMine && <Text style={styles.adminLabel}>ADMIN SUPPORT</Text>}
-              <Text style={[styles.messageText, { color: isMine ? '#000000' : '#FFFFFF' }]}>
-                {item.content}
-              </Text>
-              <Text style={[styles.messageTime, { color: isMine ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.4)' }]}>
-                {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </Text>
-            </View>
-          );
-        }}
-        ListFooterComponent={
-          showRating ? (
-            <View style={styles.inChatRatingContainer}>
-              <View style={styles.ratingCard}>
-                <Text style={styles.ratingTitle}>HOW WAS OUR SUPPORT?</Text>
-                <Text style={styles.ratingSubtitle}>Please rate your experience 1-5</Text>
-                
-                <View style={styles.starsContainer}>
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <TouchableOpacity 
-                      key={star} 
-                      onPress={() => {
-                        setRating(star);
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                      }}
-                      style={styles.starButton}
-                    >
-                      <Text style={[styles.starText, rating >= star && styles.starActive]}>
-                        {rating >= star ? '★' : '☆'}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                <TextInput
-                  style={styles.ratingInput}
-                  placeholder="Leave a comment (optional)..."
-                  placeholderTextColor="rgba(255,255,255,0.3)"
-                  value={comment}
-                  onChangeText={setComment}
-                  multiline
-                />
-
-                <View style={styles.ratingButtons}>
-                  <TouchableOpacity 
-                    style={[styles.submitButton, rating === 0 && { opacity: 0.5 }]} 
-                    onPress={submitReview}
-                    disabled={rating === 0 || isSubmitting}
-                  >
-                    {isSubmitting ? (
-                      <ActivityIndicator size="small" color="#000000" />
-                    ) : (
-                      <Text style={styles.submitButtonText}>SUBMIT REVIEW</Text>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          ) : null
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>Send a message to start a conversation with our team.</Text>
-          </View>
-        }
+    <View style={styles.container}>
+      <LinearGradient
+        colors={['#0F172A', '#000000', '#000000']}
+        style={StyleSheet.absoluteFill}
       />
-
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-      >
-        <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, 20) }]}>
-          <TextInput
-            style={styles.input}
-            placeholder="Type a message..."
-            placeholderTextColor="rgba(255,255,255,0.3)"
-            value={inputText}
-            onChangeText={setInputText}
-            multiline
-          />
+      <View style={{ paddingTop: insets.top, flex: 1 }}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <ChevronLeft color="#FFFFFF" size={28} />
+          </TouchableOpacity>
+          <View style={styles.headerTitleContainer}>
+            <Text style={styles.headerTitle}>HELP & SUPPORT</Text>
+          </View>
           <TouchableOpacity 
-            style={[styles.sendButton, !inputText.trim() && { opacity: 0.5 }]} 
-            onPress={handleSend}
-            disabled={!inputText.trim()}
+            onPress={async () => {
+              await supabase.from('rhelp_messages').insert({
+                receiver_id: currentUser.id,
+                content: "Resolved. Please rate 1-5 / Leave a comment",
+                is_from_admin: true,
+                status: 'resolved'
+              });
+            }}
+            style={styles.headerAction}
           >
-            <Send size={20} color="#000000" />
+            <Text style={styles.headerActionText}>RESOLVE</Text>
           </TouchableOpacity>
         </View>
-      </KeyboardAvoidingView>
+
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          keyExtractor={(item) => item.id.toString()}
+          contentContainerStyle={styles.chatContent}
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+          renderItem={({ item }) => {
+            const isMine = !item.is_from_admin;
+            const isResolved = item.status === 'resolved';
+            return (
+              <View style={[
+                styles.messageBubble, 
+                isMine ? styles.myMessage : styles.theirMessage,
+                isResolved && { borderLeftWidth: 4, borderLeftColor: '#10B981' }
+              ]}>
+                {!isMine && <Text style={styles.adminLabel}>SYSTEM</Text>}
+                <Text style={[styles.messageText, { color: isMine ? '#000000' : '#FFFFFF' }]}>
+                  {item.content}
+                </Text>
+                <Text style={[styles.messageTime, { color: isMine ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.4)' }]}>
+                  {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+              </View>
+            );
+          }}
+          ListFooterComponent={
+            showRating ? (
+              <View style={styles.inChatRatingContainer}>
+                <View style={styles.ratingCard}>
+                  <Text style={styles.ratingTitle}>HOW WAS OUR SUPPORT?</Text>
+                  
+                  <View style={styles.starsContainer}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <TouchableOpacity 
+                        key={star} 
+                        onPress={() => {
+                          setRating(star);
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                        }}
+                        style={styles.starButton}
+                      >
+                        <Text style={[styles.starText, rating >= star && styles.starActive]}>
+                          {rating >= star ? '★' : '☆'}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  <TextInput
+                    style={styles.ratingInput}
+                    placeholder="Leave a comment (optional)..."
+                    placeholderTextColor="rgba(255,255,255,0.3)"
+                    value={comment}
+                    onChangeText={setComment}
+                    multiline
+                  />
+
+                  <View style={styles.ratingButtons}>
+                    <TouchableOpacity 
+                      style={[styles.submitButton, rating === 0 && { opacity: 0.5 }]} 
+                      onPress={submitReview}
+                      disabled={rating === 0 || isSubmitting}
+                    >
+                      {isSubmitting ? (
+                        <ActivityIndicator size="small" color="#000000" />
+                      ) : (
+                        <Text style={styles.submitButtonText}>SUBMIT REVIEW</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            ) : null
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>Send a message to start a conversation with our team.</Text>
+            </View>
+          }
+        />
+
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        >
+          <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+            <TextInput
+              style={styles.input}
+              placeholder="Type a message..."
+              placeholderTextColor="rgba(255,255,255,0.3)"
+              value={inputText}
+              onChangeText={setInputText}
+              multiline
+            />
+            <TouchableOpacity 
+              style={[styles.sendButton, !inputText.trim() && { opacity: 0.5 }]} 
+              onPress={handleSend}
+              disabled={!inputText.trim()}
+            >
+              <Send size={20} color="#000000" />
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </View>
     </View>
   );
 }
@@ -325,8 +330,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
   },
   headerTitleContainer: {
     flexDirection: 'row',
@@ -353,13 +356,12 @@ const styles = StyleSheet.create({
   },
   chatContent: {
     padding: 20,
-    gap: 10,
+    gap: 15,
   },
   messageBubble: {
-    maxWidth: '80%',
-    padding: 12,
-    borderRadius: 18,
-    marginBottom: 5,
+    maxWidth: '85%',
+    padding: 16,
+    borderRadius: 24,
   },
   myMessage: {
     alignSelf: 'flex-end',
@@ -368,63 +370,57 @@ const styles = StyleSheet.create({
   },
   theirMessage: {
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(255,255,255,0.08)',
     borderBottomLeftRadius: 4,
   },
   messageText: {
-    fontSize: 15,
-    lineHeight: 20,
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: '500',
   },
   messageTime: {
     fontSize: 10,
     alignSelf: 'flex-end',
-    marginTop: 4,
+    marginTop: 6,
+    fontWeight: '700',
   },
   adminLabel: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '900',
-    color: '#60A5FA',
-    letterSpacing: 1,
-    marginBottom: 4,
+    color: 'rgba(255,255,255,0.4)',
+    letterSpacing: 1.5,
+    marginBottom: 6,
+    textTransform: 'uppercase',
   },
   inChatRatingContainer: {
     padding: 20,
-    marginTop: 10,
-    marginBottom: 20,
+    marginTop: 20,
   },
   ratingCard: {
-    backgroundColor: '#111111',
+    backgroundColor: 'rgba(255,255,255,0.03)',
     width: '100%',
-    borderRadius: 24,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 30,
+    padding: 30,
     alignItems: 'center',
   },
   ratingTitle: {
     color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '900',
-    letterSpacing: 1,
-    textAlign: 'center',
-  },
-  ratingSubtitle: {
-    color: 'rgba(255,255,255,0.5)',
     fontSize: 14,
-    marginTop: 8,
+    fontWeight: '900',
+    letterSpacing: 2,
     textAlign: 'center',
   },
   starsContainer: {
     flexDirection: 'row',
-    gap: 12,
-    marginVertical: 24,
+    gap: 15,
+    marginVertical: 30,
   },
   starButton: {
-    padding: 4,
+    padding: 5,
   },
   starText: {
-    fontSize: 40,
-    color: 'rgba(255,255,255,0.1)',
+    fontSize: 44,
+    color: 'rgba(255,255,255,0.05)',
   },
   starActive: {
     color: '#FBBF24',
@@ -432,79 +428,64 @@ const styles = StyleSheet.create({
   ratingInput: {
     width: '100%',
     backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 12,
-    padding: 15,
+    borderRadius: 15,
+    padding: 20,
     color: '#FFFFFF',
-    fontSize: 14,
-    minHeight: 80,
+    fontSize: 15,
+    minHeight: 100,
     textAlignVertical: 'top',
   },
   ratingButtons: {
-    flexDirection: 'row',
     width: '100%',
-    gap: 12,
-    marginTop: 24,
-  },
-  cancelButton: {
-    flex: 1,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  cancelButtonText: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 1,
+    marginTop: 30,
   },
   submitButton: {
-    flex: 2,
     backgroundColor: '#FFFFFF',
-    paddingVertical: 14,
-    borderRadius: 12,
+    paddingVertical: 18,
+    borderRadius: 15,
     alignItems: 'center',
   },
   submitButtonText: {
     color: '#000000',
     fontSize: 14,
     fontWeight: '900',
-    letterSpacing: 1,
+    letterSpacing: 2,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 15,
-    gap: 12,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.05)',
-    backgroundColor: '#000000',
+    gap: 15,
+    backgroundColor: 'transparent',
   },
   input: {
     flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 20,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 30,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
     color: '#FFFFFF',
     fontSize: 16,
-    maxHeight: 100,
+    maxHeight: 120,
   },
   sendButton: {
     backgroundColor: '#FFFFFF',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
   },
   emptyContainer: {
-    paddingVertical: 100,
+    paddingVertical: 120,
     alignItems: 'center',
   },
   emptyText: {
     color: 'rgba(255,255,255,0.3)',
     textAlign: 'center',
-    paddingHorizontal: 40,
-    fontSize: 14,
+    paddingHorizontal: 50,
+    fontSize: 15,
+    lineHeight: 22,
   },
 });

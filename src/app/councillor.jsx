@@ -4,57 +4,65 @@ import { useRouter } from 'expo-router';
 import { ChevronLeft, MessageCircle, Calendar, ShieldCheck } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { LinearGradient } from "expo-linear-gradient";
+
 export default function TalkToCouncillor() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <ChevronLeft color="#FFFFFF" size={28} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>TALK TO A COUNCILLOR</Text>
-        <View style={{ width: 28 }} />
+    <View style={styles.container}>
+      <LinearGradient
+        colors={['#0F172A', '#000000', '#000000']}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={{ paddingTop: insets.top, flex: 1 }}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <ChevronLeft color="#FFFFFF" size={28} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>LOCAL REPRESENTATIVES</Text>
+          <View style={{ width: 28 }} />
+        </View>
+
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <View style={styles.comingSoonBox}>
+            <Text style={styles.comingSoonTitle}>COMING SOON</Text>
+            <Text style={styles.comingSoonText}>
+              We're working hard to find willing local councillors to join our platform.
+            </Text>
+            <Text style={styles.comingSoonText}>
+              Soon, you'll be able to directly message a local representative for help in dire times.
+            </Text>
+          </View>
+
+          <View style={styles.featureList}>
+            <View style={styles.featureItem}>
+              <MessageCircle size={24} color="#60A5FA" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.featureTitle}>Direct Messaging</Text>
+                <Text style={styles.featureDesc}>Secure 1-to-1 chat with your local representative.</Text>
+              </View>
+            </View>
+
+            <View style={styles.featureItem}>
+              <Calendar size={24} color="#FBBF24" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.featureTitle}>Surgery Bookings</Text>
+                <Text style={styles.featureDesc}>Book slots for face-to-face local surgeries.</Text>
+              </View>
+            </View>
+
+            <View style={styles.featureItem}>
+              <ShieldCheck size={24} color="#34D399" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.featureTitle}>Verified Status</Text>
+                <Text style={styles.featureDesc}>Only officially verified councillors can participate.</Text>
+              </View>
+            </View>
+          </View>
+        </ScrollView>
       </View>
-
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.comingSoonBox}>
-          <Text style={styles.comingSoonTitle}>COMING SOON</Text>
-          <Text style={styles.comingSoonText}>
-            We're working hard to find willing local councillors to join our platform.
-          </Text>
-          <Text style={styles.comingSoonText}>
-            Soon, you'll be able to directly message a local representative for help in dire times.
-          </Text>
-        </View>
-
-        <View style={styles.featureList}>
-          <View style={styles.featureItem}>
-            <MessageCircle size={24} color="#60A5FA" />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.featureTitle}>Direct Messaging</Text>
-              <Text style={styles.featureDesc}>Secure 1-to-1 chat with your local representative.</Text>
-            </View>
-          </View>
-
-          <View style={styles.featureItem}>
-            <Calendar size={24} color="#FBBF24" />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.featureTitle}>Surgery Bookings</Text>
-              <Text style={styles.featureDesc}>Book slots for face-to-face local surgeries.</Text>
-            </View>
-          </View>
-
-          <View style={styles.featureItem}>
-            <ShieldCheck size={24} color="#34D399" />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.featureTitle}>Verified Status</Text>
-              <Text style={styles.featureDesc}>Only officially verified councillors can participate.</Text>
-            </View>
-          </View>
-        </View>
-      </ScrollView>
     </View>
   );
 }
