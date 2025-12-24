@@ -19,10 +19,38 @@ export default function NotificationPanel({ visible, onClose }) {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+    useEffect(() => {
+    let sub;
     if (visible) {
       loadNotifications();
+      
+      // Real-time subscription for the notification list
+      const setupSubscription = async () => {
+        const user = await getStoredUser();
+        if (!user) return;
+        
+        sub = supabase
+          .channel(`notification_list_${user.id}`)
+          .on('postgres_changes', 
+            { 
+              event: 'INSERT', 
+              schema: 'public', 
+              table: 'rnotifications',
+              filter: `user_id=eq.${user.id}`
+            }, 
+            payload => {
+              setNotifications(prev => [payload.new, ...prev]);
+            }
+          )
+          .subscribe();
+      };
+      
+      setupSubscription();
     }
+    
+    return () => {
+      if (sub) supabase.removeChannel(sub);
+    };
   }, [visible]);
 
   const loadNotifications = async () => {

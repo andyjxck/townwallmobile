@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, Send, MessageSquare } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,25 +16,64 @@ export default function HelpContact() {
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
 
-  useEffect(() => {
+    useEffect(() => {
+    if (!currentUser) return;
+    
     initChat();
     
-    // Subscribe to new messages
+    // Subscribe to new messages for this user
     const subscription = supabase
-      .channel('help_chat')
-      .on('postgres_changes', { event: 'INSERT', table: 'rhelp_messages' }, payload => {
-        setMessages(prev => [...prev, payload.new]);
-      })
+      .channel(`help_chat_${currentUser.id}`)
+      .on('postgres_changes', 
+        { 
+          event: 'INSERT', 
+          table: 'rhelp_messages',
+          filter: `sender_id=eq.${currentUser.id}`
+        }, 
+        payload => {
+          setMessages(prev => {
+            if (prev.find(m => m.id === payload.new.id)) return prev;
+            return [...prev, payload.new];
+          });
+        }
+      )
+      .on('postgres_changes', 
+        { 
+          event: 'INSERT', 
+          table: 'rhelp_messages',
+          filter: `receiver_id=eq.${currentUser.id}`
+        }, 
+        payload => {
+          setMessages(prev => {
+            if (prev.find(m => m.id === payload.new.id)) return prev;
+            return [...prev, payload.new];
+          });
+        }
+      )
+      .on('postgres_changes',
+        {
+          event: 'UPDATE',
+          table: 'rhelp_messages',
+          filter: `receiver_id=eq.${currentUser.id}`
+        },
+        payload => {
+          if (payload.new.status === 'resolved') {
+            Alert.alert("Support", "This ticket has been marked as resolved by our team.");
+            initChat();
+          }
+        }
+      )
       .subscribe();
 
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
+  }, [currentUser?.id]);
 
   const initChat = async () => {
     try {
       const user = await getStoredUser();
+      if (!user) return;
       setCurrentUser(user);
       
       const { data, error } = await supabase
@@ -94,19 +133,25 @@ export default function HelpContact() {
         keyExtractor={(item) => item.id.toString()}
         contentContainerStyle={styles.chatContent}
         onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-        renderItem={({ item }) => {
-          const isMine = item.sender_id === currentUser?.id;
-          return (
-            <View style={[styles.messageBubble, isMine ? styles.myMessage : styles.theirMessage]}>
-              <Text style={[styles.messageText, { color: isMine ? '#000000' : '#FFFFFF' }]}>
-                {item.content}
-              </Text>
-              <Text style={[styles.messageTime, { color: isMine ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.4)' }]}>
-                {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </Text>
-            </View>
-          );
-        }}
+          renderItem={({ item }) => {
+            const isMine = !item.is_from_admin;
+            const isResolved = item.status === 'resolved';
+            return (
+              <View style={[
+                styles.messageBubble, 
+                isMine ? styles.myMessage : styles.theirMessage,
+                isResolved && { opacity: 0.6 }
+              ]}>
+                {!isMine && <Text style={styles.adminLabel}>ADMIN SUPPORT</Text>}
+                <Text style={[styles.messageText, { color: isMine ? '#000000' : '#FFFFFF' }]}>
+                  {item.content}
+                </Text>
+                <Text style={[styles.messageTime, { color: isMine ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.4)' }]}>
+                  {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+              </View>
+            );
+          }}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>Send a message to start a conversation with our team.</Text>
@@ -192,10 +237,17 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 20,
   },
-  messageTime: {
+    messageTime: {
     fontSize: 10,
     alignSelf: 'flex-end',
     marginTop: 4,
+  },
+  adminLabel: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#60A5FA',
+    letterSpacing: 1,
+    marginBottom: 4,
   },
   inputContainer: {
     flexDirection: 'row',

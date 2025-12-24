@@ -34,12 +34,13 @@ export default function LocalBusinesses() {
     fetchBusinesses();
   }, []);
 
-  const fetchBusinesses = async () => {
+    const fetchBusinesses = async () => {
     try {
       const { data, error } = await supabase
         .from('rbusinesses')
         .select('*')
         .eq('status', 'approved')
+        .eq('is_deleted', false)
         .order('created_at', { ascending: false });
 
       if (error) throw error;

@@ -5,10 +5,11 @@ import {
   ChevronLeft, 
   Shield, 
   AlertCircle, 
-  CheckCircle, 
-  Trash2, 
-  Star, 
-  Briefcase, 
+    CheckCircle, 
+    XCircle,
+    Trash2, 
+    Star, 
+    Briefcase, 
   MessageSquare, 
   Bot, 
   Flag,
@@ -49,8 +50,113 @@ export default function ModerationAdmin() {
   useEffect(() => {
     if (isAdmin) {
       fetchData();
+      
+      // Subscribe to all new help messages for real-time updates in admin panel
+      const subscription = supabase
+        .channel('admin_help_updates')
+        .on('postgres_changes', { event: 'INSERT', table: 'rhelp_messages' }, payload => {
+          if (activeTab === 'help') {
+            fetchData(); // Refresh list to show new chats/messages
+          }
+          if (expandedChatId === payload.new.sender_id || expandedChatId === payload.new.receiver_id) {
+            fetchTranscript(expandedChatId);
+          }
+        })
+        .subscribe();
+
+      return () => {
+        subscription.unsubscribe();
+      };
     }
-  }, [activeTab, isAdmin]);
+  }, [activeTab, isAdmin, expandedChatId]);
+
+  const handleResolveTicket = async (userId) => {
+    try {
+      const { error } = await supabase
+        .from('rhelp_messages')
+        .update({ status: 'resolved' })
+        .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`);
+
+      if (error) throw error;
+      
+      await sendNotification({
+        userId: userId,
+        title: 'Support Ticket Resolved',
+        message: 'Your support ticket has been marked as resolved.',
+        type: 'help_chat',
+        link: '/support'
+      });
+
+      Alert.alert("Success", "Ticket marked as resolved.");
+      fetchData();
+      setExpandedChatId(null);
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Error", "Failed to resolve ticket.");
+    }
+  };
+
+  const handleDeleteContent = async (item, contentType) => {
+    Alert.prompt(
+      "Delete Content",
+      "Enter reason for deletion:",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Delete", 
+          style: "destructive",
+          onPress: async (reason) => {
+            if (!reason) {
+              Alert.alert("Error", "A reason is required.");
+              return;
+            }
+            try {
+              const admin = await getStoredUser();
+              let table = '';
+              if (contentType === 'talent') table = 'rtalent';
+              else if (contentType === 'business') table = 'rbusinesses';
+              else table = 'rposts';
+
+              const { error } = await supabase
+                .from(table)
+                .update({ 
+                  is_deleted: true, 
+                  deletion_reason: reason,
+                  deleted_by: admin.id 
+                })
+                .eq('id', item.id);
+
+              if (error) throw error;
+
+              // Log deletion
+              await supabase.from('rdeletion_logs').insert({
+                content_type: contentType,
+                content_id: item.id.toString(),
+                reason: reason,
+                deleted_by: admin.id
+              });
+
+              // Notify user
+              await sendNotification({
+                userId: item.user_id || item.sender_id,
+                title: 'Content Removed',
+                message: `Your ${contentType} was removed by a moderator: ${reason}`,
+                type: 'moderation',
+                link: '/profile'
+              });
+
+              setData(prev => prev.filter(i => i.id !== item.id));
+              Alert.alert("Success", "Content has been removed.");
+            } catch (error) {
+              console.error(error);
+              Alert.alert("Error", "Failed to delete content.");
+            }
+          }
+        }
+      ],
+      "plain-text"
+    );
+  };
 
   const checkAdminStatus = async () => {
     try {
@@ -289,28 +395,46 @@ export default function ModerationAdmin() {
           </>
         )}
 
-        {activeTab === 'help' && (
-          <View>
-            <Text style={styles.messageContent}>{item.content}</Text>
-            
-            <View style={styles.helpActions}>
-              <TouchableOpacity 
-                style={styles.transcriptButton}
-                onPress={() => {
-                  if (expandedChatId === item.sender_id) {
-                    setExpandedChatId(null);
-                  } else {
-                    setExpandedChatId(item.sender_id);
-                    fetchTranscript(item.sender_id);
-                  }
-                }}
-              >
-                <Text style={styles.transcriptButtonText}>
-                  {expandedChatId === item.sender_id ? 'HIDE TRANSCRIPT' : 'SHOW TRANSCRIPT'}
-                </Text>
-                {expandedChatId === item.sender_id ? <ChevronUp size={16} color="#FBBF24" /> : <ChevronDown size={16} color="#FBBF24" />}
-              </TouchableOpacity>
-            </View>
+          {activeTab === 'help' && (
+            <View>
+              <View style={styles.helpStatusRow}>
+                <Text style={styles.messageContent}>{item.content}</Text>
+                {item.status === 'resolved' && (
+                  <View style={styles.resolvedBadge}>
+                    <CheckCircle size={10} color="#10B981" />
+                    <Text style={styles.resolvedText}>RESOLVED</Text>
+                  </View>
+                )}
+              </View>
+              
+              <View style={styles.helpActions}>
+                <TouchableOpacity 
+                  style={styles.transcriptButton}
+                  onPress={() => {
+                    if (expandedChatId === item.sender_id) {
+                      setExpandedChatId(null);
+                    } else {
+                      setExpandedChatId(item.sender_id);
+                      fetchTranscript(item.sender_id);
+                    }
+                  }}
+                >
+                  <Text style={styles.transcriptButtonText}>
+                    {expandedChatId === item.sender_id ? 'HIDE TRANSCRIPT' : 'SHOW TRANSCRIPT'}
+                  </Text>
+                  {expandedChatId === item.sender_id ? <ChevronUp size={16} color="#FBBF24" /> : <ChevronDown size={16} color="#FBBF24" />}
+                </TouchableOpacity>
+
+                {item.status !== 'resolved' && (
+                  <TouchableOpacity 
+                    style={[styles.transcriptButton, { marginLeft: 10, borderColor: '#10B981' }]}
+                    onPress={() => handleResolveTicket(item.sender_id)}
+                  >
+                    <CheckCircle size={16} color="#10B981" />
+                    <Text style={[styles.transcriptButtonText, { color: '#10B981' }]}>RESOLVE</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
 
             {expandedChatId === item.sender_id && (
               <View style={styles.transcriptContainer}>
@@ -358,25 +482,33 @@ export default function ModerationAdmin() {
           </>
         )}
 
-        {activeTab !== 'help' && (
-          <View style={styles.actionRow}>
-            <TouchableOpacity 
-              style={[styles.actionButton, styles.approveButton]} 
-              onPress={() => handleAction(item.id, 'approve')}
-            >
-              <CheckCircle size={18} color="#000000" />
-              <Text style={styles.actionText}>APPROVE</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.actionButton, styles.rejectButton]} 
-              onPress={() => handleAction(item.id, 'reject')}
-            >
-              <Trash2 size={18} color="#FFFFFF" />
-              <Text style={[styles.actionText, { color: '#FFFFFF' }]}>REJECT</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+          {activeTab !== 'help' && (
+            <View style={styles.actionRow}>
+              <TouchableOpacity 
+                style={[styles.actionButton, styles.approveButton]} 
+                onPress={() => handleAction(item.id, 'approve')}
+              >
+                <CheckCircle size={18} color="#000000" />
+                <Text style={styles.actionText}>APPROVE</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.actionButton, styles.rejectButton]} 
+                onPress={() => handleAction(item.id, 'reject')}
+              >
+                <XCircle size={18} color="#FFFFFF" />
+                <Text style={[styles.actionText, { color: '#FFFFFF' }]}>REJECT</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.actionButton, { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#EF4444' }]} 
+                onPress={() => handleDeleteContent(item, activeTab)}
+              >
+                <Trash2 size={18} color="#EF4444" />
+                <Text style={[styles.actionText, { color: '#EF4444' }]}>DELETE</Text>
+              </TouchableOpacity>
+            </View>
+          )}
       </View>
     );
   };
@@ -596,11 +728,34 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(251, 191, 36, 0.2)',
   },
-  transcriptButtonText: {
+    transcriptButtonText: {
     color: '#FBBF24',
     fontSize: 11,
     fontWeight: '900',
     letterSpacing: 1,
+  },
+  helpStatusRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  resolvedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.2)',
+  },
+  resolvedText: {
+    color: '#10B981',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.5,
   },
   transcriptContainer: {
     marginTop: 10,

@@ -48,12 +48,13 @@ export default function LocalTalent() {
     }
   };
 
-  const fetchTalents = async () => {
+    const fetchTalents = async () => {
     try {
       const { data, error } = await supabase
         .from('rtalent')
         .select('*')
         .eq('status', 'approved')
+        .eq('is_deleted', false)
         .order('created_at', { ascending: false });
 
       if (error) throw error;

@@ -465,22 +465,40 @@ export default function UniversalFeed() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  useEffect(() => {
+    useEffect(() => {
     getDeviceId().then(setDeviceId);
     fetchFilterData();
     checkAdmin();
     loadUnreadCount();
 
-    // Subscribe to new notifications
-    const subscription = supabase
-      .channel('public:rnotifications')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'rnotifications' }, () => {
-        loadUnreadCount();
-      })
-      .subscribe();
+    // Subscribe to new notifications for the current user
+    const setupNotificationSubscription = async () => {
+      const user = await getStoredUser();
+      if (!user) return;
+
+      const subscription = supabase
+        .channel(`notifications_${user.id}`)
+        .on('postgres_changes', 
+          { 
+            event: 'INSERT', 
+            schema: 'public', 
+            table: 'rnotifications',
+            filter: `user_id=eq.${user.id}`
+          }, 
+          () => {
+            loadUnreadCount();
+          }
+        )
+        .subscribe();
+
+      return subscription;
+    };
+
+    let sub;
+    setupNotificationSubscription().then(s => sub = s);
 
     return () => {
-      supabase.removeChannel(subscription);
+      if (sub) supabase.removeChannel(sub);
     };
   }, []);
 
@@ -521,7 +539,8 @@ export default function UniversalFeed() {
             rzones (name),
             rusers (username, emoji_icon, avatar_url),
             rreactions (reaction_type, device_id)
-          `);
+          `)
+          .eq('is_deleted', false);
 
       if (selectedZone) query = query.eq('zone_id', selectedZone);
       if (selectedTag) query = query.eq('tag_id', selectedTag);
