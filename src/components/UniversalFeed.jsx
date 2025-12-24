@@ -42,7 +42,8 @@ import { supabase } from "../utils/supabase";
 import * as Haptics from "expo-haptics";
 import { useTheme } from "../utils/theme";
 import { Image } from "expo-image";
-import { getStoredUser } from "../utils/user";
+import { getStoredUser, logoutUser } from "../utils/user";
+import { useAuthStore } from "../utils/auth/store";
 import { TextInput } from "react-native-gesture-handler";
 import NotificationPanel from "./NotificationPanel";
 import { fetchNotifications } from "@/utils/notifications";
@@ -464,7 +465,7 @@ export default function UniversalFeed() {
   const [sortBy, setSortBy] = useState('newest');
   const [showMenu, setShowMenu] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [user, setUser] = useState(null);
+  const user = useAuthStore(state => state.auth);
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -476,9 +477,7 @@ export default function UniversalFeed() {
 
     // Subscribe to new notifications for the current user
     const setupNotificationSubscription = async () => {
-      const userData = await getStoredUser();
-      setUser(userData);
-      if (!userData) return;
+      if (!user) return;
 
       const subscription = supabase
         .channel(`notifications_${user.id}`)
@@ -633,11 +632,25 @@ export default function UniversalFeed() {
                   style={styles.dropdownItem} 
                   onPress={() => { setShowMenu(false); router.push("/profile"); }}
                 >
-                  <User size={18} color="#FFFFFF" />
+                  {user?.avatar_url ? (
+                    <Image source={{ uri: user.avatar_url }} style={{ width: 18, height: 18, borderRadius: 9 }} />
+                  ) : user?.emoji_icon ? (
+                    <Text style={{ fontSize: 16 }}>{user.emoji_icon}</Text>
+                  ) : (
+                    <User size={18} color="#FFFFFF" />
+                  )}
                   <Text style={styles.dropdownText}>PROFILE</Text>
                 </TouchableOpacity>
 
-                {(!user || !user.supabase_uid) && (
+                {user?.supabase_uid ? (
+                  <TouchableOpacity 
+                    style={styles.dropdownItem} 
+                    onPress={() => { setShowMenu(false); logoutUser(); }}
+                  >
+                    <User size={18} color="#EF4444" />
+                    <Text style={[styles.dropdownText, { color: '#EF4444' }]}>SIGN OUT</Text>
+                  </TouchableOpacity>
+                ) : (
                   <TouchableOpacity 
                     style={styles.dropdownItem} 
                     onPress={() => { setShowMenu(false); router.push("/auth?mode=login"); }}
