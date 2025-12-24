@@ -26,7 +26,8 @@ import {
   UserPlus,
   Users,
   Trash2,
-  Heart
+  Heart,
+  Share as ShareIcon
 } from "lucide-react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
@@ -35,9 +36,9 @@ import * as Haptics from "expo-haptics";
 import { decode } from "base64-arraybuffer";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { TextInput } from "react-native-gesture-handler";
+import { Share } from "react-native";
 
-const EMOJIS = ["👤", "🦊", "🐯", "🐼", "🦁", "🐨", "🐸", "🤖", "👻", "👽"];
-
+import PostItem from "../components/PostItem";
 import { LinearGradient } from "expo-linear-gradient";
 
 export default function Profile() {
@@ -104,22 +105,6 @@ export default function Profile() {
           joined: new Date(userData.created_at).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
         });
 
-        // Fetch user's own posts
-        const { data: myPosts } = await supabase
-          .from('rposts')
-          .select(`
-            *,
-            rusers (username, emoji_icon, avatar_url),
-            rzones (name),
-            rtags (name),
-            rreactions (reaction_type, device_id)
-          `)
-          .eq('user_id', userData.id)
-          .eq('is_deleted', false)
-          .order('created_at', { ascending: false });
-        
-        setUserPosts(myPosts || []);
-
         // Fetch Friends
         const { data: friendData } = await supabase
           .from('friends')
@@ -129,6 +114,23 @@ export default function Profile() {
         
         const friendsList = friendData?.map(f => f.rusers) || [];
         setFriends(friendsList);
+        const friendIds = friendsList.map(f => f.id);
+
+        // Fetch user's own posts AND friends' posts
+        const { data: feedPosts } = await supabase
+          .from('rposts')
+          .select(`
+            *,
+            rusers (username, emoji_icon, avatar_url),
+            rzones (name),
+            rtags (name),
+            rreactions (reaction_type, device_id)
+          `)
+          .in('user_id', [userData.id, ...friendIds])
+          .eq('is_deleted', false)
+          .order('created_at', { ascending: false });
+        
+        setUserPosts(feedPosts || []);
 
         // Fetch replies to user's posts
         const { data: userPostIds } = await supabase
@@ -345,6 +347,20 @@ export default function Profile() {
     ]);
   };
 
+    const handleShare = async (post) => {
+      try {
+        const result = await Share.share({
+          message: `${post.title}\n\n${post.text}\n\nShared from Town Wall`,
+          url: `${process.env.EXPO_PUBLIC_APP_URL}/post/${post.id}`
+        });
+        if (result.action === Share.sharedAction) {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+      } catch (error) {
+        console.error("Error sharing post:", error);
+      }
+    };
+
   if (loading && !user) {
     return (
       <View style={styles.loadingContainer}>
@@ -434,8 +450,8 @@ export default function Profile() {
             {/* Tabs */}
             <View style={styles.tabContainer}>
               {[
-                { id: 'posts', label: 'MY POSTS' },
-                { id: 'replies', label: 'REPLIES' },
+                { id: 'posts', label: 'FEED' },
+                { id: 'replies', label: 'MY REPLIES' },
                 { id: 'friends', label: 'FRIENDS' }
               ].map(tab => (
                 <TouchableOpacity 
@@ -449,41 +465,24 @@ export default function Profile() {
             </View>
 
             {activeTab === "posts" && (
-              <View style={styles.tabContent}>
+              <View style={styles.tabContentFull}>
                 {userPosts.length > 0 ? (
                   userPosts.map((post) => (
-                    <TouchableOpacity 
-                      key={post.id} 
-                      style={styles.postCardCompact}
-                      onPress={() => router.push(`/?postId=${post.id}`)}
-                    >
-                      <View style={styles.postCardHeader}>
-                        <View style={styles.postCardMeta}>
-                          <Text style={styles.postCardZone}>{post.rzones?.name}</Text>
-                          <Text style={styles.postCardTime}>· {getTimeAgo(new Date(post.created_at))}</Text>
-                        </View>
-                        <TouchableOpacity onPress={() => handleDeletePost(post.id)}>
-                          <Trash2 size={16} color="rgba(255,255,255,0.2)" />
-                        </TouchableOpacity>
-                      </View>
-                      <Text style={styles.postCardTitle} numberOfLines={2}>{post.title}</Text>
-                      {post.image_url && (
-                        <Image source={{ uri: post.image_url }} style={styles.postCardImage} />
-                      )}
-                      <View style={styles.postCardFooter}>
-                        <View style={styles.postCardStat}>
-                          <Heart size={14} color="rgba(255,255,255,0.4)" />
-                          <Text style={styles.postCardStatText}>
-                            {(post.rreactions || []).filter(r => r.reaction_type === 'helpful').length}
-                          </Text>
-                        </View>
-                      </View>
-                    </TouchableOpacity>
+                    <PostItem 
+                      key={post.id}
+                      item={post}
+                      deviceId={deviceId}
+                      onReaction={handleReaction}
+                      onDelete={handleDeletePost}
+                      onShare={handleShare}
+                      user={user}
+                      onComment={() => loadData()}
+                    />
                   ))
                 ) : (
                   <View style={styles.emptyContainer}>
                     <MessageSquare size={40} color="rgba(255,255,255,0.1)" />
-                    <Text style={styles.emptyText}>You haven't posted anything yet.</Text>
+                    <Text style={styles.emptyText}>No posts in your feed yet.</Text>
                   </View>
                 )}
               </View>
@@ -775,63 +774,12 @@ const styles = StyleSheet.create({
   activeTabText: {
     color: "#FFFFFF",
   },
-  tabContent: {
-    paddingHorizontal: 20,
-  },
-  postCardCompact: {
-    backgroundColor: "rgba(255,255,255,0.03)",
-    borderRadius: 20,
-    padding: 15,
-    marginBottom: 12,
-  },
-  postCardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  postCardMeta: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  postCardZone: {
-    color: "#3B82F6",
-    fontSize: 10,
-    fontWeight: "800",
-  },
-  postCardTime: {
-    color: "rgba(255,255,255,0.3)",
-    fontSize: 10,
-  },
-  postCardTitle: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "700",
-    lineHeight: 20,
-    marginBottom: 10,
-  },
-  postCardImage: {
-    width: "100%",
-    height: 150,
-    borderRadius: 12,
-    marginBottom: 10,
-  },
-  postCardFooter: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  postCardStat: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  postCardStatText: {
-    color: "rgba(255,255,255,0.4)",
-    fontSize: 12,
-    fontWeight: "700",
-  },
+    tabContent: {
+      paddingHorizontal: 20,
+    },
+    tabContentFull: {
+      paddingHorizontal: 0,
+    },
   replyCard: {
     backgroundColor: "rgba(255,255,255,0.02)",
     borderRadius: 15,
