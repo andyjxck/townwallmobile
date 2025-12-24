@@ -22,8 +22,9 @@ import {
   User,
   Send,
   Trash2,
-  VolumeX,
-} from "lucide-react-native";
+    VolumeX,
+    Pencil,
+  } from "lucide-react-native";
 import { getDeviceId } from "../utils/deviceId";
 import { supabase } from "../utils/supabase";
 import { moderateContent } from "../utils/ai";
@@ -32,7 +33,7 @@ import { Image } from "expo-image";
 import { getStoredUser } from "../utils/user";
 import { TextInput } from "react-native-gesture-handler";
 
-export default function PostItem({ item, deviceId, onReaction, onComment, onDelete, onMute, onShare, user }) {
+export default function PostItem({ item, deviceId, onReaction, onComment, onDelete, onMute, onShare, onEdit, user }) {
   const [expanded, setExpanded] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [showFullImage, setShowFullImage] = useState(false);
@@ -456,6 +457,18 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
             style={styles.actionButton}
           >
             <Trash2 size={18} color={user?.id === item.user_id ? "rgba(239, 68, 68, 0.4)" : "#EF4444"} />
+          </TouchableOpacity>
+        )}
+
+        {user?.id === item.user_id && (
+          <TouchableOpacity
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              onEdit(item);
+            }}
+            style={styles.actionButton}
+          >
+            <Pencil size={18} color="rgba(255,255,255,0.4)" />
           </TouchableOpacity>
         )}
 

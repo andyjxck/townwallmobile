@@ -113,7 +113,12 @@ export default function ZoneFeed({ zoneSlug, zoneName }) {
     );
   };
 
-  const fetchPosts = useCallback(async () => {
+    const handleEditPost = (post) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      router.push(`/post?id=${post.id}`);
+    };
+
+    const fetchPosts = useCallback(async () => {
     try {
       const { data: zoneData } = await supabase
         .from('rzones')
@@ -246,14 +251,15 @@ export default function ZoneFeed({ zoneSlug, zoneName }) {
       <FlatList
         data={posts}
         renderItem={({ item }) => (
-          <PostItem
-            item={item}
-            deviceId={deviceId}
-            onReaction={handleReaction}
-            onDelete={handleDeletePost}
-            onMute={handleMuteUser}
-            user={user}
-          />
+            <PostItem
+              item={item}
+              deviceId={deviceId}
+              onReaction={handleReaction}
+              onDelete={handleDeletePost}
+              onMute={handleMuteUser}
+              onEdit={handleEditPost}
+              user={user}
+            />
         )}
         keyExtractor={(item) => item.id.toString()}
         refreshControl={

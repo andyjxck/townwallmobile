@@ -410,7 +410,12 @@ export default function Profile() {
     );
   };
 
-  const handleLogout = async () => {
+    const handleEditPost = (post) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      router.push(`/post?id=${post.id}`);
+    };
+
+    const handleLogout = async () => {
     Alert.alert("Sign Out", "Are you sure you want to sign out?", [
       { text: "Cancel", style: "cancel" },
       { 
@@ -544,18 +549,19 @@ export default function Profile() {
             {activeTab === "posts" && (
               <View style={styles.tabContentFull}>
                 {userPosts.length > 0 ? (
-                  userPosts.map((post) => (
-                    <PostItem 
-                      key={post.id}
-                      item={post}
-                      deviceId={deviceId}
-                      onReaction={handleReaction}
-                      onDelete={handleDeletePost}
-                      onShare={handleShare}
-                      user={user}
-                      onComment={() => loadData()}
-                    />
-                  ))
+                    userPosts.map((post) => (
+                      <PostItem 
+                        key={post.id}
+                        item={post}
+                        deviceId={deviceId}
+                        onReaction={handleReaction}
+                        onDelete={handleDeletePost}
+                        onShare={handleShare}
+                        onEdit={handleEditPost}
+                        user={user}
+                        onComment={() => loadData()}
+                      />
+                    ))
                 ) : (
                   <View style={styles.emptyContainer}>
                     <MessageSquare size={40} color="rgba(255,255,255,0.1)" />

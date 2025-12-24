@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { X, ChevronRight, Image as ImageIcon, Trash2, Shield, User } from "lucide-react-native";
 import { getStoredUser } from "../utils/user";
 import { getDeviceId } from "../utils/deviceId";
@@ -27,6 +27,9 @@ import { LinearGradient } from "expo-linear-gradient";
 export default function PostScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const params = useLocalSearchParams();
+  const postId = params.id;
+
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
   const [zones, setZones] = useState([]);
@@ -45,15 +48,38 @@ export default function PostScreen() {
     getStoredUser().then(setUser);
     fetchData();
     requestPermissions();
-  }, []);
 
-  const requestPermissions = async () => {
-    if (Platform.OS !== 'web') {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        // Silent fail or alert? Let's alert to help user
-        // alert('Sorry, we need camera roll permissions to make this work!');
+    if (postId) {
+      fetchPostData();
+    }
+  }, [postId]);
+
+  const fetchPostData = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('rposts')
+        .select('*')
+        .eq('id', postId)
+        .single();
+      
+      if (error) throw error;
+      if (data) {
+        setTitle(data.title || "");
+        setText(data.text || "");
+        setIsAnonymous(data.is_anonymous);
+        if (data.image_urls) {
+          setImages(data.image_urls.map(url => ({ uri: url, fromRemote: true })));
+        } else if (data.image_url) {
+          setImages([{ uri: data.image_url, fromRemote: true }]);
+        }
+        
+        // Match zone and tag after they are fetched in fetchData
       }
+    } catch (error) {
+      console.error("Error fetching post for edit:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -62,8 +88,21 @@ export default function PostScreen() {
     const { data: tData } = await supabase.from('rtags').select('*').order('name');
     setZones(zData || []);
     setTags(tData || []);
-    // Default to Town Centre if available
-    if (zData) {
+    
+    if (postId) {
+      // Re-fetch post to ensure we have IDs for zone/tag matching
+      const { data: post } = await supabase.from('rposts').select('zone_id, tag_id').eq('id', postId).single();
+      if (post) {
+        if (zData && post.zone_id) {
+          const zone = zData.find(z => z.id === post.zone_id);
+          if (zone) setSelectedZone(zone);
+        }
+        if (tData && post.tag_id) {
+          const tag = tData.find(t => t.id === post.tag_id);
+          if (tag) setSelectedTag(tag);
+        }
+      }
+    } else if (zData) {
       const townCentre = zData.find(z => z.slug === 'town-centre');
       if (townCentre) setSelectedZone(townCentre);
     }
@@ -124,6 +163,13 @@ export default function PostScreen() {
         
         for (const img of images) {
           setUploadProgress(0.1 + (currentIdx / images.length) * 0.8);
+          
+          if (img.fromRemote) {
+            imageUrls.push(img.uri);
+            currentIdx++;
+            continue;
+          }
+
           const fileExt = img.uri.split('.').pop()?.toLowerCase() || 'jpg';
           const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
           const filePath = `${fileName}`;
@@ -162,7 +208,7 @@ export default function PostScreen() {
 
         setUploadProgress(0.9);
 
-        const { error } = await supabase.from('rposts').insert({
+        const postData = {
           title: title.trim() || text.substring(0, 50),
           text: text.trim(),
           zone_id: selectedZone?.id,
@@ -172,12 +218,27 @@ export default function PostScreen() {
           is_anonymous: isAnonymous,
           image_url: imageUrls.length > 0 ? imageUrls[0] : null,
           image_urls: imageUrls,
-          expires_at: new Date(Date.now() + 86400000).toISOString(), // 24 hours
           moderation_status: moderation.status,
           moderation_reason: moderation.reason,
-        });
+          updated_at: new Date().toISOString(),
+        };
 
-        if (error) throw error;
+        let result;
+        if (postId) {
+          result = await supabase
+            .from('rposts')
+            .update(postData)
+            .eq('id', postId);
+        } else {
+          result = await supabase
+            .from('rposts')
+            .insert({
+              ...postData,
+              expires_at: new Date(Date.now() + 86400000).toISOString(), // 24 hours
+            });
+        }
+
+        if (result.error) throw result.error;
         setUploadProgress(1);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         setStep('success');
@@ -230,7 +291,7 @@ export default function PostScreen() {
                 <X size={24} color="#FFFFFF" />
               </TouchableOpacity>
               <View style={{ flex: 1, alignItems: 'center' }}>
-                <Text style={styles.headerTitle}>NEW POST</Text>
+                <Text style={styles.headerTitle}>{postId ? 'EDIT POST' : 'NEW POST'}</Text>
                 {loading && (
                   <View style={styles.progressContainer}>
                     <View style={[styles.progressBar, { width: `${uploadProgress * 100}%` }]} />
@@ -243,7 +304,7 @@ export default function PostScreen() {
                 style={[styles.headerButton, { opacity: (!text || !selectedTag || loading) ? 0.3 : 1 }]}
               >
                 <Text style={styles.postActionText}>
-                  {loading ? "..." : "POST"}
+                  {loading ? "..." : (postId ? "UPDATE" : "POST")}
                 </Text>
               </TouchableOpacity>
             </View>

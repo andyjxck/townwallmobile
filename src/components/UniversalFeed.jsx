@@ -294,6 +294,11 @@ export default function UniversalFeed() {
     );
   };
 
+    const handleEditPost = (post) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      router.push(`/post?id=${post.id}`);
+    };
+
     const handleShare = async (post) => {
       try {
         const result = await Share.share({
@@ -483,15 +488,16 @@ export default function UniversalFeed() {
         <FlatList
           data={posts}
             renderItem={({ item }) => (
-                <PostItem 
-                  item={item} 
-                  deviceId={deviceId} 
-                  onReaction={handleReaction} 
-                  onDelete={handleDeletePost}
-                  onMute={handleMuteUser}
-                  onShare={handleShare}
-                  user={user}
-                />
+                  <PostItem 
+                    item={item} 
+                    deviceId={deviceId} 
+                    onReaction={handleReaction} 
+                    onDelete={handleDeletePost}
+                    onMute={handleMuteUser}
+                    onShare={handleShare}
+                    onEdit={handleEditPost}
+                    user={user}
+                  />
             )}
           keyExtractor={(item) => item.id.toString()}
           refreshControl={
