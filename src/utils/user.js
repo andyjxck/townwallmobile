@@ -1,6 +1,7 @@
 import { supabase } from "./supabase";
 import { getDeviceId } from "./deviceId";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Purchases from 'react-native-purchases';
 
 const USER_DATA_KEY = "@redditch_user_data";
 
@@ -33,6 +34,15 @@ export const initUser = async () => {
       throw error;
     }
 
+    // Sync with RevenueCat
+    if (ruser?.id) {
+      try {
+        await Purchases.logIn(ruser.id.toString());
+      } catch (e) {
+        console.error("RevenueCat login error:", e);
+      }
+    }
+
     await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(ruser));
     return ruser;
   } catch (error) {
@@ -57,8 +67,10 @@ export const logoutUser = async () => {
         .update({ device_id: null })
         .eq('id', userData.id);
     }
+    // Logout from RevenueCat
+    await Purchases.logOut();
   } catch (e) {
-    console.error("Error during logout disassociation:", e);
+    console.error("Error during logout:", e);
   }
   await AsyncStorage.removeItem(USER_DATA_KEY);
   await supabase.auth.signOut();
