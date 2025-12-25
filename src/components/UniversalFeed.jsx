@@ -176,64 +176,56 @@ export default function UniversalFeed() {
       if (!isRefreshing) setLoading(true);
       setLastError(null);
       try {
-            // Primary robust query (matching Profile.jsx success pattern)
-            let query = supabase
-              .from('rposts')
-              .select(`
-                *,
-                rusers (username, emoji_icon, avatar_url),
-                rzones (name),
-                rtags (name),
-                rreactions (reaction_type, device_id)
-              `)
-              .eq('is_deleted', false);
+        let query = supabase
+          .from('rposts')
+          .select(`
+            *,
+            rusers (username, emoji_icon, avatar_url),
+            rzones (name),
+            rtags (name),
+            rreactions (reaction_type, device_id)
+          `)
+          .eq('is_deleted', false);
 
-            console.log("Fetching posts with filters:", { selectedZone, selectedTag, sortBy });
+        if (selectedZone) {
+          query = query.eq('zone_id', selectedZone);
+        }
+        if (selectedTag) {
+          query = query.eq('tag_id', selectedTag);
+        }
 
-          if (selectedZone) {
-            query = query.eq('zone_id', selectedZone);
-          }
-          if (selectedTag) {
-            query = query.eq('tag_id', selectedTag);
-          }
+        if (sortBy === 'oldest') {
+          query = query.order('created_at', { ascending: true });
+        } else {
+          query = query.order('created_at', { ascending: false });
+        }
 
-          if (sortBy === 'popular') {
-            // Simple sorting by created_at for now as a fallback
-            query = query.order('created_at', { ascending: false });
-          } else if (sortBy === 'oldest') {
-            query = query.order('created_at', { ascending: true });
+        const { data, error } = await query.limit(50);
+        
+        if (error) {
+          console.error("Feed error:", error);
+          // Try an absolute bare-bones fallback if the complex one fails
+          const { data: fallback, error: fbError } = await supabase
+            .from('rposts')
+            .select('id, title, text, created_at, user_id, zone_id, tag_id')
+            .eq('is_deleted', false)
+            .order('created_at', { ascending: false })
+            .limit(20);
+          
+          if (fallback && !fbError) {
+            setPosts(fallback);
+            setLastError(`Note: Showing simplified feed (${error.message})`);
           } else {
-            query = query.order('created_at', { ascending: false });
+            setLastError(fbError?.message || error.message);
+            setPosts([]);
           }
-
-            const { data, error } = await supabase
-              .from('rposts')
-              .select(`
-                *,
-                rusers (username, emoji_icon, avatar_url),
-                rzones (name),
-                rtags (name),
-                rreactions (reaction_type, device_id)
-              `)
-              .eq('is_deleted', false)
-              .order('created_at', { ascending: sortBy !== 'oldest' })
-              .limit(50);
-            
-            if (error) {
-              console.error("Feed error:", error);
-              setLastError(error.message);
-              // Fail-safe simple query
-              const { data: fallback } = await supabase.from('rposts').select('*').limit(20);
-              setPosts(fallback || []);
-            } else {
-              // Apply manual client-side filtering if needed, but for now just set data
-              let filtered = data || [];
-              if (selectedZone) filtered = filtered.filter(p => p.zone_id === selectedZone);
-              if (selectedTag) filtered = filtered.filter(p => p.tag_id === selectedTag);
-              setPosts(filtered);
-            }
-      } catch (error) {
-        setLastError(error.message);
+        } else {
+          setPosts(data || []);
+          setLastError(null);
+        }
+      } catch (err) {
+        console.error("Fetch catch:", err);
+        setLastError(err.message);
       } finally {
         setLoading(false);
         setRefreshing(false);
