@@ -170,7 +170,7 @@ export default function PostScreen() {
         // AI Moderation
         const moderation = await moderateContent(`${title}\n${text}`);
         if (moderation.status === 'rejected') {
-          alert(`Your post was rejected by our AI moderator: ${moderation.reason}`);
+          alert(`Your post does not meet community standards: ${moderation.reason}`);
           setLoading(false);
           return;
         }

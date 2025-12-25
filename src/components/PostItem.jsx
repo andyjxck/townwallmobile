@@ -141,11 +141,11 @@ import { TextInput } from "react-native-gesture-handler";
         return;
       }
       
-      const moderation = await moderateContent(commentText.trim());
-      if (moderation.status === 'rejected') {
-        alert(`Your comment was rejected by our AI moderator: ${moderation.reason}`);
-        return;
-      }
+        const moderation = await moderateContent(commentText.trim());
+        if (moderation.status === 'rejected') {
+          alert(`Your comment does not meet community standards: ${moderation.reason}`);
+          return;
+        }
 
       const { data, error } = await supabase
         .from('rcomments')

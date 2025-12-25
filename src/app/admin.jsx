@@ -40,13 +40,13 @@ export default function ModerationAdmin() {
   const [transcripts, setTranscripts] = useState({});
   const [replyText, setReplyText] = useState('');
 
-  const TABS = [
-    { id: 'talent', label: 'TALENT', icon: Star },
-    { id: 'help', label: 'HELP CHATS', icon: MessageSquare },
-    { id: 'business', label: 'BUSINESS', icon: Briefcase },
-    { id: 'ai', label: 'AI HELD', icon: Bot },
-    { id: 'news', label: 'FAKE NEWS', icon: Flag },
-  ];
+    const TABS = [
+      { id: 'talent', label: 'TALENT', icon: Star },
+      { id: 'help', label: 'HELP CHATS', icon: MessageSquare },
+      { id: 'business', label: 'BUSINESS', icon: Briefcase },
+      { id: 'ai', label: 'HELD', icon: AlertCircle },
+      { id: 'news', label: 'FAKE NEWS', icon: Flag },
+    ];
 
   if (isSuperAdmin) {
     TABS.push({ id: 'logs', label: 'ADMIN LOGS', icon: Shield });

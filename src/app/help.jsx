@@ -291,15 +291,15 @@ export default function HelpContact() {
                       <MessageSquare size={12} color="#FFF" />
                     </View>
                   )}
-                  <View style={[
-                    styles.messageBubble, 
-                    isMine ? styles.myMessage : styles.theirMessage,
-                    isResolved && { borderLeftWidth: 4, borderLeftColor: '#10B981' }
-                  ]}>
-                    {!isMine && <Text style={styles.adminLabel}>AI ASSISTANT</Text>}
-                    <Text style={[styles.messageText, { color: isMine ? '#000000' : '#FFFFFF' }]}>
-                      {item.content}
-                    </Text>
+                    <View style={[
+                      styles.messageBubble, 
+                      isMine ? styles.myMessage : styles.theirMessage,
+                      isResolved && { borderLeftWidth: 4, borderLeftColor: '#10B981' }
+                    ]}>
+                      {!isMine && <Text style={styles.adminLabel}>TOWNWALL ASSISTANT</Text>}
+                      <Text style={[styles.messageText, { color: isMine ? '#000000' : '#FFFFFF' }]}>
+                        {item.content}
+                      </Text>
                     <View style={styles.messageFooter}>
                       <Text style={[styles.messageTime, { color: isMine ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.3)' }]}>
                         {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
