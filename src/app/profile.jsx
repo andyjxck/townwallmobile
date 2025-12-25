@@ -146,9 +146,9 @@ export default function Profile() {
                     is_anonymous, 
                     moderation_status,
                     is_deleted,
-                    user:user_id (username, emoji_icon, avatar_url),
-                    zone:zone_id (name),
-                    tag:tag_id (name),
+                    user:rusers!user_id (username, emoji_icon, avatar_url),
+                    zone:rzones!zone_id (name),
+                    tag:rtags!tag_id (name),
                     reactions:rreactions (reaction_type, device_id)
                   `)
                 .in('user_id', [userData.id, ...friendIds])

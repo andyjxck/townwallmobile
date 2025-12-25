@@ -135,26 +135,26 @@ export default function ZoneFeed({ zoneSlug, zoneName }) {
       
       if (!zoneData) return;
 
-              const { data, error } = await supabase
-                .from('rposts')
-                .select(`
-                  id, 
-                  title, 
-                  text, 
-                  created_at, 
-                  user_id, 
-                  zone_id, 
-                  tag_id, 
-                  image_url, 
-                  image_urls, 
-                  is_anonymous, 
-                  moderation_status,
-                  is_deleted,
-                  tag:tag_id (name),
-                  zone:zone_id (name),
-                  user:user_id (username, emoji_icon, avatar_url),
-                  reactions:rreactions (reaction_type, device_id)
-                `)
+                const { data, error } = await supabase
+                  .from('rposts')
+                  .select(`
+                    id, 
+                    title, 
+                    text, 
+                    created_at, 
+                    user_id, 
+                    zone_id, 
+                    tag_id, 
+                    image_url, 
+                    image_urls, 
+                    is_anonymous, 
+                    moderation_status,
+                    is_deleted,
+                    tag:rtags!tag_id (name),
+                    zone:rzones!zone_id (name),
+                    user:rusers!user_id (username, emoji_icon, avatar_url),
+                    reactions:rreactions (reaction_type, device_id)
+                  `)
               .eq('zone_id', zoneData.id)
               .eq('is_deleted', false)
               .order('created_at', { ascending: false });
@@ -267,7 +267,7 @@ export default function ZoneFeed({ zoneSlug, zoneName }) {
 
       {/* Feed */}
       <FlatList
-        ListHeaderComponent={<BannerAd />}
+        ListHeaderComponent={null}
         data={posts}
         renderItem={({ item }) => (
               <PostItem
