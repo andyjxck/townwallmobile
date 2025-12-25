@@ -192,12 +192,22 @@ export default function UniversalFeed() {
         else if (sortBy === 'popular') query = query.order('created_at', { ascending: false }); // Fallback since reaction_count doesn't exist
 
         const { data, error } = await query;
-        if (error) throw error;
-
-        setPosts(data || []);
+        if (error) {
+          console.error("Query failed, trying fallback:", error);
+          const fallback = await supabase
+            .from('rposts')
+            .select('*')
+            .eq('is_deleted', false)
+            .order('created_at', { ascending: false });
+          if (fallback.error) throw fallback.error;
+          setPosts(fallback.data || []);
+        } else {
+          setPosts(data || []);
+        }
       } catch (error) {
-      console.error("Error fetching posts:", error);
-    } finally {
+        console.error("Error fetching posts:", error);
+        Alert.alert("Feed Error", "Could not load posts. Please try again later.");
+      } finally {
       setLoading(false);
       setRefreshing(false);
     }
