@@ -45,7 +45,29 @@ export default function ZoneFeed({ zoneSlug, zoneName }) {
   useEffect(() => {
     getDeviceId().then(setDeviceId);
     checkModerator();
-  }, []);
+
+    const setupRealtimeSubscriptions = async () => {
+      // Posts & Reactions Subscription
+      const postsSub = supabase
+        .channel(`public:rposts:zone:${zoneSlug}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'rposts' }, (payload) => {
+          fetchPosts();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'rreactions' }, (payload) => {
+          fetchPosts();
+        })
+        .subscribe();
+
+      return postsSub;
+    };
+
+    let sub;
+    setupRealtimeSubscriptions().then(s => sub = s);
+
+    return () => {
+      if (sub) supabase.removeChannel(sub);
+    };
+  }, [zoneSlug, fetchPosts]);
 
   const checkModerator = async () => {
     const user = await getStoredUser();

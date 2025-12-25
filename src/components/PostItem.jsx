@@ -59,11 +59,28 @@ import PollComponent from "./PollComponent";
     player.loop = true;
   });
 
-  useEffect(() => {
-    if (isExpanded) {
-      fetchComments();
-    }
-  }, [isExpanded]);
+    useEffect(() => {
+      let sub;
+      if (isExpanded) {
+        fetchComments();
+        
+        sub = supabase
+          .channel(`post_comments_${item.id}`)
+          .on('postgres_changes', { 
+            event: '*', 
+            schema: 'public', 
+            table: 'rcomments', 
+            filter: `post_id=eq.${item.id}` 
+          }, () => {
+            fetchComments();
+          })
+          .subscribe();
+      }
+      return () => {
+        if (sub) supabase.removeChannel(sub);
+      };
+    }, [isExpanded, item.id]);
+
 
   useEffect(() => {
     checkIfSaved();

@@ -36,6 +36,17 @@ export default function LocalTalent() {
 
   useEffect(() => {
     fetchTalents();
+
+    const channel = supabase
+      .channel('rtalent_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'rtalent' }, () => {
+        fetchTalents();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchTalents = async () => {

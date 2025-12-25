@@ -39,8 +39,8 @@ export function BannerAd() {
 
   const unitId =
     Platform.OS === "ios"
-      ? "ca-app-pub-3940256099942544/2934735716"
-      : "ca-app-pub-3940256099942544/6300978111";
+      ? "ca-app-pub-1505977777207758/8766030770"
+      : "ca-app-pub-1505977777207758/8766030770";
 
   return (
     <AdMobBanner

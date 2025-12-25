@@ -76,6 +76,45 @@ export default function Profile() {
   useEffect(() => {
     getDeviceId().then(setDeviceId);
     loadData();
+
+    const setupRealtimeSubscriptions = async () => {
+      const currentUser = await getStoredUser();
+      if (!currentUser) return;
+
+      const channel = supabase
+        .channel(`profile_${currentUser.id}`)
+        // 1. User updates
+        .on('postgres_changes', { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'rusers', 
+          filter: `id=eq.${currentUser.id}` 
+        }, (payload) => {
+          setUser(payload.new);
+          setBioText(payload.new.bio || "");
+        })
+        // 2. Posts & Reactions (for list and stats)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'rposts' }, () => loadData())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'rreactions' }, () => loadData())
+        // 3. Friends
+        .on('postgres_changes', { 
+          event: '*', 
+          schema: 'public', 
+          table: 'friends'
+        }, () => loadData())
+        // 4. Comments (for replies)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'rcomments' }, () => loadData())
+        .subscribe();
+
+      return channel;
+    };
+
+    let sub;
+    setupRealtimeSubscriptions().then(s => sub = s);
+
+    return () => {
+      if (sub) supabase.removeChannel(sub);
+    };
   }, []);
 
   const loadData = async () => {

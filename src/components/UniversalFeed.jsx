@@ -105,41 +105,62 @@ export default function UniversalFeed() {
   const [unreadCount, setUnreadCount] = useState(0);
   const shareRef = useRef();
 
-  useEffect(() => {
-    getDeviceId().then(setDeviceId);
-    fetchFilterData();
-    checkModerator();
-    loadUnreadCount();
+    useEffect(() => {
+      getDeviceId().then(setDeviceId);
+      fetchFilterData();
+      checkModerator();
+      loadUnreadCount();
+  
+      const setupRealtimeSubscriptions = async () => {
+        const currentUser = await getStoredUser();
+        
+        // 1. Notification Subscription
+        let notificationSub;
+        if (currentUser) {
+          notificationSub = supabase
+            .channel(`notifications_${currentUser.id}`)
+            .on('postgres_changes', 
+              { 
+                event: 'INSERT', 
+                schema: 'public', 
+                table: 'rnotifications',
+                filter: `user_id=eq.${currentUser.id}`
+              }, 
+              () => {
+                loadUnreadCount();
+              }
+            )
+            .subscribe();
+        }
+  
+        // 2. Posts & Reactions Subscription
+        const postsSub = supabase
+          .channel('public:rposts')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'rposts' }, (payload) => {
+            // If it's a new post or a post update, we re-fetch to get nested relations
+            // Refetching is safer to ensure we have user info, zone info, etc.
+            fetchPosts(true);
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'rreactions' }, (payload) => {
+            // Reactions changed, refresh feed to show latest counts
+            fetchPosts(true);
+          })
+          .subscribe();
+  
+        return { notificationSub, postsSub };
+      };
+  
+      let subs;
+      setupRealtimeSubscriptions().then(s => subs = s);
+  
+      return () => {
+        if (subs) {
+          if (subs.notificationSub) supabase.removeChannel(subs.notificationSub);
+          if (subs.postsSub) supabase.removeChannel(subs.postsSub);
+        }
+      };
+    }, [selectedZone, selectedTag, sortBy]); // Re-subscribe when filters change if using filters in channel, but here we just refetch
 
-    const setupNotificationSubscription = async () => {
-      const currentUser = await getStoredUser();
-      if (!currentUser) return;
-
-      const subscription = supabase
-        .channel(`notifications_${currentUser.id}`)
-        .on('postgres_changes', 
-          { 
-            event: 'INSERT', 
-            schema: 'public', 
-            table: 'rnotifications',
-            filter: `user_id=eq.${currentUser.id}`
-          }, 
-          () => {
-            loadUnreadCount();
-          }
-        )
-        .subscribe();
-
-      return subscription;
-    };
-
-    let sub;
-    setupNotificationSubscription().then(s => sub = s);
-
-    return () => {
-      if (sub) supabase.removeChannel(sub);
-    };
-  }, []);
 
   const loadUnreadCount = async () => {
     const user = await getStoredUser();

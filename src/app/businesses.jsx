@@ -39,6 +39,17 @@ export default function LocalBusinesses() {
 
   useEffect(() => {
     fetchBusinesses();
+
+    const channel = supabase
+      .channel('rbusinesses_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'rbusinesses' }, () => {
+        fetchBusinesses();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
     const fetchBusinesses = async () => {

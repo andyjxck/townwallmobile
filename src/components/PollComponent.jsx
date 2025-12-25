@@ -20,6 +20,30 @@ export default function PollComponent({ pollId, onVoteChange }) {
 
   useEffect(() => {
     loadPollData();
+
+    const channel = supabase
+      .channel(`poll_${pollId}`)
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'rpoll_votes', 
+        filter: `poll_id=eq.${pollId}` 
+      }, () => {
+        loadPollData();
+      })
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'rpolls', 
+        filter: `id=eq.${pollId}` 
+      }, () => {
+        loadPollData();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [pollId]);
 
   const loadPollData = async () => {
