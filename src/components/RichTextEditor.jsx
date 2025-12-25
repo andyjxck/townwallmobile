@@ -158,16 +158,20 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 400 }
 
   const handleHeaderSelect = (header) => {
     setCurrentHeader(header);
-    if (header === 'p') {
-      richText.current?.executeAction('formatBlock', 'P');
-    } else {
-      richText.current?.executeAction(header);
+    if (header === 'h1') {
+      richText.current?.executeAction(actions.heading1);
+    } else if (header === 'h2') {
+      richText.current?.executeAction(actions.heading2);
+    } else if (header === 'h3') {
+      richText.current?.executeAction(actions.heading3);
+    } else if (header === 'p') {
+      richText.current?.executeAction(actions.setParagraph);
     }
   };
 
   const handleColorSelect = (color) => {
     richText.current?.prepareCursor();
-    richText.current?.executeAction('foreColor', color);
+    richText.current?.executeAction(actions.foreColor, color);
     setShowColorPicker(false);
   };
 
@@ -186,25 +190,25 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 400 }
           
           <View style={styles.separator} />
 
-          <RichToolbar
-            editor={richText}
-            actions={[
-              actions.setBold,
-              actions.setItalic,
-              actions.setUnderline,
-              'foreColor',
-            ]}
-            iconMap={{
-              [actions.setBold]: ({ tintColor }) => <Bold size={18} color={tintColor} />,
-              [actions.setItalic]: ({ tintColor }) => <Italic size={18} color={tintColor} />,
-              [actions.setUnderline]: ({ tintColor }) => <Underline size={18} color={tintColor} />,
-              foreColor: ({ tintColor }) => <Palette size={18} color={tintColor} />,
-            }}
-            onPressAction={(action) => {
-              if (action === 'foreColor') {
-                setShowColorPicker(!showColorPicker);
-              }
-            }}
+            <RichToolbar
+              editor={richText}
+              actions={[
+                actions.setBold,
+                actions.setItalic,
+                actions.setUnderline,
+                actions.foreColor,
+              ]}
+              iconMap={{
+                [actions.setBold]: ({ tintColor }) => <Bold size={18} color={tintColor} />,
+                [actions.setItalic]: ({ tintColor }) => <Italic size={18} color={tintColor} />,
+                [actions.setUnderline]: ({ tintColor }) => <Underline size={18} color={tintColor} />,
+                [actions.foreColor]: ({ tintColor }) => <Palette size={18} color={tintColor} />,
+              }}
+              onPressAction={(action) => {
+                if (action === actions.foreColor) {
+                  setShowColorPicker(!showColorPicker);
+                }
+              }}
             style={styles.subToolbar}
             flatContainerStyle={styles.flatStyle}
             selectedIconTint="#007AFF"
@@ -233,19 +237,23 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 400 }
 
           <View style={styles.separator} />
 
-          <RichToolbar
-            editor={richText}
-            actions={[
-              actions.insertBulletsList,
-              actions.insertOrderedList,
-              'insertImage',
-            ]}
-            iconMap={{
-              [actions.insertBulletsList]: ({ tintColor }) => <List size={18} color={tintColor} />,
-              [actions.insertOrderedList]: ({ tintColor }) => <ListOrdered size={18} color={tintColor} />,
-              insertImage: ({ tintColor }) => <ImageIcon size={18} color={tintColor} />,
-            }}
-            insertImage={onInsertImage}
+            <RichToolbar
+              editor={richText}
+              actions={[
+                actions.insertBulletsList,
+                actions.insertOrderedList,
+                actions.insertImage,
+              ]}
+              iconMap={{
+                [actions.insertBulletsList]: ({ tintColor }) => <List size={18} color={tintColor} />,
+                [actions.insertOrderedList]: ({ tintColor }) => <ListOrdered size={18} color={tintColor} />,
+                [actions.insertImage]: ({ tintColor }) => <ImageIcon size={18} color={tintColor} />,
+              }}
+              onPressAction={(action) => {
+                if (action === actions.insertImage) {
+                  onInsertImage();
+                }
+              }}
             style={styles.subToolbar}
             flatContainerStyle={styles.flatStyle}
             selectedIconTint="#007AFF"
