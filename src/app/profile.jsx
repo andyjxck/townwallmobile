@@ -36,7 +36,7 @@ import {
 } from "lucide-react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import * as Haptics from "expo-haptics";
 import { decode } from "base64-arraybuffer";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -259,11 +259,10 @@ export default function Profile() {
         if (updateError) throw updateError;
         setShowEmojiPicker(false);
         loadData();
-      } catch (error) {
-        Alert.alert("Error", "Failed to upload avatar.");
-      } finally {
-        setLoading(false);
-      }
+        } catch (error) {
+          console.error("Avatar upload error:", error);
+          Alert.alert("Error", "Failed to upload avatar.");
+        }
     }
   };
 
@@ -301,11 +300,10 @@ export default function Profile() {
 
         if (updateError) throw updateError;
         loadData();
-      } catch (error) {
-        Alert.alert("Error", "Failed to upload cover photo. Make sure 'covers' bucket exists.");
-      } finally {
-        setUploadingCover(false);
-      }
+        } catch (error) {
+          console.error("Cover upload error:", error);
+          Alert.alert("Error", "Failed to upload cover photo. Make sure 'covers' bucket exists.");
+        }
     }
   };
 
