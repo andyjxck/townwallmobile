@@ -696,3 +696,4 @@ function getTimeAgo(date) {
   if (seconds < 86400) return `${Math.floor(seconds / 3600)}H`;
   return `${Math.floor(seconds / 86400)}D`;
 }
+
