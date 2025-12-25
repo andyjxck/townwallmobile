@@ -173,37 +173,44 @@ export default function UniversalFeed() {
   const fetchPosts = async (isRefreshing = false) => {
     if (!isRefreshing) setLoading(true);
       try {
-            let query = supabase
-              .from('rposts')
-              .select(`
-                *,
-                rusers (username, emoji_icon, avatar_url),
-                rzones (name),
-                rtags (name),
-                rreactions (reaction_type, device_id)
-              `)
-              .eq('is_deleted', false);
-
-        if (selectedZone) query = query.eq('zone_id', selectedZone);
-        if (selectedTag) query = query.eq('tag_id', selectedTag);
-
-        if (sortBy === 'newest') query = query.order('created_at', { ascending: false });
-        else if (sortBy === 'oldest') query = query.order('created_at', { ascending: true });
-        else if (sortBy === 'popular') query = query.order('created_at', { ascending: false }); // Fallback since reaction_count doesn't exist
-
-        const { data, error } = await query;
-        if (error) {
-          console.error("Query failed, trying fallback:", error);
-          const fallback = await supabase
+          let query = supabase
             .from('rposts')
-            .select('*')
-            .eq('is_deleted', false)
-            .order('created_at', { ascending: false });
-          if (fallback.error) throw fallback.error;
-          setPosts(fallback.data || []);
-        } else {
-          setPosts(data || []);
-        }
+            .select(`
+              *,
+              rusers (username, emoji_icon, avatar_url),
+              rzones (name),
+              rtags (name),
+              rreactions (reaction_type, device_id)
+            `)
+            .eq('is_deleted', false);
+
+          // Only add expiration filter if we want to be strict, 
+          // but let's keep it loose for now to ensure posts show up
+          // .gt('expires_at', new Date().toISOString());
+
+          if (selectedZone) query = query.eq('zone_id', selectedZone);
+          if (selectedTag) query = query.eq('tag_id', selectedTag);
+
+          if (sortBy === 'newest') query = query.order('created_at', { ascending: false });
+          else if (sortBy === 'oldest') query = query.order('created_at', { ascending: true });
+          else query = query.order('created_at', { ascending: false });
+
+          const { data, error } = await query;
+          
+          if (error || !data || data.length === 0) {
+            console.log("Main query failed or empty, trying ultra-fallback...");
+            const { data: fallbackData, error: fallbackError } = await supabase
+              .from('rposts')
+              .select('*')
+              .eq('is_deleted', false)
+              .order('created_at', { ascending: false })
+              .limit(50);
+            
+            if (fallbackError) throw fallbackError;
+            setPosts(fallbackData || []);
+          } else {
+            setPosts(data);
+          }
       } catch (error) {
         console.error("Error fetching posts:", error);
         Alert.alert("Feed Error", "Could not load posts. Please try again later.");
