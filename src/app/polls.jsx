@@ -605,8 +605,9 @@ export default function PollsScreen() {
         </ScrollView>
       </View>
     </View>
-  );
-}
+    </TouchableWithoutFeedback>
+    );
+  }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000000' },
