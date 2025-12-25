@@ -167,13 +167,6 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 400 }
             onSelect={handleListSelect}
           />
 
-          <ToolbarDropdown 
-            icon={Palette} 
-            type="color"
-            onSelect={handleColorSelect}
-            currentValue={currentColor}
-          />
-
           <View style={styles.separator} />
 
           <RichToolbar
