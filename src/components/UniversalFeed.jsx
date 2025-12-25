@@ -937,6 +937,8 @@ const styles = StyleSheet.create({
   },
 });
 
+export default UniversalFeed;
+
 function getTimeAgo(date) {
   const seconds = Math.floor((new Date() - date) / 1000);
   if (seconds < 60) return "NOW";
