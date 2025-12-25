@@ -175,53 +175,6 @@ export function NativeAd() {
     </NativeAdView>
   );
 }
-        <View style={styles.postContainer}>
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            <View style={{ flex: 1 }}>
-              <View style={[styles.postHeader, { gap: 8 }]}>
-                <IconView style={styles.adIcon} />
-                <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <AdvertiserView style={[styles.zoneText, { color: '#FFFFFF' }]} />
-                    <View style={styles.adSticker}>
-                      <Text style={styles.adStickerText}>SPONSORED</Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-
-              <HeadlineView style={[styles.postTitle, { color: '#FFFFFF' }]} />
-              <TaglineView style={[styles.postBody, { color: 'rgba(255, 255, 255, 0.6)', marginTop: 4, fontSize: 13 }]} numberOfLines={2} />
-            </View>
-
-            <ImageView
-              style={{ width: 80, height: 80, borderRadius: 8 }}
-            />
-          </View>
-
-          <View style={styles.actionRow}>
-            <View style={styles.actionButton}>
-              <Heart size={18} color="rgba(255,255,255,0.2)" />
-              <Text style={[styles.actionCount, { color: "rgba(255,255,255,0.2)" }]}>0</Text>
-            </View>
-            <View style={styles.actionButton}>
-              <Star size={18} color="rgba(255,255,255,0.2)" />
-              <Text style={[styles.actionCount, { color: "rgba(255,255,255,0.2)" }]}>0</Text>
-            </View>
-            
-            <CallToActionView
-              style={styles.inlineCta}
-              textStyle={styles.inlineCtaText}
-            />
-
-            <View style={{ flex: 1 }} />
-            <ShareIcon size={18} color="rgba(255,255,255,0.4)" />
-          </View>
-        </View>
-      )}
-    </NativeAdView>
-  );
-}
 
 const styles = StyleSheet.create({
   postContainer: {
