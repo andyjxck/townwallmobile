@@ -37,8 +37,11 @@ import { Image } from "expo-image";
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { getStoredUser } from "../utils/user";
 import { TextInput } from "react-native-gesture-handler";
+import RenderHtml from 'react-native-render-html';
+import { useWindowDimensions } from 'react-native';
 
   export default function PostItem({ item, deviceId, onReaction, onComment, onDelete, onMute, onShare, onEdit, user }) {
+    const { width } = useWindowDimensions();
     const [revealed, setRevealed] = useState(false);
     const [showFullImage, setShowFullImage] = useState(false);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -272,12 +275,33 @@ import { TextInput } from "react-native-gesture-handler";
                   {item.title || "Untitled Post"}
                 </Text>
                 
-                <Text 
-                  style={[styles.postBody, { color: 'rgba(255, 255, 255, 0.8)', marginTop: 8 }]} 
-                  numberOfLines={isExpanded ? undefined : 3}
-                >
-                  {item.text}
-                </Text>
+                  {isExpanded ? (
+                    <RenderHtml
+                      contentWidth={width - 40}
+                      source={{ html: item.text }}
+                      tagsStyles={{
+                        body: {
+                          color: 'rgba(255, 255, 255, 0.8)',
+                          fontSize: 14,
+                          lineHeight: 20,
+                        },
+                        p: {
+                          marginBottom: 8,
+                        },
+                        img: {
+                          borderRadius: 8,
+                          marginVertical: 10,
+                        }
+                      }}
+                    />
+                  ) : (
+                    <Text 
+                      style={[styles.postBody, { color: 'rgba(255, 255, 255, 0.8)', marginTop: 8 }]} 
+                      numberOfLines={3}
+                    >
+                      {item.text.replace(/<[^>]*>?/gm, '')}
+                    </Text>
+                  )}
               </TouchableOpacity>
             </View>
 

@@ -23,6 +23,7 @@ import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 
 import { LinearGradient } from "expo-linear-gradient";
+import { RichTextEditor } from "../components/RichTextEditor";
 
 export default function PostScreen() {
   const insets = useSafeAreaInsets();
@@ -384,14 +385,10 @@ export default function PostScreen() {
               style={styles.titleInput}
             />
 
-            <TextInput
-              multiline
-              placeholder="What's happening?"
-              placeholderTextColor="rgba(255,255,255,0.2)"
+            <RichTextEditor
               value={text}
-              onChangeText={setText}
-              maxLength={2000}
-              style={styles.bodyInput}
+              onChange={setText}
+              placeholder="What's happening?"
             />
 
             <ScrollView 
