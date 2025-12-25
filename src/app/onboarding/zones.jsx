@@ -1,37 +1,48 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   View,
   Text,
   TouchableOpacity,
   ScrollView,
   TextInput,
+  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 import { Search, Check } from "lucide-react-native";
 import { completeOnboarding } from "@/utils/onboarding";
+import { supabase } from "@/utils/supabase";
 import * as Haptics from "expo-haptics";
-
-const ZONES = [
-  { id: 1, name: "Astwood Bank & Feckenham" },
-  { id: 2, name: "Batchley & Brockhill" },
-  { id: 3, name: "Central" },
-  { id: 4, name: "Greenlands & Lakeside" },
-  { id: 5, name: "Headless Cross & Oakenshaw" },
-  { id: 6, name: "Matchborough & Woodrow" },
-  { id: 7, name: "North" },
-  { id: 8, name: "Webheath & Callow Hill" },
-  { id: 9, name: "Winyates" },
-];
 
 export default function ZonesScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [selectedZone, setSelectedZone] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [zones, setZones] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredZones = ZONES.filter((zone) =>
+  useEffect(() => {
+    fetchZones();
+  }, []);
+
+  const fetchZones = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('rzones')
+        .select('*')
+        .order('name');
+      if (error) throw error;
+      setZones(data || []);
+    } catch (error) {
+      console.error("Error fetching zones:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredZones = zones.filter((zone) =>
     zone.name.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 

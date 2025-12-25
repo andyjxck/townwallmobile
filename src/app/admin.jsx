@@ -1,36 +1,30 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert, ActivityIndicator, ScrollView, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert, ActivityIndicator, ScrollView, TextInput, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { 
   ChevronLeft, 
   Shield, 
   AlertCircle, 
-    CheckCircle, 
-    XCircle,
-    Trash2, 
-    Star, 
-    Briefcase, 
+  CheckCircle, 
+  XCircle,
+  Trash2, 
+  Star, 
+  Briefcase, 
   MessageSquare, 
   Bot, 
   Flag,
   Send,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  RefreshCw,
+  BarChart2,
+  Undo
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/utils/supabase';
 import { getStoredUser } from '@/utils/user';
 import { sendNotification } from '@/utils/notifications';
 import * as Haptics from 'expo-haptics';
-
-const TABS = [
-  { id: 'talent', label: 'TALENT', icon: Star },
-  { id: 'help', label: 'HELP CHATS', icon: MessageSquare },
-  { id: 'business', label: 'BUSINESS', icon: Briefcase },
-  { id: 'ai', label: 'AI HELD', icon: Bot },
-  { id: 'news', label: 'FAKE NEWS', icon: Flag },
-];
-
 import { LinearGradient } from "expo-linear-gradient";
 
 export default function ModerationAdmin() {
@@ -38,12 +32,26 @@ export default function ModerationAdmin() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [activeTab, setActiveTab] = useState('talent');
   const [data, setData] = useState([]);
+  const [analytics, setAnalytics] = useState(null);
   const [expandedChatId, setExpandedChatId] = useState(null);
   const [transcripts, setTranscripts] = useState({});
   const [replyText, setReplyText] = useState('');
-  const [replyingTo, setReplyingTo] = useState(null);
+
+  const TABS = [
+    { id: 'talent', label: 'TALENT', icon: Star },
+    { id: 'help', label: 'HELP CHATS', icon: MessageSquare },
+    { id: 'business', label: 'BUSINESS', icon: Briefcase },
+    { id: 'ai', label: 'AI HELD', icon: Bot },
+    { id: 'news', label: 'FAKE NEWS', icon: Flag },
+  ];
+
+  if (isSuperAdmin) {
+    TABS.push({ id: 'logs', label: 'ADMIN LOGS', icon: Shield });
+    TABS.push({ id: 'analytics', label: 'ANALYTICS', icon: BarChart2 });
+  }
 
   useEffect(() => {
     checkAdminStatus();
@@ -52,121 +60,20 @@ export default function ModerationAdmin() {
   useEffect(() => {
     if (isAdmin) {
       fetchData();
-      
-      // Subscribe to all new help messages for real-time updates in admin panel
-      const subscription = supabase
-        .channel('admin_help_updates')
-        .on('postgres_changes', { event: 'INSERT', table: 'rhelp_messages' }, payload => {
-          if (activeTab === 'help') {
-            fetchData(); // Refresh list to show new chats/messages
-          }
-          if (expandedChatId === payload.new.sender_id || expandedChatId === payload.new.receiver_id) {
-            fetchTranscript(expandedChatId);
-          }
-        })
-        .subscribe();
-
-      return () => {
-        subscription.unsubscribe();
-      };
     }
-  }, [activeTab, isAdmin, expandedChatId]);
-
-  const handleResolveTicket = async (userId) => {
-    try {
-      const { error } = await supabase
-        .from('rhelp_messages')
-        .update({ status: 'resolved' })
-        .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`);
-
-      if (error) throw error;
-      
-      await sendNotification({
-        userId: userId,
-        title: 'Support Ticket Resolved',
-        message: 'Your support ticket has been marked as resolved.',
-        type: 'help_chat',
-        link: '/support'
-      });
-
-      Alert.alert("Success", "Ticket marked as resolved.");
-      fetchData();
-      setExpandedChatId(null);
-    } catch (error) {
-      console.error(error);
-      Alert.alert("Error", "Failed to resolve ticket.");
-    }
-  };
-
-  const handleDeleteContent = async (item, contentType) => {
-    Alert.prompt(
-      "Delete Content",
-      "Enter reason for deletion:",
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Delete", 
-          style: "destructive",
-          onPress: async (reason) => {
-            if (!reason) {
-              Alert.alert("Error", "A reason is required.");
-              return;
-            }
-            try {
-              const admin = await getStoredUser();
-              let table = '';
-              if (contentType === 'talent') table = 'rtalent';
-              else if (contentType === 'business') table = 'rbusinesses';
-              else table = 'rposts';
-
-              const { error } = await supabase
-                .from(table)
-                .update({ 
-                  is_deleted: true, 
-                  deletion_reason: reason,
-                  deleted_by: admin.id 
-                })
-                .eq('id', item.id);
-
-              if (error) throw error;
-
-              // Log deletion
-              await supabase.from('rdeletion_logs').insert({
-                content_type: contentType,
-                content_id: item.id.toString(),
-                reason: reason,
-                deleted_by: admin.id
-              });
-
-              // Notify user
-              await sendNotification({
-                userId: item.user_id || item.sender_id,
-                title: 'Content Removed',
-                message: `Your ${contentType} was removed by a moderator: ${reason}`,
-                type: 'moderation',
-                link: '/profile'
-              });
-
-              setData(prev => prev.filter(i => i.id !== item.id));
-              Alert.alert("Success", "Content has been removed.");
-            } catch (error) {
-              console.error(error);
-              Alert.alert("Error", "Failed to delete content.");
-            }
-          }
-        }
-      ],
-      "plain-text"
-    );
-  };
+  }, [activeTab, isAdmin]);
 
   const checkAdminStatus = async () => {
     try {
       const user = await getStoredUser();
+      if (!user) {
+        router.replace('/auth');
+        return;
+      }
       const { data: userData, error } = await supabase
         .from('rusers')
-        .select('is_admin, is_moderator')
-        .eq('id', user?.id)
+        .select('is_admin, is_moderator, username')
+        .eq('id', user.id)
         .single();
       
       if (error) throw error;
@@ -177,7 +84,10 @@ export default function ModerationAdmin() {
         return;
       }
       
-      setIsAdmin(true); // Using isAdmin state to represent "Moderation Access"
+      setIsAdmin(true); 
+      if (userData.username === 'andysocial') {
+        setIsSuperAdmin(true);
+      }
     } catch (error) {
       console.error(error);
       setLoading(false);
@@ -212,7 +122,6 @@ export default function ModerationAdmin() {
           .order('created_at', { ascending: false });
         if (error) throw error;
         
-        // Group by user to show "chats"
         const uniqueChats = [];
         const seenUsers = new Set();
         help.forEach(msg => {
@@ -238,63 +147,75 @@ export default function ModerationAdmin() {
           .order('created_at', { ascending: false });
         if (error) throw error;
         result = news;
+      } else if (activeTab === 'logs' && isSuperAdmin) {
+        const { data: logsData, error } = await supabase
+          .from('rmoderation_logs')
+          .select(`*, moderator:rusers!rmoderation_logs_moderator_id_fkey(username)`)
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        result = logsData;
+      } else if (activeTab === 'analytics' && isSuperAdmin) {
+        const [users, posts, reactions, comments] = await Promise.all([
+          supabase.from('rusers').select('id', { count: 'exact', head: true }),
+          supabase.from('rposts').select('id', { count: 'exact', head: true }),
+          supabase.from('rreactions').select('id', { count: 'exact', head: true }),
+          supabase.from('rcomments').select('id', { count: 'exact', head: true })
+        ]);
+        setAnalytics({
+          users: users.count,
+          posts: posts.count,
+          reactions: reactions.count,
+          comments: comments.count
+        });
+        result = [];
       }
       setData(result || []);
     } catch (error) {
       console.error(error);
-      Alert.alert("Error", "Failed to fetch moderation data.");
+      Alert.alert("Error", "Failed to fetch data.");
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchTranscript = async (userId) => {
-    try {
-      const { data: messages, error } = await supabase
-        .from('rhelp_messages')
-        .select(`*, rusers!rhelp_messages_sender_id_fkey(username)`)
-        .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
-        .order('created_at', { ascending: true });
-      
-      if (error) throw error;
-      setTranscripts(prev => ({ ...prev, [userId]: messages }));
-    } catch (error) {
-      console.error(error);
-      Alert.alert("Error", "Failed to fetch transcript.");
-    }
-  };
-
-  const handleSendReply = async (userId) => {
-    if (!replyText.trim()) return;
+  const handleRestorePost = async (log) => {
+    if (log.target_type !== 'post') return;
     
-    try {
-      const admin = await getStoredUser();
-      const { error } = await supabase
-        .from('rhelp_messages')
-        .insert({
-          sender_id: admin.id,
-          receiver_id: userId,
-          content: replyText,
-          is_from_admin: true
-        });
+    Alert.alert(
+      "Restore Post",
+      "Are you sure you want to restore this post?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Restore", 
+          onPress: async () => {
+            try {
+              const { error } = await supabase
+                .from('rposts')
+                .update({ is_deleted: false, deletion_reason: null, deleted_by: null })
+                .eq('id', log.target_id);
+              
+              if (error) throw error;
+              
+              const admin = await getStoredUser();
+              await supabase.from('rmoderation_logs').insert({
+                moderator_id: admin.id,
+                target_id: log.target_id,
+                target_type: 'post',
+                action: 'restore_post',
+                reason: 'Restored by super admin'
+              });
 
-      if (error) throw error;
-      
-      await sendNotification({
-        userId: userId,
-        title: 'Support Message',
-        message: `Admin replied: ${replyText.substring(0, 50)}${replyText.length > 50 ? '...' : ''}`,
-        type: 'help_chat',
-        link: '/support'
-      });
-
-      setReplyText('');
-      fetchTranscript(userId);
-      Alert.alert("Success", "Reply sent.");
-    } catch (error) {
-      console.error(error);
-      Alert.alert("Error", "Failed to send reply.");
-    }
+              Alert.alert("Success", "Post has been restored.");
+              fetchData();
+            } catch (error) {
+              console.error(error);
+              Alert.alert("Error", "Failed to restore post.");
+            }
+          }
+        }
+      ]
+    );
   };
 
   const handleAction = async (itemId, action) => {
@@ -315,57 +236,48 @@ export default function ModerationAdmin() {
           moderation_status: action === 'approve' ? 'approved' : 'rejected',
           is_blurred: action === 'reject'
         };
-      } else if (activeTab === 'help') {
-        if (action === 'reject') {
-          const { error } = await supabase.from('rhelp_messages').delete().eq('id', itemId);
-          if (error) throw error;
-          setData(prev => prev.filter(p => p.id !== itemId));
-          return;
-        }
-        return;
       }
 
-      const { error } = await supabase
-        .from(table)
-        .update(updateData)
-        .eq('id', itemId);
-
+      const { error } = await supabase.from(table).update(updateData).eq('id', itemId);
       if (error) throw error;
       
-      const item = data.find(i => i.id === itemId);
-      if (item && item.user_id) {
-        let title = '';
-        let message = '';
-        
-        if (activeTab === 'talent') {
-          title = action === 'approve' ? 'Talent Approved' : 'Talent Rejected';
-          message = action === 'approve' ? `Your talent "${item.name}" has been approved!` : `Your talent "${item.name}" was not approved.`;
-        } else if (activeTab === 'business') {
-          title = action === 'approve' ? 'Business Approved' : 'Business Rejected';
-          message = action === 'approve' ? `Your business "${item.name}" has been approved!` : `Your business "${item.name}" was not approved.`;
-        } else {
-          title = action === 'approve' ? 'Post Approved' : 'Post Rejected';
-          message = action === 'approve' ? `Your post has been approved!` : `Your post was rejected for violating guidelines.`;
-        }
-
-        await sendNotification({
-          userId: item.user_id,
-          title,
-          message,
-          type: 'moderation',
-          link: '/profile'
-        });
-      }
-
       setData(prev => prev.filter(p => p.id !== itemId));
       Alert.alert("Success", `Item has been ${action}d.`);
     } catch (error) {
       console.error(error);
-      Alert.alert("Error", "Failed to perform action.");
+      Alert.alert("Error", "Action failed.");
     }
   };
 
   const renderItem = ({ item }) => {
+    if (activeTab === 'logs') {
+      return (
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.logAction}>{item.action.toUpperCase().replace('_', ' ')}</Text>
+            <Text style={styles.date}>{new Date(item.created_at).toLocaleString()}</Text>
+          </View>
+          <View style={styles.contentPadding}>
+            <Text style={styles.logDetail}>Moderator: @{item.moderator?.username}</Text>
+            <Text style={styles.logDetail}>Target: {item.target_type} (ID: {item.target_id})</Text>
+            <Text style={styles.logReason}>Reason: {item.reason}</Text>
+            
+            {item.action === 'delete_post' && item.target_type === 'post' && (
+              <TouchableOpacity 
+                style={styles.restoreButton}
+                onPress={() => handleRestorePost(item)}
+              >
+                <Undo size={16} color="#4ADE80" />
+                <Text style={styles.restoreText}>RESTORE POST</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      );
+    }
+
+    if (activeTab === 'analytics') return null;
+
     const Icon = TABS.find(t => t.id === activeTab)?.icon || Shield;
     
     return (
@@ -380,137 +292,22 @@ export default function ModerationAdmin() {
           <Text style={styles.date}>{new Date(item.created_at).toLocaleDateString()}</Text>
         </View>
 
-        {activeTab === 'talent' && (
-          <View style={styles.contentPadding}>
-            <Text style={styles.title}>{item.name}</Text>
-            <Text style={styles.subtitle}>{item.category} • {item.platform}</Text>
-            <Text style={styles.description}>{item.description}</Text>
-          </View>
-        )}
+        <View style={styles.contentPadding}>
+          {item.title && <Text style={styles.title}>{item.title}</Text>}
+          {item.name && <Text style={styles.title}>{item.name}</Text>}
+          <Text style={styles.description}>{item.text || item.description || item.content}</Text>
+        </View>
 
-        {activeTab === 'business' && (
-          <View style={styles.contentPadding}>
-            <Text style={styles.title}>{item.name}</Text>
-            <Text style={styles.subtitle}>{item.category}</Text>
-            <Text style={styles.description}>{item.description}</Text>
-            {item.website && <Text style={styles.link}>{item.website}</Text>}
-          </View>
-        )}
-
-          {activeTab === 'help' && (
-            <View style={styles.contentPadding}>
-              <View style={styles.helpStatusRow}>
-                <Text style={styles.messageContent}>{item.content}</Text>
-                {item.status === 'resolved' && (
-                  <View style={styles.resolvedBadge}>
-                    <CheckCircle size={10} color="#10B981" />
-                    <Text style={styles.resolvedText}>RESOLVED</Text>
-                  </View>
-                )}
-              </View>
-              
-              <View style={styles.helpActions}>
-                <TouchableOpacity 
-                  style={styles.transcriptButton}
-                  onPress={() => {
-                    if (expandedChatId === item.sender_id) {
-                      setExpandedChatId(null);
-                    } else {
-                      setExpandedChatId(item.sender_id);
-                      fetchTranscript(item.sender_id);
-                    }
-                  }}
-                >
-                  <Text style={styles.transcriptButtonText}>
-                    {expandedChatId === item.sender_id ? 'HIDE TRANSCRIPT' : 'SHOW TRANSCRIPT'}
-                  </Text>
-                  {expandedChatId === item.sender_id ? <ChevronUp size={16} color="#FFFFFF" /> : <ChevronDown size={16} color="#FFFFFF" />}
-                </TouchableOpacity>
-
-                {item.status !== 'resolved' && (
-                  <TouchableOpacity 
-                    style={[styles.transcriptButton, { marginLeft: 10, borderColor: '#10B981' }]}
-                    onPress={() => handleResolveTicket(item.sender_id)}
-                  >
-                    <CheckCircle size={16} color="#10B981" />
-                    <Text style={[styles.transcriptButtonText, { color: '#10B981' }]}>RESOLVE</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-
-            {expandedChatId === item.sender_id && (
-              <View style={styles.transcriptContainer}>
-                {transcripts[item.sender_id]?.map((msg) => (
-                  <View key={msg.id} style={[
-                    styles.transcriptMessage,
-                    msg.is_from_admin ? styles.adminMessage : styles.userMessage
-                  ]}>
-                    <Text style={styles.transcriptSender}>
-                      {msg.is_from_admin ? 'Admin' : `@${msg.rusers?.username}`}
-                    </Text>
-                    <Text style={styles.transcriptText}>{msg.content}</Text>
-                    <Text style={styles.transcriptTime}>
-                      {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </Text>
-                  </View>
-                ))}
-                
-                <View style={styles.replyBox}>
-                  <TextInput
-                    style={styles.replyInput}
-                    placeholder="Type a reply..."
-                    placeholderTextColor="rgba(255,255,255,0.3)"
-                    value={replyText}
-                    onChangeText={setReplyText}
-                    multiline
-                  />
-                  <TouchableOpacity 
-                    style={styles.sendButton}
-                    onPress={() => handleSendReply(item.sender_id)}
-                  >
-                    <Send size={20} color="#000000" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-          </View>
-        )}
-
-        {(activeTab === 'ai' || activeTab === 'news') && (
-          <View style={styles.contentPadding}>
-            <Text style={styles.title}>{item.title}</Text>
-            <Text style={styles.zone}>{item.rzones?.name}</Text>
-            <Text style={styles.description}>{item.text}</Text>
-          </View>
-        )}
-
-          {activeTab !== 'help' && (
-            <View style={styles.actionRow}>
-              <TouchableOpacity 
-                style={[styles.actionButton, styles.approveButton]} 
-                onPress={() => handleAction(item.id, 'approve')}
-              >
-                <CheckCircle size={18} color="#000000" />
-                <Text style={styles.actionText}>APPROVE</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.actionButton, styles.rejectButton]} 
-                onPress={() => handleAction(item.id, 'reject')}
-              >
-                <XCircle size={18} color="#FFFFFF" />
-                <Text style={[styles.actionText, { color: '#FFFFFF' }]}>REJECT</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={[styles.actionButton, { backgroundColor: 'transparent', borderLeftWidth: 1, borderLeftColor: 'rgba(255,255,255,0.1)', borderRadius: 0 }]} 
-                onPress={() => handleDeleteContent(item, activeTab)}
-              >
-                <Trash2 size={18} color="#EF4444" />
-                <Text style={[styles.actionText, { color: '#EF4444' }]}>DELETE</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+        <View style={styles.actionRow}>
+          <TouchableOpacity style={[styles.actionButton, styles.approveButton]} onPress={() => handleAction(item.id, 'approve')}>
+            <CheckCircle size={18} color="#000000" />
+            <Text style={styles.actionText}>APPROVE</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.actionButton, styles.rejectButton]} onPress={() => handleAction(item.id, 'reject')}>
+            <XCircle size={18} color="#FFFFFF" />
+            <Text style={[styles.actionText, { color: '#FFFFFF' }]}>REJECT</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   };
@@ -519,18 +316,15 @@ export default function ModerationAdmin() {
 
   return (
     <View style={styles.container}>
-      <LinearGradient
-        colors={['#0F172A', '#000000', '#000000']}
-        style={StyleSheet.absoluteFill}
-      />
+      <LinearGradient colors={['#0F172A', '#000000', '#000000']} style={StyleSheet.absoluteFill} />
       <View style={{ paddingTop: insets.top, flex: 1 }}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <ChevronLeft color="#FFFFFF" size={28} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>MODERATION</Text>
+          <Text style={styles.headerTitle}>{isSuperAdmin ? 'SUPER ADMIN' : 'MODERATION'}</Text>
           <TouchableOpacity onPress={fetchData} style={styles.backButton}>
-            <AlertCircle color="#FFFFFF" size={24} />
+            <RefreshCw color="#FFFFFF" size={24} />
           </TouchableOpacity>
         </View>
 
@@ -549,19 +343,24 @@ export default function ModerationAdmin() {
                   }}
                 >
                   <Icon size={14} color={isActive ? '#000000' : 'rgba(255,255,255,0.4)'} />
-                  <Text style={[styles.tabText, isActive && styles.activeTabText]}>
-                    {tab.label}
-                  </Text>
+                  <Text style={[styles.tabText, isActive && styles.activeTabText]}>{tab.label}</Text>
                 </TouchableOpacity>
               );
             })}
           </ScrollView>
         </View>
 
-        {loading ? (
-          <View style={styles.centered}>
-            <ActivityIndicator color="#FFFFFF" />
-          </View>
+        {activeTab === 'analytics' && analytics ? (
+          <ScrollView style={styles.analyticsScroll}>
+            <View style={styles.analyticsGrid}>
+              <View style={styles.statCard}><Text style={styles.statValue}>{analytics.users}</Text><Text style={styles.statLabel}>USERS</Text></View>
+              <View style={styles.statCard}><Text style={styles.statValue}>{analytics.posts}</Text><Text style={styles.statLabel}>POSTS</Text></View>
+              <View style={styles.statCard}><Text style={styles.statValue}>{analytics.reactions}</Text><Text style={styles.statLabel}>REACTIONS</Text></View>
+              <View style={styles.statCard}><Text style={styles.statValue}>{analytics.comments}</Text><Text style={styles.statLabel}>COMMENTS</Text></View>
+            </View>
+          </ScrollView>
+        ) : loading ? (
+          <View style={styles.centered}><ActivityIndicator color="#FFFFFF" /></View>
         ) : (
           <FlatList
             data={data}
@@ -582,279 +381,42 @@ export default function ModerationAdmin() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#000000',
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-  },
-  headerTitle: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '900',
-    letterSpacing: 2,
-  },
-  backButton: {
-    padding: 5,
-  },
-  tabContainer: {
-    paddingVertical: 10,
-  },
-  tabScroll: {
-    paddingHorizontal: 20,
-    gap: 12,
-  },
-  tab: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 30,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    gap: 8,
-  },
-  activeTab: {
-    backgroundColor: '#FFFFFF',
-  },
-  tabText: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
-  activeTabText: {
-    color: '#000000',
-  },
-  listContent: {
-    paddingBottom: 40,
-  },
-  card: {
-    backgroundColor: 'rgba(255,255,255,0.02)',
-    marginBottom: 1,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    paddingBottom: 10,
-  },
-  userRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  iconContainer: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  username: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  date: {
-    color: 'rgba(255,255,255,0.3)',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  contentPadding: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
-  title: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '800',
-    marginBottom: 4,
-  },
-  subtitle: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: 12,
-    fontWeight: '700',
-    marginBottom: 12,
-  },
-  description: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 15,
-    lineHeight: 22,
-    marginBottom: 20,
-  },
-  zone: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 10,
-    opacity: 0.5,
-  },
-  messageContent: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    lineHeight: 24,
-    marginBottom: 20,
-  },
-  link: {
-    color: '#3B82F6',
-    fontSize: 14,
-    textDecorationLine: 'underline',
-    marginBottom: 20,
-  },
-  helpActions: {
-    flexDirection: 'row',
-    marginBottom: 10,
-  },
-  transcriptButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  transcriptButtonText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
-  helpStatusRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: 10,
-  },
-  resolvedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  resolvedText: {
-    color: '#10B981',
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-  },
-  transcriptContainer: {
-    marginTop: 20,
-    padding: 20,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-  },
-  transcriptMessage: {
-    marginBottom: 15,
-    padding: 12,
-    borderRadius: 15,
-    maxWidth: '85%',
-  },
-  userMessage: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-  },
-  adminMessage: {
-    alignSelf: 'flex-end',
-    backgroundColor: '#FFFFFF',
-  },
-  transcriptSender: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: 'rgba(255,255,255,0.4)',
-    marginBottom: 6,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  transcriptText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  transcriptTime: {
-    fontSize: 10,
-    color: 'rgba(255,255,255,0.2)',
-    marginTop: 6,
-    textAlign: 'right',
-  },
-  replyBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginTop: 20,
-    paddingTop: 20,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.05)',
-  },
-  replyInput: {
-    flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 12,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    color: '#FFFFFF',
-    fontSize: 14,
-    maxHeight: 100,
-  },
-  sendButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionRow: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255,255,255,0.02)',
-  },
-  actionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 18,
-    gap: 10,
-  },
-  approveButton: {
-    backgroundColor: '#FFFFFF',
-  },
-  rejectButton: {
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-  },
-  actionText: {
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
-  emptyContainer: {
-    paddingVertical: 150,
-    alignItems: 'center',
-    gap: 20,
-  },
-  emptyText: {
-    color: 'rgba(255,255,255,0.2)',
-    fontSize: 14,
-    fontWeight: '900',
-    letterSpacing: 2,
-  },
+  container: { flex: 1, backgroundColor: '#000000' },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 15 },
+  headerTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '900', letterSpacing: 2 },
+  backButton: { padding: 5 },
+  tabContainer: { paddingVertical: 10 },
+  tabScroll: { paddingHorizontal: 20, gap: 12 },
+  tab: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 30, backgroundColor: 'rgba(255,255,255,0.05)', gap: 8 },
+  activeTab: { backgroundColor: '#FFFFFF' },
+  tabText: { color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '900', letterSpacing: 1 },
+  activeTabText: { color: '#000000' },
+  listContent: { paddingBottom: 40 },
+  card: { backgroundColor: 'rgba(255,255,255,0.02)', marginBottom: 1 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingBottom: 10 },
+  userRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  iconContainer: { width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(255, 255, 255, 0.1)', alignItems: 'center', justifyContent: 'center' },
+  username: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
+  date: { color: 'rgba(255,255,255,0.3)', fontSize: 11, fontWeight: '700' },
+  contentPadding: { paddingHorizontal: 20, paddingBottom: 20 },
+  title: { color: '#FFFFFF', fontSize: 18, fontWeight: '800', marginBottom: 4 },
+  description: { color: 'rgba(255,255,255,0.7)', fontSize: 15, lineHeight: 22 },
+  actionRow: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.02)' },
+  actionButton: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 18, gap: 10 },
+  approveButton: { backgroundColor: '#FFFFFF' },
+  rejectButton: { backgroundColor: 'rgba(239, 68, 68, 0.1)' },
+  actionText: { fontSize: 12, fontWeight: '900', letterSpacing: 1 },
+  emptyContainer: { paddingVertical: 150, alignItems: 'center', gap: 20 },
+  emptyText: { color: 'rgba(255,255,255,0.2)', fontSize: 14, fontWeight: '900', letterSpacing: 2 },
+  logAction: { color: '#F59E0B', fontSize: 12, fontWeight: '900', letterSpacing: 1 },
+  logDetail: { color: '#FFFFFF', fontSize: 13, marginBottom: 4 },
+  logReason: { color: 'rgba(255,255,255,0.5)', fontSize: 13, fontStyle: 'italic', marginTop: 8 },
+  restoreButton: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 15, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 12, backgroundColor: 'rgba(74, 222, 128, 0.1)', borderWidth: 1, borderColor: 'rgba(74, 222, 128, 0.2)', alignSelf: 'flex-start' },
+  restoreText: { color: '#4ADE80', fontSize: 11, fontWeight: '900', letterSpacing: 1 },
+  analyticsScroll: { flex: 1, padding: 20 },
+  analyticsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 15 },
+  statCard: { width: (Dimensions.get('window').width - 55) / 2, backgroundColor: 'rgba(255,255,255,0.05)', padding: 20, borderRadius: 20, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  statValue: { color: '#FFFFFF', fontSize: 32, fontWeight: '900' },
+  statLabel: { color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '800', letterSpacing: 2, marginTop: 4 }
 });

@@ -157,149 +157,86 @@ export default function UniversalFeed() {
     }
   };
 
-  const handleMuteUser = async (userId) => {
-    Alert.alert(
-      "Mute User",
-      "Are you sure you want to mute this user? They will no longer be able to post.",
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Mute", 
-          style: "destructive",
-          onPress: async () => {
-            try {
-              const admin = await getStoredUser();
-              const { error } = await supabase
-                .from('rusers')
-                .update({ 
-                  is_muted: true,
-                  muted_at: new Date().toISOString(),
-                  muted_by: admin.supabase_uid
-                })
-                .eq('id', userId);
-              
-              if (error) throw error;
-              
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              Alert.alert("Success", "User has been muted.");
-            } catch (error) {
-              console.error("Error muting user:", error);
-              Alert.alert("Error", "Failed to mute user.");
-            }
-          }
-        }
-      ]
-    );
-  };
+    const [moderationTarget, setModerationTarget] = useState(null); // { type: 'post' | 'user', id: string, data?: any }
+    const [moderationReason, setModerationReason] = useState("");
+    const [showModerationModal, setShowModerationModal] = useState(false);
 
-  const fetchFilterData = async () => {
-    const { data: zData } = await supabase.from('rzones').select('*').order('name');
-    const { data: tData } = await supabase.from('rtags').select('*').order('name');
-    setZones(zData || []);
-    setTags(tData || []);
-  };
+    const handleMuteUser = async (userId) => {
+      setModerationTarget({ type: 'user', id: userId });
+      setModerationReason("");
+      setShowModerationModal(true);
+    };
 
-  const fetchPosts = useCallback(async () => {
-    try {
-        let query = supabase
-          .from('rposts')
-          .select(`
-            *,
-            rtags (name),
-            rzones (name),
-            rusers (username, emoji_icon, avatar_url),
-            rreactions (reaction_type, device_id)
-          `)
-          .eq('is_deleted', false);
+    const handleDeletePost = async (postId) => {
+      const post = posts.find(p => p.id === postId);
+      setModerationTarget({ type: 'post', id: postId, data: post });
+      setModerationReason("");
+      setShowModerationModal(true);
+    };
 
-      if (selectedZone) query = query.eq('zone_id', selectedZone);
-      if (selectedTag) query = query.eq('tag_id', selectedTag);
-
-      if (sortBy === 'popular') {
-        // We'll sort in memory since rreactions is a join
-        const { data, error } = await query;
-        if (error) throw error;
-        const sorted = (data || []).sort((a, b) => {
-          const countA = (a.rreactions || []).length;
-          const countB = (b.rreactions || []).length;
-          return countB - countA;
-        });
-        setPosts(sorted);
-      } else {
-        query = query.order('created_at', { ascending: sortBy === 'oldest' });
-        const { data, error } = await query;
-        if (error) throw error;
-        setPosts(data || []);
-      }
-    } catch (error) {
-      console.error("Error fetching posts:", error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [selectedZone, selectedTag, sortBy]);
-
-  useEffect(() => {
-    fetchPosts();
-  }, [fetchPosts]);
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchPosts();
-  };
-
-  const handleReaction = async (postId, reactionType, currentlyReacted) => {
-    if (!deviceId) return;
-
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
-    try {
-      if (currentlyReacted) {
-        await supabase
-          .from('rreactions')
-          .delete()
-          .match({ post_id: postId, reaction_type: reactionType, device_id: deviceId });
-      } else {
-        await supabase
-          .from('rreactions')
-          .insert({ post_id: postId, reaction_type: reactionType, device_id: deviceId });
+    const submitModeration = async () => {
+      if (!moderationReason.trim()) {
+        Alert.alert("Reason Required", "Please provide a reason for this action.");
+        return;
       }
 
-      fetchPosts();
-    } catch (error) {
-      console.error("Error updating reaction:", error);
-    }
-  };
+      try {
+        const admin = await getStoredUser();
+        if (moderationTarget.type === 'post') {
+          // Soft delete post and log
+          const { error: postError } = await supabase
+            .from('rposts')
+            .update({ 
+              is_deleted: true,
+              deletion_reason: moderationReason,
+              deleted_by: admin.supabase_uid
+            })
+            .eq('id', moderationTarget.id);
+          
+          if (postError) throw postError;
 
-  const handleDeletePost = async (postId) => {
-    Alert.alert(
-      "Delete Post",
-      "Are you sure you want to delete this post? This action cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Delete", 
-          style: "destructive",
-          onPress: async () => {
-            try {
-              const { error } = await supabase
-                .from('rposts')
-                .update({ is_deleted: true })
-                .eq('id', postId);
-              
-              if (error) throw error;
-              
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              fetchPosts();
-            } catch (error) {
-              console.error("Error deleting post:", error);
-              Alert.alert("Error", "Failed to delete post. Please try again.");
-            }
-          }
+          await supabase.from('rmoderation_logs').insert({
+            moderator_id: admin.id,
+            target_id: moderationTarget.id,
+            target_type: 'post',
+            action: 'delete_post',
+            reason: moderationReason,
+            metadata: moderationTarget.data
+          });
+
+        } else if (moderationTarget.type === 'user') {
+          // Mute user and log
+          const { error: userError } = await supabase
+            .from('rusers')
+            .update({ 
+              is_muted: true,
+              muted_at: new Date().toISOString(),
+              muted_by: admin.supabase_uid,
+              mute_reason: moderationReason
+            })
+            .eq('id', moderationTarget.id);
+          
+          if (userError) throw userError;
+
+          await supabase.from('rmoderation_logs').insert({
+            moderator_id: admin.id,
+            target_id: moderationTarget.id,
+            target_type: 'user',
+            action: 'mute_user',
+            reason: moderationReason
+          });
         }
-      ]
-    );
-  };
+
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setShowModerationModal(false);
+        fetchPosts();
+        Alert.alert("Success", "Action completed and logged.");
+      } catch (error) {
+        console.error("Error in moderation action:", error);
+        Alert.alert("Error", "Failed to complete action.");
+      }
+    };
+
 
     const handleEditPost = (post) => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -565,15 +502,58 @@ export default function UniversalFeed() {
         <Plus size={32} color="#000000" strokeWidth={3} />
       </TouchableOpacity>
 
-      <ShareManager ref={shareRef} />
+        <ShareManager ref={shareRef} />
 
-        <NotificationPanel 
-          visible={showNotifications} 
-          onClose={() => {
-            setShowNotifications(false);
-            loadUnreadCount();
-          }} 
-        />
+        <Modal
+          visible={showModerationModal}
+          transparent
+          animationType="fade"
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.moderationCard}>
+              <Text style={styles.moderationTitle}>
+                {moderationTarget?.type === 'post' ? 'DELETE POST' : 'MUTE USER'}
+              </Text>
+              <Text style={styles.moderationSubtitle}>
+                Please provide a reason for this action. This will be recorded in the admin logs.
+              </Text>
+              
+              <TextInput
+                style={styles.reasonInput}
+                placeholder="Reason (e.g. Spam, Harassment, Misleading content)"
+                placeholderTextColor="rgba(255,255,255,0.3)"
+                value={moderationReason}
+                onChangeText={setModerationReason}
+                multiline
+                numberOfLines={4}
+              />
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity 
+                  onPress={() => setShowModerationModal(false)}
+                  style={[styles.modalButton, { backgroundColor: 'rgba(255,255,255,0.05)' }]}
+                >
+                  <Text style={[styles.modalButtonText, { color: '#FFFFFF' }]}>CANCEL</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  onPress={submitModeration}
+                  style={[styles.modalButton, { backgroundColor: '#EF4444' }]}
+                >
+                  <Text style={styles.modalButtonText}>CONFIRM</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+          <NotificationPanel 
+            visible={showNotifications} 
+            onClose={() => {
+              setShowNotifications(false);
+              loadUnreadCount();
+            }} 
+          />
+
       </View>
     );
   }
@@ -966,11 +946,62 @@ export default function UniversalFeed() {
       right: 0,
       alignItems: 'center',
     },
-    menuFooterText: {
-      color: 'rgba(255,255,255,0.2)',
-      fontSize: 12,
-      fontWeight: '600',
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.85)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 20,
+    },
+    moderationCard: {
+      width: '100%',
+      maxWidth: 400,
+      backgroundColor: '#1E293B',
+      borderRadius: 24,
+      padding: 24,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.1)',
+    },
+    moderationTitle: {
+      color: '#FFFFFF',
+      fontSize: 18,
+      fontWeight: '900',
       letterSpacing: 2,
+      marginBottom: 8,
+    },
+    moderationSubtitle: {
+      color: 'rgba(255,255,255,0.6)',
+      fontSize: 14,
+      lineHeight: 20,
+      marginBottom: 20,
+    },
+    reasonInput: {
+      backgroundColor: 'rgba(0,0,0,0.2)',
+      borderRadius: 12,
+      padding: 16,
+      color: '#FFFFFF',
+      fontSize: 16,
+      textAlignVertical: 'top',
+      minHeight: 100,
+      marginBottom: 24,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.05)',
+    },
+    modalActions: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    modalButton: {
+      flex: 1,
+      paddingVertical: 16,
+      borderRadius: 12,
+      alignItems: 'center',
+    },
+    modalButtonText: {
+      color: '#FFFFFF',
+      fontSize: 14,
+      fontWeight: '800',
+      letterSpacing: 1,
     },
   });
 
