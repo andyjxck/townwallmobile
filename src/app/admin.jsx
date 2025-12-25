@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert, ActivityIndicator, ScrollView, TextInput, Dimensions, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert, ActivityIndicator, ScrollView, TextInput, Dimensions, KeyboardAvoidingView, Platform, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
 import { 
   ChevronLeft, 
@@ -41,8 +41,10 @@ export default function ModerationAdmin() {
   const [transcripts, setTranscripts] = useState({});
   const [replyText, setReplyText] = useState('');
   const [aiFilter, setAiFilter] = useState('held');
+  const [overrideItem, setOverrideItem] = useState(null);
+  const [overrideReason, setOverrideReason] = useState('');
 
-    const TABS = [
+  const TABS = [
       { id: 'talent', label: 'TALENT', icon: Star },
       { id: 'help', label: 'HELP CHATS', icon: MessageSquare },
       { id: 'votes', label: 'VOTES', icon: CheckCircle },
@@ -307,14 +309,52 @@ export default function ModerationAdmin() {
       if (error) throw error;
       
       setReplyText('');
-      setExpandedChatId(null);
-      Alert.alert("Success", "Reply sent.");
-      fetchData();
-    } catch (error) {
-      console.error(error);
-      Alert.alert("Error", "Reply failed.");
-    }
-  };
+    setExpandedChatId(null);
+    Alert.alert("Success", "Reply sent.");
+    fetchData();
+  } catch (error) {
+    console.error(error);
+    Alert.alert("Error", "Reply failed.");
+  }
+};
+
+const handleOverrideDelete = async () => {
+  if (!overrideReason.trim()) {
+    Alert.alert("Reason Required", "Please provide a reason for overriding.");
+    return;
+  }
+
+  try {
+    const user = await getStoredUser();
+    const { error } = await supabase
+      .from('rposts')
+      .update({ 
+        is_deleted: true, 
+        deletion_reason: overrideReason.trim(), 
+        deleted_by: user.id,
+        moderation_status: 'rejected' 
+      })
+      .eq('id', overrideItem.id);
+    
+    if (error) throw error;
+
+    await supabase.from('rmoderation_logs').insert({
+      moderator_id: user.id,
+      target_id: overrideItem.id,
+      target_type: 'post',
+      action: 'delete_post',
+      reason: `Override: ${overrideReason.trim()}`
+    });
+
+    setData(prev => prev.filter(p => p.id !== overrideItem.id));
+    setOverrideItem(null);
+    setOverrideReason('');
+    Alert.alert("Success", "Post has been deleted.");
+  } catch (error) {
+    console.error(error);
+    Alert.alert("Error", "Failed to delete post.");
+  }
+};
 
   const fetchTranscript = async (userId) => {
     try {
@@ -454,14 +494,28 @@ export default function ModerationAdmin() {
         </View>
 
         <View style={styles.actionRow}>
-          <TouchableOpacity style={[styles.actionButton, styles.approveButton]} onPress={() => handleAction(item.id, 'approve')}>
-            <CheckCircle size={18} color="#000000" />
-            <Text style={styles.actionText}>APPROVE</Text>
-          </TouchableOpacity>
+          {activeTab !== 'ai' && (
+            <TouchableOpacity style={[styles.actionButton, styles.approveButton]} onPress={() => handleAction(item.id, 'approve')}>
+              <CheckCircle size={18} color="#000000" />
+              <Text style={styles.actionText}>APPROVE</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity style={[styles.actionButton, styles.rejectButton]} onPress={() => handleAction(item.id, 'reject')}>
             <XCircle size={18} color="#FFFFFF" />
             <Text style={[styles.actionText, { color: '#FFFFFF' }]}>REJECT</Text>
           </TouchableOpacity>
+          {activeTab === 'ai' && (
+            <TouchableOpacity 
+              style={[styles.actionButton, { backgroundColor: '#F59E0B' }]} 
+              onPress={() => {
+                setOverrideItem(item);
+                setOverrideReason('');
+              }}
+            >
+              <Trash2 size={18} color="#000" />
+              <Text style={[styles.actionText, { color: '#000' }]}>OVERRIDE</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     );
@@ -552,6 +606,45 @@ export default function ModerationAdmin() {
             }
           />
         )}
+
+        <Modal
+          visible={!!overrideItem}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setOverrideItem(null)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>OVERRIDE & DELETE</Text>
+              <Text style={styles.modalSubtitle}>Please provide a reason for deleting this post.</Text>
+              
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Reason for deletion..."
+                placeholderTextColor="rgba(255,255,255,0.3)"
+                value={overrideReason}
+                onChangeText={setOverrideReason}
+                multiline
+                numberOfLines={4}
+              />
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity 
+                  style={[styles.modalButton, styles.cancelButton]} 
+                  onPress={() => setOverrideItem(null)}
+                >
+                  <Text style={styles.cancelButtonText}>CANCEL</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.modalButton, styles.confirmButton]} 
+                  onPress={handleOverrideDelete}
+                >
+                  <Text style={styles.confirmButtonText}>DELETE POST</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </KeyboardAvoidingView>
     </View>
   );
@@ -615,6 +708,17 @@ const styles = StyleSheet.create({
   transcriptText: { color: '#FFF', fontSize: 13 },
   transcriptTime: { color: 'rgba(255,255,255,0.3)', fontSize: 9, alignSelf: 'flex-end', marginTop: 4 },
   replyContainer: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 15 },
-  replyInput: { flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, paddingHorizontal: 15, paddingVertical: 10, color: '#FFF', fontSize: 14, maxHeight: 100 },
-  sendButtonSmall: { backgroundColor: '#FFF', width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' }
-});
+    replyInput: { flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, paddingHorizontal: 15, paddingVertical: 10, color: '#FFF', fontSize: 14, maxHeight: 100 },
+    sendButtonSmall: { backgroundColor: '#FFF', width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+    modalContent: { backgroundColor: '#1E293B', width: '100%', borderRadius: 24, padding: 24, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+    modalTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '900', letterSpacing: 1, marginBottom: 8 },
+    modalSubtitle: { color: 'rgba(255,255,255,0.5)', fontSize: 14, marginBottom: 20 },
+    modalInput: { backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: 12, padding: 15, color: '#FFFFFF', fontSize: 15, minHeight: 100, textAlignVertical: 'top', borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', marginBottom: 20 },
+    modalButtons: { flexDirection: 'row', gap: 12 },
+    modalButton: { flex: 1, paddingVertical: 15, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+    cancelButton: { backgroundColor: 'rgba(255,255,255,0.05)' },
+    confirmButton: { backgroundColor: '#EF4444' },
+    cancelButtonText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900', letterSpacing: 1 },
+    confirmButtonText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900', letterSpacing: 1 }
+  });
