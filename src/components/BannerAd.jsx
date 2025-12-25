@@ -1,73 +1,52 @@
-import React from 'react';
-import { View, Text, Platform, StyleSheet } from 'react-native';
-import { BannerAd as AdMobBanner, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
-import Constants, { ExecutionEnvironment } from 'expo-constants';
+import { View, Text, Platform } from "react-native";
+import Constants, { ExecutionEnvironment } from "expo-constants";
 
-const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
-
-const BANNER_ID = Platform.select({
-  ios: 'ca-app-pub-3940256099942544/2934735716', // Test ID
-  android: 'ca-app-pub-3940256099942544/6300978111', // Test ID
-});
+const isExpoGo =
+  Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
 export function BannerAd() {
   if (isExpoGo) {
     return (
-      <View style={styles.placeholderContainer}>
-        <View style={styles.placeholderBox}>
-          <Text style={styles.placeholderTitle}>SPONSORED BANNER AD</Text>
-          <Text style={styles.placeholderSubtitle}>Ads are disabled in Expo Go. This will be a Google Banner Ad in production.</Text>
-        </View>
+      <View
+        style={{
+          height: 60,
+          marginHorizontal: 20,
+          marginVertical: 10,
+          borderRadius: 12,
+          backgroundColor: "rgba(59,130,246,0.1)",
+          borderWidth: 1,
+          borderStyle: "dashed",
+          borderColor: "rgba(59,130,246,0.2)",
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
+        <Text style={{ color: "#3B82F6", fontSize: 10, fontWeight: "900" }}>
+          SPONSORED BANNER AD
+        </Text>
+        <Text style={{ color: "rgba(59,130,246,0.6)", fontSize: 8 }}>
+          Ad placeholder (Expo Go)
+        </Text>
       </View>
     );
   }
 
+  // 🚨 SAFE dynamic import (NOT top-level)
+  const {
+    BannerAd: AdMobBanner,
+    BannerAdSize,
+  } = require("react-native-google-mobile-ads");
+
+  const unitId =
+    Platform.OS === "ios"
+      ? "ca-app-pub-3940256099942544/2934735716"
+      : "ca-app-pub-3940256099942544/6300978111";
+
   return (
-    <View style={{ 
-      alignItems: 'center', 
-      justifyContent: 'center',
-      marginVertical: 10,
-      width: '100%',
-    }}>
-      <AdMobBanner
-        unitId={BANNER_ID}
-        size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
-        requestOptions={{
-          requestNonPersonalizedAdsOnly: true,
-        }}
-        onAdFailedToLoad={(error) => console.error('Banner ad failed to load: ', error)}
-      />
-    </View>
+    <AdMobBanner
+      unitId={unitId}
+      size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
+      requestOptions={{ requestNonPersonalizedAdsOnly: true }}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  placeholderContainer: {
-    paddingHorizontal: 20,
-    marginVertical: 10,
-    width: '100%',
-  },
-  placeholderBox: {
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-    borderRadius: 12,
-    padding: 15,
-    borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.2)',
-    borderStyle: 'dashed',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 60,
-  },
-  placeholderTitle: {
-    color: '#3B82F6',
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
-  placeholderSubtitle: {
-    color: 'rgba(59, 130, 246, 0.6)',
-    fontSize: 8,
-    textAlign: 'center',
-    marginTop: 2,
-  }
-});
