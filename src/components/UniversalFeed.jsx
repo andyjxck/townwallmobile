@@ -57,6 +57,7 @@ import NotificationPanel from "./NotificationPanel";
 import { fetchNotifications } from "@/utils/notifications";
 import { ShareManager } from "./ShareManager";
 import { BannerAd } from "@/components/BannerAd";
+import { NativeAd } from "@/components/NativeAd";
 import PostItem from "./PostItem";
 
 function SkeletonPost() {
@@ -619,6 +620,7 @@ const fetchPosts = async (isRefreshing = false) => {
                     onEdit={handleEditPost}
                     user={user}
                   />
+                  {(index + 1) % 5 === 0 && <NativeAd />}
                 </View>
               )}
             keyExtractor={(item) => item.id.toString()}
