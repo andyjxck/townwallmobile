@@ -384,37 +384,27 @@ import PostItem from "./PostItem";
                   style={{ width: 32, height: 32, borderRadius: 8 }}
                   contentFit="contain"
                 />
-                <TouchableOpacity 
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    router.push("/polls");
-                  }}
-                  style={{ padding: 4 }}
-                >
-                  <Vote size={22} color="rgba(255,255,255,0.4)" />
-                </TouchableOpacity>
-              </View>
-                <View style={styles.headerActions}>
-                  <TouchableOpacity 
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      setShowFilterSort(!showFilterSort);
-                      setShowMenu(false);
-                    }} 
-                    style={styles.iconButton}
-                  >
-                    <ListFilter size={24} color={showFilterSort || selectedZone || selectedTag ? "#FFFFFF" : "rgba(255,255,255,0.4)"} />
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    onPress={() => {
-                      setShowMenu(!showMenu);
-                      setShowFilterSort(false);
-                    }} 
-                    style={styles.iconButton}
-                  >
-                    <Menu size={24} color="#FFFFFF" />
-                  </TouchableOpacity>
-                </View>
+                  <View style={styles.headerActions}>
+                    <TouchableOpacity 
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        setShowFilterSort(!showFilterSort);
+                        setShowMenu(false);
+                      }} 
+                      style={styles.iconButton}
+                    >
+                      <ListFilter size={24} color={showFilterSort || selectedZone || selectedTag ? "#FFFFFF" : "rgba(255,255,255,0.4)"} />
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      onPress={() => {
+                        setShowMenu(!showMenu);
+                        setShowFilterSort(false);
+                      }} 
+                      style={styles.iconButton}
+                    >
+                      <Menu size={24} color="#FFFFFF" />
+                    </TouchableOpacity>
+                  </View>
             </View>
 
           {/* Dropdown Menu */}
@@ -452,12 +442,20 @@ import PostItem from "./PostItem";
                   </TouchableOpacity>
                 )}
 
-                <View style={styles.dropdownDivider} />
+                  <View style={styles.dropdownDivider} />
 
-              <TouchableOpacity 
-                style={styles.dropdownItem} 
-                onPress={() => { setShowMenu(false); router.push("/talent"); }}
-              >
+                <TouchableOpacity 
+                  style={styles.dropdownItem} 
+                  onPress={() => { setShowMenu(false); router.push("/polls"); }}
+                >
+                  <Vote size={18} color="#FBBF24" />
+                  <Text style={styles.dropdownText}>FUTURE FEATURES</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.dropdownItem} 
+                  onPress={() => { setShowMenu(false); router.push("/talent"); }}
+                >
                 <Music size={18} color="#A855F7" />
                 <Text style={styles.dropdownText}>LOCAL TALENT</Text>
               </TouchableOpacity>
@@ -541,9 +539,9 @@ import PostItem from "./PostItem";
 
               <View style={styles.dropdownDivider} />
 
-              <View style={styles.dropdownHeader}>
-                <Text style={styles.dropdownLabel}>TAG</Text>
-                {selectedTag && (
+                <View style={styles.dropdownHeader}>
+                  <Text style={styles.dropdownLabel}>HASHTAGS</Text>
+                  {selectedTag && (
                   <TouchableOpacity onPress={() => setSelectedTag(null)}>
                     <Text style={styles.clearText}>CLEAR</Text>
                   </TouchableOpacity>
@@ -760,10 +758,11 @@ const styles = StyleSheet.create({
   filterPill: {
     paddingVertical: 5,
   },
-  filterText: {
-    fontSize: 12,
-    letterSpacing: 0.5,
-  },
+    filterText: {
+      color: '#FFFFFF',
+      fontSize: 12,
+      letterSpacing: 0.5,
+    },
   skeletonContainer: {
     paddingHorizontal: 20,
     paddingVertical: 20,
@@ -884,7 +883,7 @@ const styles = StyleSheet.create({
       marginBottom: 10,
     },
     dropdownLabel: {
-      color: 'rgba(255,255,255,0.4)',
+      color: '#FFFFFF',
       fontSize: 10,
       fontWeight: '900',
       letterSpacing: 1.5,
