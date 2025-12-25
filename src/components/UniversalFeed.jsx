@@ -12,6 +12,7 @@ import {
     Alert,
     Share,
     TextInput as RNTextInput,
+    ScrollView,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -40,12 +41,13 @@ import {
   Shield,
   HelpCircle,
   MessageCircle,
-  Bell,
-  Trash2,
-    LayoutGrid,
-    Hash,
-    Vote,
-  } from "lucide-react-native";
+    Bell,
+    Trash2,
+      LayoutGrid,
+      Hash,
+      Vote,
+      ListFilter,
+    } from "lucide-react-native";
 import { getDeviceId } from "../utils/deviceId";
 import { supabase } from "../utils/supabase";
 import * as Haptics from "expo-haptics";
@@ -95,9 +97,10 @@ import PostItem from "./PostItem";
   const [selectedTag, setSelectedTag] = useState(null);
   const [sortBy, setSortBy] = useState('newest');
   const [showMenu, setShowMenu] = useState(false);
-  const [showZones, setShowZones] = useState(false);
-  const [showTags, setShowTags] = useState(false);
-  const [isModerator, setIsModerator] = useState(false);
+    const [showZones, setShowZones] = useState(false);
+    const [showTags, setShowTags] = useState(false);
+    const [showFilterSort, setShowFilterSort] = useState(false);
+    const [isModerator, setIsModerator] = useState(false);
   const user = useAuthStore(state => state.auth);
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -384,52 +387,31 @@ import PostItem from "./PostItem";
                 <TouchableOpacity 
                   onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setShowZones(!showZones);
-                    setShowTags(false);
+                    router.push("/polls");
                   }}
                   style={{ padding: 4 }}
                 >
-                  <LayoutGrid size={22} color={showZones ? "#FFFFFF" : "rgba(255,255,255,0.4)"} />
+                  <Vote size={22} color="rgba(255,255,255,0.4)" />
                 </TouchableOpacity>
-                  <TouchableOpacity 
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      setShowTags(!showTags);
-                      setShowZones(false);
-                    }}
-                    style={{ padding: 4 }}
-                  >
-                    <Hash size={22} color={showTags ? "#FFFFFF" : "rgba(255,255,255,0.4)"} />
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      router.push("/polls");
-                    }}
-                    style={{ padding: 4 }}
-                  >
-                    <Vote size={22} color="rgba(255,255,255,0.4)" />
-                  </TouchableOpacity>
               </View>
                 <View style={styles.headerActions}>
                   <TouchableOpacity 
                     onPress={() => {
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      setSortBy(s => {
-                        if (s === 'newest') return 'popular';
-                        if (s === 'popular') return 'oldest';
-                        return 'newest';
-                      });
+                      setShowFilterSort(!showFilterSort);
+                      setShowMenu(false);
                     }} 
                     style={styles.iconButton}
                   >
-                    {sortBy === 'popular' ? (
-                      <Zap size={20} color="#F59E0B" />
-                    ) : (
-                      <ArrowUpDown size={20} color={sortBy === 'newest' ? "#FFFFFF" : "rgba(255,255,255,0.4)"} />
-                    )}
+                    <ListFilter size={24} color={showFilterSort || selectedZone || selectedTag ? "#FFFFFF" : "rgba(255,255,255,0.4)"} />
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => setShowMenu(!showMenu)} style={styles.iconButton}>
+                  <TouchableOpacity 
+                    onPress={() => {
+                      setShowMenu(!showMenu);
+                      setShowFilterSort(false);
+                    }} 
+                    style={styles.iconButton}
+                  >
                     <Menu size={24} color="#FFFFFF" />
                   </TouchableOpacity>
                 </View>
@@ -508,58 +490,92 @@ import PostItem from "./PostItem";
             </View>
           )}
 
-          <View style={styles.filterSection}>
-            {showZones && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <FlatList
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.filterList}
-                  data={[{ id: null, name: 'ALL ZONES' }, ...zones]}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      onPress={() => setSelectedZone(item.id)}
-                      style={styles.filterPill}
-                    >
-                      <Text style={[
-                        styles.filterText,
-                        { color: selectedZone === item.id ? '#FFFFFF' : 'rgba(255,255,255,0.4)', 
-                          fontWeight: selectedZone === item.id ? '800' : '400' }
-                      ]}>
-                        {item.name.toUpperCase()}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                  keyExtractor={item => `zone-${item.id}`}
-                />
+          {showFilterSort && (
+            <View style={[styles.filterSortDropdown, { top: insets.top + 55 }]}>
+              <View style={styles.dropdownHeader}>
+                <Text style={styles.dropdownLabel}>SORT BY</Text>
               </View>
-            )}
-
-            {showTags && (
-              <FlatList
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={[styles.filterList, { marginTop: showZones ? 4 : 0 }]}
-                data={[{ id: null, name: 'EVERYTHING' }, ...tags]}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    onPress={() => setSelectedTag(item.id)}
-                    style={styles.filterPill}
+              <View style={styles.sortOptionsRow}>
+                {['newest', 'popular', 'oldest'].map(option => (
+                  <TouchableOpacity 
+                    key={option} 
+                    onPress={() => {
+                      setSortBy(option);
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    }}
+                    style={[styles.sortOptionPill, sortBy === option && styles.activeSortPill]}
                   >
-                    <Text style={[
-                      styles.filterText,
-                      { color: selectedTag === item.id ? '#FFFFFF' : 'rgba(255,255,255,0.4)',
-                        fontWeight: selectedTag === item.id ? '800' : '400',
-                        fontSize: 11 }
-                    ]}>
-                      #{item.name.toUpperCase().replace(/\s+/g, '')}
+                    <Text style={[styles.sortOptionText, sortBy === option && styles.activeSortOptionText]}>
+                      {option.toUpperCase()}
                     </Text>
                   </TouchableOpacity>
+                ))}
+              </View>
+
+              <View style={styles.dropdownDivider} />
+
+              <View style={styles.dropdownHeader}>
+                <Text style={styles.dropdownLabel}>ZONE</Text>
+                {selectedZone && (
+                  <TouchableOpacity onPress={() => setSelectedZone(null)}>
+                    <Text style={styles.clearText}>CLEAR</Text>
+                  </TouchableOpacity>
                 )}
-                keyExtractor={item => `tag-${item.id}`}
-              />
-            )}
-          </View>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dropdownScroll}>
+                {zones.map(zone => (
+                  <TouchableOpacity 
+                    key={zone.id} 
+                    onPress={() => {
+                      setSelectedZone(zone.id);
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    }}
+                    style={[styles.filterPill, selectedZone === zone.id && styles.activeFilterPill]}
+                  >
+                    <Text style={[styles.filterText, selectedZone === zone.id && styles.activeFilterText]}>
+                      {zone.name.toUpperCase()}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              <View style={styles.dropdownDivider} />
+
+              <View style={styles.dropdownHeader}>
+                <Text style={styles.dropdownLabel}>TAG</Text>
+                {selectedTag && (
+                  <TouchableOpacity onPress={() => setSelectedTag(null)}>
+                    <Text style={styles.clearText}>CLEAR</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dropdownScroll}>
+                {tags.map(tag => (
+                  <TouchableOpacity 
+                    key={tag.id} 
+                    onPress={() => {
+                      setSelectedTag(tag.id);
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    }}
+                    style={[styles.filterPill, selectedTag === tag.id && styles.activeFilterPill]}
+                  >
+                    <Text style={[styles.filterText, selectedTag === tag.id && styles.activeFilterText]}>
+                      #{tag.name.toUpperCase().replace(/\s+/g, '')}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              {(selectedZone || selectedTag) && (
+                <TouchableOpacity 
+                  style={styles.applyButton} 
+                  onPress={() => setShowFilterSort(false)}
+                >
+                  <Text style={styles.applyButtonText}>CLOSE</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
       </View>
 
       {loading && !refreshing ? (
@@ -839,13 +855,95 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
   },
-  modalButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
-});
+    modalButtonText: {
+      color: '#FFFFFF',
+      fontSize: 14,
+      fontWeight: '800',
+      letterSpacing: 1,
+    },
+    filterSortDropdown: {
+      position: 'absolute',
+      right: 20,
+      width: 280,
+      backgroundColor: '#0F172A',
+      borderRadius: 20,
+      padding: 15,
+      zIndex: 1000,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.08)',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 20 },
+      shadowOpacity: 0.6,
+      shadowRadius: 30,
+      elevation: 20,
+    },
+    dropdownHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 10,
+    },
+    dropdownLabel: {
+      color: 'rgba(255,255,255,0.4)',
+      fontSize: 10,
+      fontWeight: '900',
+      letterSpacing: 1.5,
+    },
+    sortOptionsRow: {
+      flexDirection: 'row',
+      gap: 8,
+      marginBottom: 5,
+    },
+    sortOptionPill: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 20,
+      backgroundColor: 'rgba(255,255,255,0.05)',
+      borderWidth: 1,
+      borderColor: 'transparent',
+    },
+    activeSortPill: {
+      backgroundColor: 'rgba(255,255,255,0.1)',
+      borderColor: 'rgba(255,255,255,0.2)',
+    },
+    sortOptionText: {
+      color: 'rgba(255,255,255,0.4)',
+      fontSize: 10,
+      fontWeight: '700',
+    },
+    activeSortOptionText: {
+      color: '#FFFFFF',
+    },
+    clearText: {
+      color: '#EF4444',
+      fontSize: 10,
+      fontWeight: '800',
+    },
+    dropdownScroll: {
+      gap: 10,
+      paddingRight: 10,
+    },
+    activeFilterPill: {
+      backgroundColor: 'rgba(255,255,255,0.1)',
+    },
+    activeFilterText: {
+      color: '#FFFFFF',
+      fontWeight: '800',
+    },
+    applyButton: {
+      marginTop: 15,
+      paddingVertical: 12,
+      backgroundColor: 'rgba(255,255,255,0.05)',
+      borderRadius: 12,
+      alignItems: 'center',
+    },
+    applyButtonText: {
+      color: '#FFFFFF',
+      fontSize: 11,
+      fontWeight: '800',
+      letterSpacing: 1,
+    },
+  });
 
 function getTimeAgo(date) {
   const seconds = Math.floor((new Date() - date) / 1000);
