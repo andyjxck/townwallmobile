@@ -7,12 +7,17 @@ export function NativeAd() {
       marginVertical: 10, 
       marginHorizontal: 16, 
       padding: 16, 
-      backgroundColor: 'rgba(255,255,255,0.03)', 
+      backgroundColor: '#1E293B', 
       borderRadius: 16,
-      borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.08)',
+      borderWidth: 2,
+      borderColor: '#3B82F6',
       minHeight: 250,
-      justifyContent: 'center'
+      justifyContent: 'center',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.3,
+      shadowRadius: 20,
+      elevation: 10
     }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
         <View style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.1)' }} />

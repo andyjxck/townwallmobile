@@ -408,6 +408,17 @@ const fetchPosts = async (isRefreshing = false) => {
     setSelectedTag(null);
   };
 
+  const getFeedData = () => {
+    const data = [];
+    posts.forEach((post, index) => {
+      data.push({ ...post, _isPost: true });
+      if (index === 0 || (index + 1) % 5 === 0) {
+        data.push({ _isAd: true, id: `ad-${index}` });
+      }
+    });
+    return data;
+  };
+
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -606,24 +617,24 @@ const fetchPosts = async (isRefreshing = false) => {
         </View>
       ) : (
         <FlatList
-        data={posts}
+          data={getFeedData()}
           ListHeaderComponent={<BannerAd />}
-          renderItem={({ item, index }) => (
-            <View>
-                  <PostItem 
-                    item={item} 
-                    deviceId={deviceId} 
-                    onReaction={handleReaction} 
-                    onDelete={handleDeletePost}
-                    onMute={handleMuteUser}
-                    onShare={handleShare}
-                    onEdit={handleEditPost}
-                    user={user}
-                  />
-                  {(index + 1) % 5 === 0 && <NativeAd />}
-                </View>
-              )}
-            keyExtractor={(item) => item.id.toString()}
+          renderItem={({ item }) => {
+            if (item._isAd) return <NativeAd />;
+            return (
+              <PostItem 
+                item={item} 
+                deviceId={deviceId} 
+                onReaction={handleReaction} 
+                onDelete={handleDeletePost}
+                onMute={handleMuteUser}
+                onShare={handleShare}
+                onEdit={handleEditPost}
+                user={user}
+              />
+            );
+          }}
+          keyExtractor={(item) => item.id.toString()}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
