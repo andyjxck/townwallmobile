@@ -310,57 +310,34 @@ export default function LocalBusinesses() {
             <Image 
               source={{ uri: item.avatar_url || `https://avatar.vercel.sh/${item.name}.png` }} 
               style={styles.cardImage} 
+              resizeMode="cover"
             />
             <LinearGradient
-              colors={['rgba(0,0,0,0.5)', 'transparent', 'rgba(0,0,0,0.8)']}
+              colors={['transparent', 'rgba(0,0,0,0.8)']}
               style={StyleSheet.absoluteFill}
             />
             
             <View style={styles.cardOverlayTop}>
-              <View style={styles.categoryTag}>
-                <Text style={styles.categoryTagText}>{item.category?.toUpperCase() || 'BUSINESS'}</Text>
-              </View>
               {item.rating ? (
                 <View style={styles.ratingPill}>
-                  <Star size={12} color="#FBBF24" fill="#FBBF24" />
+                  <Star size={10} color="#FBBF24" fill="#FBBF24" />
                   <Text style={styles.ratingPillText}>{item.rating}</Text>
                 </View>
-              ) : null}
-            </View>
-
-            <View style={styles.cardOverlayBottom}>
-              <Text style={styles.bizName}>{item.name}</Text>
-              {item.address && (
-                <View style={styles.locRow}>
-                  <MapPin size={12} color="rgba(255,255,255,0.7)" />
-                  <Text style={styles.locText} numberOfLines={1}>{item.address}</Text>
-                </View>
+              ) : (
+                <View />
               )}
             </View>
           </View>
 
-          <View style={styles.cardFooter}>
-            <View style={styles.footerInfo}>
-              <Text style={styles.bizDesc} numberOfLines={1}>
-                {item.description || "Discover local services and products..."}
-              </Text>
-            </View>
-            <View style={styles.footerActions}>
-              {item.phone && (
-                <TouchableOpacity 
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    Linking.openURL(`tel:${item.phone}`);
-                  }}
-                  style={styles.actionCircle}
-                >
-                  <Phone size={18} color="#FFF" />
-                </TouchableOpacity>
-              )}
-              <View style={[styles.actionCircle, styles.primaryActionCircle]}>
-                <ExternalLink size={18} color="#000" strokeWidth={2.5} />
+          <View style={styles.cardInfo}>
+            <Text style={styles.bizNameSmall} numberOfLines={1}>{item.name}</Text>
+            <Text style={styles.bizCategorySmall} numberOfLines={1}>{item.category?.toUpperCase() || 'BUSINESS'}</Text>
+            {item.address ? (
+              <View style={styles.locRowSmall}>
+                <MapPin size={10} color="rgba(255,255,255,0.4)" />
+                <Text style={styles.locTextSmall} numberOfLines={1}>{item.address}</Text>
               </View>
-            </View>
+            ) : null}
           </View>
         </TouchableOpacity>
       );
@@ -453,12 +430,14 @@ export default function LocalBusinesses() {
           </View>
         ) : (
             viewMode === 'list' ? (
-                <FlatList
-                  data={displayBusinesses}
-                  renderItem={renderItem}
-                  keyExtractor={(item) => item.id.toString()}
-                  contentContainerStyle={styles.listContent}
-                  ListFooterComponent={displayBusinesses.length > 0 ? <BannerAd /> : null}
+                  <FlatList
+                    data={displayBusinesses}
+                    renderItem={renderItem}
+                    keyExtractor={(item) => item.id.toString()}
+                    numColumns={2}
+                    columnWrapperStyle={styles.columnWrapper}
+                    contentContainerStyle={styles.listContent}
+                    ListFooterComponent={displayBusinesses.length > 0 ? <BannerAd /> : null}
                   ListEmptyComponent={
                   <View style={styles.emptyState}>
                     <Briefcase size={48} color="rgba(255,255,255,0.1)" />
@@ -643,26 +622,25 @@ export default function LocalBusinesses() {
       fontSize: 14,
     },
     listContent: {
-      paddingHorizontal: 16,
+      paddingHorizontal: 12,
       paddingBottom: 120,
-      gap: 16,
+    },
+    columnWrapper: {
+      justifyContent: 'space-between',
     },
     businessCard: {
-      backgroundColor: '#1A1A1A',
-      borderRadius: 28,
+      flex: 1,
+      height: 220,
+      margin: 6,
+      borderRadius: 24,
       overflow: 'hidden',
+      backgroundColor: '#111',
       borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.08)',
-      elevation: 4,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: 0.3,
-      shadowRadius: 12,
+      borderColor: 'rgba(255,255,255,0.05)',
     },
     cardImageContainer: {
-      height: 240,
+      flex: 1,
       width: '100%',
-      backgroundColor: '#111',
     },
     cardImage: {
       width: '100%',
@@ -670,97 +648,54 @@ export default function LocalBusinesses() {
     },
     cardOverlayTop: {
       position: 'absolute',
-      top: 16,
-      left: 16,
-      right: 16,
+      top: 10,
+      left: 10,
+      right: 10,
       flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
+      justifyContent: 'flex-end',
     },
-    categoryTag: {
-      backgroundColor: 'rgba(0,0,0,0.6)',
-      paddingHorizontal: 10,
-      paddingVertical: 6,
-      borderRadius: 12,
+    ratingPill: {
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 3,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 10,
       borderWidth: 1,
       borderColor: 'rgba(255,255,255,0.1)',
     },
-    categoryTagText: {
+    ratingPillText: {
       color: '#FFF',
+      fontSize: 10,
+      fontWeight: '900',
+    },
+    cardInfo: {
+      padding: 12,
+      backgroundColor: '#111',
+    },
+    bizNameSmall: {
+      color: '#FFFFFF',
+      fontSize: 14,
+      fontWeight: '800',
+    },
+    bizCategorySmall: {
+      color: '#4ADE80',
       fontSize: 9,
       fontWeight: '800',
-      letterSpacing: 1,
+      letterSpacing: 0.5,
+      marginTop: 2,
     },
-    ratingPill: {
-      backgroundColor: '#FFF',
+    locRowSmall: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 4,
-      paddingHorizontal: 10,
-      paddingVertical: 6,
-      borderRadius: 12,
-    },
-    ratingPillText: {
-      color: '#000',
-      fontSize: 11,
-      fontWeight: '900',
-    },
-    cardOverlayBottom: {
-      position: 'absolute',
-      bottom: 20,
-      left: 20,
-      right: 20,
-    },
-    bizName: {
-      color: '#FFFFFF',
-      fontSize: 28,
-      fontWeight: '900',
-      letterSpacing: -0.5,
-    },
-    locRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
       marginTop: 4,
     },
-    locText: {
-      color: 'rgba(255,255,255,0.8)',
-      fontSize: 13,
-      fontWeight: '500',
-    },
-    cardFooter: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      padding: 16,
-      backgroundColor: 'rgba(255,255,255,0.02)',
-      borderTopWidth: 1,
-      borderTopColor: 'rgba(255,255,255,0.05)',
-    },
-    footerInfo: {
-      flex: 1,
-    },
-    bizDesc: {
+    locTextSmall: {
       color: 'rgba(255,255,255,0.4)',
-      fontSize: 12,
+      fontSize: 10,
       fontWeight: '500',
-    },
-    footerActions: {
-      flexDirection: 'row',
-      gap: 10,
-    },
-    actionCircle: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
-      backgroundColor: 'rgba(255,255,255,0.1)',
-      justifyContent: 'center',
-      alignItems: 'center',
-      borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.05)',
-    },
-    primaryActionCircle: {
-      backgroundColor: '#FFFFFF',
-      borderColor: '#FFFFFF',
     },
     backButton: {
       padding: 5,

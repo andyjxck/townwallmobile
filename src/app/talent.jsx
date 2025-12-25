@@ -206,50 +206,24 @@ export default function LocalTalent() {
           onPress={() => handleOpenLink(item.link)}
           style={styles.talentCard}
         >
-          <Image 
-            source={{ uri: item.avatar_url || `https://avatar.vercel.sh/${item.name}.png` }} 
-            style={styles.cardImage} 
-          />
-          <LinearGradient
-            colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.95)']}
-            style={styles.cardGradient}
-          />
+          <View style={styles.cardImageContainer}>
+            <Image 
+              source={{ uri: item.avatar_url || `https://avatar.vercel.sh/${item.name}.png` }} 
+              style={styles.cardImage} 
+              resizeMode="cover"
+            />
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.8)']}
+              style={styles.cardGradient}
+            />
+            <View style={styles.cardPlatformBadge}>
+              {getPlatformIcon(item.platform)}
+            </View>
+          </View>
           
-          <View style={styles.cardContent}>
-            <View style={styles.cardTopRow}>
-              <View style={styles.categoryBadge}>
-                <Text style={styles.categoryBadgeText}>{item.category || 'Talent'}</Text>
-              </View>
-              <View style={styles.platformIconContainer}>
-                {getPlatformIcon(item.platform)}
-              </View>
-            </View>
-
-            <View style={styles.cardBottomSection}>
-              <Text style={styles.talentName}>{item.name}</Text>
-              <Text style={styles.talentTitle} numberOfLines={1}>{item.title}</Text>
-              
-              {item.description ? (
-                <Text style={styles.talentDesc} numberOfLines={2}>{item.description}</Text>
-              ) : null}
-
-              <View style={styles.actionRow}>
-                <View style={styles.primaryAction}>
-                  <Text style={styles.primaryActionText}>VIEW {item.platform?.toUpperCase() || 'PROFILE'}</Text>
-                  <ExternalLink size={12} color="#000" strokeWidth={3} />
-                </View>
-                <TouchableOpacity 
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    // Share functionality
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  }}
-                  style={styles.secondaryAction}
-                >
-                  <Plus size={18} color="#FFF" />
-                </TouchableOpacity>
-              </View>
-            </View>
+          <View style={styles.cardInfo}>
+            <Text style={styles.talentNameSmall} numberOfLines={1}>{item.name}</Text>
+            <Text style={styles.talentTitleSmall} numberOfLines={1}>{item.category || 'Talent'}</Text>
           </View>
         </TouchableOpacity>
       );
@@ -335,6 +309,8 @@ export default function LocalTalent() {
             data={filteredTalents}
             renderItem={renderTalentCard}
             keyExtractor={(item) => item.id.toString()}
+            numColumns={2}
+            columnWrapperStyle={styles.columnWrapper}
             contentContainerStyle={styles.listContent}
             ListEmptyComponent={
               <View style={styles.emptyState}>
@@ -544,116 +520,64 @@ export default function LocalTalent() {
       color: '#000000',
     },
     listContent: {
-      paddingHorizontal: 16,
+      paddingHorizontal: 12,
       paddingBottom: 120,
-      gap: 16,
+    },
+    columnWrapper: {
+      justifyContent: 'space-between',
     },
     talentCard: {
-      height: 480,
-      borderRadius: 32,
+      flex: 1,
+      height: 220,
+      margin: 6,
+      borderRadius: 24,
       overflow: 'hidden',
       backgroundColor: '#111',
-      elevation: 10,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 12 },
-      shadowOpacity: 0.6,
-      shadowRadius: 16,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.05)',
+    },
+    cardImageContainer: {
+      flex: 1,
+      width: '100%',
     },
     cardImage: {
       width: '100%',
       height: '100%',
-      position: 'absolute',
     },
     cardGradient: {
       position: 'absolute',
       bottom: 0,
       left: 0,
       right: 0,
-      height: '100%',
+      height: '60%',
     },
-    cardContent: {
-      flex: 1,
-      padding: 24,
-      justifyContent: 'space-between',
-    },
-    cardTopRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
+    cardPlatformBadge: {
+      position: 'absolute',
+      top: 10,
+      right: 10,
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'center',
       alignItems: 'center',
-    },
-    categoryBadge: {
-      backgroundColor: 'rgba(255,255,255,0.12)',
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 12,
       borderWidth: 1,
       borderColor: 'rgba(255,255,255,0.1)',
     },
-    categoryBadgeText: {
+    cardInfo: {
+      padding: 12,
+      backgroundColor: '#111',
+    },
+    talentNameSmall: {
       color: '#FFFFFF',
-      fontSize: 10,
-      fontWeight: '700',
-      letterSpacing: 0.5,
+      fontSize: 14,
+      fontWeight: '800',
     },
-    platformIconContainer: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      backgroundColor: 'rgba(255,255,255,0.08)',
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    cardBottomSection: {
-      gap: 4,
-    },
-    talentName: {
-      color: '#FFFFFF',
-      fontSize: 32,
-      fontWeight: '900',
-      letterSpacing: -1,
-    },
-    talentTitle: {
-      color: 'rgba(255,255,255,0.8)',
-      fontSize: 16,
-      fontWeight: '600',
-    },
-    talentDesc: {
+    talentTitleSmall: {
       color: 'rgba(255,255,255,0.5)',
-      fontSize: 13,
-      lineHeight: 18,
-      marginTop: 8,
-    },
-    actionRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
-      marginTop: 20,
-    },
-    primaryAction: {
-      flex: 1,
-      height: 48,
-      backgroundColor: '#FFFFFF',
-      borderRadius: 24,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-    },
-    primaryActionText: {
-      color: '#000000',
-      fontSize: 12,
-      fontWeight: '900',
-      letterSpacing: 0.5,
-    },
-    secondaryAction: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
-      backgroundColor: 'rgba(255,255,255,0.15)',
-      justifyContent: 'center',
-      alignItems: 'center',
-      borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.1)',
+      fontSize: 11,
+      fontWeight: '600',
+      marginTop: 2,
     },
     backButton: {
       padding: 5,
