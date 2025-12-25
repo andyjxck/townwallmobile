@@ -392,15 +392,27 @@ import { TextInput } from "react-native-gesture-handler";
         </TouchableOpacity>
 
         {(user?.id === item.user_id || user?.is_admin || user?.is_moderator) && (
-          <TouchableOpacity
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              onDelete(item.id);
-            }}
-            style={styles.actionButton}
-          >
-            <Trash2 size={20} color="rgba(239, 68, 68, 0.4)" />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <TouchableOpacity
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                onEdit(item);
+              }}
+              style={styles.actionButton}
+            >
+              <Pencil size={20} color="rgba(255, 255, 255, 0.4)" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                onDelete(item.id);
+              }}
+              style={styles.actionButton}
+            >
+              <Trash2 size={20} color="rgba(239, 68, 68, 0.4)" />
+            </TouchableOpacity>
+          </View>
         )}
       </View>
 
