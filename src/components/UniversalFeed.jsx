@@ -98,6 +98,7 @@ export default function UniversalFeed() {
     const [showZones, setShowZones] = useState(false);
     const [showTags, setShowTags] = useState(false);
     const [isModerator, setIsModerator] = useState(false);
+    const [lastError, setLastError] = useState(null);
     const user = useAuthStore(state => state.auth);
     const [showNotifications, setShowNotifications] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
@@ -148,8 +149,6 @@ export default function UniversalFeed() {
       }
 
       if (sortBy === 'popular') {
-        // In a real app, you'd sort by reaction count. 
-        // For simplicity, we'll just keep newest for now or use a different logic if available.
         query = query.order("created_at", { ascending: false });
       } else if (sortBy === 'oldest') {
         query = query.order("created_at", { ascending: true });
@@ -166,7 +165,6 @@ export default function UniversalFeed() {
       }
 
       setPosts(data || []);
-      setLastError(null);
     } catch (err) {
       console.error("Fetch catch:", err);
       setLastError(err?.message || "Unknown error");
@@ -176,6 +174,32 @@ export default function UniversalFeed() {
       setRefreshing(false);
     }
   };
+
+  const setupNotificationSubscription = async () => {
+    const user = await getStoredUser();
+    if (!user) return null;
+    
+    const channel = supabase
+      .channel('public:rnotifications')
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'rnotifications',
+        filter: `user_id=eq.${user.id}`
+      }, () => {
+        loadUnreadCount();
+      })
+      .subscribe();
+      
+    return channel;
+  };
+
+  useEffect(() => {
+    fetchPosts();
+    loadUnreadCount();
+    checkModerator();
+    fetchFilterData();
+    getDeviceId().then(setDeviceId);
 
     let sub;
     setupNotificationSubscription().then(s => sub = s);
@@ -218,1055 +242,718 @@ export default function UniversalFeed() {
     }
   };
 
-    const [lastError, setLastError] = useState(null);
-
-const fetchPosts = async (isRefreshing = false) => {
-  if (!isRefreshing) setLoading(true);
-  setLastError(null);
-
-  try {
-    console.log("======== FEED DEBUG START ========");
-    console.log("selectedZone:", selectedZone, "selectedTag:", selectedTag, "sortBy:", sortBy);
-
-    // STEP 0: Can we read ANYTHING from rposts at all?
-    const q0 = await supabase
-      .from("rposts")
-      .select("id", { count: "exact" })
-      .limit(5);
-
-    console.log("Q0 rposts ids:", q0.data, "count:", q0.count, "error:", q0.error);
-
-    // STEP 1: Apply only base filters (deleted + approved)
-    const q1 = await supabase
-      .from("rposts")
-      .select("id, is_deleted, moderation_status, created_at", { count: "exact" })
-      .eq("is_deleted", false)
-      .eq("moderation_status", "approved")
-      .order("created_at", { ascending: false })
-      .limit(10);
-
-    console.log("Q1 base filters:", q1.data, "count:", q1.count, "error:", q1.error);
-
-    // STEP 2: Add zone/tag filters (still NO joins)
-    let q2builder = supabase
-      .from("rposts")
-      .select("id, title, zone_id, tag_id, created_at", { count: "exact" })
-      .eq("is_deleted", false)
-      .eq("moderation_status", "approved");
-
-    if (selectedZone !== null && selectedZone !== undefined) q2builder = q2builder.eq("zone_id", selectedZone);
-    if (selectedTag !== null && selectedTag !== undefined) q2builder = q2builder.eq("tag_id", selectedTag);
-
-    const q2 = await q2builder
-      .order("created_at", { ascending: false })
-      .limit(10);
-
-    console.log("Q2 + zone/tag:", q2.data, "count:", q2.count, "error:", q2.error);
-
-    // STEP 3: Now do your FULL query with joins
-    let query = supabase
-      .from("rposts")
-      .select(`
-        id,
-        title,
-        text,
-        created_at,
-        user_id,
-        zone_id,
-        tag_id,
-        image_url,
-        image_urls,
-        is_anonymous,
-        moderation_status,
-        is_deleted,
-        user:rusers (username, emoji_icon, avatar_url),
-        zone:rzones (name),
-        tag:rtags (name),
-        reactions:rreactions (reaction_type, device_id)
-      `)
-      .eq("is_deleted", false)
-      .eq("moderation_status", "approved");
-
-    if (selectedZone !== null && selectedZone !== undefined) query = query.eq("zone_id", selectedZone);
-    if (selectedTag !== null && selectedTag !== undefined) query = query.eq("tag_id", selectedTag);
-
-    query = query.order("created_at", { ascending: false });
-
-    const { data, error } = await query.limit(50);
-
-    console.log("Q3 full join data len:", (data || []).length, "error:", error);
-    console.log("======== FEED DEBUG END ========");
-
-    if (error) {
-      setLastError(error.message);
-      setPosts([]);
-      return;
-    }
-
-    setPosts(data || []);
-    setLastError(null);
-  } catch (err) {
-    console.error("Fetch catch:", err);
-    setLastError(err?.message || "Unknown error");
-    setPosts([]);
-  } finally {
-    setLoading(false);
-    setRefreshing(false);
-  }
-};
-
-  const handleReaction = async (postId, type) => {
-    if (!user) {
-      Alert.alert("Sign In", "Please sign in to react to posts.");
-      return;
-    }
+  const handleReaction = async (postId, reactionType) => {
+    if (!deviceId) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      
       const { data: existing } = await supabase
-        .from('rreactions')
-        .select('*')
-        .eq('post_id', postId)
-        .eq('user_id', user.id)
-        .single();
+        .from("rreactions")
+        .select("id")
+        .eq("post_id", postId)
+        .eq("device_id", deviceId)
+        .eq("reaction_type", reactionType)
+        .maybeSingle();
 
       if (existing) {
-        if (existing.reaction_type === type) {
-          await supabase.from('rreactions').delete().eq('id', existing.id);
-        } else {
-          await supabase.from('rreactions').update({ reaction_type: type }).eq('id', existing.id);
-        }
+        await supabase.from("rreactions").delete().eq("id", existing.id);
       } else {
-        await supabase.from('rreactions').insert({
+        await supabase.from("rreactions").insert({
           post_id: postId,
-          user_id: user.id,
-          reaction_type: type,
-          device_id: deviceId
+          device_id: deviceId,
+          reaction_type: reactionType,
         });
       }
-
       fetchPosts(true);
-    } catch (error) {
-      console.error("Error reacting:", error);
+    } catch (err) {
+      console.error("Reaction error:", err);
     }
   };
 
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    fetchPosts(true);
-  }, [selectedZone, selectedTag, sortBy]);
-
-  useEffect(() => {
-    fetchPosts();
-  }, [selectedZone, selectedTag, sortBy]);
-
-    const [moderationTarget, setModerationTarget] = useState(null); // { type: 'post' | 'user', id: string, data?: any }
-    const [moderationReason, setModerationReason] = useState("");
-    const [showModerationModal, setShowModerationModal] = useState(false);
-
-    const handleMuteUser = async (userId) => {
-      setModerationTarget({ type: 'user', id: userId });
-      setModerationReason("");
-      setShowModerationModal(true);
-    };
-
-    const handleDeletePost = async (postId) => {
-      const post = posts.find(p => p.id === postId);
-      setModerationTarget({ type: 'post', id: postId, data: post });
-      setModerationReason("");
-      setShowModerationModal(true);
-    };
-
-    const submitModeration = async () => {
-      if (!moderationReason.trim()) {
-        Alert.alert("Reason Required", "Please provide a reason for this action.");
-        return;
-      }
-
-      try {
-        const admin = await getStoredUser();
-        if (moderationTarget.type === 'post') {
-          // Soft delete post and log
-          const { error: postError } = await supabase
-            .from('rposts')
-            .update({ 
-              is_deleted: true,
-              deletion_reason: moderationReason,
-              deleted_by: admin.supabase_uid
-            })
-            .eq('id', moderationTarget.id);
-          
-          if (postError) throw postError;
-
-          await supabase.from('rmoderation_logs').insert({
-            moderator_id: admin.id,
-            target_id: moderationTarget.id,
-            target_type: 'post',
-            action: 'delete_post',
-            reason: moderationReason,
-            metadata: moderationTarget.data
-          });
-
-        } else if (moderationTarget.type === 'user') {
-          // Mute user and log
-          const { error: userError } = await supabase
-            .from('rusers')
-            .update({ 
-              is_muted: true,
-              muted_at: new Date().toISOString(),
-              muted_by: admin.supabase_uid,
-              mute_reason: moderationReason
-            })
-            .eq('id', moderationTarget.id);
-          
-          if (userError) throw userError;
-
-          await supabase.from('rmoderation_logs').insert({
-            moderator_id: admin.id,
-            target_id: moderationTarget.id,
-            target_type: 'user',
-            action: 'mute_user',
-            reason: moderationReason
-          });
+  const handleMuteUser = async (targetUserId) => {
+    if (!isModerator) return;
+    Alert.alert(
+      "Mute User",
+      "Are you sure you want to mute this user? They will not be able to post or comment.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Mute", 
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const { error } = await supabase
+                .from('rusers')
+                .update({ is_muted: true })
+                .eq('id', targetUserId);
+              if (error) throw error;
+              alert("User muted successfully");
+            } catch (err) {
+              alert("Error muting user: " + err.message);
+            }
+          }
         }
-
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        setShowModerationModal(false);
-        fetchPosts();
-        Alert.alert("Success", "Action completed and logged.");
-      } catch (error) {
-        console.error("Error in moderation action:", error);
-        Alert.alert("Error", "Failed to complete action.");
-      }
-    };
-
-
-    const handleEditPost = (post) => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      router.push(`/post?id=${post.id}`);
-    };
-
-    const handleShare = async (post) => {
-      shareRef.current?.share(post);
-    };
-
-    const clearFilters = () => {
-    setSelectedZone(null);
-    setSelectedTag(null);
+      ]
+    );
   };
 
-  const getFeedData = () => {
-    const data = [];
-    posts.forEach((post, index) => {
-      data.push({ ...post, _isPost: true });
-      if (index === 0 || (index + 1) % 5 === 0) {
-        data.push({ _isAd: true, id: `ad-${index}` });
-      }
-    });
-    return data;
+  const handleDeletePost = async (postId) => {
+    if (!isModerator) return;
+    Alert.alert(
+      "Delete Post",
+      "Are you sure you want to delete this post? This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Delete", 
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const { error } = await supabase
+                .from('rposts')
+                .update({ is_deleted: true })
+                .eq('id', postId);
+              if (error) throw error;
+              fetchPosts(true);
+            } catch (err) {
+              alert("Error deleting post: " + err.message);
+            }
+          }
+        }
+      ]
+    );
   };
 
-  return (
-    <View style={styles.container}>
-      <LinearGradient
-        colors={['#0F172A', '#000000', '#000000']}
-        style={StyleSheet.absoluteFill}
-      />
-      <StatusBar style="light" />
-      
-        <View style={{ paddingTop: insets.top }}>
-            <View style={styles.header}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 15 }}>
-                <Image 
-                  source={require('../../assets/images/icon.png')} 
-                  style={{ width: 32, height: 32, borderRadius: 8 }}
-                  contentFit="contain"
-                />
-                <TouchableOpacity 
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setShowZones(!showZones);
-                    setShowTags(false);
-                  }}
-                  style={{ padding: 4 }}
-                >
-                  <LayoutGrid size={22} color={showZones ? "#FFFFFF" : "rgba(255,255,255,0.4)"} />
-                </TouchableOpacity>
-                  <TouchableOpacity 
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      setShowTags(!showTags);
-                      setShowZones(false);
-                    }}
-                    style={{ padding: 4 }}
-                  >
-                    <Hash size={22} color={showTags ? "#FFFFFF" : "rgba(255,255,255,0.4)"} />
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      setShowSearch(!showSearch);
-                      if (!showSearch) {
-                        setShowZones(false);
-                        setShowTags(false);
-                      }
-                    }}
-                    style={{ padding: 4 }}
-                  >
-                    <Search size={22} color={showSearch ? "#FFFFFF" : "rgba(255,255,255,0.4)"} />
-                  </TouchableOpacity>
-                </View>
-                <View style={styles.headerActions}>
-                  <TouchableOpacity 
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      setSortBy(s => {
-                        if (s === 'newest') return 'popular';
-                        if (s === 'popular') return 'oldest';
-                        return 'newest';
-                      });
-                    }} 
-                    style={styles.iconButton}
-                  >
-                    {sortBy === 'popular' ? (
-                      <Zap size={20} color="#F59E0B" />
-                    ) : (
-                      <ArrowUpDown size={20} color={sortBy === 'newest' ? "#FFFFFF" : "rgba(255,255,255,0.4)"} />
-                    )}
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => setShowMenu(!showMenu)} style={styles.iconButton}>
-                    <Menu size={24} color="#FFFFFF" />
-                  </TouchableOpacity>
-                </View>
-            </View>
-
-          {/* Dropdown Menu */}
-          {showMenu && (
-            <View style={[styles.dropdownContainer, { top: insets.top + 55 }]}>
-                <TouchableOpacity 
-                  style={styles.dropdownItem} 
-                  onPress={() => { setShowMenu(false); router.push("/profile"); }}
-                >
-                  {user?.avatar_url ? (
-                    <Image source={{ uri: user.avatar_url }} style={{ width: 18, height: 18, borderRadius: 9 }} />
-                  ) : user?.emoji_icon ? (
-                    <Text style={{ fontSize: 16 }}>{user.emoji_icon}</Text>
-                  ) : (
-                    <User size={18} color="#FFFFFF" />
-                  )}
-                  <Text style={styles.dropdownText}>PROFILE</Text>
-                </TouchableOpacity>
-
-                {user?.supabase_uid ? (
-                  <TouchableOpacity 
-                    style={styles.dropdownItem} 
-                    onPress={() => { setShowMenu(false); logoutUser(); }}
-                  >
-                    <User size={18} color="#EF4444" />
-                    <Text style={[styles.dropdownText, { color: '#EF4444' }]}>SIGN OUT</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity 
-                    style={styles.dropdownItem} 
-                    onPress={() => { setShowMenu(false); router.push("/auth?mode=login"); }}
-                  >
-                    <User size={18} color="#4ADE80" />
-                    <Text style={[styles.dropdownText, { color: '#4ADE80' }]}>SIGN IN</Text>
-                  </TouchableOpacity>
-                )}
-
-                <View style={styles.dropdownDivider} />
-
-              <TouchableOpacity 
-                style={styles.dropdownItem} 
-                onPress={() => { setShowMenu(false); router.push("/talent"); }}
-              >
-                <Music size={18} color="#A855F7" />
-                <Text style={styles.dropdownText}>LOCAL TALENT</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={styles.dropdownItem} 
-                onPress={() => { setShowMenu(false); router.push("/businesses"); }}
-              >
-                <Briefcase size={18} color="#3B82F6" />
-                <Text style={styles.dropdownText}>BUSINESSES</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={styles.dropdownItem} 
-                onPress={() => { setShowMenu(false); router.push("/help"); }}
-              >
-                <HelpCircle size={18} color="#10B981" />
-                <Text style={styles.dropdownText}>HELP / CONTACT</Text>
-              </TouchableOpacity>
-
-                {isModerator && (
-                  <TouchableOpacity 
-                    style={styles.dropdownItem} 
-                    onPress={() => { setShowMenu(false); router.push("/admin"); }}
-                  >
-                    <Shield size={18} color="#EF4444" />
-                    <Text style={styles.dropdownText}>MODERATION</Text>
-                  </TouchableOpacity>
-                )}
-            </View>
-          )}
-
-            <View style={styles.filterSection}>
-              {showSearch && (
-                <View style={styles.searchContainer}>
-                  <TextInput
-                    style={styles.searchInput}
-                    placeholder="Search posts..."
-                    placeholderTextColor="rgba(255,255,255,0.3)"
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                    autoFocus
-                  />
-                  <TouchableOpacity onPress={() => { setSearchQuery(""); setShowSearch(false); fetchPosts(); }}>
-                    <X size={20} color="rgba(255,255,255,0.4)" />
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              {showZones && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <FlatList
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.filterList}
-                  data={[{ id: null, name: 'ALL ZONES' }, ...zones]}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      onPress={() => setSelectedZone(item.id)}
-                      style={styles.filterPill}
-                    >
-                      <Text style={[
-                        styles.filterText,
-                        { color: selectedZone === item.id ? '#FFFFFF' : 'rgba(255,255,255,0.4)', 
-                          fontWeight: selectedZone === item.id ? '800' : '400' }
-                      ]}>
-                        {item.name.toUpperCase()}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                  keyExtractor={item => `zone-${item.id}`}
-                />
-              </View>
-            )}
-
-            {showTags && (
-              <FlatList
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={[styles.filterList, { marginTop: showZones ? 4 : 0 }]}
-                data={[{ id: null, name: 'EVERYTHING' }, ...tags]}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    onPress={() => setSelectedTag(item.id)}
-                    style={styles.filterPill}
-                  >
-                    <Text style={[
-                      styles.filterText,
-                      { color: selectedTag === item.id ? '#FFFFFF' : 'rgba(255,255,255,0.4)',
-                        fontWeight: selectedTag === item.id ? '800' : '400',
-                        fontSize: 11 }
-                    ]}>
-                      #{item.name.toUpperCase().replace(/\s+/g, '')}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-                keyExtractor={item => `tag-${item.id}`}
-              />
-            )}
-          </View>
-      </View>
-
-      {loading && !refreshing ? (
-        <View style={styles.loadingContainer}>
-          <FlatList
-            data={[1, 2, 3, 4, 5]}
-            renderItem={() => <SkeletonPost />}
-            keyExtractor={i => i.toString()}
-          />
+  if (loading && !refreshing && posts.length === 0) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.background }]}>
+        <View style={styles.header}>
+          <Text style={[styles.title, { color: colors.text }]}>THE WALL</Text>
         </View>
-      ) : (
         <FlatList
-          data={getFeedData()}
-          ListHeaderComponent={<BannerAd />}
-          renderItem={({ item }) => {
-            if (item._isAd) return <NativeAd />;
-            return (
-              <PostItem 
-                item={item} 
-                deviceId={deviceId} 
-                onReaction={handleReaction} 
-                onDelete={handleDeletePost}
-                onMute={handleMuteUser}
-                onShare={handleShare}
-                onEdit={handleEditPost}
-                user={user}
-              />
-            );
-          }}
-          keyExtractor={(item) => item.id.toString()}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={onRefresh}
-                tintColor="#FFFFFF"
-              />
-            }
-            contentContainerStyle={{ 
-              paddingBottom: insets.bottom + 100,
-            }}
-            ListFooterComponent={null}
-            ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <Search size={40} color="rgba(255,255,255,0.2)" style={{ marginBottom: 16 }} />
-                <Text style={{ color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>
-                  No posts found. {lastError ? `\n\nError: ${lastError}` : ''}
-                </Text>
-                <TouchableOpacity onPress={clearFilters} style={styles.clearButton}>
-                  <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>CLEAR FILTERS</Text>
-                </TouchableOpacity>
-              </View>
-            }
+          data={[1,2,3,4]}
+          renderItem={() => <SkeletonPost />}
+          keyExtractor={i => i.toString()}
+          contentContainerStyle={styles.listContent}
         />
-      )}
-
-      <TouchableOpacity
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          router.push("/post");
-        }}
-        activeOpacity={0.9}
-        style={styles.fab}
-      >
-        <Plus size={32} color="#000000" strokeWidth={3} />
-      </TouchableOpacity>
-
-        <ShareManager ref={shareRef} />
-
-        <Modal
-          visible={showModerationModal}
-          transparent
-          animationType="fade"
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.moderationCard}>
-              <Text style={styles.moderationTitle}>
-                {moderationTarget?.type === 'post' ? 'DELETE POST' : 'MUTE USER'}
-              </Text>
-              <Text style={styles.moderationSubtitle}>
-                Please provide a reason for this action. This will be recorded in the admin logs.
-              </Text>
-              
-              <TextInput
-                style={styles.reasonInput}
-                placeholder="Reason (e.g. Spam, Harassment, Misleading content)"
-                placeholderTextColor="rgba(255,255,255,0.3)"
-                value={moderationReason}
-                onChangeText={setModerationReason}
-                multiline
-                numberOfLines={4}
-              />
-
-              <View style={styles.modalActions}>
-                <TouchableOpacity 
-                  onPress={() => setShowModerationModal(false)}
-                  style={[styles.modalButton, { backgroundColor: 'rgba(255,255,255,0.05)' }]}
-                >
-                  <Text style={[styles.modalButtonText, { color: '#FFFFFF' }]}>CANCEL</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  onPress={submitModeration}
-                  style={[styles.modalButton, { backgroundColor: '#EF4444' }]}
-                >
-                  <Text style={styles.modalButtonText}>CONFIRM</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-
-          <NotificationPanel 
-            visible={showNotifications} 
-            onClose={() => {
-              setShowNotifications(false);
-              loadUnreadCount();
-            }} 
-          />
-
       </View>
     );
   }
 
-  const styles = StyleSheet.create({
+  return (
+    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.background }]}>
+      <StatusBar style="light" />
+      
+      <View style={styles.header}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <TouchableOpacity 
+            style={styles.menuButton}
+            onPress={() => setShowMenu(true)}
+          >
+            <Menu size={24} color={colors.text} />
+          </TouchableOpacity>
+          <Text style={[styles.title, { color: colors.text }]}>THE WALL</Text>
+        </View>
+        
+        <View style={styles.headerActions}>
+          <TouchableOpacity 
+            style={styles.iconButton}
+            onPress={() => setShowSearch(!showSearch)}
+          >
+            <Search size={22} color={showSearch ? colors.primary : colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.iconButton}
+            onPress={() => setShowNotifications(true)}
+          >
+            <Bell size={22} color={colors.text} />
+            {unreadCount > 0 && <View style={styles.badge} />}
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {showSearch && (
+        <View style={styles.searchContainer}>
+          <View style={styles.searchBar}>
+            <Search size={18} color="rgba(255,255,255,0.4)" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search the wall..."
+              placeholderTextColor="rgba(255,255,255,0.4)"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoFocus
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery("")}>
+                <X size={18} color="rgba(255,255,255,0.4)" />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      )}
+
+      <View style={styles.filterContainer}>
+        <FlatList
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          data={[
+            { id: 'zones', icon: LayoutGrid, label: selectedZone ? zones.find(z => z.id === selectedZone)?.name : 'All Zones' },
+            { id: 'tags', icon: Hash, label: selectedTag ? tags.find(t => t.id === selectedTag)?.name : 'All Tags' },
+            { id: 'sort', icon: ArrowUpDown, label: sortBy.charAt(0).toUpperCase() + sortBy.slice(1) },
+          ]}
+          renderItem={({ item }) => (
+            <TouchableOpacity 
+              style={[
+                styles.filterChip,
+                (item.id === 'zones' && selectedZone) || (item.id === 'tags' && selectedTag) ? styles.activeChip : null
+              ]}
+              onPress={() => {
+                if (item.id === 'zones') setShowZones(true);
+                if (item.id === 'tags') setShowTags(true);
+                if (item.id === 'sort') {
+                  const options = ['newest', 'popular', 'oldest'];
+                  const next = options[(options.indexOf(sortBy) + 1) % options.length];
+                  setSortBy(next);
+                  fetchPosts(true);
+                }
+              }}
+            >
+              <item.icon size={14} color={((item.id === 'zones' && selectedZone) || (item.id === 'tags' && selectedTag)) ? '#000' : 'rgba(255,255,255,0.6)'} />
+              <Text style={[
+                styles.filterLabel,
+                ((item.id === 'zones' && selectedZone) || (item.id === 'tags' && selectedTag)) ? styles.activeLabel : null
+              ]}>{item.label}</Text>
+            </TouchableOpacity>
+          )}
+          keyExtractor={i => i.id}
+          contentContainerStyle={{ paddingHorizontal: 20, gap: 10 }}
+        />
+      </View>
+
+      {lastError && (
+        <View style={styles.errorContainer}>
+          <AlertTriangle size={20} color="#EF4444" />
+          <Text style={styles.errorText}>{lastError}</Text>
+          <TouchableOpacity onPress={() => fetchPosts()}>
+            <Text style={styles.retryText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      <FlatList
+        data={posts}
+        renderItem={({ item, index }) => (
+          <View>
+            <PostItem 
+              item={item} 
+              deviceId={deviceId}
+              user={user}
+              onReaction={(postId, type) => handleReaction(postId, type)}
+              onComment={() => fetchPosts(true)}
+              onDelete={(id) => handleDeletePost(id)}
+              onMute={(id) => handleMuteUser(id)}
+              onShare={(p) => shareRef.current?.open(p)}
+            />
+            {index % 5 === 2 && <NativeAd />}
+          </View>
+        )}
+        keyExtractor={(item) => item.id.toString()}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => fetchPosts(true)}
+            tintColor={colors.primary}
+          />
+        }
+        contentContainerStyle={styles.listContent}
+        ListEmptyComponent={
+          !loading && (
+            <View style={styles.emptyContainer}>
+              <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 16 }}>No posts found</Text>
+              {(selectedZone || selectedTag || searchQuery) && (
+                <TouchableOpacity 
+                  style={styles.clearButton}
+                  onPress={() => {
+                    setSelectedZone(null);
+                    setSelectedTag(null);
+                    setSearchQuery("");
+                    fetchPosts(true);
+                  }}
+                >
+                  <Text style={{ color: colors.primary }}>Clear filters</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )
+        }
+      />
+
+      <TouchableOpacity 
+        style={[styles.fab, { backgroundColor: colors.primary }]}
+        onPress={() => router.push("/post")}
+      >
+        <Plus size={30} color="#000" />
+      </TouchableOpacity>
+
+      {/* Side Menu */}
+      <Modal
+        visible={showMenu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowMenu(false)}
+      >
+        <TouchableOpacity 
+          style={styles.menuOverlay}
+          activeOpacity={1}
+          onPress={() => setShowMenu(false)}
+        >
+          <View style={[styles.menuContent, { backgroundColor: '#0F172A' }]}>
+            <View style={[styles.menuHeader, { paddingTop: insets.top + 20 }]}>
+              {user ? (
+                <TouchableOpacity 
+                  style={styles.profileSection}
+                  onPress={() => {
+                    setShowMenu(false);
+                    router.push("/profile");
+                  }}
+                >
+                  {user.avatar_url ? (
+                    <Image source={{ uri: user.avatar_url }} style={styles.menuAvatar} />
+                  ) : (
+                    <View style={styles.menuAvatarPlaceholder}>
+                      <Text style={{ fontSize: 24 }}>{user.emoji_icon || '👤'}</Text>
+                    </View>
+                  )}
+                  <View>
+                    <Text style={styles.menuUsername}>{user.username}</Text>
+                    <Text style={styles.menuViewProfile}>View Profile</Text>
+                  </View>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity 
+                  style={styles.loginButton}
+                  onPress={() => {
+                    setShowMenu(false);
+                    router.push("/auth");
+                  }}
+                >
+                  <Text style={styles.loginButtonText}>Login / Sign Up</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <View style={styles.menuItems}>
+              <TouchableOpacity 
+                style={styles.menuItem}
+                onPress={() => {
+                  setShowMenu(false);
+                  router.push("/businesses");
+                }}
+              >
+                <Briefcase size={22} color="#FFF" />
+                <Text style={styles.menuItemText}>Local Businesses</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.menuItem}
+                onPress={() => {
+                  setShowMenu(false);
+                  router.push("/talent");
+                }}
+              >
+                <Star size={22} color="#FFF" />
+                <Text style={styles.menuItemText}>Local Talent</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.menuItem}
+                onPress={() => {
+                  setShowMenu(false);
+                  router.push("/councillor");
+                }}
+              >
+                <User size={22} color="#FFF" />
+                <Text style={styles.menuItemText}>Contact Councillor</Text>
+              </TouchableOpacity>
+
+              <View style={styles.menuDivider} />
+
+              <TouchableOpacity 
+                style={styles.menuItem}
+                onPress={() => {
+                  setShowMenu(false);
+                  router.push("/settings");
+                }}
+              >
+                <Settings size={22} color="#FFF" />
+                <Text style={styles.menuItemText}>Settings</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.menuItem}
+                onPress={() => {
+                  setShowMenu(false);
+                  router.push("/help");
+                }}
+              >
+                <HelpCircle size={22} color="#FFF" />
+                <Text style={styles.menuItemText}>Help & Support</Text>
+              </TouchableOpacity>
+
+              {user && (
+                <TouchableOpacity 
+                  style={[styles.menuItem, { marginTop: 20 }]}
+                  onPress={async () => {
+                    await logoutUser();
+                    setShowMenu(false);
+                  }}
+                >
+                  <X size={22} color="#EF4444" />
+                  <Text style={[styles.menuItemText, { color: '#EF4444' }]}>Logout</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <View style={styles.menuFooter}>
+              <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 12 }}>TownWall v1.0.0</Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Zones Modal */}
+      <Modal visible={showZones} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>SELECT ZONE</Text>
+              <TouchableOpacity onPress={() => setShowZones(false)}>
+                <X color="#FFF" />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={[{ id: null, name: 'All Zones' }, ...zones]}
+              renderItem={({ item }) => (
+                <TouchableOpacity 
+                  style={[styles.modalItem, selectedZone === item.id && styles.modalItemActive]}
+                  onPress={() => {
+                    setSelectedZone(item.id);
+                    setShowZones(false);
+                    fetchPosts(true);
+                  }}
+                >
+                  <Text style={[styles.modalItemText, selectedZone === item.id && styles.modalItemTextActive]}>
+                    {item.name}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              keyExtractor={i => (i.id || 'all').toString()}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* Tags Modal */}
+      <Modal visible={showTags} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>SELECT TAG</Text>
+              <TouchableOpacity onPress={() => setShowTags(false)}>
+                <X color="#FFF" />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={[{ id: null, name: 'All Tags' }, ...tags]}
+              renderItem={({ item }) => (
+                <TouchableOpacity 
+                  style={[styles.modalItem, selectedTag === item.id && styles.modalItemActive]}
+                  onPress={() => {
+                    setSelectedTag(item.id);
+                    setShowTags(false);
+                    fetchPosts(true);
+                  }}
+                >
+                  <Text style={[styles.modalItemText, selectedTag === item.id && styles.modalItemTextActive]}>
+                    {item.name}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              keyExtractor={i => (i.id || 'all').toString()}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      <NotificationPanel 
+        visible={showNotifications} 
+        onClose={() => {
+          setShowNotifications(false);
+          loadUnreadCount();
+        }} 
+      />
+      
+      <ShareManager ref={shareRef} />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 15,
   },
-  logo: {
+  title: {
     fontSize: 24,
-    fontWeight: '900',
+    fontWeight: "900",
     letterSpacing: -1,
   },
   headerActions: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 15,
   },
-    iconButton: {
-      padding: 5,
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    justifyContent: "center",
+    alignItems: "center",
     position: 'relative',
   },
-    dropdownContainer: {
-      position: 'absolute',
-      right: 20,
-      width: 220,
-      backgroundColor: '#0F172A',
-      borderRadius: 20,
-      padding: 8,
-      zIndex: 1000,
-      borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.08)',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 20 },
-      shadowOpacity: 0.6,
-      shadowRadius: 30,
-      elevation: 20,
-    },
-
-  dropdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    gap: 12,
-  },
-  dropdownText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
-  dropdownBadge: {
+  badge: {
     position: 'absolute',
-    top: -2,
-    right: -2,
+    top: 10,
+    right: 10,
     width: 8,
     height: 8,
     borderRadius: 4,
     backgroundColor: '#EF4444',
-    borderWidth: 1,
-    borderColor: '#111111',
+    borderWidth: 2,
+    borderColor: '#000',
   },
-  dropdownDivider: {
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    marginVertical: 8,
-  },
-  badge: {
-      position: 'absolute',
-      top: 0,
-      right: 0,
-      backgroundColor: '#EF4444',
-      borderRadius: 10,
-      minWidth: 16,
-      height: 16,
-      justifyContent: 'center',
-      alignItems: 'center',
-      paddingHorizontal: 3,
-      borderWidth: 1.5,
-      borderColor: '#000000',
-    },
-    badgeText: {
-      color: '#FFFFFF',
-      fontSize: 8,
-      fontWeight: '900',
-    },
-    filterSection: {
-      paddingBottom: 10,
-    },
-    searchContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: 'rgba(255,255,255,0.05)',
-      marginHorizontal: 20,
-      marginBottom: 10,
-      paddingHorizontal: 15,
-      paddingVertical: 10,
-      borderRadius: 12,
-      gap: 10,
-    },
-    searchInput: {
-      flex: 1,
-      color: '#FFFFFF',
-      fontSize: 14,
-      fontWeight: '600',
-    },
-    filterList: {
+  searchContainer: {
     paddingHorizontal: 20,
-    gap: 15,
+    paddingBottom: 15,
   },
-  filterPill: {
-    paddingVertical: 5,
-  },
-  filterText: {
-    fontSize: 12,
-    letterSpacing: 0.5,
-  },
-    postContainer: {
-      paddingHorizontal: 20,
-      paddingVertical: 20,
-      backgroundColor: 'rgba(255,255,255,0.02)',
-      marginBottom: 1,
-      position: 'relative',
-    },
-    deleteButton: {
-      position: 'absolute',
-      top: 12,
-      right: 12,
-      zIndex: 10,
-      padding: 8,
-    },
-    postHeader: {
-      flexDirection: "row",
-      alignItems: "center",
-      marginBottom: 10,
-    },
-
-  zoneText: {
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-  },
-  timeText: {
-    fontSize: 11,
-    marginLeft: 4,
-  },
-  tagText: {
-    fontSize: 11,
-    marginLeft: 4,
-  },
-  postTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    lineHeight: 24,
-  },
-  expandedContent: {
-    marginTop: 12,
-  },
-  postBody: {
-    fontSize: 15,
-    lineHeight: 22,
-    marginBottom: 16,
-  },
-    postFooter: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingTop: 12,
-    },
-    footerText: {
-      fontSize: 11,
-      fontWeight: '600',
-      letterSpacing: 0.5,
-      textTransform: 'uppercase',
-    },
-    actionRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 12,
-      marginTop: 16,
-      flexWrap: "wrap",
-    },
-    actionButton: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 8,
-    },
-    actionCount: {
-      fontSize: 13,
-      fontWeight: "800",
-    },
-
-  blurBanner: {
+  searchBar: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(239, 68, 68, 0.08)",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "rgba(239, 68, 68, 0.2)",
-    marginBottom: 8,
-    gap: 10,
-  },
-  blurText: {
-    color: "#EF4444",
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  emptyContainer: {
-    paddingVertical: 100,
-    alignItems: "center",
-  },
-  clearButton: {
-    marginTop: 20,
-    padding: 10,
-  },
-  commentsSection: {
-    marginTop: 20,
-    paddingTop: 15,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.05)",
-  },
-  commentsHeader: {
-    color: "rgba(255,255,255,0.3)",
-    fontSize: 10,
-    fontWeight: "800",
-    letterSpacing: 1,
-    marginBottom: 15,
-  },
-  commentItem: {
-    marginBottom: 12,
-  },
-  commentUser: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "700",
-    marginBottom: 2,
-  },
-  commentText: {
-    color: "rgba(255,255,255,0.7)",
-    fontSize: 14,
-    lineHeight: 18,
-  },
-  noComments: {
-    color: "rgba(255,255,255,0.2)",
-    fontSize: 13,
-    fontStyle: "italic",
-    marginBottom: 15,
-  },
-  commentInputRow: {
-    flexDirection: "row",
-    alignItems: "flex-end",
     backgroundColor: "rgba(255,255,255,0.05)",
     borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginTop: 10,
+    paddingHorizontal: 15,
+    height: 45,
     gap: 10,
   },
-  commentInput: {
+  searchInput: {
     flex: 1,
     color: "#FFFFFF",
-    fontSize: 14,
-    maxHeight: 80,
-    paddingTop: 4,
+    fontSize: 16,
   },
-  sendButton: {
-    padding: 4,
+  filterContainer: {
+    marginBottom: 15,
+  },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  activeChip: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#FFFFFF',
+  },
+  filterLabel: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  activeLabel: {
+    color: '#000',
+  },
+  listContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 100,
+  },
+  postContainer: {
+    marginBottom: 20,
+    backgroundColor: "rgba(255,255,255,0.03)",
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.05)",
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    marginHorizontal: 20,
+    marginBottom: 15,
+    padding: 12,
+    borderRadius: 12,
+    gap: 10,
+  },
+  errorText: {
+    flex: 1,
+    color: '#EF4444',
+    fontSize: 13,
+  },
+  retryText: {
+    color: '#EF4444',
+    fontWeight: '800',
+    fontSize: 13,
+    textDecorationLine: 'underline',
   },
   fab: {
     position: "absolute",
-    bottom: 35,
-    right: 25,
-    width: 65,
-    height: 65,
-    borderRadius: 32.5,
-    backgroundColor: '#FFFFFF',
+    bottom: 30,
+    right: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     justifyContent: "center",
     alignItems: "center",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
   },
-  fullImageContainer: {
+  menuOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.95)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  menuContent: {
+    width: '80%',
+    height: '100%',
+    padding: 20,
+  },
+  menuHeader: {
+    marginBottom: 30,
+  },
+  profileSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 15,
+  },
+  menuAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
+  menuAvatarPlaceholder: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255,255,255,0.1)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  closeImageButton: {
+  menuUsername: {
+    color: '#FFF',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  menuViewProfile: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  loginButton: {
+    backgroundColor: '#FFF',
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  loginButtonText: {
+    color: '#000',
+    fontWeight: '800',
+  },
+  menuItems: {
+    gap: 10,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    gap: 15,
+  },
+  menuItemText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    marginVertical: 10,
+  },
+  menuFooter: {
     position: 'absolute',
-    top: 50,
-    right: 25,
-    zIndex: 10,
+    bottom: 40,
+    left: 20,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#1E293B',
+    borderRadius: 20,
+    maxHeight: '80%',
+    padding: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    color: '#FFF',
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  modalItem: {
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  modalItemActive: {
+    borderBottomColor: '#FFF',
+  },
+  modalItemText: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 16,
+  },
+  modalItemTextActive: {
+    color: '#FFF',
+    fontWeight: '800',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 50,
+  },
+  clearButton: {
+    marginTop: 15,
     padding: 10,
   },
-    fullImage: {
-      width: '100%',
-      height: '100%',
-    },
-    navOverlay: {
-      position: 'absolute',
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      width: '100%',
-      paddingHorizontal: 20,
-      pointerEvents: 'box-none',
-    },
-    navButton: {
-      backgroundColor: 'rgba(0,0,0,0.3)',
-      borderRadius: 25,
-      padding: 5,
-    },
-    paginationDots: {
-      position: 'absolute',
-      bottom: 60,
-      flexDirection: 'row',
-      gap: 8,
-    },
-    dot: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
-    },
-    menuOverlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.95)',
-    },
-    menuContent: {
-      flex: 1,
-      paddingHorizontal: 30,
-    },
-    menuHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 40,
-    },
-    menuTitle: {
-      color: '#FFFFFF',
-      fontSize: 28,
-      fontWeight: '900',
-      letterSpacing: 4,
-    },
-    menuCloseButton: {
-      padding: 5,
-    },
-    menuGrid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: 20,
-    },
-    menuItem: {
-      width: (Dimensions.get('window').width - 80) / 2,
-      backgroundColor: 'rgba(255,255,255,0.05)',
-      borderRadius: 20,
-      padding: 20,
-      alignItems: 'center',
-      borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.1)',
-    },
-    menuIconContainer: {
-      width: 50,
-      height: 50,
-      borderRadius: 15,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginBottom: 12,
-    },
-    menuItemLabel: {
-      color: '#FFFFFF',
-      fontSize: 14,
-      fontWeight: '700',
-      textAlign: 'center',
-    },
-    menuItemPrice: {
-      color: 'rgba(255,255,255,0.4)',
-      fontSize: 12,
-      fontWeight: '600',
-      marginTop: 4,
-    },
-    menuItemStatus: {
-      color: '#F59E0B',
-      fontSize: 10,
-      fontWeight: '900',
-      marginTop: 4,
-    },
-    menuFooter: {
-      position: 'absolute',
-      bottom: 50,
-      left: 0,
-      right: 0,
-      alignItems: 'center',
-    },
-    modalOverlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.85)',
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: 20,
-    },
-    moderationCard: {
-      width: '100%',
-      maxWidth: 400,
-      backgroundColor: '#1E293B',
-      borderRadius: 24,
-      padding: 24,
-      borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.1)',
-    },
-    moderationTitle: {
-      color: '#FFFFFF',
-      fontSize: 18,
-      fontWeight: '900',
-      letterSpacing: 2,
-      marginBottom: 8,
-    },
-    moderationSubtitle: {
-      color: 'rgba(255,255,255,0.6)',
-      fontSize: 14,
-      lineHeight: 20,
-      marginBottom: 20,
-    },
-    reasonInput: {
-      backgroundColor: 'rgba(0,0,0,0.2)',
-      borderRadius: 12,
-      padding: 16,
-      color: '#FFFFFF',
-      fontSize: 16,
-      textAlignVertical: 'top',
-      minHeight: 100,
-      marginBottom: 24,
-      borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.05)',
-    },
-    modalActions: {
-      flexDirection: 'row',
-      gap: 12,
-    },
-    modalButton: {
-      flex: 1,
-      paddingVertical: 16,
-      borderRadius: 12,
-      alignItems: 'center',
-    },
-    modalButtonText: {
-      color: '#FFFFFF',
-      fontSize: 14,
-      fontWeight: '800',
-      letterSpacing: 1,
-    },
-  });
+});
 
 function getTimeAgo(date) {
   const seconds = Math.floor((new Date() - date) / 1000);
