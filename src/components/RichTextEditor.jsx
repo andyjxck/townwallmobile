@@ -6,7 +6,9 @@ import {
   ScrollView, 
   TouchableOpacity,
   Platform,
-  KeyboardAvoidingView
+  KeyboardAvoidingView,
+  Modal,
+  TouchableWithoutFeedback
 } from 'react-native';
 import { 
   actions, 
@@ -36,32 +38,82 @@ import {
   AlignLeft,
   AlignCenter,
   AlignRight,
-  AlignJustify
+  AlignJustify,
+  ChevronDown,
+  Undo2,
+  Redo2,
+  Trash2,
+  Plus
 } from 'lucide-react-native';
 
-const customActions = [
-  ...defaultActions,
-  actions.setStrikethrough,
-  actions.heading1,
-  actions.heading2,
-  actions.heading3,
-  actions.setHR,
-  actions.insertLink,
-  actions.quote,
-  actions.code,
-  'foreColor',
-  'hiliteColor',
+const COLORS = [
+  '#000000', '#FFFFFF', '#FF3B30', '#4CD964', '#007AFF', 
+  '#FFCC00', '#5856D6', '#FF9500', '#8E8E93', '#C7C7CC'
 ];
 
-const COLORS = [
-  '#000000', '#ffffff', '#ff0000', '#00ff00', '#0000ff', 
-  '#ffff00', '#ff00ff', '#00ffff', '#888888', '#444444'
-];
+function HeaderDropdown({ currentHeader, onSelect }) {
+  const [visible, setVisible] = useState(false);
+
+  const options = [
+    { label: 'Paragraph', value: 'p', icon: Type },
+    { label: 'Heading 1', value: 'h1', icon: Heading1 },
+    { label: 'Heading 2', value: 'h2', icon: Heading2 },
+    { label: 'Heading 3', value: 'h3', icon: Heading3 },
+  ];
+
+  const currentOption = options.find(o => o.value === currentHeader) || options[0];
+
+  return (
+    <View>
+      <TouchableOpacity 
+        style={styles.dropdownTrigger} 
+        onPress={() => setVisible(true)}
+      >
+        <currentOption.icon size={18} color="#FFFFFF" />
+        <Text style={styles.dropdownText}>{currentOption.label}</Text>
+        <ChevronDown size={14} color="rgba(255,255,255,0.4)" />
+      </TouchableOpacity>
+
+      <Modal
+        visible={visible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.dropdownMenu}>
+              {options.map((option) => (
+                <TouchableOpacity
+                  key={option.value}
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    onSelect(option.value);
+                    setVisible(false);
+                  }}
+                >
+                  <option.icon size={18} color={currentHeader === option.value ? '#007AFF' : '#FFFFFF'} />
+                  <Text style={[
+                    styles.dropdownItemText,
+                    currentHeader === option.value && { color: '#007AFF', fontWeight: 'bold' }
+                  ]}>
+                    {option.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+    </View>
+  );
+}
 
 export function RichTextEditor({ value, onChange, placeholder }) {
   const richText = useRef();
   const [showColorPicker, setShowColorPicker] = useState(false);
-  const [colorMode, setColorMode] = useState('foreColor'); // 'foreColor' or 'hiliteColor'
+  const [colorMode, setColorMode] = useState('foreColor');
+  const [currentHeader, setCurrentHeader] = useState('p');
 
   const onInsertImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -71,8 +123,6 @@ export function RichTextEditor({ value, onChange, placeholder }) {
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
       const item = result.assets[0];
-      
-      // Upload to Supabase
       const fileExt = item.uri.split('.').pop()?.toLowerCase() || 'jpg';
       const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
       const filePath = `rich-text/${fileName}`;
@@ -102,103 +152,122 @@ export function RichTextEditor({ value, onChange, placeholder }) {
         richText.current?.insertImage(publicUrlData.publicUrl);
       } catch (error) {
         console.error("Image upload error:", error);
-        alert("Failed to upload image.");
       }
     }
   };
 
-  const handleCustomAction = (action) => {
-    if (action === 'foreColor') {
-      setColorMode('foreColor');
-      setShowColorPicker(!showColorPicker);
-    } else if (action === 'hiliteColor') {
-      setColorMode('hiliteColor');
-      setShowColorPicker(!showColorPicker);
-    }
-  };
-
-  const onSelectColor = (color) => {
-    if (colorMode === 'foreColor') {
-      richText.current?.prepareCursor();
-      richText.current?.executeAction('foreColor', color);
+  const handleHeaderSelect = (header) => {
+    setCurrentHeader(header);
+    if (header === 'p') {
+      richText.current?.executeAction('formatBlock', '<P>');
     } else {
-      richText.current?.prepareCursor();
-      richText.current?.executeAction('hiliteColor', color);
+      richText.current?.executeAction(header);
     }
-    setShowColorPicker(false);
   };
 
   return (
     <View style={styles.container}>
-      <RichToolbar
-        editor={richText}
-        actions={[
-          actions.setBold,
-          actions.setItalic,
-          actions.setUnderline,
-          actions.setStrikethrough,
-          actions.insertBulletsList,
-          actions.insertOrderedList,
-          actions.heading1,
-          actions.heading2,
-          actions.heading3,
-          actions.setHR,
-          actions.insertLink,
-          actions.quote,
-          actions.code,
-          actions.alignLeft,
-          actions.alignCenter,
-          actions.alignRight,
-          actions.alignFull,
-          'foreColor',
-          'hiliteColor',
-          'insertImage',
-          actions.undo,
-          actions.redo,
-          actions.removeFormat,
-        ]}
-        iconMap={{
-          [actions.setBold]: ({ tintColor }) => <Bold size={20} color={tintColor} />,
-          [actions.setItalic]: ({ tintColor }) => <Italic size={20} color={tintColor} />,
-          [actions.setUnderline]: ({ tintColor }) => <Underline size={20} color={tintColor} />,
-          [actions.setStrikethrough]: ({ tintColor }) => <Type size={20} color={tintColor} strokeWidth={3} />,
-          [actions.insertBulletsList]: ({ tintColor }) => <List size={20} color={tintColor} />,
-          [actions.insertOrderedList]: ({ tintColor }) => <ListOrdered size={20} color={tintColor} />,
-          [actions.heading1]: ({ tintColor }) => <Heading1 size={20} color={tintColor} />,
-          [actions.heading2]: ({ tintColor }) => <Heading2 size={20} color={tintColor} />,
-          [actions.heading3]: ({ tintColor }) => <Heading3 size={20} color={tintColor} />,
-          [actions.setHR]: ({ tintColor }) => <Minus size={20} color={tintColor} />,
-          [actions.insertLink]: ({ tintColor }) => <LinkIcon size={20} color={tintColor} />,
-          [actions.quote]: ({ tintColor }) => <Quote size={20} color={tintColor} />,
-          [actions.code]: ({ tintColor }) => <Code size={20} color={tintColor} />,
-          [actions.alignLeft]: ({ tintColor }) => <AlignLeft size={20} color={tintColor} />,
-          [actions.alignCenter]: ({ tintColor }) => <AlignCenter size={20} color={tintColor} />,
-          [actions.alignRight]: ({ tintColor }) => <AlignRight size={20} color={tintColor} />,
-          [actions.alignFull]: ({ tintColor }) => <AlignJustify size={20} color={tintColor} />,
-          foreColor: ({ tintColor }) => <Palette size={20} color={tintColor} />,
-          hiliteColor: ({ tintColor }) => <Palette size={20} color={tintColor} fill={tintColor} />,
-          insertImage: ({ tintColor }) => <ImageIcon size={20} color={tintColor} />,
-          [actions.removeFormat]: ({ tintColor }) => <Eraser size={20} color={tintColor} />,
-        }}
-        onPressAction={handleCustomAction}
-        insertImage={onInsertImage}
-        style={styles.richBar}
-        flatContainerStyle={styles.flatStyle}
-        selectedIconTint="#FFFFFF"
-        iconTint="rgba(255,255,255,0.4)"
-      />
+      <View style={styles.toolbarContainer}>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.toolbarContent}
+        >
+          <HeaderDropdown 
+            currentHeader={currentHeader} 
+            onSelect={handleHeaderSelect} 
+          />
+          
+          <View style={styles.separator} />
 
-      {showColorPicker && (
-        <ScrollView horizontal style={styles.colorPicker} showsHorizontalScrollIndicator={false}>
-          {COLORS.map(color => (
-            <TouchableOpacity
-              key={color}
-              onPress={() => onSelectColor(color)}
-              style={[styles.colorOption, { backgroundColor: color }]}
-            />
-          ))}
+          <RichToolbar
+            editor={richText}
+            actions={[
+              actions.setBold,
+              actions.setItalic,
+              actions.setUnderline,
+              'foreColor',
+            ]}
+            iconMap={{
+              [actions.setBold]: ({ tintColor }) => <Bold size={18} color={tintColor} />,
+              [actions.setItalic]: ({ tintColor }) => <Italic size={18} color={tintColor} />,
+              [actions.setUnderline]: ({ tintColor }) => <Underline size={18} color={tintColor} />,
+              foreColor: ({ tintColor }) => <Palette size={18} color={tintColor} />,
+            }}
+            onPressAction={(action) => {
+              if (action === 'foreColor') {
+                setColorMode('foreColor');
+                setShowColorPicker(!showColorPicker);
+              }
+            }}
+            style={styles.subToolbar}
+            flatContainerStyle={styles.flatStyle}
+            selectedIconTint="#007AFF"
+            iconTint="rgba(255,255,255,0.6)"
+          />
+
+          <View style={styles.separator} />
+
+          <RichToolbar
+            editor={richText}
+            actions={[
+              actions.insertBulletsList,
+              actions.insertOrderedList,
+              actions.insertLink,
+              'insertImage',
+            ]}
+            iconMap={{
+              [actions.insertBulletsList]: ({ tintColor }) => <List size={18} color={tintColor} />,
+              [actions.insertOrderedList]: ({ tintColor }) => <ListOrdered size={18} color={tintColor} />,
+              [actions.insertLink]: ({ tintColor }) => <LinkIcon size={18} color={tintColor} />,
+              insertImage: ({ tintColor }) => <ImageIcon size={18} color={tintColor} />,
+            }}
+            insertImage={onInsertImage}
+            style={styles.subToolbar}
+            flatContainerStyle={styles.flatStyle}
+            selectedIconTint="#007AFF"
+            iconTint="rgba(255,255,255,0.6)"
+          />
+
+          <View style={styles.separator} />
+
+          <RichToolbar
+            editor={richText}
+            actions={[
+              actions.undo,
+              actions.redo,
+              actions.removeFormat,
+            ]}
+            iconMap={{
+              [actions.undo]: ({ tintColor }) => <Undo2 size={18} color={tintColor} />,
+              [actions.redo]: ({ tintColor }) => <Redo2 size={18} color={tintColor} />,
+              [actions.removeFormat]: ({ tintColor }) => <Eraser size={18} color={tintColor} />,
+            }}
+            style={styles.subToolbar}
+            flatContainerStyle={styles.flatStyle}
+            selectedIconTint="#007AFF"
+            iconTint="rgba(255,255,255,0.6)"
+          />
         </ScrollView>
-      )}
+
+        {showColorPicker && (
+          <View style={styles.colorPickerContainer}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {COLORS.map(color => (
+                <TouchableOpacity
+                  key={color}
+                  onPress={() => {
+                    richText.current?.prepareCursor();
+                    richText.current?.executeAction('foreColor', color);
+                    setShowColorPicker(false);
+                  }}
+                  style={[styles.colorOption, { backgroundColor: color }]}
+                />
+              ))}
+            </ScrollView>
+          </View>
+        )}
+      </View>
 
       <RichEditor
         ref={richText}
@@ -206,14 +275,14 @@ export function RichTextEditor({ value, onChange, placeholder }) {
         onChange={onChange}
         placeholder={placeholder}
         editorStyle={{
-          backgroundColor: 'transparent',
+          backgroundColor: '#000000',
           color: '#FFFFFF',
           placeholderColor: 'rgba(255,255,255,0.2)',
           contentCSSText: `
             font-size: 18px; 
             line-height: 28px; 
             font-family: -apple-system, sans-serif;
-            padding: 0;
+            padding: 15px;
           `,
         }}
         style={styles.richEditor}
@@ -226,32 +295,88 @@ export function RichTextEditor({ value, onChange, placeholder }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#000000',
   },
-  richBar: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderTopLeftRadius: 15,
-    borderTopRightRadius: 15,
+  toolbarContainer: {
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: '#111111',
+    paddingVertical: 8,
+  },
+  toolbarContent: {
+    alignItems: 'center',
+    paddingHorizontal: 12,
+  },
+  subToolbar: {
+    backgroundColor: 'transparent',
+    minWidth: 40,
   },
   flatStyle: {
-    paddingHorizontal: 10,
+    paddingHorizontal: 0,
+    gap: 12,
+  },
+  separator: {
+    width: 1,
+    height: 24,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    marginHorizontal: 12,
+  },
+  dropdownTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 8,
+  },
+  dropdownText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dropdownMenu: {
+    backgroundColor: '#1C1C1E',
+    borderRadius: 12,
+    padding: 8,
+    width: 200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    gap: 12,
+    borderRadius: 8,
+  },
+  dropdownItemText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+  },
+  colorPickerContainer: {
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  colorOption: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    marginHorizontal: 6,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   richEditor: {
     flex: 1,
-    minHeight: 300,
   },
-  colorPicker: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    padding: 10,
-    flexDirection: 'row',
-  },
-  colorOption: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    marginHorizontal: 5,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-  }
 });
