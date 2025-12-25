@@ -175,29 +175,29 @@ export default function UniversalFeed() {
       if (!isRefreshing) setLoading(true);
       setLastError(null);
           try {
-            // Use LEFT JOINS (remove !) for maximum robustness
-            let query = supabase
-              .from('rposts')
-              .select(`
-                id, 
-                title, 
-                text, 
-                created_at, 
-                user_id, 
-                zone_id, 
-                tag_id, 
-                image_url, 
-                image_urls, 
-                is_anonymous, 
-                moderation_status,
-                is_deleted,
-                user:rusers (username, emoji_icon, avatar_url),
-                zone:rzones (name),
-                tag:rtags (name),
-                reactions:rreactions (reaction_type, device_id)
-              `)
-              .eq('is_deleted', false)
-              .eq('moderation_status', 'approved');
+              // Use explicit join hints to resolve ambiguity and force LEFT JOINS
+              let query = supabase
+                .from('rposts')
+                .select(`
+                  id, 
+                  title, 
+                  text, 
+                  created_at, 
+                  user_id, 
+                  zone_id, 
+                  tag_id, 
+                  image_url, 
+                  image_urls, 
+                  is_anonymous, 
+                  moderation_status,
+                  is_deleted,
+                  user:rusers!user_id (username, emoji_icon, avatar_url),
+                  zone:rzones!zone_id (name),
+                  tag:rtags!tag_id (name),
+                  reactions:rreactions (reaction_type, device_id)
+                `)
+                .eq('is_deleted', false)
+                .eq('moderation_status', 'approved');
 
           if (selectedZone !== null && selectedZone !== undefined) {
             query = query.eq('zone_id', selectedZone);
@@ -216,14 +216,14 @@ export default function UniversalFeed() {
         
         if (error) {
           console.error("Feed error:", error);
-              // Try an absolute bare-bones fallback if the complex one fails
+                  // Try an absolute bare-bones fallback if the complex one fails
                   const { data: fallback, error: fbError } = await supabase
                     .from('rposts')
                     .select(`
                       id, title, text, created_at, user_id, zone_id, tag_id, image_url, image_urls, is_anonymous,
-                      user:rusers (username, emoji_icon, avatar_url),
-                      zone:rzones (name),
-                      tag:rtags (name)
+                      user:rusers!user_id (username, emoji_icon, avatar_url),
+                      zone:rzones!zone_id (name),
+                      tag:rtags!tag_id (name)
                     `)
                 .eq('is_deleted', false)
                 .order('created_at', { ascending: false })
@@ -589,7 +589,7 @@ export default function UniversalFeed() {
         </View>
       ) : (
         <FlatList
-          ListHeaderComponent={null}
+          ListHeaderComponent={<BannerAd />}
           renderItem={({ item, index }) => (
             <View>
                   <PostItem 
