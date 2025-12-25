@@ -136,20 +136,94 @@ export function NativeAd() {
     CallToActionView,
     HeadlineView,
     TaglineView,
-    AdvertiserView,
     ImageView,
     IconView,
+    AdvertiserView,
   } = require("react-native-google-mobile-ads");
 
   return (
     <NativeAdView
       ref={nativeAdRef}
       adUnitID={NATIVE_AD_UNIT_ID}
-      onAdLoaded={() => setAdLoaded(true)}
-      onAdFailedToLoad={() => setAdLoaded(false)}
-      style={{ minHeight: 120 }}
+      onAdLoaded={() => {
+        console.log("Native ad loaded");
+        setAdLoaded(true);
+      }}
+      onAdFailedToLoad={(error) => {
+        console.warn("Native ad failed to load:", error);
+        setAdLoaded(false);
+      }}
+      style={{ minHeight: 120, marginVertical: 10 }}
     >
-      {!adLoaded ? renderPlaceholder() : <View />}
+      {!adLoaded ? (
+        renderPlaceholder()
+      ) : (
+        <View style={styles.postContainer}>
+          <View style={{ flexDirection: "row", gap: 12 }}>
+            <View style={{ flex: 1 }}>
+              <View style={[styles.postHeader, { gap: 8 }]}>
+                <IconView style={styles.adIconNative} />
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <AdvertiserView
+                      style={[styles.zoneText, { color: "#FFFFFF" }]}
+                    />
+                    <View style={styles.adSticker}>
+                      <Text style={styles.adStickerText}>SPONSORED</Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+
+              <HeadlineView
+                style={[styles.postTitle, { color: "#FFFFFF" }]}
+                numberOfLines={2}
+              />
+              <TaglineView
+                style={[
+                  styles.postBody,
+                  { color: "rgba(255,255,255,0.7)", marginTop: 4 },
+                ]}
+                numberOfLines={2}
+              />
+            </View>
+
+            <ImageView style={{ width: 80, height: 80, borderRadius: 8 }} />
+          </View>
+
+          <CallToActionView
+            style={styles.ctaButton}
+            textStyle={styles.ctaText}
+          />
+
+          <View style={styles.actionRow}>
+            <View style={styles.actionButton}>
+              <Heart size={18} color="rgba(255,255,255,0.2)" />
+              <Text
+                style={[styles.actionCount, { color: "rgba(255,255,255,0.2)" }]}
+              >
+                0
+              </Text>
+            </View>
+            <View style={styles.actionButton}>
+              <Star size={18} color="rgba(255,255,255,0.2)" />
+              <Text
+                style={[styles.actionCount, { color: "rgba(255,255,255,0.2)" }]}
+              >
+                0
+              </Text>
+            </View>
+            <View style={styles.actionButton}>
+              <Info size={18} color="#3B82F6" />
+              <Text style={[styles.actionCount, { color: "#3B82F6" }]}>
+                PROMOTED
+              </Text>
+            </View>
+            <View style={{ flex: 1 }} />
+            <ShareIcon size={18} color="rgba(255,255,255,0.4)" />
+          </View>
+        </View>
+      )}
     </NativeAdView>
   );
 }
@@ -170,6 +244,11 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(245,158,11,0.1)",
     justifyContent: "center",
     alignItems: "center",
+  },
+  adIconNative: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
   },
   adSticker: {
     marginLeft: 8,

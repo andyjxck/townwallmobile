@@ -296,16 +296,31 @@ export default function LocalBusinesses() {
   );
 
   const displayBusinesses = useMemo(() => {
-    return filteredBusinesses;
+    const data = [];
+    filteredBusinesses.forEach((b, index) => {
+      data.push({ ...b, _isBusiness: true });
+      if ((index + 1) % 4 === 0) {
+        data.push({ _isAd: true, id: `ad-${index}` });
+      }
+    });
+    return data;
   }, [filteredBusinesses]);
 
-    const renderItem = ({ item }) => {
+  const renderItem = ({ item }) => {
+    if (item._isAd) {
       return (
-        <TouchableOpacity 
-          activeOpacity={0.9}
-          onPress={() => handleOpenLink(item.link)}
-          style={styles.businessCard}
-        >
+        <View style={{ width: width - 24, marginHorizontal: 6, marginVertical: 6 }}>
+          <NativeAd />
+        </View>
+      );
+    }
+
+    return (
+      <TouchableOpacity
+        activeOpacity={0.9}
+        onPress={() => handleOpenLink(item.link)}
+        style={styles.businessCard}
+      >
           <View style={styles.cardImageContainer}>
             <Image 
               source={{ uri: item.avatar_url || `https://avatar.vercel.sh/${item.name}.png` }} 

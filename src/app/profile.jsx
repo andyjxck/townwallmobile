@@ -602,20 +602,37 @@ export default function Profile() {
           </ScrollView>
         </View>
 
-        {/* Tab Content */}
-        <View style={styles.contentArea}>
-          {activeTab === 'posts' && (
-            userPosts.length > 0 ? (
-              userPosts.map(post => (
-                <PostItem key={post.id} item={post} deviceId={deviceId} onReaction={handleReaction} onDelete={handleDeletePost} onShare={handleShare} onEdit={handleEditPost} user={user} onComment={loadData} />
-              ))
-            ) : (
-              <View style={styles.emptyContainer}>
-                <MessageSquare size={40} color="rgba(255,255,255,0.1)" />
-                <Text style={styles.emptyText}>No posts yet.</Text>
-              </View>
-            )
-          )}
+          {/* Tab Content */}
+          <View style={styles.contentArea}>
+            {activeTab === 'posts' && (
+              userPosts.length > 0 ? (
+                userPosts.map((post, index) => (
+                  <View key={post.id}>
+                    <PostItem 
+                      item={post} 
+                      deviceId={deviceId} 
+                      onReaction={handleReaction} 
+                      onDelete={handleDeletePost} 
+                      onShare={handleShare} 
+                      onEdit={handleEditPost} 
+                      user={user} 
+                      onComment={loadData} 
+                    />
+                    {(index + 1) % 5 === 0 && (
+                      <View style={{ marginBottom: 10 }}>
+                        <NativeAd />
+                      </View>
+                    )}
+                  </View>
+                ))
+              ) : (
+                <View style={styles.emptyContainer}>
+                  <MessageSquare size={40} color="rgba(255,255,255,0.1)" />
+                  <Text style={styles.emptyText}>No posts yet.</Text>
+                </View>
+              )
+            )}
+
 
           {activeTab === 'media' && renderMediaGrid()}
 
