@@ -85,6 +85,14 @@ export default function PollsScreen() {
       }
     };
 
+    const getCardStyle = (status) => {
+      switch (status?.toLowerCase()) {
+        case 'approved': return { borderColor: '#10B981', backgroundColor: 'rgba(16, 185, 129, 0.05)' };
+        case 'rejected': return { borderColor: '#EF4444', backgroundColor: 'rgba(239, 68, 68, 0.05)' };
+        default: return {};
+      }
+    };
+
     const loadData = async () => {
     setLoading(true);
     try {
@@ -578,9 +586,9 @@ export default function PollsScreen() {
                 </TouchableOpacity>
               </View>
 
-              {getFilteredSuggestions().map((item) => (
-                <View key={item.id} style={styles.ideaCard}>
-                  <View style={styles.ideaHeader}>
+                {getFilteredSuggestions().map((item) => (
+                  <View key={item.id} style={[styles.ideaCard, getCardStyle(item.status)]}>
+                    <View style={styles.ideaHeader}>
                     <Text style={styles.ideaUserIcon}>{item.user?.emoji_icon || '👤'}</Text>
                     <Text style={styles.ideaUsername}>{item.user?.username || 'Anonymous'}</Text>
                     <Text style={styles.ideaTime}>{getTimeAgo(new Date(item.created_at))}</Text>

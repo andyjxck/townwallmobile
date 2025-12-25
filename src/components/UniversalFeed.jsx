@@ -400,7 +400,7 @@ export default function UniversalFeed() {
   };
 
   return (
-    <TouchableWithoutFeedback onPress={closeMenus}>
+    <TouchableWithoutFeedback onPress={closeMenus} accessible={false}>
       <View style={styles.container}>
         <LinearGradient
           colors={['#0F172A', '#000000', '#000000']}
