@@ -936,13 +936,3 @@ const styles = StyleSheet.create({
     padding: 10,
   },
 });
-
-export default UniversalFeed;
-
-function getTimeAgo(date) {
-  const seconds = Math.floor((new Date() - date) / 1000);
-  if (seconds < 60) return "NOW";
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}M`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}H`;
-  return `${Math.floor(seconds / 86400)}D`;
-}

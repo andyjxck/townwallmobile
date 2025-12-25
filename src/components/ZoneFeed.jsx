@@ -370,13 +370,3 @@ function getTagColor(tagName) {
   return colors[tagName] || "#94A3B8";
 }
 
-export default ZoneFeed;
-
-function getTimeAgo(date) {
-  const seconds = Math.floor((new Date() - date) / 1000);
-  if (seconds < 60) return "NOW";
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}M`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}H`;
-  return `${Math.floor(seconds / 86400)}D`;
-}
-
