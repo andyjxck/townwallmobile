@@ -179,24 +179,24 @@ export default function UniversalFeed() {
           // Use an explicit select string with foreign key hints for maximum robustness
             let query = supabase
               .from('rposts')
-                .select(`
-                  id, 
-                  title, 
-                  text, 
-                  created_at, 
-                  user_id, 
-                  zone_id, 
-                  tag_id, 
-                  image_url, 
-                  image_urls, 
-                  is_anonymous, 
-                  moderation_status,
-                  is_deleted,
-                  user:rusers!user_id (username, emoji_icon, avatar_url),
-                  zone:rzones!zone_id (name),
-                  tag:rtags!tag_id (name),
-                  reactions:rreactions (reaction_type, device_id)
-                `)
+                  .select(`
+                    id, 
+                    title, 
+                    text, 
+                    created_at, 
+                    user_id, 
+                    zone_id, 
+                    tag_id, 
+                    image_url, 
+                    image_urls, 
+                    is_anonymous, 
+                    moderation_status,
+                    is_deleted,
+                    user:rusers (username, emoji_icon, avatar_url),
+                    zone:rzones (name),
+                    tag:rtags (name),
+                    reactions:rreactions (reaction_type, device_id)
+                  `)
               .eq('is_deleted', false);
 
         if (selectedZone) {
@@ -217,14 +217,14 @@ export default function UniversalFeed() {
         if (error) {
           console.error("Feed error:", error);
               // Try an absolute bare-bones fallback if the complex one fails
-                const { data: fallback, error: fbError } = await supabase
-                  .from('rposts')
-                  .select(`
-                    id, title, text, created_at, user_id, zone_id, tag_id, image_urls, is_anonymous,
-                    user:rusers!user_id (username, emoji_icon, avatar_url),
-                    zone:rzones!zone_id (name),
-                    tag:rtags!tag_id (name)
-                  `)
+                  const { data: fallback, error: fbError } = await supabase
+                    .from('rposts')
+                    .select(`
+                      id, title, text, created_at, user_id, zone_id, tag_id, image_url, image_urls, is_anonymous,
+                      user:rusers (username, emoji_icon, avatar_url),
+                      zone:rzones (name),
+                      tag:rtags (name)
+                    `)
                 .eq('is_deleted', false)
                 .order('created_at', { ascending: false })
                 .limit(20);
