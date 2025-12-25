@@ -27,6 +27,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/utils/supabase';
 import { getStoredUser } from '@/utils/user';
+import { moderateContent } from '@/utils/ai';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from "expo-linear-gradient";
 
@@ -167,8 +168,18 @@ export default function PollsScreen() {
     }
 
     setIsSubmittingSuggestion(true);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    
     try {
+      // AI Moderation
+      const moderation = await moderateContent(suggestion.trim());
+      if (moderation.status === 'rejected') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        Alert.alert("Content Policy", moderation.reason || "This suggestion doesn't meet our community standards.");
+        setIsSubmittingSuggestion(false);
+        return;
+      }
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       const { error } = await supabase
         .from('rfeature_suggestions')
         .insert({
@@ -201,6 +212,28 @@ export default function PollsScreen() {
 
     setIsCreatingPoll(true);
     try {
+      // AI Moderation for Poll Question
+      const moderation = await moderateContent(newPollQuestion.trim());
+      if (moderation.status === 'rejected') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        Alert.alert("Content Policy", moderation.reason || "This poll question doesn't meet our community standards.");
+        setIsCreatingPoll(false);
+        return;
+      }
+
+      // Optional: Moderate options too? Probably a good idea if we want total moderation.
+      for (const option of newPollOptions) {
+        if (option.trim()) {
+          const optMod = await moderateContent(option.trim());
+          if (optMod.status === 'rejected') {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            Alert.alert("Content Policy", `Option "${option}" doesn't meet standards: ${optMod.reason}`);
+            setIsCreatingPoll(false);
+            return;
+          }
+        }
+      }
+
       const { data: poll, error: pollError } = await supabase
         .from('rpolls')
         .insert({
