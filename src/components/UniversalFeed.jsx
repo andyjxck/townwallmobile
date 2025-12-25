@@ -13,6 +13,7 @@ import {
     Share,
     TextInput as RNTextInput,
     ScrollView,
+    TouchableWithoutFeedback
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -393,15 +394,21 @@ export default function UniversalFeed() {
     setSelectedTag(null);
   };
 
+  const closeMenus = () => {
+    setShowMenu(false);
+    setShowFilterSort(false);
+  };
+
   return (
-    <View style={styles.container}>
-      <LinearGradient
-        colors={['#0F172A', '#000000', '#000000']}
-        style={StyleSheet.absoluteFill}
-      />
-      <StatusBar style="light" />
-      
-      <View style={{ paddingTop: insets.top }}>
+    <TouchableWithoutFeedback onPress={closeMenus}>
+      <View style={styles.container}>
+        <LinearGradient
+          colors={['#0F172A', '#000000', '#000000']}
+          style={StyleSheet.absoluteFill}
+        />
+        <StatusBar style="light" />
+        
+        <View style={{ paddingTop: insets.top }}>
         <View style={styles.header}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 15 }}>
             <Image 

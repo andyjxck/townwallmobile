@@ -40,9 +40,12 @@ export default function ModerationAdmin() {
   const [expandedChatId, setExpandedChatId] = useState(null);
   const [transcripts, setTranscripts] = useState({});
   const [replyText, setReplyText] = useState('');
-  const [aiFilter, setAiFilter] = useState('held');
-  const [overrideItem, setOverrideItem] = useState(null);
-  const [overrideReason, setOverrideReason] = useState('');
+    const [aiFilter, setAiFilter] = useState('held');
+    const [overrideItem, setOverrideItem] = useState(null);
+    const [overrideReason, setOverrideReason] = useState('');
+    const [pollModalItem, setPollModalItem] = useState(null);
+    const [pollQuestion, setPollQuestion] = useState('');
+    const [pollOptions, setPollOptions] = useState(['Yes', 'No', 'Maybe later']);
 
   const TABS = [
       { id: 'talent', label: 'TALENT', icon: Star },
@@ -254,8 +257,14 @@ export default function ModerationAdmin() {
         table = 'rbusinesses';
         updateData = { status: action === 'approve' ? 'approved' : 'rejected' };
       } else if (activeTab === 'votes') {
+        if (action === 'approve') {
+          setPollModalItem(itemId);
+          const suggestion = data.find(i => i.id === itemId);
+          setPollQuestion(suggestion?.suggestion_text || '');
+          return; // Modal will handle the rest
+        }
         table = 'rfeature_suggestions';
-        updateData = { status: action === 'approve' ? 'approved' : 'rejected' };
+        updateData = { status: 'rejected' };
       } else if (activeTab === 'ai' || activeTab === 'news') {
         table = 'rposts';
         updateData = { 
@@ -355,6 +364,64 @@ const handleOverrideDelete = async () => {
     Alert.alert("Error", "Failed to delete post.");
   }
 };
+
+  const handleCreatePollFromSuggestion = async () => {
+    if (!pollQuestion.trim() || pollOptions.some(o => !o.trim())) {
+      Alert.alert("Incomplete", "Please provide a question and all options.");
+      return;
+    }
+
+    try {
+      const user = await getStoredUser();
+      
+      // 1. Create the poll
+      const { data: poll, error: pollError } = await supabase
+        .from('rpolls')
+        .insert({
+          question: pollQuestion.trim(),
+          is_active: true
+        })
+        .select()
+        .single();
+
+      if (pollError) throw pollError;
+
+      // 2. Create options
+      const optionsToInsert = pollOptions.map(o => ({
+        poll_id: poll.id,
+        option_text: o.trim()
+      }));
+
+      const { error: optionsError } = await supabase
+        .from('rpoll_options')
+        .insert(optionsToInsert);
+
+      if (optionsError) throw optionsError;
+
+      // 3. Mark suggestion as approved
+      const { error: suggestionError } = await supabase
+        .from('rfeature_suggestions')
+        .update({ status: 'approved' })
+        .eq('id', pollModalItem);
+
+      if (suggestionError) throw suggestionError;
+
+      Alert.alert("Success", "Poll created and suggestion approved!");
+      setData(prev => prev.filter(p => p.id !== pollModalItem));
+      setPollModalItem(null);
+      setPollQuestion('');
+      setPollOptions(['Yes', 'No', 'Maybe later']);
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Error", "Failed to complete operation.");
+    }
+  };
+
+  const updatePollOption = (text, index) => {
+    const newOptions = [...pollOptions];
+    newOptions[index] = text;
+    setPollOptions(newOptions);
+  };
 
   const fetchTranscript = async (userId) => {
     try {
@@ -644,8 +711,59 @@ const handleOverrideDelete = async () => {
               </View>
             </View>
           </View>
-        </Modal>
-      </KeyboardAvoidingView>
+          </Modal>
+
+          <Modal
+            visible={!!pollModalItem}
+            transparent={true}
+            animationType="slide"
+            onRequestClose={() => setPollModalItem(null)}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>POLL TEMPLATE</Text>
+                <Text style={styles.modalSubtitle}>Create a structured vote for this feature suggestion.</Text>
+                
+                <Text style={styles.label}>QUESTION</Text>
+                <TextInput
+                  style={[styles.modalInput, { minHeight: 60, marginBottom: 15 }]}
+                  placeholder="Poll Question..."
+                  placeholderTextColor="rgba(255,255,255,0.3)"
+                  value={pollQuestion}
+                  onChangeText={setPollQuestion}
+                  multiline
+                />
+
+                <Text style={styles.label}>OPTIONS</Text>
+                {pollOptions.map((opt, idx) => (
+                  <TextInput
+                    key={idx}
+                    style={[styles.modalInput, { minHeight: 45, marginBottom: 10, paddingVertical: 10 }]}
+                    placeholder={`Option ${idx + 1}`}
+                    placeholderTextColor="rgba(255,255,255,0.3)"
+                    value={opt}
+                    onChangeText={(text) => updatePollOption(text, idx)}
+                  />
+                ))}
+
+                <View style={[styles.modalButtons, { marginTop: 10 }]}>
+                  <TouchableOpacity 
+                    style={[styles.modalButton, styles.cancelButton]} 
+                    onPress={() => setPollModalItem(null)}
+                  >
+                    <Text style={styles.cancelButtonText}>CANCEL</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.modalButton, { backgroundColor: '#4ADE80' }]} 
+                    onPress={handleCreatePollFromSuggestion}
+                  >
+                    <Text style={[styles.confirmButtonText, { color: '#000' }]}>APPROVE & CREATE POLL</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+        </KeyboardAvoidingView>
     </View>
   );
 }

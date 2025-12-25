@@ -9,7 +9,8 @@ import {
   ActivityIndicator, 
   TextInput,
   Dimensions,
-  FlatList
+  FlatList,
+  TouchableWithoutFeedback
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { 
@@ -25,7 +26,8 @@ import {
   Sparkles,
   Filter,
   ArrowUpDown,
-  Check
+  Check,
+  XCircle
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/utils/supabase';
@@ -101,12 +103,16 @@ export default function PollsScreen() {
         setUser(storedUser);
       }
 
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
         const { data: suggestionsData, error: suggestionsError } = await supabase
           .from('rfeature_suggestions')
           .select(`
             *,
             user:rusers(username, emoji_icon)
           `)
+          .or(`status.eq.pending,created_at.gt.${sevenDaysAgo.toISOString()}`)
           .order('created_at', { ascending: false });
 
         if (suggestionsError) throw suggestionsError;
@@ -417,22 +423,26 @@ export default function PollsScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <LinearGradient colors={['#0F172A', '#000000', '#000000']} style={StyleSheet.absoluteFill} />
-      <View style={{ paddingTop: insets.top, flex: 1 }}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <ChevronLeft color="#FFFFFF" size={28} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>FUTURE FEATURES</Text>
-          {user?.is_admin ? (
-            <TouchableOpacity onPress={() => setShowAdminForm(!showAdminForm)} style={styles.backButton}>
-              <Plus color={showAdminForm ? "#EF4444" : "#4ADE80"} size={28} />
+    <TouchableWithoutFeedback onPress={() => setShowFilterSortMenu(false)}>
+      <View style={styles.container}>
+        <LinearGradient colors={['#0F172A', '#000000', '#000000']} style={StyleSheet.absoluteFill} />
+        <View style={{ paddingTop: insets.top, flex: 1 }}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+              <ChevronLeft color="#FFFFFF" size={28} />
             </TouchableOpacity>
-          ) : <View style={{ width: 28 }} />}
-        </View>
+            <Text style={styles.headerTitle}>FUTURE FEATURES</Text>
+            {user?.is_admin ? (
+              <TouchableOpacity onPress={() => setShowAdminForm(!showAdminForm)} style={styles.backButton}>
+                <Plus color={showAdminForm ? "#EF4444" : "#4ADE80"} size={28} />
+              </TouchableOpacity>
+            ) : <View style={{ width: 28 }} />}
+          </View>
 
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <ScrollView 
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+          >
           {showAdminForm && (
             <View style={styles.adminCard}>
               <Text style={styles.adminTitle}>CREATE NEW POLL</Text>
