@@ -45,9 +45,9 @@ function ToolbarDropdown({ icon: Icon, label, options, onSelect, currentValue, t
         style={styles.dropdownTrigger} 
         onPress={() => setVisible(true)}
       >
-        <Icon size={18} color="#FFFFFF" />
-        {label && <Text style={styles.dropdownText}>{label}</Text>}
-        <ChevronDown size={12} color="rgba(255,255,255,0.4)" />
+          <Icon size={18} color="rgba(255,255,255,0.6)" />
+          {label && <Text style={styles.dropdownText}>{label}</Text>}
+          <ChevronDown size={10} color="rgba(255,255,255,0.3)" />
       </TouchableOpacity>
 
       <Modal
@@ -161,15 +161,11 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 400 }
             currentValue={currentAlignment}
           />
 
-          <View style={styles.separator} />
-
           <ToolbarDropdown 
             icon={List} 
             options={listOptions}
             onSelect={handleListSelect}
           />
-
-          <View style={styles.separator} />
 
           <ToolbarDropdown 
             icon={Palette} 
@@ -271,11 +267,9 @@ const styles = StyleSheet.create({
   dropdownTrigger: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 6,
-    borderRadius: 8,
-    gap: 6,
+    gap: 4,
   },
   dropdownText: {
     color: '#FFFFFF',
