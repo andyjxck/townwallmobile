@@ -33,7 +33,11 @@
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>2</string>
+	<key>GADApplicationIdentifier</key>
+	<string>ca-app-pub-1505977777207758~6195707754</string>
+	<key>GADDelayAppMeasurementInit</key>
+	<false/>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>LSMinimumSystemVersion</key>
@@ -77,6 +81,8 @@
 	<array>
 		<string>$(PRODUCT_BUNDLE_IDENTIFIER).expo.index_route</string>
 	</array>
+	<key>NSUserTrackingUsageDescription</key>
+	<string>Allow this app to collect app-related data that can be used for tracking you or your device.</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>UIBackgroundModes</key>

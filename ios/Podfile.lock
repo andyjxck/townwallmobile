@@ -121,11 +121,15 @@ PODS:
     - ExpoModulesCore
   - ExpoSensors (15.0.6):
     - ExpoModulesCore
+  - ExpoSharing (14.0.8):
+    - ExpoModulesCore
   - ExpoSplashScreen (31.0.8):
     - ExpoModulesCore
   - ExpoSymbols (1.0.6):
     - ExpoModulesCore
   - ExpoSystemUI (6.0.7):
+    - ExpoModulesCore
+  - ExpoTrackingTransparency (6.0.8):
     - ExpoModulesCore
   - ExpoVideo (3.0.11):
     - ExpoModulesCore
@@ -163,6 +167,9 @@ PODS:
   - EXUpdatesInterface (2.0.0):
     - ExpoModulesCore
   - FBLazyVector (0.81.4)
+  - Google-Mobile-Ads-SDK (12.11.0):
+    - GoogleUserMessagingPlatform (>= 1.1)
+  - GoogleUserMessagingPlatform (3.0.0)
   - hermes-engine (0.81.4):
     - hermes-engine/Pre-built (= 0.81.4)
   - hermes-engine/Pre-built (0.81.4)
@@ -1608,6 +1615,28 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - react-native-view-shot (4.0.3):
+    - hermes-engine
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - Yoga
   - react-native-webview (13.15.0):
     - hermes-engine
     - RCTRequired
@@ -2072,6 +2101,30 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - RNGoogleMobileAds (16.0.1):
+    - Google-Mobile-Ads-SDK (= 12.11.0)
+    - GoogleUserMessagingPlatform (= 3.0.0)
+    - hermes-engine
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - Yoga
   - RNPaywalls (9.6.1):
     - PurchasesHybridCommonUI (= 17.12.0)
     - React-Core
@@ -2367,9 +2420,11 @@ DEPENDENCIES:
   - ExpoModulesCore (from `../node_modules/expo-modules-core`)
   - ExpoSecureStore (from `../node_modules/expo-secure-store/ios`)
   - ExpoSensors (from `../node_modules/expo-sensors/ios`)
+  - ExpoSharing (from `../node_modules/expo-sharing/ios`)
   - ExpoSplashScreen (from `../node_modules/expo-splash-screen/ios`)
   - ExpoSymbols (from `../node_modules/expo-symbols/ios`)
   - ExpoSystemUI (from `../node_modules/expo-system-ui/ios`)
+  - ExpoTrackingTransparency (from `../node_modules/expo-tracking-transparency/ios`)
   - ExpoVideo (from `../node_modules/expo-video/ios`)
   - ExpoWebBrowser (from `../node_modules/expo-web-browser/ios`)
   - EXStructuredHeaders (from `../node_modules/expo-structured-headers/ios`)
@@ -2415,6 +2470,7 @@ DEPENDENCIES:
   - react-native-safe-area-context (from `../node_modules/react-native-safe-area-context`)
   - "react-native-skia (from `../node_modules/@shopify/react-native-skia`)"
   - "react-native-slider (from `../node_modules/@react-native-community/slider`)"
+  - react-native-view-shot (from `../node_modules/react-native-view-shot`)
   - react-native-webview (from `../node_modules/react-native-webview`)
   - React-NativeModulesApple (from `../node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios`)
   - React-oscompat (from `../node_modules/react-native/ReactCommon/oscompat`)
@@ -2451,6 +2507,7 @@ DEPENDENCIES:
   - "RNCMaskedView (from `../node_modules/@react-native-masked-view/masked-view`)"
   - "RNCPicker (from `../node_modules/@react-native-picker/picker`)"
   - RNGestureHandler (from `../node_modules/react-native-gesture-handler`)
+  - RNGoogleMobileAds (from `../node_modules/react-native-google-mobile-ads`)
   - RNPaywalls (from `../node_modules/react-native-purchases-ui`)
   - RNPurchases (from `../node_modules/react-native-purchases`)
   - RNReanimated (from `../node_modules/react-native-reanimated`)
@@ -2461,6 +2518,8 @@ DEPENDENCIES:
 
 SPEC REPOS:
   trunk:
+    - Google-Mobile-Ads-SDK
+    - GoogleUserMessagingPlatform
     - libavif
     - libdav1d
     - libwebp
@@ -2542,12 +2601,16 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo-secure-store/ios"
   ExpoSensors:
     :path: "../node_modules/expo-sensors/ios"
+  ExpoSharing:
+    :path: "../node_modules/expo-sharing/ios"
   ExpoSplashScreen:
     :path: "../node_modules/expo-splash-screen/ios"
   ExpoSymbols:
     :path: "../node_modules/expo-symbols/ios"
   ExpoSystemUI:
     :path: "../node_modules/expo-system-ui/ios"
+  ExpoTrackingTransparency:
+    :path: "../node_modules/expo-tracking-transparency/ios"
   ExpoVideo:
     :path: "../node_modules/expo-video/ios"
   ExpoWebBrowser:
@@ -2637,6 +2700,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/@shopify/react-native-skia"
   react-native-slider:
     :path: "../node_modules/@react-native-community/slider"
+  react-native-view-shot:
+    :path: "../node_modules/react-native-view-shot"
   react-native-webview:
     :path: "../node_modules/react-native-webview"
   React-NativeModulesApple:
@@ -2709,6 +2774,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/@react-native-picker/picker"
   RNGestureHandler:
     :path: "../node_modules/react-native-gesture-handler"
+  RNGoogleMobileAds:
+    :path: "../node_modules/react-native-google-mobile-ads"
   RNPaywalls:
     :path: "../node_modules/react-native-purchases-ui"
   RNPurchases:
@@ -2758,15 +2825,19 @@ SPEC CHECKSUMS:
   ExpoModulesCore: ecb96f70bf2a80d31e87ce0a2ac980563c0df6e5
   ExpoSecureStore: 57327b9a484ad730cf823c82d092e0bf71e11512
   ExpoSensors: a04e0d47652b6c15c958e6d340f9af7d586bb3d9
+  ExpoSharing: 0d983394ed4a80334bab5a0d5384f75710feb7e8
   ExpoSplashScreen: 1665809071bd907c6fdbfd9c09583ee4d51b41d4
   ExpoSymbols: 3efee6865b1955fe3805ca88b36e8674ce6970dd
   ExpoSystemUI: 6cd74248a2282adf6dec488a75fa532d69dee314
+  ExpoTrackingTransparency: 4f823a38ff7c0efea4cac722ecbc0589278ff548
   ExpoVideo: 6ffaf450d18b2ca33bdf92acaea80271b4a06c92
   ExpoWebBrowser: 84d4438464d9754a4c1f1eaa97cd747f3752187e
   EXStructuredHeaders: c951e77f2d936f88637421e9588c976da5827368
   EXUpdates: 8c37e4c51035410ce6fc8094e6010450f695d903
   EXUpdatesInterface: 5adf50cb41e079c861da6d9b4b954c3db9a50734
   FBLazyVector: 9e0cd874afd81d9a4d36679daca991b58b260d42
+  Google-Mobile-Ads-SDK: b833c723759e32bbaf06edaaf2293f08ed898232
+  GoogleUserMessagingPlatform: f8d0cdad3ca835406755d0a69aa634f00e76d576
   hermes-engine: 35c763d57c9832d0eef764316ca1c4d043581394
   libavif: 84bbb62fb232c3018d6f1bab79beea87e35de7b7
   libdav1d: 23581a4d8ec811ff171ed5e2e05cd27bad64c39f
@@ -2811,6 +2882,7 @@ SPEC CHECKSUMS:
   react-native-safe-area-context: 8dc43e60dd67fd2be098486fd8195e143fb47c6f
   react-native-skia: 5d024324ef7b19f8fd70868458b0d7b2cb6644b5
   react-native-slider: ae14f6462a8a9afd94cdf269f23a365e19976645
+  react-native-view-shot: 8853a6bacbf77899d550773a84986f251f509ffc
   react-native-webview: ea441b2e73f711c183580fb6db89aa587f0dd92a
   React-NativeModulesApple: a9464983ccc0f66f45e93558671f60fc7536e438
   React-oscompat: 73db7dbc80edef36a9d6ed3c6c4e1724ead4236d
@@ -2849,6 +2921,7 @@ SPEC CHECKSUMS:
   RNCMaskedView: ee2fc4739eb35be50bcf4f95daca19f316b5d50c
   RNCPicker: e77543f719cf823e13dcf8080336d633101b098e
   RNGestureHandler: c3831b3b1b5014c6afab7fff7e4171394a3419ab
+  RNGoogleMobileAds: d457485810977317b4a7b0484214247d4c798ddb
   RNPaywalls: 49981e876944c5b6a70f1d440da6814a1b63f204
   RNPurchases: 14791d01d683a7f334f03d8ffadf92260b3c54a0
   RNReanimated: 20c098ad6ed3cd6569263ed54d055e53e82da861
