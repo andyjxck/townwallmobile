@@ -22,7 +22,10 @@ import {
   Trash2,
   Lock,
   MessageSquare,
-  Sparkles
+  Sparkles,
+  Filter,
+  ArrowUpDown,
+  Check
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/utils/supabase';
@@ -40,8 +43,12 @@ export default function PollsScreen() {
   const [user, setUser] = useState(null);
   const [activePolls, setActivePolls] = useState([]);
   const [userVotes, setUserVotes] = useState({});
-  const [suggestion, setSuggestion] = useState('');
-  const [isSubmittingSuggestion, setIsSubmittingSuggestion] = useState(false);
+    const [suggestion, setSuggestion] = useState('');
+    const [isSubmittingSuggestion, setIsSubmittingSuggestion] = useState(false);
+    const [suggestions, setSuggestions] = useState([]);
+    const [sortBy, setSortBy] = useState('newest');
+    const [filterBy, setFilterBy] = useState('all');
+    const [showFilterSortMenu, setShowFilterSortMenu] = useState(false);
   
   // Admin state
   const [showAdminForm, setShowAdminForm] = useState(false);
@@ -53,7 +60,30 @@ export default function PollsScreen() {
     loadData();
   }, []);
 
-  const loadData = async () => {
+    const getFilteredSuggestions = () => {
+      let filtered = [...suggestions];
+      
+      if (filterBy === 'mine' && user) {
+        filtered = filtered.filter(s => s.user_id === user.id);
+      }
+      
+      return filtered.sort((a, b) => {
+        const dateA = new Date(a.created_at);
+        const dateB = new Date(b.created_at);
+        return sortBy === 'newest' ? dateB - dateA : dateA - dateB;
+      });
+    };
+
+    const getStatusColor = (status) => {
+      switch (status?.toLowerCase()) {
+        case 'approved': return '#10B981';
+        case 'implemented': return '#3B82F6';
+        case 'rejected': return '#EF4444';
+        default: return '#F59E0B'; // pending
+      }
+    };
+
+    const loadData = async () => {
     setLoading(true);
     try {
       const storedUser = await getStoredUser();
@@ -71,7 +101,18 @@ export default function PollsScreen() {
         setUser(storedUser);
       }
 
-      const currentUser = userData || storedUser;
+        const { data: suggestionsData, error: suggestionsError } = await supabase
+          .from('rfeature_suggestions')
+          .select(`
+            *,
+            user:rusers(username, emoji_icon)
+          `)
+          .order('created_at', { ascending: false });
+
+        if (suggestionsError) throw suggestionsError;
+        setSuggestions(suggestionsData || []);
+
+        const currentUser = userData || storedUser;
 
       // Fetch active polls
       const { data: polls, error: pollError } = await supabase
@@ -187,10 +228,11 @@ export default function PollsScreen() {
           suggestion_text: suggestion.trim()
         });
 
-      if (error) throw error;
-      
-      setSuggestion('');
-      Alert.alert("Thank You!", "Your feature suggestion has been submitted for review.");
+        if (error) throw error;
+        
+        setSuggestion('');
+        loadData();
+        Alert.alert("Thank You!", "Your feature suggestion has been submitted for review.");
     } catch (error) {
       console.error("Error submitting suggestion:", error);
       Alert.alert("Error", "Failed to submit suggestion.");
@@ -447,38 +489,101 @@ export default function PollsScreen() {
             )}
           </View>
 
-          <View style={styles.suggestionSection}>
-            <View style={styles.sectionHeader}>
-              <Sparkles size={20} color="#FBBF24" />
-              <Text style={styles.sectionTitle}>HAVE AN IDEA?</Text>
+            <View style={styles.suggestionSection}>
+              <View style={styles.sectionHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                  <Sparkles size={20} color="#FBBF24" />
+                  <Text style={styles.sectionTitle}>COMMUNITY IDEAS</Text>
+                </View>
+                <TouchableOpacity 
+                  onPress={() => setShowFilterSortMenu(!showFilterSortMenu)}
+                  style={styles.filterSortButton}
+                >
+                  <ArrowUpDown size={18} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+
+              {showFilterSortMenu && (
+                <View style={styles.dropdownContainer}>
+                  <Text style={styles.dropdownHeader}>SORT BY</Text>
+                  <TouchableOpacity 
+                    style={styles.dropdownItem} 
+                    onPress={() => { setSortBy('newest'); setShowFilterSortMenu(false); }}
+                  >
+                    <Text style={[styles.dropdownText, sortBy === 'newest' && { color: '#4ADE80' }]}>NEWEST</Text>
+                    {sortBy === 'newest' && <Check size={14} color="#4ADE80" />}
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.dropdownItem} 
+                    onPress={() => { setSortBy('oldest'); setShowFilterSortMenu(false); }}
+                  >
+                    <Text style={[styles.dropdownText, sortBy === 'oldest' && { color: '#4ADE80' }]}>OLDEST</Text>
+                    {sortBy === 'oldest' && <Check size={14} color="#4ADE80" />}
+                  </TouchableOpacity>
+
+                  <View style={styles.dropdownDivider} />
+                  
+                  <Text style={styles.dropdownHeader}>FILTER BY</Text>
+                  <TouchableOpacity 
+                    style={styles.dropdownItem} 
+                    onPress={() => { setFilterBy('all'); setShowFilterSortMenu(false); }}
+                  >
+                    <Text style={[styles.dropdownText, filterBy === 'all' && { color: '#4ADE80' }]}>ALL IDEAS</Text>
+                    {filterBy === 'all' && <Check size={14} color="#4ADE80" />}
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.dropdownItem} 
+                    onPress={() => { setFilterBy('mine'); setShowFilterSortMenu(false); }}
+                  >
+                    <Text style={[styles.dropdownText, filterBy === 'mine' && { color: '#4ADE80' }]}>MY IDEAS</Text>
+                    {filterBy === 'mine' && <Check size={14} color="#4ADE80" />}
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              <View style={[styles.suggestionCard, { marginBottom: 20 }]}>
+                <Text style={styles.suggestionInfo}>
+                  What else would you like to see on Town Wall? We build based on your feedback!
+                </Text>
+                <TextInput
+                  style={styles.suggestionInput}
+                  placeholder="Tell us your feature idea..."
+                  placeholderTextColor="rgba(255,255,255,0.3)"
+                  value={suggestion}
+                  onChangeText={setSuggestion}
+                  multiline
+                  maxLength={280}
+                />
+                <TouchableOpacity 
+                  style={[styles.submitBtn, !suggestion.trim() && { opacity: 0.5 }]} 
+                  onPress={handleSubmitSuggestion}
+                  disabled={!suggestion.trim() || isSubmittingSuggestion}
+                >
+                  {isSubmittingSuggestion ? <ActivityIndicator size="small" color="#000" /> : (
+                    <>
+                      <Send size={16} color="#000" />
+                      <Text style={styles.submitBtnText}>SUBMIT IDEA</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              {getFilteredSuggestions().map((item) => (
+                <View key={item.id} style={styles.ideaCard}>
+                  <View style={styles.ideaHeader}>
+                    <Text style={styles.ideaUserIcon}>{item.user?.emoji_icon || '👤'}</Text>
+                    <Text style={styles.ideaUsername}>{item.user?.username || 'Anonymous'}</Text>
+                    <Text style={styles.ideaTime}>{getTimeAgo(new Date(item.created_at))}</Text>
+                  </View>
+                  <Text style={styles.ideaText}>{item.suggestion_text}</Text>
+                  <View style={styles.ideaFooter}>
+                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+                      <Text style={styles.statusText}>{(item.status || 'PENDING').toUpperCase()}</Text>
+                    </View>
+                  </View>
+                </View>
+              ))}
             </View>
-            <View style={styles.suggestionCard}>
-              <Text style={styles.suggestionInfo}>
-                What else would you like to see on Town Wall? We build based on your feedback!
-              </Text>
-              <TextInput
-                style={styles.suggestionInput}
-                placeholder="Tell us your feature idea..."
-                placeholderTextColor="rgba(255,255,255,0.3)"
-                value={suggestion}
-                onChangeText={setSuggestion}
-                multiline
-                maxLength={280}
-              />
-              <TouchableOpacity 
-                style={[styles.submitBtn, !suggestion.trim() && { opacity: 0.5 }]} 
-                onPress={handleSubmitSuggestion}
-                disabled={!suggestion.trim() || isSubmittingSuggestion}
-              >
-                {isSubmittingSuggestion ? <ActivityIndicator size="small" color="#000" /> : (
-                  <>
-                    <Send size={16} color="#000" />
-                    <Text style={styles.submitBtnText}>SUBMIT IDEA</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
         </ScrollView>
       </View>
     </View>
@@ -530,8 +635,112 @@ const styles = StyleSheet.create({
   addOptionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 10 },
   addOptionText: { color: '#4ADE80', fontSize: 11, fontWeight: '900' },
   createBtn: { backgroundColor: '#4ADE80', marginTop: 15, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
-  createBtnText: { color: '#000000', fontSize: 13, fontWeight: '900', letterSpacing: 1 },
-  
-  emptyBox: { paddingVertical: 40, alignItems: 'center', gap: 15 },
+    createBtnText: { color: '#000000', fontSize: 13, fontWeight: '900', letterSpacing: 1 },
+    
+    filterSortButton: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: 'rgba(255,255,255,0.05)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.1)',
+    },
+    dropdownContainer: {
+      position: 'absolute',
+      top: 50,
+      right: 0,
+      width: 200,
+      backgroundColor: '#1E293B',
+      borderRadius: 15,
+      padding: 10,
+      zIndex: 1000,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.1)',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.3,
+      shadowRadius: 15,
+      elevation: 10,
+    },
+    dropdownHeader: {
+      color: 'rgba(255,255,255,0.4)',
+      fontSize: 10,
+      fontWeight: '900',
+      letterSpacing: 1,
+      marginBottom: 8,
+      marginTop: 5,
+      paddingHorizontal: 10,
+    },
+    dropdownItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 12,
+      paddingHorizontal: 10,
+      borderRadius: 8,
+    },
+    dropdownText: {
+      color: '#FFFFFF',
+      fontSize: 12,
+      fontWeight: '700',
+      letterSpacing: 0.5,
+    },
+    dropdownDivider: {
+      height: 1,
+      backgroundColor: 'rgba(255,255,255,0.1)',
+      marginVertical: 5,
+    },
+    ideaCard: {
+      backgroundColor: 'rgba(255,255,255,0.03)',
+      borderRadius: 20,
+      padding: 20,
+      marginBottom: 15,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.05)',
+    },
+    ideaHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    ideaUserIcon: {
+      fontSize: 16,
+      marginRight: 8,
+    },
+    ideaUsername: {
+      color: '#FFFFFF',
+      fontSize: 13,
+      fontWeight: '700',
+      flex: 1,
+    },
+    ideaTime: {
+      color: 'rgba(255,255,255,0.3)',
+      fontSize: 11,
+      fontWeight: '600',
+    },
+    ideaText: {
+      color: 'rgba(255,255,255,0.8)',
+      fontSize: 15,
+      lineHeight: 22,
+      marginBottom: 15,
+    },
+    ideaFooter: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    statusBadge: {
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 6,
+    },
+    statusText: {
+      color: '#000000',
+      fontSize: 10,
+      fontWeight: '900',
+    },
+    
+    emptyBox: { paddingVertical: 40, alignItems: 'center', gap: 15 },
   emptyText: { color: 'rgba(255,255,255,0.3)', fontSize: 14, fontWeight: '600' }
 });
