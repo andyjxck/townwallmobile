@@ -192,9 +192,9 @@ export default function UniversalFeed() {
             is_anonymous, 
             moderation_status,
             is_deleted,
-            rusers:user_id (username, emoji_icon, avatar_url),
-            rzones:zone_id (name),
-            rtags:tag_id (name),
+            rusers (username, emoji_icon, avatar_url),
+            rzones (name),
+            rtags (name),
             rreactions (reaction_type, device_id)
           `)
           .eq('is_deleted', false);
@@ -219,7 +219,12 @@ export default function UniversalFeed() {
           // Try an absolute bare-bones fallback if the complex one fails
           const { data: fallback, error: fbError } = await supabase
             .from('rposts')
-            .select('id, title, text, created_at, user_id, zone_id, tag_id, image_urls, is_anonymous')
+            .select(`
+              id, title, text, created_at, user_id, zone_id, tag_id, image_urls, is_anonymous,
+              rusers (username, emoji_icon, avatar_url),
+              rzones (name),
+              rtags (name)
+            `)
             .eq('is_deleted', false)
             .order('created_at', { ascending: false })
             .limit(20);
