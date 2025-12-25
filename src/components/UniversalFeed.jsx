@@ -42,9 +42,10 @@ import {
   MessageCircle,
   Bell,
   Trash2,
-  LayoutGrid,
-  Hash,
-} from "lucide-react-native";
+    LayoutGrid,
+    Hash,
+    Vote,
+  } from "lucide-react-native";
 import { getDeviceId } from "../utils/deviceId";
 import { supabase } from "../utils/supabase";
 import * as Haptics from "expo-haptics";
@@ -390,16 +391,25 @@ import PostItem from "./PostItem";
                 >
                   <LayoutGrid size={22} color={showZones ? "#FFFFFF" : "rgba(255,255,255,0.4)"} />
                 </TouchableOpacity>
-                <TouchableOpacity 
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setShowTags(!showTags);
-                    setShowZones(false);
-                  }}
-                  style={{ padding: 4 }}
-                >
-                  <Hash size={22} color={showTags ? "#FFFFFF" : "rgba(255,255,255,0.4)"} />
-                </TouchableOpacity>
+                  <TouchableOpacity 
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setShowTags(!showTags);
+                      setShowZones(false);
+                    }}
+                    style={{ padding: 4 }}
+                  >
+                    <Hash size={22} color={showTags ? "#FFFFFF" : "rgba(255,255,255,0.4)"} />
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      router.push("/polls");
+                    }}
+                    style={{ padding: 4 }}
+                  >
+                    <Vote size={22} color="rgba(255,255,255,0.4)" />
+                  </TouchableOpacity>
               </View>
                 <View style={styles.headerActions}>
                   <TouchableOpacity 
