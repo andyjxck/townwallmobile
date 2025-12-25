@@ -214,13 +214,19 @@ export default function HelpContact() {
       }
 
       // AI Assistant Response
+      const isOvertaken = messages.some(m => m.status === 'overtaken');
+      if (isOvertaken) {
+        console.log("Chat overtaken by agent. AI suppressed.");
+        return;
+      }
+
       const history = messages.slice(-5).map(m => ({
             role: m.is_from_admin ? 'assistant' : 'user',
             content: m.content
           }));
-  
+
           const aiResponse = await getAIAssistantResponse(text, history);
-  
+
           await supabase
             .from('rhelp_messages')
             .insert({

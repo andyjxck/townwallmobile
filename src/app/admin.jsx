@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert, ActivityIndicator, ScrollView, TextInput, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert, ActivityIndicator, ScrollView, TextInput, Dimensions, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { 
   ChevronLeft, 
@@ -18,7 +18,8 @@ import {
   ChevronUp,
   RefreshCw,
   BarChart2,
-  Undo
+  Undo,
+  UserCheck
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/utils/supabase';
@@ -44,6 +45,7 @@ export default function ModerationAdmin() {
     const TABS = [
       { id: 'talent', label: 'TALENT', icon: Star },
       { id: 'help', label: 'HELP CHATS', icon: MessageSquare },
+      { id: 'votes', label: 'VOTES', icon: CheckCircle },
       { id: 'business', label: 'BUSINESS', icon: Briefcase },
       { id: 'ai', label: 'AI LOGS', icon: Bot },
       { id: 'news', label: 'FAKE NEWS', icon: Flag },
@@ -115,38 +117,50 @@ export default function ModerationAdmin() {
           .order('created_at', { ascending: false });
         if (error) throw error;
         result = business;
+      } else if (activeTab === 'votes') {
+        const { data: votes, error } = await supabase
+          .from('rfeature_suggestions')
+          .select(`*, rusers(username)`)
+          .eq('status', 'pending')
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        result = votes;
       } else if (activeTab === 'help') {
         const { data: help, error } = await supabase
           .from('rhelp_messages')
           .select(`*, rusers!rhelp_messages_sender_id_fkey(username)`)
-          .eq('is_from_admin', false)
           .order('created_at', { ascending: false });
         if (error) throw error;
         
         const uniqueChats = [];
         const seenUsers = new Set();
         help.forEach(msg => {
-          if (!seenUsers.has(msg.sender_id)) {
-            uniqueChats.push(msg);
-            seenUsers.add(msg.sender_id);
+          const userId = msg.is_from_admin ? msg.receiver_id : msg.sender_id;
+          if (!seenUsers.has(userId)) {
+            // Find if this specific chat is overtaken
+            const isOvertaken = help.some(m => 
+              (m.sender_id === userId || m.receiver_id === userId) && 
+              m.status === 'overtaken'
+            );
+            uniqueChats.push({ ...msg, display_user_id: userId, is_overtaken: isOvertaken });
+            seenUsers.add(userId);
           }
         });
         result = uniqueChats;
-        } else if (activeTab === 'ai') {
-          let query = supabase
-            .from('rposts')
-            .select(`*, rusers(username), rzones(name)`)
-            .order('created_at', { ascending: false });
-          
-          if (aiFilter === 'approved') query = query.eq('moderation_status', 'approved');
-          else if (aiFilter === 'rejected') query = query.eq('moderation_status', 'rejected');
-          else query = query.eq('moderation_status', 'held');
+      } else if (activeTab === 'ai') {
+        let query = supabase
+          .from('rposts')
+          .select(`*, rusers(username), rzones(name)`)
+          .order('created_at', { ascending: false });
+        
+        if (aiFilter === 'approved') query = query.eq('moderation_status', 'approved');
+        else if (aiFilter === 'rejected') query = query.eq('moderation_status', 'rejected');
+        else query = query.eq('moderation_status', 'held');
 
-          const { data: ai, error } = await query;
-          if (error) throw error;
-          result = ai;
-        } else if (activeTab === 'news') {
-
+        const { data: ai, error } = await query;
+        if (error) throw error;
+        result = ai;
+      } else if (activeTab === 'news') {
         const { data: news, error } = await supabase
           .from('rposts')
           .select(`*, rusers(username), rzones(name)`)
@@ -237,6 +251,9 @@ export default function ModerationAdmin() {
       } else if (activeTab === 'business') {
         table = 'rbusinesses';
         updateData = { status: action === 'approve' ? 'approved' : 'rejected' };
+      } else if (activeTab === 'votes') {
+        table = 'rfeature_suggestions';
+        updateData = { status: action === 'approve' ? 'approved' : 'rejected' };
       } else if (activeTab === 'ai' || activeTab === 'news') {
         table = 'rposts';
         updateData = { 
@@ -253,6 +270,63 @@ export default function ModerationAdmin() {
     } catch (error) {
       console.error(error);
       Alert.alert("Error", "Action failed.");
+    }
+  };
+
+  const handleOvertake = async (userId) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      const admin = await getStoredUser();
+      const { error } = await supabase.from('rhelp_messages').insert({
+        sender_id: admin.id,
+        receiver_id: userId,
+        content: "A real agent has joined the chat.",
+        is_from_admin: true,
+        status: 'overtaken'
+      });
+      if (error) throw error;
+      
+      Alert.alert("Success", "You have overtaken this chat. AI responses are now disabled.");
+      fetchData();
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Error", "Overtake failed.");
+    }
+  };
+
+  const handleReply = async (userId) => {
+    if (!replyText.trim()) return;
+    try {
+      const admin = await getStoredUser();
+      const { error } = await supabase.from('rhelp_messages').insert({
+        sender_id: admin.id,
+        receiver_id: userId,
+        content: replyText.trim(),
+        is_from_admin: true
+      });
+      if (error) throw error;
+      
+      setReplyText('');
+      setExpandedChatId(null);
+      Alert.alert("Success", "Reply sent.");
+      fetchData();
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Error", "Reply failed.");
+    }
+  };
+
+  const fetchTranscript = async (userId) => {
+    try {
+      const { data: messages, error } = await supabase
+        .from('rhelp_messages')
+        .select('*')
+        .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      setTranscripts(prev => ({ ...prev, [userId]: messages }));
+    } catch (error) {
+      console.error(error);
     }
   };
 
@@ -287,6 +361,74 @@ export default function ModerationAdmin() {
 
     const Icon = TABS.find(t => t.id === activeTab)?.icon || Shield;
     
+    if (activeTab === 'help') {
+      const isExpanded = expandedChatId === item.display_user_id;
+      const transcript = transcripts[item.display_user_id] || [];
+
+      return (
+        <View style={styles.card}>
+          <TouchableOpacity 
+            style={styles.cardHeader}
+            onPress={() => {
+              if (!isExpanded) fetchTranscript(item.display_user_id);
+              setExpandedChatId(isExpanded ? null : item.display_user_id);
+            }}
+          >
+            <View style={styles.userRow}>
+              <View style={[styles.iconContainer, item.is_overtaken && { backgroundColor: '#4ADE80' }]}>
+                {item.is_overtaken ? <UserCheck size={14} color="#000" /> : <MessageSquare size={14} color="#FFF" />}
+              </View>
+              <Text style={styles.username}>@{item.rusers?.username || 'user_' + item.display_user_id}</Text>
+              {item.is_overtaken && <View style={styles.overtakenBadge}><Text style={styles.overtakenBadgeText}>AGENT JOINED</Text></View>}
+            </View>
+            <View style={styles.headerRight}>
+              <Text style={styles.date}>{new Date(item.created_at).toLocaleDateString()}</Text>
+              {isExpanded ? <ChevronUp size={20} color="rgba(255,255,255,0.4)" /> : <ChevronDown size={20} color="rgba(255,255,255,0.4)" />}
+            </View>
+          </TouchableOpacity>
+
+          <View style={styles.contentPadding}>
+            <Text style={styles.description} numberOfLines={isExpanded ? undefined : 2}>
+              {item.content}
+            </Text>
+            
+            {isExpanded && (
+              <View style={styles.transcriptContainer}>
+                <View style={styles.transcriptLine} />
+                {transcript.map((msg) => (
+                  <View key={msg.id} style={[styles.transcriptMsg, msg.is_from_admin ? styles.adminMsg : styles.userMsg]}>
+                    <Text style={styles.transcriptText}>{msg.content}</Text>
+                    <Text style={styles.transcriptTime}>{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+                  </View>
+                ))}
+
+                {item.is_overtaken ? (
+                  <View style={styles.replyContainer}>
+                    <TextInput
+                      style={styles.replyInput}
+                      placeholder="Type your response as an agent..."
+                      placeholderTextColor="rgba(255,255,255,0.3)"
+                      value={replyText}
+                      onChangeText={setReplyText}
+                      multiline
+                    />
+                    <TouchableOpacity style={styles.sendButtonSmall} onPress={() => handleReply(item.display_user_id)}>
+                      <Send size={18} color="#000" />
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <TouchableOpacity style={styles.overtakeButton} onPress={() => handleOvertake(item.display_user_id)}>
+                    <UserCheck size={18} color="#000" />
+                    <Text style={styles.overtakeButtonText}>OVERTAKE CHAT FROM AI</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+          </View>
+        </View>
+      );
+    }
+
     return (
       <View style={styles.card}>
         <View style={styles.cardHeader}>
@@ -299,18 +441,17 @@ export default function ModerationAdmin() {
           <Text style={styles.date}>{new Date(item.created_at).toLocaleDateString()}</Text>
         </View>
 
-          <View style={styles.contentPadding}>
-            {item.title && <Text style={styles.title}>{item.title}</Text>}
-            {item.name && <Text style={styles.title}>{item.name}</Text>}
-            <Text style={styles.description}>{item.text || item.description || item.content}</Text>
-            {activeTab === 'ai' && item.moderation_reason && (
-              <View style={styles.aiReasonContainer}>
-                <Bot size={12} color="#4ADE80" />
-                <Text style={styles.aiReasonText}>AI REASON: {item.moderation_reason}</Text>
-              </View>
-            )}
-          </View>
-
+        <View style={styles.contentPadding}>
+          {item.title && <Text style={styles.title}>{item.title}</Text>}
+          {item.name && <Text style={styles.title}>{item.name}</Text>}
+          <Text style={styles.description}>{item.suggestion_text || item.text || item.description || item.content}</Text>
+          {activeTab === 'ai' && item.moderation_reason && (
+            <View style={styles.aiReasonContainer}>
+              <Bot size={12} color="#4ADE80" />
+              <Text style={styles.aiReasonText}>AI REASON: {item.moderation_reason}</Text>
+            </View>
+          )}
+        </View>
 
         <View style={styles.actionRow}>
           <TouchableOpacity style={[styles.actionButton, styles.approveButton]} onPress={() => handleAction(item.id, 'approve')}>
@@ -331,7 +472,10 @@ export default function ModerationAdmin() {
   return (
     <View style={styles.container}>
       <LinearGradient colors={['#0F172A', '#000000', '#000000']} style={StyleSheet.absoluteFill} />
-      <View style={{ paddingTop: insets.top, flex: 1 }}>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+        style={{ paddingTop: insets.top, flex: 1 }}
+      >
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <ChevronLeft color="#FFFFFF" size={28} />
@@ -362,29 +506,28 @@ export default function ModerationAdmin() {
               );
             })}
           </ScrollView>
+        </View>
+
+        {activeTab === 'ai' && (
+          <View style={styles.aiFilterContainer}>
+            {['held', 'approved', 'rejected'].map((filter) => (
+              <TouchableOpacity
+                key={filter}
+                style={[styles.aiFilterButton, aiFilter === filter && styles.aiFilterButtonActive]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setAiFilter(filter);
+                }}
+              >
+                <Text style={[styles.aiFilterText, aiFilter === filter && styles.aiFilterTextActive]}>
+                  {filter.toUpperCase()}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
+        )}
 
-          {activeTab === 'ai' && (
-            <View style={styles.aiFilterContainer}>
-              {['held', 'approved', 'rejected'].map((filter) => (
-                <TouchableOpacity
-                  key={filter}
-                  style={[styles.aiFilterButton, aiFilter === filter && styles.aiFilterButtonActive]}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setAiFilter(filter);
-                  }}
-                >
-                  <Text style={[styles.aiFilterText, aiFilter === filter && styles.aiFilterTextActive]}>
-                    {filter.toUpperCase()}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-
-          {activeTab === 'analytics' && analytics ? (
-
+        {activeTab === 'analytics' && analytics ? (
           <ScrollView style={styles.analyticsScroll}>
             <View style={styles.analyticsGrid}>
               <View style={styles.statCard}><Text style={styles.statValue}>{analytics.users}</Text><Text style={styles.statLabel}>USERS</Text></View>
@@ -398,7 +541,7 @@ export default function ModerationAdmin() {
         ) : (
           <FlatList
             data={data}
-            keyExtractor={(item) => item.id.toString()}
+            keyExtractor={(item, index) => item.id?.toString() || index.toString()}
             contentContainerStyle={styles.listContent}
             renderItem={renderItem}
             ListEmptyComponent={
@@ -409,7 +552,7 @@ export default function ModerationAdmin() {
             }
           />
         )}
-      </View>
+      </KeyboardAvoidingView>
     </View>
   );
 }
@@ -420,6 +563,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 15 },
   headerTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '900', letterSpacing: 2 },
   backButton: { padding: 5 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   tabContainer: { paddingVertical: 10 },
   tabScroll: { paddingHorizontal: 20, gap: 12 },
   tab: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 30, backgroundColor: 'rgba(255,255,255,0.05)', gap: 8 },
@@ -452,13 +596,25 @@ const styles = StyleSheet.create({
   analyticsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 15 },
   statCard: { width: (Dimensions.get('window').width - 55) / 2, backgroundColor: 'rgba(255,255,255,0.05)', padding: 20, borderRadius: 20, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
   statValue: { color: '#FFFFFF', fontSize: 32, fontWeight: '900' },
-    statLabel: { color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '800', letterSpacing: 2, marginTop: 4 },
-    aiReasonContainer: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12, padding: 10, backgroundColor: 'rgba(74, 222, 128, 0.05)', borderRadius: 8, borderWidth: 1, borderColor: 'rgba(74, 222, 128, 0.1)' },
-    aiReasonText: { color: '#4ADE80', fontSize: 11, fontWeight: '700', flex: 1 },
-    aiFilterContainer: { flexDirection: 'row', paddingHorizontal: 20, paddingBottom: 15, gap: 10 },
-    aiFilterButton: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
-    aiFilterButtonActive: { backgroundColor: '#4ADE80', borderColor: '#4ADE80' },
-    aiFilterText: { color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '900', letterSpacing: 1 },
-    aiFilterTextActive: { color: '#000000' }
-  });
-
+  statLabel: { color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '800', letterSpacing: 2, marginTop: 4 },
+  aiReasonContainer: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12, padding: 10, backgroundColor: 'rgba(74, 222, 128, 0.05)', borderRadius: 8, borderWidth: 1, borderColor: 'rgba(74, 222, 128, 0.1)' },
+  aiReasonText: { color: '#4ADE80', fontSize: 11, fontWeight: '700', flex: 1 },
+  aiFilterContainer: { flexDirection: 'row', paddingHorizontal: 20, paddingBottom: 15, gap: 10 },
+  aiFilterButton: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  aiFilterButtonActive: { backgroundColor: '#4ADE80', borderColor: '#4ADE80' },
+  aiFilterText: { color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '900', letterSpacing: 1 },
+  aiFilterTextActive: { color: '#000000' },
+  overtakeButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#4ADE80', paddingVertical: 12, borderRadius: 12, marginTop: 15 },
+  overtakeButtonText: { color: '#000', fontSize: 12, fontWeight: '900', letterSpacing: 1 },
+  overtakenBadge: { backgroundColor: '#4ADE80', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 8 },
+  overtakenBadgeText: { color: '#000', fontSize: 8, fontWeight: '900' },
+  transcriptContainer: { marginTop: 15, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)', paddingTop: 15 },
+  transcriptMsg: { padding: 10, borderRadius: 12, marginBottom: 8, maxWidth: '90%' },
+  userMsg: { backgroundColor: 'rgba(255,255,255,0.1)', alignSelf: 'flex-start' },
+  adminMsg: { backgroundColor: 'rgba(74, 222, 128, 0.1)', alignSelf: 'flex-end' },
+  transcriptText: { color: '#FFF', fontSize: 13 },
+  transcriptTime: { color: 'rgba(255,255,255,0.3)', fontSize: 9, alignSelf: 'flex-end', marginTop: 4 },
+  replyContainer: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 15 },
+  replyInput: { flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, paddingHorizontal: 15, paddingVertical: 10, color: '#FFF', fontSize: 14, maxHeight: 100 },
+  sendButtonSmall: { backgroundColor: '#FFF', width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' }
+});
