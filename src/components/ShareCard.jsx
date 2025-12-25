@@ -29,49 +29,48 @@ export function ShareCard({ post }) {
         </View>
 
         {/* Content Section */}
-        <View style={styles.content}>
-          {mainImage && (
-            <Image
-              source={{ uri: mainImage }}
-              style={styles.mainImage}
-              contentFit="cover"
-            />
-          )}
-          
-          <Text style={styles.title} numberOfLines={2}>
-            {post.title || 'Untitled Post'}
-          </Text>
-          
-          <Text style={styles.body} numberOfLines={4}>
-            {post.text}
-          </Text>
-        </View>
-
-        {/* Footer with Author and App Info */}
-        <View style={styles.footer}>
-          <View style={styles.authorInfo}>
-            {post.rusers?.avatar_url ? (
-              <Image 
-                source={{ uri: post.rusers.avatar_url }} 
-                style={styles.avatar} 
+          <View style={styles.content}>
+            {mainImage && (
+              <Image
+                source={{ uri: mainImage }}
+                style={styles.mainImage}
+                contentFit="cover"
               />
-            ) : post.rusers?.emoji_icon ? (
-              <Text style={styles.emojiIcon}>{post.rusers.emoji_icon}</Text>
-            ) : (
-              <View style={styles.avatarPlaceholder}>
-                <User size={12} color="rgba(255,255,255,0.4)" />
-              </View>
             )}
-            <Text style={styles.username}>
-              @{post.is_anonymous ? 'anonymous' : (post.rusers?.username || 'user')}
+            
+            <Text style={styles.title}>
+              {post.title || 'Untitled Post'}
+            </Text>
+            
+            <Text style={styles.body}>
+              {post.text}
             </Text>
           </View>
-          
-          <View style={styles.appPromo}>
-            <Text style={styles.promoText}>Join the wall</Text>
-            <Text style={styles.appUrl}>townwall.app</Text>
+
+          {/* Footer with Author and App Info */}
+          <View style={styles.footer}>
+            <View style={styles.authorInfo}>
+              {post.rusers?.avatar_url ? (
+                <Image 
+                  source={{ uri: post.rusers.avatar_url }} 
+                  style={styles.avatar} 
+                />
+              ) : post.rusers?.emoji_icon ? (
+                <Text style={styles.emojiIcon}>{post.rusers.emoji_icon}</Text>
+              ) : (
+                <View style={styles.avatarPlaceholder}>
+                  <User size={12} color="rgba(255,255,255,0.4)" />
+                </View>
+              )}
+              <Text style={styles.username}>
+                @{post.is_anonymous ? 'anonymous' : (post.rusers?.username || 'user')}
+              </Text>
+            </View>
+            
+            <View style={styles.appPromo}>
+              <Text style={styles.promoText}>Download on iOS</Text>
+            </View>
           </View>
-        </View>
       </LinearGradient>
     </View>
   );

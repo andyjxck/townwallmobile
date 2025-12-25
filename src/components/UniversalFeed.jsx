@@ -173,16 +173,16 @@ export default function UniversalFeed() {
   const fetchPosts = async (isRefreshing = false) => {
     if (!isRefreshing) setLoading(true);
       try {
-          let query = supabase
-            .from('rposts')
-            .select(`
-              *,
-              rusers(username, emoji_icon, avatar_url),
-              rzones(name),
-              rtags(name),
-              rreactions(reaction_type, device_id)
-            `)
-            .eq('is_deleted', false);
+            let query = supabase
+              .from('rposts')
+              .select(`
+                *,
+                rusers (username, emoji_icon, avatar_url),
+                rzones (name),
+                rtags (name),
+                rreactions (reaction_type, device_id)
+              `)
+              .eq('is_deleted', false);
 
         if (selectedZone) query = query.eq('zone_id', selectedZone);
         if (selectedTag) query = query.eq('tag_id', selectedTag);
@@ -545,31 +545,32 @@ export default function UniversalFeed() {
           ListHeaderComponent={<BannerAd />}
           renderItem={({ item, index }) => (
             <View>
-              <PostItem 
-                item={item} 
-                deviceId={deviceId} 
-                onReaction={handleReaction} 
-                onDelete={handleDeletePost}
-                onMute={handleMuteUser}
-                onShare={handleShare}
-                onEdit={handleEditPost}
-                user={user}
+                <PostItem 
+                  item={item} 
+                  deviceId={deviceId} 
+                  onReaction={handleReaction} 
+                  onDelete={handleDeletePost}
+                  onMute={handleMuteUser}
+                  onShare={handleShare}
+                  onEdit={handleEditPost}
+                  user={user}
+                />
+                {index > 0 && index % 3 === 0 && <NativeAd />}
+              </View>
+            )}
+            keyExtractor={(item) => item.id.toString()}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor="#FFFFFF"
               />
-              {index > 0 && index % 5 === 0 && <NativeAd />}
-            </View>
-          )}
-          keyExtractor={(item) => item.id.toString()}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor="#FFFFFF"
-            />
-          }
-          contentContainerStyle={{ 
-            paddingBottom: insets.bottom + 100,
-          }}
-          ListEmptyComponent={
+            }
+            contentContainerStyle={{ 
+              paddingBottom: insets.bottom + 100,
+            }}
+            ListFooterComponent={posts.length > 0 ? <BannerAd /> : null}
+            ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Search size={40} color="rgba(255,255,255,0.2)" style={{ marginBottom: 16 }} />
               <Text style={{ color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>

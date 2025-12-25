@@ -28,6 +28,7 @@ import PostItem from "./PostItem";
 import { getStoredUser } from "../utils/user";
 import { useAuthStore } from "../utils/auth/store";
 import { ShareManager } from "./ShareManager";
+import { BannerAd } from "./BannerAd";
 
 export default function ZoneFeed({ zoneSlug, zoneName }) {
   const insets = useSafeAreaInsets();
@@ -255,6 +256,7 @@ export default function ZoneFeed({ zoneSlug, zoneName }) {
 
       {/* Feed */}
       <FlatList
+        ListHeaderComponent={<BannerAd />}
         data={posts}
         renderItem={({ item }) => (
               <PostItem
