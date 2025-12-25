@@ -173,16 +173,16 @@ export default function UniversalFeed() {
   const fetchPosts = async (isRefreshing = false) => {
     if (!isRefreshing) setLoading(true);
       try {
-        let query = supabase
-          .from('rposts')
-          .select(`
-            *,
-            user:rusers!rposts_user_id_fkey(username, emoji_icon, avatar_url),
-            zone:rzones(name),
-            tag:rtags(name),
-            rreactions(reaction_type, device_id)
-          `)
-          .eq('is_deleted', false);
+          let query = supabase
+            .from('rposts')
+            .select(`
+              *,
+              rusers(username, emoji_icon, avatar_url),
+              rzones(name),
+              rtags(name),
+              rreactions(reaction_type, device_id)
+            `)
+            .eq('is_deleted', false);
 
         if (selectedZone) query = query.eq('zone_id', selectedZone);
         if (selectedTag) query = query.eq('tag_id', selectedTag);
@@ -220,16 +220,17 @@ export default function UniversalFeed() {
         .single();
 
       if (existing) {
-        if (existing.type === type) {
+        if (existing.reaction_type === type) {
           await supabase.from('rreactions').delete().eq('id', existing.id);
         } else {
-          await supabase.from('rreactions').update({ type }).eq('id', existing.id);
+          await supabase.from('rreactions').update({ reaction_type: type }).eq('id', existing.id);
         }
       } else {
         await supabase.from('rreactions').insert({
           post_id: postId,
           user_id: user.id,
-          type
+          reaction_type: type,
+          device_id: deviceId
         });
       }
 
