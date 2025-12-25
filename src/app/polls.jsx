@@ -188,8 +188,13 @@ export default function PollsScreen() {
     }
   };
 
-  const handleCreatePoll = async () => {
-    if (!newPollQuestion.trim() || newPollOptions.some(o => !o.trim())) {
+    const handleCreatePoll = async () => {
+      if (!user?.is_admin) {
+        Alert.alert("Permission Denied", "Only admins can create polls.");
+        return;
+      }
+
+      if (!newPollQuestion.trim() || newPollOptions.some(o => !o.trim())) {
       Alert.alert("Incomplete", "Please provide a question and at least two options.");
       return;
     }
@@ -243,6 +248,10 @@ export default function PollsScreen() {
           text: "Close", 
           style: "destructive",
           onPress: async () => {
+            if (!user?.is_admin) {
+              Alert.alert("Permission Denied", "Only admins can perform this action.");
+              return;
+            }
             try {
               const { error } = await supabase
                 .from('rpolls')
