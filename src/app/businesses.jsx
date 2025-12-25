@@ -311,44 +311,56 @@ export default function LocalBusinesses() {
               source={{ uri: item.avatar_url || `https://avatar.vercel.sh/${item.name}.png` }} 
               style={styles.cardImage} 
             />
-            {item.rating ? (
-              <View style={styles.ratingBadge}>
-                <Star size={10} color="#000" fill="#000" />
-                <Text style={styles.ratingText}>{item.rating}</Text>
+            <LinearGradient
+              colors={['rgba(0,0,0,0.5)', 'transparent', 'rgba(0,0,0,0.8)']}
+              style={StyleSheet.absoluteFill}
+            />
+            
+            <View style={styles.cardOverlayTop}>
+              <View style={styles.categoryTag}>
+                <Text style={styles.categoryTagText}>{item.category?.toUpperCase() || 'BUSINESS'}</Text>
               </View>
-            ) : null}
+              {item.rating ? (
+                <View style={styles.ratingPill}>
+                  <Star size={12} color="#FBBF24" fill="#FBBF24" />
+                  <Text style={styles.ratingPillText}>{item.rating}</Text>
+                </View>
+              ) : null}
+            </View>
+
+            <View style={styles.cardOverlayBottom}>
+              <Text style={styles.bizName}>{item.name}</Text>
+              {item.address && (
+                <View style={styles.locRow}>
+                  <MapPin size={12} color="rgba(255,255,255,0.7)" />
+                  <Text style={styles.locText} numberOfLines={1}>{item.address}</Text>
+                </View>
+              )}
+            </View>
           </View>
 
-          <View style={styles.cardContent}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.categoryBadge}>{item.category?.toUpperCase() || 'BUSINESS'}</Text>
-              <View style={styles.cardActions}>
-                {item.phone && (
-                  <TouchableOpacity 
-                    onPress={() => Linking.openURL(`tel:${item.phone}`)}
-                    style={styles.iconButton}
-                  >
-                    <Phone size={16} color="#FFF" />
-                  </TouchableOpacity>
-                )}
-                <View style={styles.iconButton}>
-                  <ExternalLink size={16} color="#FFF" />
-                </View>
+          <View style={styles.cardFooter}>
+            <View style={styles.footerInfo}>
+              <Text style={styles.bizDesc} numberOfLines={1}>
+                {item.description || "Discover local services and products..."}
+              </Text>
+            </View>
+            <View style={styles.footerActions}>
+              {item.phone && (
+                <TouchableOpacity 
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    Linking.openURL(`tel:${item.phone}`);
+                  }}
+                  style={styles.actionCircle}
+                >
+                  <Phone size={18} color="#FFF" />
+                </TouchableOpacity>
+              )}
+              <View style={[styles.actionCircle, styles.primaryActionCircle]}>
+                <ExternalLink size={18} color="#000" strokeWidth={2.5} />
               </View>
             </View>
-            
-            <Text style={styles.businessName}>{item.name}</Text>
-            
-            {item.address && (
-              <View style={styles.addressRow}>
-                <MapPin size={12} color="rgba(255,255,255,0.4)" />
-                <Text style={styles.addressText} numberOfLines={1}>{item.address}</Text>
-              </View>
-            )}
-
-            {item.description && (
-              <Text style={styles.descriptionText} numberOfLines={2}>{item.description}</Text>
-            )}
           </View>
         </TouchableOpacity>
       );
@@ -631,19 +643,24 @@ export default function LocalBusinesses() {
       fontSize: 14,
     },
     listContent: {
-      paddingHorizontal: 20,
+      paddingHorizontal: 16,
       paddingBottom: 120,
-      gap: 20,
+      gap: 16,
     },
     businessCard: {
-      backgroundColor: 'rgba(255,255,255,0.03)',
-      borderRadius: 24,
+      backgroundColor: '#1A1A1A',
+      borderRadius: 28,
       overflow: 'hidden',
       borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.05)',
+      borderColor: 'rgba(255,255,255,0.08)',
+      elevation: 4,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.3,
+      shadowRadius: 12,
     },
     cardImageContainer: {
-      height: 180,
+      height: 240,
       width: '100%',
       backgroundColor: '#111',
     },
@@ -651,71 +668,99 @@ export default function LocalBusinesses() {
       width: '100%',
       height: '100%',
     },
-    ratingBadge: {
+    cardOverlayTop: {
       position: 'absolute',
       top: 16,
+      left: 16,
       right: 16,
-      backgroundColor: '#FFFFFF',
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      borderRadius: 8,
-    },
-    ratingText: {
-      color: '#000',
-      fontSize: 11,
-      fontWeight: '800',
-    },
-    cardContent: {
-      padding: 20,
-    },
-    cardHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: 12,
     },
-    categoryBadge: {
-      color: 'rgba(255,255,255,0.4)',
-      fontSize: 10,
+    categoryTag: {
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.1)',
+    },
+    categoryTagText: {
+      color: '#FFF',
+      fontSize: 9,
       fontWeight: '800',
-      letterSpacing: 1.5,
+      letterSpacing: 1,
     },
-    cardActions: {
+    ratingPill: {
+      backgroundColor: '#FFF',
       flexDirection: 'row',
-      gap: 8,
-    },
-    iconButton: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      backgroundColor: 'rgba(255,255,255,0.08)',
-      justifyContent: 'center',
       alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 12,
     },
-    businessName: {
+    ratingPillText: {
+      color: '#000',
+      fontSize: 11,
+      fontWeight: '900',
+    },
+    cardOverlayBottom: {
+      position: 'absolute',
+      bottom: 20,
+      left: 20,
+      right: 20,
+    },
+    bizName: {
       color: '#FFFFFF',
-      fontSize: 24,
-      fontWeight: '700',
+      fontSize: 28,
+      fontWeight: '900',
       letterSpacing: -0.5,
     },
-    addressRow: {
+    locRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
-      marginTop: 8,
+      marginTop: 4,
     },
-    addressText: {
-      color: 'rgba(255,255,255,0.4)',
+    locText: {
+      color: 'rgba(255,255,255,0.8)',
       fontSize: 13,
+      fontWeight: '500',
     },
-    descriptionText: {
-      color: 'rgba(255,255,255,0.5)',
-      fontSize: 14,
-      lineHeight: 20,
-      marginTop: 12,
+    cardFooter: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 16,
+      backgroundColor: 'rgba(255,255,255,0.02)',
+      borderTopWidth: 1,
+      borderTopColor: 'rgba(255,255,255,0.05)',
+    },
+    footerInfo: {
+      flex: 1,
+    },
+    bizDesc: {
+      color: 'rgba(255,255,255,0.4)',
+      fontSize: 12,
+      fontWeight: '500',
+    },
+    footerActions: {
+      flexDirection: 'row',
+      gap: 10,
+    },
+    actionCircle: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: 'rgba(255,255,255,0.1)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.05)',
+    },
+    primaryActionCircle: {
+      backgroundColor: '#FFFFFF',
+      borderColor: '#FFFFFF',
     },
     backButton: {
       padding: 5,

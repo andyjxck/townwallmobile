@@ -211,29 +211,44 @@ export default function LocalTalent() {
             style={styles.cardImage} 
           />
           <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.8)', '#000000']}
+            colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.95)']}
             style={styles.cardGradient}
           />
+          
           <View style={styles.cardContent}>
-            <View style={styles.cardHeader}>
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{item.category?.toUpperCase() || 'TALENT'}</Text>
+            <View style={styles.cardTopRow}>
+              <View style={styles.categoryBadge}>
+                <Text style={styles.categoryBadgeText}>{item.category || 'Talent'}</Text>
               </View>
-              <View style={styles.platformIcon}>
+              <View style={styles.platformIconContainer}>
                 {getPlatformIcon(item.platform)}
               </View>
             </View>
-            
-            <Text style={styles.cardTitle}>{item.name}</Text>
-            <Text style={styles.cardSubtitle}>{item.title}</Text>
-            
-            {item.description ? (
-              <Text style={styles.cardDescription} numberOfLines={2}>{item.description}</Text>
-            ) : null}
 
-            <View style={styles.cardFooter}>
-              <Text style={styles.visitLabel}>VIEW {item.platform?.toUpperCase()}</Text>
-              <ExternalLink size={14} color="#FFF" />
+            <View style={styles.cardBottomSection}>
+              <Text style={styles.talentName}>{item.name}</Text>
+              <Text style={styles.talentTitle} numberOfLines={1}>{item.title}</Text>
+              
+              {item.description ? (
+                <Text style={styles.talentDesc} numberOfLines={2}>{item.description}</Text>
+              ) : null}
+
+              <View style={styles.actionRow}>
+                <View style={styles.primaryAction}>
+                  <Text style={styles.primaryActionText}>VIEW {item.platform?.toUpperCase() || 'PROFILE'}</Text>
+                  <ExternalLink size={12} color="#000" strokeWidth={3} />
+                </View>
+                <TouchableOpacity 
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    // Share functionality
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  }}
+                  style={styles.secondaryAction}
+                >
+                  <Plus size={18} color="#FFF" />
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </TouchableOpacity>
@@ -529,15 +544,20 @@ export default function LocalTalent() {
       color: '#000000',
     },
     listContent: {
-      paddingHorizontal: 20,
+      paddingHorizontal: 16,
       paddingBottom: 120,
-      gap: 20,
+      gap: 16,
     },
     talentCard: {
-      height: 400,
-      borderRadius: 24,
+      height: 480,
+      borderRadius: 32,
       overflow: 'hidden',
       backgroundColor: '#111',
+      elevation: 10,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 12 },
+      shadowOpacity: 0.6,
+      shadowRadius: 16,
     },
     cardImage: {
       width: '100%',
@@ -549,65 +569,91 @@ export default function LocalTalent() {
       bottom: 0,
       left: 0,
       right: 0,
-      height: '70%',
+      height: '100%',
     },
     cardContent: {
       flex: 1,
-      justifyContent: 'flex-end',
       padding: 24,
+      justifyContent: 'space-between',
     },
-    cardHeader: {
+    cardTopRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: 12,
     },
-    badge: {
-      backgroundColor: 'rgba(255,255,255,0.15)',
-      paddingHorizontal: 10,
-      paddingVertical: 4,
-      borderRadius: 6,
-    },
-    badgeText: {
-      color: '#FFF',
-      fontSize: 9,
-      fontWeight: '900',
-      letterSpacing: 1,
-    },
-    cardTitle: {
-      color: '#FFFFFF',
-      fontSize: 32,
-      fontWeight: '800',
-      letterSpacing: -1,
-    },
-    cardSubtitle: {
-      color: 'rgba(255,255,255,0.7)',
-      fontSize: 16,
-      fontWeight: '500',
-      marginTop: 4,
-    },
-    cardDescription: {
-      color: 'rgba(255,255,255,0.5)',
-      fontSize: 14,
-      lineHeight: 20,
-      marginTop: 12,
-    },
-    cardFooter: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-      marginTop: 20,
-      alignSelf: 'flex-start',
-      backgroundColor: 'rgba(255,255,255,0.1)',
+    categoryBadge: {
+      backgroundColor: 'rgba(255,255,255,0.12)',
       paddingHorizontal: 12,
-      paddingVertical: 8,
-      borderRadius: 100,
+      paddingVertical: 6,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.1)',
     },
-    visitLabel: {
+    categoryBadgeText: {
       color: '#FFFFFF',
       fontSize: 10,
+      fontWeight: '700',
+      letterSpacing: 0.5,
+    },
+    platformIconContainer: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: 'rgba(255,255,255,0.08)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    cardBottomSection: {
+      gap: 4,
+    },
+    talentName: {
+      color: '#FFFFFF',
+      fontSize: 32,
       fontWeight: '900',
-      letterSpacing: 1,
+      letterSpacing: -1,
+    },
+    talentTitle: {
+      color: 'rgba(255,255,255,0.8)',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    talentDesc: {
+      color: 'rgba(255,255,255,0.5)',
+      fontSize: 13,
+      lineHeight: 18,
+      marginTop: 8,
+    },
+    actionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      marginTop: 20,
+    },
+    primaryAction: {
+      flex: 1,
+      height: 48,
+      backgroundColor: '#FFFFFF',
+      borderRadius: 24,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+    },
+    primaryActionText: {
+      color: '#000000',
+      fontSize: 12,
+      fontWeight: '900',
+      letterSpacing: 0.5,
+    },
+    secondaryAction: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: 'rgba(255,255,255,0.15)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.1)',
     },
     backButton: {
       padding: 5,
