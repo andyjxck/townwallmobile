@@ -1,11 +1,40 @@
 import React from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import { NativeAdView, NativeAsset, NativeMediaView, NativeAssetType, TestIds } from 'react-native-google-mobile-ads';
+import Constants from 'expo-constants';
 
 const adUnitId = __DEV__ ? TestIds.NATIVE : 'ca-app-pub-1505977777207758/1579458289';
 
 export function NativeAd() {
   if (Platform.OS === 'web') return null;
+
+  // Show placeholder in Expo Go (appOwnership is 'expo')
+  if (Constants.appOwnership === 'expo' && __DEV__) {
+    return (
+      <View style={[styles.container, { borderStyle: 'dashed' }]}>
+        <View style={styles.adContent}>
+          <View style={styles.header}>
+            <View style={[styles.icon, { backgroundColor: '#e0e0e0' }]} />
+            <View style={styles.headerText}>
+              <Text style={[styles.headline, { backgroundColor: '#e0e0e0', color: 'transparent', width: '80%', height: 16, borderRadius: 4 }]}>Placeholder</Text>
+              <Text style={[styles.advertiser, { backgroundColor: '#f0f0f0', color: 'transparent', width: '40%', height: 12, borderRadius: 4, marginTop: 4 }]}>Advertiser</Text>
+            </View>
+            <View style={styles.adBadge}>
+              <Text style={styles.adBadgeText}>Ad</Text>
+            </View>
+          </View>
+          <Text style={[styles.bodyText, { backgroundColor: '#f0f0f0', color: 'transparent', width: '100%', height: 14, borderRadius: 4, marginBottom: 4 }]}>Body</Text>
+          <Text style={[styles.bodyText, { backgroundColor: '#f0f0f0', color: 'transparent', width: '90%', height: 14, borderRadius: 4 }]}>Body</Text>
+          <View style={[styles.mediaView, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }]}>
+            <Text style={{ color: '#999', fontSize: 14 }}>Native Ad Placeholder (Expo Go)</Text>
+          </View>
+          <View style={[styles.ctaButton, { backgroundColor: '#ccc' }]}>
+            <Text style={styles.ctaText}>Learn More</Text>
+          </View>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
