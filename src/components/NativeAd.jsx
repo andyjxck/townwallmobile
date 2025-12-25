@@ -11,6 +11,9 @@ import NativeAdView, {
   ImageView,
   IconView,
 } from 'react-native-google-mobile-ads';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
+
+const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
 const NATIVE_AD_UNIT_ID = Platform.select({
   ios: 'ca-app-pub-1505977777207758/1579458289',
@@ -55,6 +58,11 @@ export function NativeAd() {
           <Text style={[styles.postTitle, { color: '#FFFFFF' }]}>
             Boost your business on TownWall
           </Text>
+          {isExpoGo && (
+            <Text style={{ color: 'rgba(255, 255, 255, 0.4)', fontSize: 10, marginTop: 4 }}>
+              [Native Ad Placeholder for Expo Go]
+            </Text>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity 
@@ -104,6 +112,10 @@ export function NativeAd() {
     </View>
   );
 
+  if (isExpoGo) {
+    return renderPlaceholder();
+  }
+
   return (
     <NativeAdView
       ref={nativeAdRef}
@@ -116,6 +128,53 @@ export function NativeAd() {
       style={{ minHeight: 120 }}
     >
       {!adLoaded ? renderPlaceholder() : (
+        <View style={styles.postContainer}>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <View style={{ flex: 1 }}>
+              <View style={[styles.postHeader, { gap: 8 }]}>
+                <IconView style={styles.adIcon} />
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <AdvertiserView style={[styles.zoneText, { color: '#FFFFFF' }]} />
+                    <View style={styles.adSticker}>
+                      <Text style={styles.adStickerText}>SPONSORED</Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+
+              <HeadlineView style={[styles.postTitle, { color: '#FFFFFF' }]} />
+              <TaglineView style={[styles.postBody, { color: 'rgba(255, 255, 255, 0.6)', marginTop: 4, fontSize: 13 }]} numberOfLines={2} />
+            </View>
+
+            <ImageView
+              style={{ width: 80, height: 80, borderRadius: 8 }}
+            />
+          </View>
+
+          <View style={styles.actionRow}>
+            <View style={styles.actionButton}>
+              <Heart size={18} color="rgba(255,255,255,0.2)" />
+              <Text style={[styles.actionCount, { color: "rgba(255,255,255,0.2)" }]}>0</Text>
+            </View>
+            <View style={styles.actionButton}>
+              <Star size={18} color="rgba(255,255,255,0.2)" />
+              <Text style={[styles.actionCount, { color: "rgba(255,255,255,0.2)" }]}>0</Text>
+            </View>
+            
+            <CallToActionView
+              style={styles.inlineCta}
+              textStyle={styles.inlineCtaText}
+            />
+
+            <View style={{ flex: 1 }} />
+            <ShareIcon size={18} color="rgba(255,255,255,0.4)" />
+          </View>
+        </View>
+      )}
+    </NativeAdView>
+  );
+}
         <View style={styles.postContainer}>
           <View style={{ flexDirection: 'row', gap: 12 }}>
             <View style={{ flex: 1 }}>
