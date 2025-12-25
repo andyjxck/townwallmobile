@@ -19,32 +19,33 @@ import {
   Underline, 
   List, 
   ListOrdered, 
-  Palette, 
-  AlignLeft, 
-  AlignCenter, 
-  AlignRight, 
   ChevronDown, 
-  Undo2, 
-  Redo2,
   Check,
   BarChart2
 } from 'lucide-react-native';
 
-const COLORS = [
-  '#000000', '#FFFFFF', '#8E8E93', '#C7C7CC', '#FF3B30', '#FF9500', 
-  '#FFCC00', '#4CD964', '#007AFF', '#5856D6', '#AF52DE', '#FF2D55',
-  '#2ECC71', '#3498DB', '#9B59B6', '#F1C40F', '#E67E22', '#E74C3C', 
-  '#1ABC9C', '#34495E', '#D35400', '#BDC3C7', '#7F8C8D', '#2C3E50'
-];
-
-function ToolbarDropdown({ icon: Icon, label, options, onSelect, currentValue, type = 'list' }) {
+function ToolbarDropdown({ icon: Icon, label, options, onSelect, currentValue }) {
   const [visible, setVisible] = useState(false);
+  const triggerRef = useRef();
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+
+  const toggle = () => {
+    if (visible) {
+      setVisible(false);
+    } else {
+      triggerRef.current.measure((x, y, width, height, pageX, pageY) => {
+        setPos({ top: pageY + height + 5, left: pageX });
+        setVisible(true);
+      });
+    }
+  };
 
   return (
     <View>
       <TouchableOpacity 
+        ref={triggerRef}
         style={styles.dropdownTrigger} 
-        onPress={() => setVisible(true)}
+        onPress={toggle}
       >
           <Icon size={18} color="rgba(255,255,255,0.6)" />
           {label && <Text style={styles.dropdownText}>{label}</Text>}
@@ -54,49 +55,37 @@ function ToolbarDropdown({ icon: Icon, label, options, onSelect, currentValue, t
       <Modal
         visible={visible}
         transparent={true}
-        animationType="fade"
+        animationType="none"
         onRequestClose={() => setVisible(false)}
       >
         <TouchableWithoutFeedback onPress={() => setVisible(false)}>
           <View style={styles.modalOverlay}>
-            <View style={[styles.dropdownMenu, type === 'color' && styles.colorMenu]}>
-              {type === 'color' ? (
-                <View style={styles.colorGrid}>
-                  {COLORS.map((color) => (
-                    <TouchableOpacity
-                      key={color}
-                      style={[styles.colorOption, { backgroundColor: color }]}
-                      onPress={() => {
-                        onSelect(color);
-                        setVisible(false);
-                      }}
-                    >
-                      {currentValue === color && (
-                        <Check size={14} color={color === '#FFFFFF' ? '#000000' : '#FFFFFF'} />
-                      )}
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              ) : (
-                options.map((option) => (
-                  <TouchableOpacity
-                    key={option.value}
-                    style={styles.dropdownItem}
-                    onPress={() => {
-                      onSelect(option.value);
-                      setVisible(false);
-                    }}
-                  >
-                    <option.icon size={18} color={currentValue === option.value ? '#007AFF' : '#FFFFFF'} />
-                    <Text style={[
-                      styles.dropdownItemText,
-                      currentValue === option.value && { color: '#007AFF', fontWeight: 'bold' }
-                    ]}>
-                      {option.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))
-              )}
+            <View style={[
+              styles.dropdownMenu, 
+              { 
+                position: 'absolute',
+                top: pos.top,
+                left: Math.max(10, Math.min(pos.left, 150)),
+              }
+            ]}>
+              {options.map((option) => (
+                <TouchableOpacity
+                  key={option.value}
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    onSelect(option.value);
+                    setVisible(false);
+                  }}
+                >
+                  <option.icon size={18} color={currentValue === option.value ? '#007AFF' : '#FFFFFF'} />
+                  <Text style={[
+                    styles.dropdownItemText,
+                    currentValue === option.value && { color: '#007AFF', fontWeight: 'bold' }
+                  ]}>
+                    {option.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
         </TouchableWithoutFeedback>
@@ -107,7 +96,6 @@ function ToolbarDropdown({ icon: Icon, label, options, onSelect, currentValue, t
 
 export function RichTextEditor({ value, onChange, placeholder, onPollPress, minHeight = 400 }) {
   const richText = useRef();
-  const [currentColor, setCurrentColor] = useState('#FFFFFF');
 
   const handleListSelect = (type) => {
     if (type === 'bullets') {
@@ -115,13 +103,6 @@ export function RichTextEditor({ value, onChange, placeholder, onPollPress, minH
     } else if (type === 'numbers') {
       richText.current?.executeAction(actions.insertOrderedList);
     }
-  };
-
-  const handleColorSelect = (color) => {
-    setCurrentColor(color);
-    richText.current?.focusContent();
-    richText.current?.prepareCursor();
-    richText.current?.executeAction(actions.foreColor, color);
   };
 
   const listOptions = [
@@ -244,50 +225,31 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: 'transparent',
   },
   dropdownMenu: {
     backgroundColor: '#1C1C1E',
-    borderRadius: 16,
-    padding: 8,
-    width: 220,
+    borderRadius: 12,
+    padding: 4,
+    width: 160,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    elevation: 10,
-  },
-  colorMenu: {
-    width: 280,
-    padding: 16,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   dropdownItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    gap: 12,
-    borderRadius: 10,
+    padding: 10,
+    gap: 10,
+    borderRadius: 8,
   },
   dropdownItemText: {
     color: '#FFFFFF',
-    fontSize: 15,
-  },
-  colorGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    justifyContent: 'center',
-  },
-  colorOption: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    fontSize: 14,
   },
   editorWrapper: {
     borderWidth: 1,
@@ -301,3 +263,4 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
+
