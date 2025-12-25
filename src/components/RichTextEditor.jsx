@@ -1,34 +1,25 @@
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState } from 'react';
 import { 
   StyleSheet, 
   Text, 
   View, 
   ScrollView, 
   TouchableOpacity,
-  Platform,
   Modal,
-  TouchableWithoutFeedback,
-  Dimensions
+  TouchableWithoutFeedback
 } from 'react-native';
 import { 
   actions, 
   RichEditor, 
   RichToolbar 
 } from 'react-native-pell-rich-editor';
-import * as ImagePicker from 'expo-image-picker';
-import { supabase } from '../utils/supabase';
 import { 
   Bold, 
   Italic, 
   Underline, 
-  Type, 
   List, 
   ListOrdered, 
-  Image as ImageIcon, 
   Palette, 
-  Heading1, 
-  Heading2, 
-  Heading3, 
   AlignLeft, 
   AlignCenter, 
   AlignRight, 
@@ -115,60 +106,8 @@ function ToolbarDropdown({ icon: Icon, label, options, onSelect, currentValue, t
 
 export function RichTextEditor({ value, onChange, placeholder, minHeight = 400 }) {
   const richText = useRef();
-  const [currentHeader, setCurrentHeader] = useState('p');
   const [currentAlignment, setCurrentAlignment] = useState('left');
   const [currentColor, setCurrentColor] = useState('#FFFFFF');
-
-  const onInsertImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      const item = result.assets[0];
-      const fileExt = item.uri.split('.').pop()?.toLowerCase() || 'jpg';
-      const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
-      const filePath = `rich-text/${fileName}`;
-
-      try {
-        const arrayBuffer = await new Promise((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          xhr.onload = () => resolve(xhr.response);
-          xhr.onerror = () => reject(new TypeError("Network request failed"));
-          xhr.responseType = "arraybuffer";
-          xhr.open("GET", item.uri, true);
-          xhr.send(null);
-        });
-
-        const { error: uploadError } = await supabase.storage
-          .from('posts')
-          .upload(filePath, arrayBuffer, {
-            contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
-          });
-
-        if (uploadError) throw uploadError;
-
-        const { data: publicUrlData } = supabase.storage
-          .from('posts')
-          .getPublicUrl(filePath);
-        
-        richText.current?.insertImage(publicUrlData.publicUrl);
-      } catch (error) {
-        console.error("Image upload error:", error);
-      }
-    }
-  };
-
-  const handleHeaderSelect = (header) => {
-    setCurrentHeader(header);
-    switch (header) {
-      case 'h1': richText.current?.executeAction(actions.heading1); break;
-      case 'h2': richText.current?.executeAction(actions.heading2); break;
-      case 'h3': richText.current?.executeAction(actions.heading3); break;
-      case 'p': richText.current?.executeAction(actions.setParagraph); break;
-    }
-  };
 
   const handleAlignmentSelect = (alignment) => {
     setCurrentAlignment(alignment);
@@ -189,17 +128,10 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 400 }
 
   const handleColorSelect = (color) => {
     setCurrentColor(color);
-    // Explicitly focus and prepare cursor to ensure color applies
     richText.current?.focusContent();
+    richText.current?.prepareCursor();
     richText.current?.executeAction(actions.foreColor, color);
   };
-
-  const headerOptions = [
-    { label: 'Paragraph', value: 'p', icon: Type },
-    { label: 'Heading 1', value: 'h1', icon: Heading1 },
-    { label: 'Heading 2', value: 'h2', icon: Heading2 },
-    { label: 'Heading 3', value: 'h3', icon: Heading3 },
-  ];
 
   const alignmentOptions = [
     { label: 'Left', value: 'left', icon: AlignLeft },
@@ -213,7 +145,6 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 400 }
   ];
 
   const CurrentAlignmentIcon = alignmentOptions.find(o => o.value === currentAlignment)?.icon || AlignLeft;
-  const CurrentHeaderIcon = headerOptions.find(o => o.value === currentHeader)?.icon || Type;
 
   return (
     <View style={styles.container}>
@@ -223,16 +154,6 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 400 }
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.toolbarContent}
         >
-          <ToolbarDropdown 
-            icon={CurrentHeaderIcon} 
-            label={headerOptions.find(o => o.value === currentHeader)?.label}
-            options={headerOptions}
-            onSelect={handleHeaderSelect}
-            currentValue={currentHeader}
-          />
-
-          <View style={styles.separator} />
-
           <ToolbarDropdown 
             icon={CurrentAlignmentIcon} 
             options={alignmentOptions}
@@ -265,18 +186,11 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 400 }
               actions.setBold,
               actions.setItalic,
               actions.setUnderline,
-              actions.insertImage,
             ]}
             iconMap={{
               [actions.setBold]: ({ tintColor }) => <Bold size={18} color={tintColor} />,
               [actions.setItalic]: ({ tintColor }) => <Italic size={18} color={tintColor} />,
               [actions.setUnderline]: ({ tintColor }) => <Underline size={18} color={tintColor} />,
-              [actions.insertImage]: ({ tintColor }) => <ImageIcon size={18} color={tintColor} />,
-            }}
-            onPressAction={(action) => {
-              if (action === actions.insertImage) {
-                onInsertImage();
-              }
             }}
             style={styles.subToolbar}
             flatContainerStyle={styles.flatStyle}
