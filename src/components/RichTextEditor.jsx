@@ -31,7 +31,6 @@ import {
   Code,
   Minus,
   Palette,
-  Eraser,
   Heading1,
   Heading2,
   Heading3,
@@ -48,7 +47,9 @@ import {
 
 const COLORS = [
   '#000000', '#FFFFFF', '#FF3B30', '#4CD964', '#007AFF', 
-  '#FFCC00', '#5856D6', '#FF9500', '#8E8E93', '#C7C7CC'
+  '#FFCC00', '#5856D6', '#FF9500', '#8E8E93', '#C7C7CC',
+  '#2ECC71', '#3498DB', '#9B59B6', '#F1C40F', '#E67E22',
+  '#E74C3C', '#1ABC9C', '#34495E', '#D35400', '#BDC3C7'
 ];
 
 function HeaderDropdown({ currentHeader, onSelect }) {
@@ -112,7 +113,6 @@ function HeaderDropdown({ currentHeader, onSelect }) {
 export function RichTextEditor({ value, onChange, placeholder, minHeight = 400 }) {
   const richText = useRef();
   const [showColorPicker, setShowColorPicker] = useState(false);
-  const [colorMode, setColorMode] = useState('foreColor');
   const [currentHeader, setCurrentHeader] = useState('p');
 
   const onInsertImage = async () => {
@@ -159,10 +159,16 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 400 }
   const handleHeaderSelect = (header) => {
     setCurrentHeader(header);
     if (header === 'p') {
-      richText.current?.executeAction('formatBlock', '<P>');
+      richText.current?.executeAction('formatBlock', 'P');
     } else {
       richText.current?.executeAction(header);
     }
+  };
+
+  const handleColorSelect = (color) => {
+    richText.current?.prepareCursor();
+    richText.current?.executeAction('foreColor', color);
+    setShowColorPicker(false);
   };
 
   return (
@@ -196,7 +202,6 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 400 }
             }}
             onPressAction={(action) => {
               if (action === 'foreColor') {
-                setColorMode('foreColor');
                 setShowColorPicker(!showColorPicker);
               }
             }}
@@ -211,15 +216,33 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 400 }
           <RichToolbar
             editor={richText}
             actions={[
+              actions.alignLeft,
+              actions.alignCenter,
+              actions.alignRight,
+            ]}
+            iconMap={{
+              [actions.alignLeft]: ({ tintColor }) => <AlignLeft size={18} color={tintColor} />,
+              [actions.alignCenter]: ({ tintColor }) => <AlignCenter size={18} color={tintColor} />,
+              [actions.alignRight]: ({ tintColor }) => <AlignRight size={18} color={tintColor} />,
+            }}
+            style={styles.subToolbar}
+            flatContainerStyle={styles.flatStyle}
+            selectedIconTint="#007AFF"
+            iconTint="rgba(255,255,255,0.6)"
+          />
+
+          <View style={styles.separator} />
+
+          <RichToolbar
+            editor={richText}
+            actions={[
               actions.insertBulletsList,
               actions.insertOrderedList,
-              actions.insertLink,
               'insertImage',
             ]}
             iconMap={{
               [actions.insertBulletsList]: ({ tintColor }) => <List size={18} color={tintColor} />,
               [actions.insertOrderedList]: ({ tintColor }) => <ListOrdered size={18} color={tintColor} />,
-              [actions.insertLink]: ({ tintColor }) => <LinkIcon size={18} color={tintColor} />,
               insertImage: ({ tintColor }) => <ImageIcon size={18} color={tintColor} />,
             }}
             insertImage={onInsertImage}
@@ -236,12 +259,10 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 400 }
             actions={[
               actions.undo,
               actions.redo,
-              actions.removeFormat,
             ]}
             iconMap={{
               [actions.undo]: ({ tintColor }) => <Undo2 size={18} color={tintColor} />,
               [actions.redo]: ({ tintColor }) => <Redo2 size={18} color={tintColor} />,
-              [actions.removeFormat]: ({ tintColor }) => <Eraser size={18} color={tintColor} />,
             }}
             style={styles.subToolbar}
             flatContainerStyle={styles.flatStyle}
@@ -256,11 +277,7 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 400 }
               {COLORS.map(color => (
                 <TouchableOpacity
                   key={color}
-                  onPress={() => {
-                    richText.current?.prepareCursor();
-                    richText.current?.executeAction('foreColor', color);
-                    setShowColorPicker(false);
-                  }}
+                  onPress={() => handleColorSelect(color)}
                   style={[styles.colorOption, { backgroundColor: color }]}
                 />
               ))}
@@ -269,25 +286,27 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 400 }
         )}
       </View>
 
-      <RichEditor
-        ref={richText}
-        initialContentHTML={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        editorStyle={{
-          backgroundColor: '#000000',
-          color: '#FFFFFF',
-          placeholderColor: 'rgba(255,255,255,0.2)',
-          contentCSSText: `
-            font-size: 18px; 
-            line-height: 28px; 
-            font-family: -apple-system, sans-serif;
-            padding: 15px;
-          `,
-        }}
-        style={[styles.richEditor, { minHeight }]}
-        useContainer={false}
-      />
+      <View style={[styles.editorWrapper, { minHeight }]}>
+        <RichEditor
+          ref={richText}
+          initialContentHTML={value}
+          onChange={onChange}
+          placeholder={placeholder}
+          editorStyle={{
+            backgroundColor: '#000000',
+            color: '#FFFFFF',
+            placeholderColor: 'rgba(255,255,255,0.2)',
+            contentCSSText: `
+              font-size: 18px; 
+              line-height: 28px; 
+              font-family: -apple-system, sans-serif;
+              padding: 15px;
+            `,
+          }}
+          style={styles.richEditor}
+          useContainer={true}
+        />
+      </View>
     </View>
   );
 }
@@ -374,6 +393,14 @@ const styles = StyleSheet.create({
     marginHorizontal: 6,
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.2)',
+  },
+  editorWrapper: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 12,
+    marginVertical: 10,
+    overflow: 'hidden',
+    backgroundColor: '#000000',
   },
   richEditor: {
     flex: 1,
