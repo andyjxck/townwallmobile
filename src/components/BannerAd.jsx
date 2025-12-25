@@ -1,15 +1,28 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Platform, Text } from 'react-native';
-import { BannerAd as AdMobBanner, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
 import Constants from 'expo-constants';
 
-const adUnitId = __DEV__ ? TestIds.BANNER : 'ca-app-pub-1505977777207758/8766030770';
-
 export function BannerAd() {
+  const [adConfig, setAdConfig] = useState(null);
+
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    try {
+      const ads = require('react-native-google-mobile-ads');
+      setAdConfig({
+        BannerAd: ads.BannerAd,
+        BannerAdSize: ads.BannerAdSize,
+        TestIds: ads.TestIds
+      });
+    } catch (e) {
+      console.warn('BannerAds not supported in this environment');
+    }
+  }, []);
+
   if (Platform.OS === 'web') return null;
 
   // Show placeholder in Expo Go (appOwnership is 'expo')
-  if (Constants.appOwnership === 'expo' && __DEV__) {
+  if ((Constants.appOwnership === 'expo' && __DEV__) || !adConfig) {
     return (
       <View style={{ 
         alignItems: 'center', 
@@ -22,10 +35,13 @@ export function BannerAd() {
         borderColor: '#ddd',
         borderStyle: 'dashed'
       }}>
-        <Text style={{ color: '#666', fontSize: 12 }}>Banner Ad Placeholder (Expo Go)</Text>
+        <Text style={{ color: '#666', fontSize: 12 }}>Banner Ad Placeholder</Text>
       </View>
     );
   }
+
+  const { BannerAd: AdMobBanner, BannerAdSize, TestIds } = adConfig;
+  const adUnitId = __DEV__ ? TestIds.BANNER : 'ca-app-pub-1505977777207758/8766030770';
 
   return (
     <View style={{ alignItems: 'center', marginVertical: 10 }}>

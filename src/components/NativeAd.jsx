@@ -1,15 +1,30 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
-import { NativeAdView, NativeAsset, NativeMediaView, NativeAssetType, TestIds } from 'react-native-google-mobile-ads';
 import Constants from 'expo-constants';
 
-const adUnitId = __DEV__ ? TestIds.NATIVE : 'ca-app-pub-1505977777207758/1579458289';
-
 export function NativeAd() {
+  const [adConfig, setAdConfig] = useState(null);
+
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    try {
+      const ads = require('react-native-google-mobile-ads');
+      setAdConfig({
+        NativeAdView: ads.NativeAdView,
+        NativeAsset: ads.NativeAsset,
+        NativeMediaView: ads.NativeMediaView,
+        NativeAssetType: ads.NativeAssetType,
+        TestIds: ads.TestIds
+      });
+    } catch (e) {
+      console.warn('NativeAds not supported in this environment');
+    }
+  }, []);
+
   if (Platform.OS === 'web') return null;
 
   // Show placeholder in Expo Go (appOwnership is 'expo')
-  if (Constants.appOwnership === 'expo' && __DEV__) {
+  if ((Constants.appOwnership === 'expo' && __DEV__) || !adConfig) {
     return (
       <View style={[styles.container, { borderStyle: 'dashed' }]}>
         <View style={styles.adContent}>
@@ -26,7 +41,7 @@ export function NativeAd() {
           <Text style={[styles.bodyText, { backgroundColor: '#f0f0f0', color: 'transparent', width: '100%', height: 14, borderRadius: 4, marginBottom: 4 }]}>Body</Text>
           <Text style={[styles.bodyText, { backgroundColor: '#f0f0f0', color: 'transparent', width: '90%', height: 14, borderRadius: 4 }]}>Body</Text>
           <View style={[styles.mediaView, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }]}>
-            <Text style={{ color: '#999', fontSize: 14 }}>Native Ad Placeholder (Expo Go)</Text>
+            <Text style={{ color: '#999', fontSize: 14 }}>Native Ad Placeholder</Text>
           </View>
           <View style={[styles.ctaButton, { backgroundColor: '#ccc' }]}>
             <Text style={styles.ctaText}>Learn More</Text>
@@ -35,6 +50,9 @@ export function NativeAd() {
       </View>
     );
   }
+
+  const { NativeAdView, NativeAsset, NativeMediaView, NativeAssetType, TestIds } = adConfig;
+  const adUnitId = __DEV__ ? TestIds.NATIVE : 'ca-app-pub-1505977777207758/1579458289';
 
   return (
     <View style={styles.container}>

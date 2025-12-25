@@ -3,7 +3,6 @@ import { App } from 'expo-router/build/qualified-entry';
 import React, { memo, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import { requestTrackingPermissionsAsync } from 'expo-tracking-transparency';
-import mobileAds from 'react-native-google-mobile-ads';
 import { ErrorBoundaryWrapper } from './__create/SharedErrorBoundary';
 import './src/__create/polyfills';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -92,12 +91,18 @@ const CreateApp = () => {
         console.log('Tracking permission granted');
       }
       
-      try {
-        await mobileAds().initialize();
-        console.log('AdMob initialized');
-      } catch (error) {
-        console.error('AdMob initialization error:', error);
-      }
+        try {
+          // Dynamically require to avoid startup crash if module is missing
+          const ads = require('react-native-google-mobile-ads');
+          const mobileAds = ads.default || ads;
+          if (mobileAds && typeof mobileAds === 'function') {
+            await mobileAds().initialize();
+            console.log('AdMob initialized');
+          }
+        } catch (error) {
+          console.warn('AdMob initialization skipped:', error.message);
+        }
+
     })();
   }, []);
 
