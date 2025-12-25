@@ -1,20 +1,28 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, Platform } from 'react-native';
+import { BannerAd as AdMobBanner, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
+
+const BANNER_ID = Platform.select({
+  ios: 'ca-app-pub-3940256099942544/2934735716', // Test ID
+  android: 'ca-app-pub-3940256099942544/6300978111', // Test ID
+});
 
 export function BannerAd() {
   return (
     <View style={{ 
       alignItems: 'center', 
       justifyContent: 'center',
-      marginVertical: 10, 
-      backgroundColor: 'rgba(255,255,255,0.05)', 
-      height: 50, 
+      marginVertical: 10,
       width: '100%',
-      borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.1)',
-      borderStyle: 'dashed'
     }}>
-      <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12 }}>Banner Ad Placeholder (Disabled for Expo Go)</Text>
+      <AdMobBanner
+        unitId={BANNER_ID}
+        size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
+        requestOptions={{
+          requestNonPersonalizedAdsOnly: true,
+        }}
+        onAdFailedToLoad={(error) => console.error('Banner ad failed to load: ', error)}
+      />
     </View>
   );
 }

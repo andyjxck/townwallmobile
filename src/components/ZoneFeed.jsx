@@ -29,6 +29,7 @@ import { getStoredUser } from "../utils/user";
 import { useAuthStore } from "../utils/auth/store";
 import { ShareManager } from "./ShareManager";
 import { BannerAd } from "./BannerAd";
+import { NativeAd } from "./NativeAd";
 
 export default function ZoneFeed({ zoneSlug, zoneName }) {
   const insets = useSafeAreaInsets();
