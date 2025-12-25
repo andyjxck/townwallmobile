@@ -744,3 +744,11 @@ const styles = StyleSheet.create({
     emptyBox: { paddingVertical: 40, alignItems: 'center', gap: 15 },
   emptyText: { color: 'rgba(255,255,255,0.3)', fontSize: 14, fontWeight: '600' }
 });
+
+function getTimeAgo(date) {
+  const seconds = Math.floor((new Date() - date) / 1000);
+  if (seconds < 60) return "NOW";
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}M`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}H`;
+  return `${Math.floor(seconds / 86400)}D`;
+}
