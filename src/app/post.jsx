@@ -339,96 +339,115 @@ export default function PostScreen() {
               </TouchableOpacity>
             </View>
 
-          <ScrollView contentContainerStyle={styles.scrollContent}>
-            <View style={styles.quickInfoRow}>
-              <TouchableOpacity
-                onPress={() => setStep('zone')}
-                style={styles.pillButton}
-              >
-                <Text style={styles.pillText}>{selectedZone?.name?.toUpperCase() || 'SELECT ZONE'}</Text>
-                <ChevronRight size={12} color="rgba(255,255,255,0.3)" />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => setStep('tag')}
-                style={styles.pillButton}
-              >
-                <Text style={styles.pillText}>{selectedTag?.name?.toUpperCase() || 'SELECT TAG'}</Text>
-                <ChevronRight size={12} color="rgba(255,255,255,0.3)" />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setIsAnonymous(!isAnonymous);
-                }}
-                style={[styles.pillButton, !isAnonymous && styles.pillActive]}
-              >
-                {isAnonymous ? (
-                  <Shield size={12} color="rgba(255,255,255,0.4)" />
-                ) : (
-                  <User size={12} color="#000000" />
-                )}
-                <Text style={[styles.pillText, !isAnonymous && { color: '#000000' }]}>
-                  {isAnonymous ? 'ANONYMOUS' : (user?.username?.toUpperCase() || 'PUBLIC')}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            <TextInput
-              autoFocus
-              placeholder="Post Title"
-              placeholderTextColor="rgba(255,255,255,0.2)"
-              value={title}
-              onChangeText={setTitle}
-              maxLength={100}
-              style={styles.titleInput}
-            />
-
-            <RichTextEditor
-              value={text}
-              onChange={setText}
-              placeholder="What's happening?"
-            />
-
             <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.imageGrid}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.scrollContent}
             >
-              {media.map((item, index) => (
-                <View key={index} style={styles.imageWrapper}>
-                  {item.type === 'video' ? (
-                    <View style={[styles.previewImage, { backgroundColor: '#1E293B', justifyContent: 'center', alignItems: 'center' }]}>
-                      <Play size={32} color="rgba(255,255,255,0.2)" fill="rgba(255,255,255,0.1)" />
-                      <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '900', marginTop: 5 }}>VIDEO</Text>
-                    </View>
-                  ) : (
-                    <Image source={{ uri: item.uri }} style={styles.previewImage} />
-                  )}
-                  <TouchableOpacity 
-                    onPress={() => {
-                      const newMedia = [...media];
-                      newMedia.splice(index, 1);
-                      setMedia(newMedia);
-                    }}
-                    style={styles.removeImageButton}
-                  >
-                    <X size={12} color="#FFFFFF" />
-                  </TouchableOpacity>
-                </View>
-              ))}
+              <View style={styles.metaRow}>
+                <TouchableOpacity
+                  onPress={() => setStep('zone')}
+                  style={styles.metaPill}
+                >
+                  <Text style={styles.metaPillLabel}>ZONE</Text>
+                  <Text style={styles.metaPillValue}>{selectedZone?.name?.toUpperCase() || 'SELECT'}</Text>
+                </TouchableOpacity>
 
+                <TouchableOpacity
+                  onPress={() => setStep('tag')}
+                  style={styles.metaPill}
+                >
+                  <Text style={styles.metaPillLabel}>TAG</Text>
+                  <Text style={styles.metaPillValue}>{selectedTag?.name?.toUpperCase() || 'SELECT'}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setIsAnonymous(!isAnonymous);
+                  }}
+                  style={[styles.metaPill, !isAnonymous && styles.metaPillActive]}
+                >
+                  <Text style={[styles.metaPillLabel, !isAnonymous && { color: 'rgba(0,0,0,0.5)' }]}>POST AS</Text>
+                  <View style={styles.metaPillValueContainer}>
+                    {isAnonymous ? (
+                      <Shield size={10} color="#FFFFFF" style={{ marginRight: 4 }} />
+                    ) : (
+                      <User size={10} color="#000000" style={{ marginRight: 4 }} />
+                    )}
+                    <Text style={[styles.metaPillValue, !isAnonymous && { color: '#000000' }]}>
+                      {isAnonymous ? 'ANONYMOUS' : (user?.username?.toUpperCase() || 'PUBLIC')}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+
+              <TextInput
+                placeholder="Post Title"
+                placeholderTextColor="rgba(255,255,255,0.2)"
+                value={title}
+                onChangeText={setTitle}
+                maxLength={100}
+                style={styles.titleInput}
+              />
+
+              <RichTextEditor
+                value={text}
+                onChange={setText}
+                placeholder="What's happening?"
+                minHeight={350}
+              />
+
+              {media.length > 0 && (
+                <View style={styles.mediaContainer}>
+                  <ScrollView 
+                    horizontal 
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.imageGrid}
+                  >
+                    {media.map((item, index) => (
+                      <View key={index} style={styles.imageWrapper}>
+                        {item.type === 'video' ? (
+                          <View style={[styles.previewImage, { backgroundColor: '#1E293B', justifyContent: 'center', alignItems: 'center' }]}>
+                            <Play size={32} color="rgba(255,255,255,0.2)" fill="rgba(255,255,255,0.1)" />
+                            <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '900', marginTop: 5 }}>VIDEO</Text>
+                          </View>
+                        ) : (
+                          <Image source={{ uri: item.uri }} style={styles.previewImage} />
+                        )}
+                        <TouchableOpacity 
+                          onPress={() => {
+                            const newMedia = [...media];
+                            newMedia.splice(index, 1);
+                            setMedia(newMedia);
+                          }}
+                          style={styles.removeImageButton}
+                        >
+                          <X size={12} color="#FFFFFF" />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+            </ScrollView>
+
+            <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
               <TouchableOpacity 
                 onPress={pickMedia}
-                style={styles.addImageButton}
+                style={styles.bottomBarButton}
               >
-                <ImageIcon size={24} color="rgba(255,255,255,0.3)" />
-                <Text style={styles.addImageText}>ADD MEDIA</Text>
+                <ImageIcon size={20} color="#FFFFFF" />
+                <Text style={styles.bottomBarButtonText}>ADD MEDIA</Text>
               </TouchableOpacity>
-            </ScrollView>
-          </ScrollView>
-        </View>
+              
+              <View style={{ flex: 1 }} />
+              
+              <Text style={styles.charCount}>
+                {text.length} characters
+              </Text>
+            </View>
+          </View>
+
 
         {/* Zone Picker Overlay */}
         {step === 'zone' && (
@@ -568,93 +587,116 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingBottom: 40,
+    paddingTop: 10,
+    paddingBottom: 100,
   },
-  quickInfoRow: {
+  metaRow: {
     flexDirection: 'row',
-    gap: 10,
-    marginBottom: 30,
+    gap: 8,
+    marginBottom: 25,
     flexWrap: 'wrap',
   },
-  pillButton: {
+  metaPill: {
     backgroundColor: 'rgba(255,255,255,0.05)',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
-  pillActive: {
+  metaPillActive: {
     backgroundColor: '#FFFFFF',
+    borderColor: '#FFFFFF',
   },
-  pillText: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 10,
+  metaPillLabel: {
+    color: 'rgba(255,255,255,0.3)',
+    fontSize: 8,
     fontWeight: '900',
     letterSpacing: 1,
+    marginBottom: 2,
+  },
+  metaPillValue: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  metaPillValueContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   titleInput: {
     color: '#FFFFFF',
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: '900',
-    marginBottom: 15,
+    marginBottom: 10,
     letterSpacing: -0.5,
   },
-  bodyInput: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '400',
-    lineHeight: 28,
-    minHeight: 200,
-    textAlignVertical: 'top',
+  mediaContainer: {
+    marginTop: 20,
   },
   imageGrid: {
-    gap: 12,
-    marginTop: 30,
+    gap: 10,
+    paddingRight: 20,
   },
   imageWrapper: {
     position: 'relative',
-    width: 140,
-    height: 140,
+    width: 120,
+    height: 120,
   },
   previewImage: {
-    width: 140,
-    height: 140,
-    borderRadius: 15,
+    width: 120,
+    height: 120,
+    borderRadius: 12,
   },
   removeImageButton: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    top: 6,
+    right: 6,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  addImageButton: {
-    width: 140,
-    height: 140,
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    borderRadius: 15,
-    justifyContent: 'center',
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#000000',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.1)',
+    flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: 'rgba(255,255,255,0.1)',
+    paddingHorizontal: 20,
+    paddingTop: 15,
   },
-  addImageText: {
-    color: 'rgba(255,255,255,0.3)',
-    fontSize: 10,
-    marginTop: 8,
+  bottomBarButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderRadius: 20,
+    gap: 8,
+  },
+  bottomBarButtonText: {
+    color: '#FFFFFF',
+    fontSize: 11,
     fontWeight: '900',
     letterSpacing: 1,
+  },
+  charCount: {
+    color: 'rgba(255,255,255,0.3)',
+    fontSize: 11,
+    fontWeight: '600',
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: '#000000',
+    zIndex: 1000,
   },
   overlayHeader: {
     padding: 25,
@@ -671,6 +713,8 @@ const styles = StyleSheet.create({
   overlayItem: {
     paddingHorizontal: 25,
     paddingVertical: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
   },
   overlayItemText: {
     color: 'rgba(255,255,255,0.4)',

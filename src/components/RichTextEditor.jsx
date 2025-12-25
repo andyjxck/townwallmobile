@@ -109,7 +109,7 @@ function HeaderDropdown({ currentHeader, onSelect }) {
   );
 }
 
-export function RichTextEditor({ value, onChange, placeholder }) {
+export function RichTextEditor({ value, onChange, placeholder, minHeight = 400 }) {
   const richText = useRef();
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [colorMode, setColorMode] = useState('foreColor');
@@ -285,7 +285,7 @@ export function RichTextEditor({ value, onChange, placeholder }) {
             padding: 15px;
           `,
         }}
-        style={styles.richEditor}
+        style={[styles.richEditor, { minHeight }]}
         useContainer={false}
       />
     </View>
@@ -294,7 +294,6 @@ export function RichTextEditor({ value, onChange, placeholder }) {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     backgroundColor: '#000000',
   },
   toolbarContainer: {
