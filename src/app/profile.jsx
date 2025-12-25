@@ -261,7 +261,7 @@ export default function Profile() {
         loadData();
         } catch (error) {
           console.error("Avatar upload error:", error);
-          Alert.alert("Error", "Failed to upload avatar.");
+          Alert.alert("Error", `Failed to upload avatar: ${error.message || 'Unknown error'}`);
         }
     }
   };
@@ -302,7 +302,7 @@ export default function Profile() {
         loadData();
         } catch (error) {
           console.error("Cover upload error:", error);
-          Alert.alert("Error", "Failed to upload cover photo. Make sure 'covers' bucket exists.");
+          Alert.alert("Error", `Failed to upload cover photo: ${error.message || 'Unknown error'}. Make sure 'covers' bucket exists.`);
         }
     }
   };
