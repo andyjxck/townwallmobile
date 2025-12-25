@@ -192,9 +192,9 @@ export default function UniversalFeed() {
               is_anonymous, 
               moderation_status,
               is_deleted,
-              user:user_id (username, emoji_icon, avatar_url),
-              zone:zone_id (name),
-              tag:tag_id (name),
+              user:rusers (username, emoji_icon, avatar_url),
+              zone:rzones (name),
+              tag:rtags (name),
               reactions:rreactions (reaction_type, device_id)
             `)
             .eq('is_deleted', false);
@@ -221,9 +221,9 @@ export default function UniversalFeed() {
               .from('rposts')
               .select(`
                 id, title, text, created_at, user_id, zone_id, tag_id, image_urls, is_anonymous,
-                user:user_id (username, emoji_icon, avatar_url),
-                zone:zone_id (name),
-                tag:tag_id (name)
+                user:rusers (username, emoji_icon, avatar_url),
+                zone:rzones (name),
+                tag:rtags (name)
               `)
               .eq('is_deleted', false)
               .order('created_at', { ascending: false })

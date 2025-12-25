@@ -54,10 +54,10 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
       try {
         const { data } = await supabase
           .from('rcomments')
-          .select(`
-            *,
-            user:user_id (username, emoji_icon, avatar_url)
-          `)
+            .select(`
+              *,
+              user:rusers (username, emoji_icon, avatar_url)
+            `)
           .eq('post_id', item.id)
           .order('created_at', { ascending: true });
         setComments(data || []);
@@ -140,7 +140,7 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
     return () => clearInterval(interval);
   }, [hasMultipleImages, images.length, showFullImage]);
 
-  const reactions = item.rreactions || [];
+  const reactions = item.reactions || item.rreactions || [];
   const helpfulCount = reactions.filter(r => r.reaction_type === 'helpful').length;
   const seenCount = reactions.filter(r => r.reaction_type === 'seen').length;
   const fakeCount = reactions.filter(r => r.reaction_type === 'fake').length;
@@ -188,41 +188,41 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
               activeOpacity={0.8}
               style={{ flex: 1 }}
             >
-                <View style={[styles.postHeader, { gap: 8 }]}>
-                  {!item.is_anonymous && (item.user?.avatar_url || item.user?.emoji_icon || item.rusers?.avatar_url || item.rusers?.emoji_icon) ? (
-                    (item.user?.avatar_url || item.rusers?.avatar_url) ? (
-                      <Image 
-                        source={{ uri: item.user?.avatar_url || item.rusers?.avatar_url }} 
-                        style={{ width: 24, height: 24, borderRadius: 12 }} 
-                      />
+                  <View style={[styles.postHeader, { gap: 8 }]}>
+                    {!item.is_anonymous && (item.user?.avatar_url || item.user?.emoji_icon) ? (
+                      item.user?.avatar_url ? (
+                        <Image 
+                          source={{ uri: item.user.avatar_url }} 
+                          style={{ width: 24, height: 24, borderRadius: 12 }} 
+                        />
+                      ) : (
+                        <Text style={{ fontSize: 16 }}>{item.user.emoji_icon}</Text>
+                      )
                     ) : (
-                      <Text style={{ fontSize: 16 }}>{item.user?.emoji_icon || item.rusers?.emoji_icon}</Text>
-                    )
-                  ) : (
-                    <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' }}>
-                      <User size={14} color="rgba(255,255,255,0.4)" />
-                    </View>
-                  )}
-                  
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[styles.zoneText, { color: '#FFFFFF' }]}>
-                        {!item.is_anonymous && (item.user?.username || item.rusers?.username) ? (item.user?.username || item.rusers?.username) : "Anonymous"}
-                      </Text>
-                      <Text style={[styles.timeText, { color: 'rgba(255, 255, 255, 0.3)' }]}>
-                        · {item.zone?.name || item.rzones?.name}
-                      </Text>
-                      <Text style={[styles.timeText, { color: 'rgba(255, 255, 255, 0.3)' }]}>
-                        · {timeAgo}
-                      </Text>
-                    </View>
-                    {(item.tag?.name || item.rtags?.name) && (
-                      <Text style={[styles.tagText, { color: 'rgba(255, 255, 255, 0.3)', marginTop: 1 }]}>
-                        #{(item.tag?.name || item.rtags?.name).replace(/\s+/g, '')}
-                      </Text>
+                      <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' }}>
+                        <User size={14} color="rgba(255,255,255,0.4)" />
+                      </View>
                     )}
+                    
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={[styles.zoneText, { color: '#FFFFFF' }]}>
+                          {!item.is_anonymous && item.user?.username ? item.user.username : "Anonymous"}
+                        </Text>
+                        <Text style={[styles.timeText, { color: 'rgba(255, 255, 255, 0.3)' }]}>
+                          · {item.zone?.name}
+                        </Text>
+                        <Text style={[styles.timeText, { color: 'rgba(255, 255, 255, 0.3)' }]}>
+                          · {timeAgo}
+                        </Text>
+                      </View>
+                      {item.tag?.name && (
+                        <Text style={[styles.tagText, { color: 'rgba(255, 255, 255, 0.3)', marginTop: 1 }]}>
+                          #{item.tag.name.replace(/\s+/g, '')}
+                        </Text>
+                      )}
+                    </View>
                   </View>
-                </View>
 
               <Text style={[styles.postTitle, { color: '#FFFFFF', opacity: shouldBlur ? 0.6 : 1 }]}>
                 {item.title || "Untitled Post"}
