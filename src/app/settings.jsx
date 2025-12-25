@@ -12,6 +12,7 @@ import { Share } from "react-native";
 import { getStoredUser, logoutUser, initUser } from "../utils/user";
 
 import { LinearGradient } from "expo-linear-gradient";
+import { BannerAd } from "@/components/BannerAd";
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -82,6 +83,7 @@ export default function SettingsScreen() {
         </View>
 
         <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}>
+            <BannerAd />
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>PREFERENCES</Text>
               <SettingsItem 

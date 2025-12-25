@@ -41,6 +41,7 @@ import { Share } from "react-native";
 import PostItem from "../components/PostItem";
 import { LinearGradient } from "expo-linear-gradient";
 import { ShareManager } from "../components/ShareManager";
+import { BannerAd } from "@/components/BannerAd";
 
 export default function Profile() {
   const router = useRouter();
@@ -461,6 +462,7 @@ export default function Profile() {
         </View>
 
           <ScrollView showsVerticalScrollIndicator={false}>
+            <BannerAd />
             <View style={styles.profileSection}>
               <TouchableOpacity 
                 style={styles.avatarContainer} 

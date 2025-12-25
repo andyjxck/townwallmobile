@@ -57,6 +57,7 @@ import NotificationPanel from "./NotificationPanel";
 import { fetchNotifications } from "@/utils/notifications";
 import { ShareManager } from "./ShareManager";
 import { BannerAd } from "@/components/BannerAd";
+import { NativeAd } from "@/components/NativeAd";
 
 function SkeletonPost() {
   return (
@@ -512,18 +513,21 @@ export default function UniversalFeed() {
       ) : (
         <FlatList
           ListHeaderComponent={<BannerAd />}
-          renderItem={({ item }) => (
-                <PostItem 
-                  item={item} 
-                    deviceId={deviceId} 
-                    onReaction={handleReaction} 
-                    onDelete={handleDeletePost}
-                    onMute={handleMuteUser}
-                    onShare={handleShare}
-                    onEdit={handleEditPost}
-                    user={user}
-                  />
-            )}
+          renderItem={({ item, index }) => (
+            <View>
+              <PostItem 
+                item={item} 
+                deviceId={deviceId} 
+                onReaction={handleReaction} 
+                onDelete={handleDeletePost}
+                onMute={handleMuteUser}
+                onShare={handleShare}
+                onEdit={handleEditPost}
+                user={user}
+              />
+              {index > 0 && index % 5 === 0 && <NativeAd />}
+            </View>
+          )}
           keyExtractor={(item) => item.id.toString()}
           refreshControl={
             <RefreshControl
