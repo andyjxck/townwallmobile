@@ -79,10 +79,10 @@ export default function UniversalFeed() {
             <View style={{ height: 20, width: '60%', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 4, marginTop: 4 }} />
           </View>
           <View style={{ width: 80, height: 80, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.1)' }} />
+          </View>
         </View>
-      </View>
-    );
-  }
+      );
+    }
 
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -725,7 +725,8 @@ export default function UniversalFeed() {
       />
 
     </View>
-  );
+    </TouchableWithoutFeedback>
+    );
 }
 
 const styles = StyleSheet.create({
