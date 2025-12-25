@@ -39,7 +39,6 @@ import { getStoredUser } from "../utils/user";
 import { TextInput } from "react-native-gesture-handler";
 
   export default function PostItem({ item, deviceId, onReaction, onComment, onDelete, onMute, onShare, onEdit, user }) {
-    const [showComments, setShowComments] = useState(false);
     const [revealed, setRevealed] = useState(false);
     const [showFullImage, setShowFullImage] = useState(false);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -57,10 +56,10 @@ import { TextInput } from "react-native-gesture-handler";
   });
 
   useEffect(() => {
-    if (showComments) {
+    if (isExpanded) {
       fetchComments();
     }
-  }, [showComments]);
+  }, [isExpanded]);
 
   useEffect(() => {
     checkIfSaved();
@@ -342,7 +341,7 @@ import { TextInput } from "react-native-gesture-handler";
           style={styles.actionButton}
         >
           <Heart
-            size={18}
+            size={20}
             color={userReactions.helpful ? "#F43F5E" : "rgba(255,255,255,0.4)"}
             fill={userReactions.helpful ? "#F43F5E" : "transparent"}
           />
@@ -354,35 +353,42 @@ import { TextInput } from "react-native-gesture-handler";
         <TouchableOpacity
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            setShowComments(true);
+            onReaction(item.id, "seen", userReactions.seen);
           }}
           style={styles.actionButton}
         >
           <Star
-            size={18}
-            color="rgba(255,255,255,0.4)"
+            size={20}
+            color={userReactions.seen ? "#FBBF24" : "rgba(255,255,255,0.4)"}
+            fill={userReactions.seen ? "#FBBF24" : "transparent"}
           />
-          <Text style={[styles.actionCount, { color: "rgba(255,255,255,0.4)" }]}>
-            REPLY
+          <Text style={[styles.actionCount, { color: userReactions.seen ? "#FBBF24" : "rgba(255,255,255,0.4)" }]}>
+            {seenCount || 0}
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={handleSave}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            onReaction(item.id, "fake", userReactions.fake);
+          }}
           style={styles.actionButton}
         >
-          <Bookmark
-            size={18}
-            color={isSaved ? "#3B82F6" : "rgba(255,255,255,0.4)"}
-            fill={isSaved ? "#3B82F6" : "transparent"}
+          <Flag
+            size={20}
+            color={userReactions.fake ? "#EF4444" : "rgba(255,255,255,0.4)"}
+            fill={userReactions.fake ? "#EF4444" : "transparent"}
           />
+          <Text style={[styles.actionCount, { color: userReactions.fake ? "#EF4444" : "rgba(255,255,255,0.4)" }]}>
+            REPORT
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           onPress={() => onShare(item)}
           style={styles.actionButton}
         >
-          <ShareIcon size={18} color="rgba(255,255,255,0.4)" />
+          <ShareIcon size={20} color="rgba(255,255,255,0.4)" />
         </TouchableOpacity>
 
         {(user?.id === item.user_id || user?.is_admin || user?.is_moderator) && (
@@ -393,10 +399,54 @@ import { TextInput } from "react-native-gesture-handler";
             }}
             style={styles.actionButton}
           >
-            <Trash2 size={18} color="rgba(239, 68, 68, 0.4)" />
+            <Trash2 size={20} color="rgba(239, 68, 68, 0.4)" />
           </TouchableOpacity>
         )}
       </View>
+
+      {isExpanded && (
+        <View style={styles.expandedContent}>
+          <View style={styles.commentsDivider} />
+          <Text style={styles.commentsHeader}>COMMENTS</Text>
+          
+          {loadingComments ? (
+            <ActivityIndicator color="#FFF" style={{ marginVertical: 20 }} />
+          ) : (
+            <View style={styles.commentsList}>
+              {comments.map((c) => (
+                <View key={c.id} style={styles.commentItem}>
+                  <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                    <Text style={{ fontSize: 16 }}>{c.user?.emoji_icon || "👤"}</Text>
+                    <Text style={styles.commentUser}>@{c.user?.username || "Anon"}</Text>
+                  </View>
+                  <Text style={styles.commentText}>{c.text}</Text>
+                </View>
+              ))}
+              {comments.length === 0 && (
+                <Text style={styles.noComments}>No comments yet.</Text>
+              )}
+            </View>
+          )}
+
+          <View style={styles.commentInputRow}>
+            <TextInput
+              style={styles.inlineInput}
+              placeholder="Add a comment..."
+              placeholderTextColor="rgba(255,255,255,0.3)"
+              value={commentText}
+              onChangeText={setCommentText}
+              multiline
+            />
+            <TouchableOpacity 
+              style={styles.inlineSendButton} 
+              onPress={handleSendComment}
+              disabled={!commentText.trim()}
+            >
+              <Send size={18} color={commentText.trim() ? "#FFF" : "rgba(255,255,255,0.2)"} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       {/* Full Screen Image/Video Modal */}
       <Modal visible={showFullImage} transparent animationType="fade">
@@ -464,72 +514,6 @@ import { TextInput } from "react-native-gesture-handler";
           )}
         </View>
       </Modal>
-
-      {/* Comments / Replies Modal */}
-      <Modal visible={showComments} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <KeyboardAvoidingView 
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            style={styles.commentsModal}
-          >
-            <View style={styles.modalHeader}>
-              <View style={styles.modalHandle} />
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', paddingHorizontal: 20 }}>
-                <Text style={styles.modalTitle}>REPLIES</Text>
-                <TouchableOpacity onPress={() => setShowComments(false)}>
-                  <X size={24} color="#FFF" />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <FlatList
-              data={comments}
-              keyExtractor={(item) => item.id.toString()}
-              contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
-              ListHeaderComponent={() => (
-                <View style={{ marginBottom: 20, paddingBottom: 20, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)' }}>
-                  <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '700' }}>{item.title}</Text>
-                  <Text style={{ color: 'rgba(255,255,255,0.7)', marginTop: 8 }}>{item.text}</Text>
-                </View>
-              )}
-              renderItem={({ item: c }) => (
-                <View style={styles.commentItem}>
-                  <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-                    <Text style={{ fontSize: 16 }}>{c.user?.emoji_icon || "👤"}</Text>
-                    <Text style={styles.commentUser}>@{c.user?.username || "Anon"}</Text>
-                  </View>
-                  <Text style={styles.commentText}>{c.text}</Text>
-                </View>
-              )}
-              ListEmptyComponent={() => (
-                loadingComments ? (
-                  <ActivityIndicator color="#FFF" />
-                ) : (
-                  <Text style={styles.noComments}>No replies yet. Be the first!</Text>
-                )
-              )}
-            />
-
-            <View style={styles.modalInputContainer}>
-              <TextInput
-                style={styles.modalInput}
-                placeholder="Write a reply..."
-                placeholderTextColor="rgba(255,255,255,0.3)"
-                value={commentText}
-                onChangeText={setCommentText}
-                multiline
-              />
-              <TouchableOpacity 
-                style={styles.modalSendButton} 
-                onPress={handleSendComment}
-                disabled={!commentText.trim()}
-              >
-                <Send size={20} color={commentText.trim() ? "#FFF" : "rgba(255,255,255,0.2)"} />
-              </TouchableOpacity>
-            </View>
-          </KeyboardAvoidingView>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -572,8 +556,11 @@ const styles = StyleSheet.create({
   actionRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 20,
+    justifyContent: 'space-between',
     marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.05)',
   },
   actionButton: {
     flexDirection: "row",
@@ -583,6 +570,59 @@ const styles = StyleSheet.create({
   actionCount: {
     fontSize: 12,
     fontWeight: "800",
+  },
+  expandedContent: {
+    marginTop: 20,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 12,
+    padding: 16,
+  },
+  commentsDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    marginBottom: 16,
+  },
+  commentsHeader: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 2,
+    marginBottom: 16,
+  },
+  commentsList: {
+    gap: 16,
+  },
+  commentItem: {
+    gap: 4,
+  },
+  commentUser: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  commentText: {
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  commentInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 20,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  inlineInput: {
+    flex: 1,
+    color: '#FFF',
+    fontSize: 14,
+    maxHeight: 100,
+  },
+  inlineSendButton: {
+    padding: 4,
   },
   blurBanner: {
     flexDirection: "row",
@@ -601,25 +641,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
   },
-  commentItem: {
-    marginBottom: 16,
-  },
-  commentUser: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  commentText: {
-    color: "rgba(255,255,255,0.7)",
-    fontSize: 14,
-    lineHeight: 20,
-    marginTop: 4,
-  },
   noComments: {
     color: "rgba(255,255,255,0.2)",
     fontSize: 14,
     textAlign: 'center',
-    marginTop: 20,
+    paddingVertical: 10,
   },
   fullImageContainer: {
     flex: 1,
@@ -648,54 +674,6 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'flex-end',
-  },
-  commentsModal: {
-    backgroundColor: '#0F172A',
-    height: '80%',
-    borderTopLeftRadius: 25,
-    borderTopRightRadius: 25,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
-  },
-  modalHeader: {
-    alignItems: 'center',
-    paddingTop: 10,
-    paddingBottom: 20,
-  },
-  modalHandle: {
-    width: 40,
-    height: 4,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 2,
-    marginBottom: 15,
-  },
-  modalTitle: {
-    color: '#FFF',
-    fontSize: 14,
-    fontWeight: '900',
-    letterSpacing: 2,
-  },
-  modalInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 15,
-    backgroundColor: '#1E293B',
-    marginHorizontal: 20,
-    borderRadius: 15,
-    gap: 12,
-  },
-  modalInput: {
-    flex: 1,
-    color: '#FFF',
-    fontSize: 15,
-    maxHeight: 100,
-  },
-  modalSendButton: {
-    padding: 5,
   },
 });
 

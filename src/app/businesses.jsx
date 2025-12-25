@@ -299,61 +299,60 @@ export default function LocalBusinesses() {
     return filteredBusinesses;
   }, [filteredBusinesses]);
 
-  const renderItem = ({ item }) => {
-    return (
-      <TouchableOpacity 
-        activeOpacity={0.7}
-        onPress={() => handleOpenLink(item.link)}
-        style={styles.card}
-      >
-        <View style={styles.cardRow}>
-          <View style={styles.cardMain}>
-            <View style={styles.categoryRow}>
-              <Text style={styles.categoryText}>{item.category?.toUpperCase() || 'BUSINESS'}</Text>
-              {item.rating ? (
-                <View style={styles.ratingBadge}>
-                  <Star size={10} color="#FBBF24" fill="#FBBF24" />
-                  <Text style={styles.ratingText}>{item.rating}</Text>
-                </View>
-              ) : null}
-            </View>
-            
-            <Text style={styles.businessNameText}>{item.name}</Text>
-            
-            {item.address ? (
-              <View style={styles.infoRow}>
-                <MapPin size={12} color="rgba(255,255,255,0.4)" />
-                <Text style={styles.infoText} numberOfLines={1}>{item.address}</Text>
-              </View>
-            ) : null}
-
-            {item.description ? (
-              <Text style={styles.descText} numberOfLines={2}>{item.description}</Text>
-            ) : null}
-
-            <View style={styles.actionRow}>
-              <View style={styles.visitAction}>
-                <Text style={styles.visitText}>VIEW ON MAPS</Text>
-                <ExternalLink size={12} color="#FFFFFF" strokeWidth={2.5} />
-              </View>
-              {item.phone ? (
-                <TouchableOpacity onPress={() => Linking.openURL(`tel:${item.phone}`)} style={styles.phoneAction}>
-                  <Phone size={14} color="rgba(255,255,255,0.6)" />
-                </TouchableOpacity>
-              ) : null}
-            </View>
-          </View>
-          
-          <View style={styles.cardSide}>
+    const renderItem = ({ item }) => {
+      return (
+        <TouchableOpacity 
+          activeOpacity={0.9}
+          onPress={() => handleOpenLink(item.link)}
+          style={styles.businessCard}
+        >
+          <View style={styles.cardImageContainer}>
             <Image 
               source={{ uri: item.avatar_url || `https://avatar.vercel.sh/${item.name}.png` }} 
-              style={styles.businessAvatar} 
+              style={styles.cardImage} 
             />
+            {item.rating ? (
+              <View style={styles.ratingBadge}>
+                <Star size={10} color="#000" fill="#000" />
+                <Text style={styles.ratingText}>{item.rating}</Text>
+              </View>
+            ) : null}
           </View>
-        </View>
-      </TouchableOpacity>
-    );
-  };
+
+          <View style={styles.cardContent}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.categoryBadge}>{item.category?.toUpperCase() || 'BUSINESS'}</Text>
+              <View style={styles.cardActions}>
+                {item.phone && (
+                  <TouchableOpacity 
+                    onPress={() => Linking.openURL(`tel:${item.phone}`)}
+                    style={styles.iconButton}
+                  >
+                    <Phone size={16} color="#FFF" />
+                  </TouchableOpacity>
+                )}
+                <View style={styles.iconButton}>
+                  <ExternalLink size={16} color="#FFF" />
+                </View>
+              </View>
+            </View>
+            
+            <Text style={styles.businessName}>{item.name}</Text>
+            
+            {item.address && (
+              <View style={styles.addressRow}>
+                <MapPin size={12} color="rgba(255,255,255,0.4)" />
+                <Text style={styles.addressText} numberOfLines={1}>{item.address}</Text>
+              </View>
+            )}
+
+            {item.description && (
+              <Text style={styles.descriptionText} numberOfLines={2}>{item.description}</Text>
+            )}
+          </View>
+        </TouchableOpacity>
+      );
+    };
 
   const renderMapView = () => {
     // Collect businesses with valid coordinates (mocked if not present for this exercise, or used if available)
@@ -595,330 +594,307 @@ export default function LocalBusinesses() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#000000',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
-  },
-  searchSection: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
-  },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    height: 44,
-    gap: 10,
-  },
-  searchInput: {
-    flex: 1,
-    color: '#FFFFFF',
-    fontSize: 14,
-  },
-  headerTitle: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '900',
-    letterSpacing: 2,
-  },
-  backButton: {
-    padding: 5,
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  listContent: {
-    paddingBottom: 120,
-  },
-  card: {
-    paddingHorizontal: 20,
-    paddingVertical: 32,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.08)',
-  },
-  cardRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  cardMain: {
-    flex: 1,
-    paddingRight: 20,
-  },
-  categoryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 8,
-  },
-  categoryText: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 2,
-  },
-  ratingBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(251, 191, 36, 0.1)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  ratingText: {
-    color: '#FBBF24',
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  businessNameText: {
-    color: '#FFFFFF',
-    fontSize: 22,
-    fontWeight: '300',
-    lineHeight: 28,
-    letterSpacing: -0.5,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 6,
-  },
-  infoText: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: 12,
-  },
-  descText: {
-    color: 'rgba(255,255,255,0.45)',
-    fontSize: 14,
-    lineHeight: 20,
-    marginTop: 12,
-    fontWeight: '400',
-  },
-  actionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 15,
-    marginTop: 20,
-  },
-  visitAction: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    alignSelf: 'flex-start',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.2)',
-    paddingBottom: 4,
-  },
-  visitText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
-  phoneAction: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cardSide: {
-    alignItems: 'center',
-  },
-  businessAvatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-  },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    backgroundColor: '#FFFFFF',
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.5,
-    shadowRadius: 15,
-    elevation: 10,
-  },
-  emptyState: {
-    alignItems: 'center',
-    marginTop: 100,
-  },
-  emptyText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '800',
-    marginTop: 20,
-  },
-  emptySubtext: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 14,
-    marginTop: 5,
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#000000',
-    borderTopLeftRadius: 40,
-    borderTopRightRadius: 40,
-    padding: 30,
-    maxHeight: '92%',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.1)',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  modalTitle: {
-    color: '#FFFFFF',
-    fontSize: 24,
-    fontWeight: '300',
-    letterSpacing: -0.5,
-  },
-  closeText: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  priceTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 32,
-    gap: 10,
-  },
-  priceText: {
-    color: 'rgba(255, 255, 255, 0.6)',
-    fontSize: 13,
-    fontWeight: '400',
-  },
-  label: {
-    color: 'rgba(255,255,255,0.3)',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 2,
-    marginBottom: 12,
-    marginTop: 20,
-  },
-  hintText: {
-    color: 'rgba(255,255,255,0.2)',
-    fontSize: 10,
-    marginTop: 4,
-  },
-  input: {
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
-    paddingVertical: 12,
-    color: '#FFFFFF',
-    fontSize: 17,
-    marginBottom: 10,
-  },
-  linkInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  processButton: {
-    backgroundColor: '#FFFFFF',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  tagRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 10,
-    flexWrap: 'wrap',
-  },
-  tag: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 100,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  activeTag: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#FFFFFF',
-  },
-  tagText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  textArea: {
-    minHeight: 80,
-    textAlignVertical: 'top',
-  },
-  submitButton: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 100,
-    padding: 20,
-    alignItems: 'center',
-    marginTop: 40,
-  },
-  submitButtonText: {
-    color: '#000000',
-    fontSize: 15,
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
-  imagePicker: {
-    width: 80,
-    height: 80,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    borderStyle: 'dashed',
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-    marginBottom: 10,
-  },
-  pickedImage: {
-    width: '100%',
-    height: '100%',
-  },
-  imagePlaceholder: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  imagePlaceholderText: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: 9,
-    fontWeight: '600',
-  },
-});
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: '#000000',
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      paddingVertical: 15,
+    },
+    headerTitle: {
+      color: '#FFFFFF',
+      fontSize: 18,
+      fontWeight: '900',
+      letterSpacing: 2,
+    },
+    searchSection: {
+      paddingHorizontal: 20,
+      paddingVertical: 10,
+    },
+    searchBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(255,255,255,0.05)',
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      height: 44,
+      gap: 10,
+    },
+    searchInput: {
+      flex: 1,
+      color: '#FFFFFF',
+      fontSize: 14,
+    },
+    listContent: {
+      paddingHorizontal: 20,
+      paddingBottom: 120,
+      gap: 20,
+    },
+    businessCard: {
+      backgroundColor: 'rgba(255,255,255,0.03)',
+      borderRadius: 24,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.05)',
+    },
+    cardImageContainer: {
+      height: 180,
+      width: '100%',
+      backgroundColor: '#111',
+    },
+    cardImage: {
+      width: '100%',
+      height: '100%',
+    },
+    ratingBadge: {
+      position: 'absolute',
+      top: 16,
+      right: 16,
+      backgroundColor: '#FFFFFF',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 8,
+    },
+    ratingText: {
+      color: '#000',
+      fontSize: 11,
+      fontWeight: '800',
+    },
+    cardContent: {
+      padding: 20,
+    },
+    cardHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    categoryBadge: {
+      color: 'rgba(255,255,255,0.4)',
+      fontSize: 10,
+      fontWeight: '800',
+      letterSpacing: 1.5,
+    },
+    cardActions: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    iconButton: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: 'rgba(255,255,255,0.08)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    businessName: {
+      color: '#FFFFFF',
+      fontSize: 24,
+      fontWeight: '700',
+      letterSpacing: -0.5,
+    },
+    addressRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginTop: 8,
+    },
+    addressText: {
+      color: 'rgba(255,255,255,0.4)',
+      fontSize: 13,
+    },
+    descriptionText: {
+      color: 'rgba(255,255,255,0.5)',
+      fontSize: 14,
+      lineHeight: 20,
+      marginTop: 12,
+    },
+    backButton: {
+      padding: 5,
+    },
+    centered: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    fab: {
+      position: 'absolute',
+      right: 20,
+      backgroundColor: '#FFFFFF',
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      justifyContent: 'center',
+      alignItems: 'center',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.5,
+      shadowRadius: 15,
+      elevation: 10,
+    },
+    emptyState: {
+      alignItems: 'center',
+      marginTop: 100,
+    },
+    emptyText: {
+      color: '#FFFFFF',
+      fontSize: 18,
+      fontWeight: '800',
+      marginTop: 20,
+    },
+    emptySubtext: {
+      color: 'rgba(255,255,255,0.5)',
+      fontSize: 14,
+      marginTop: 5,
+    },
+    modalOverlay: {
+      flex: 1,
+      justifyContent: 'flex-end',
+    },
+    modalContent: {
+      backgroundColor: '#000000',
+      borderTopLeftRadius: 40,
+      borderTopRightRadius: 40,
+      padding: 30,
+      maxHeight: '92%',
+      borderTopWidth: 1,
+      borderTopColor: 'rgba(255,255,255,0.1)',
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 32,
+    },
+    modalTitle: {
+      color: '#FFFFFF',
+      fontSize: 24,
+      fontWeight: '300',
+      letterSpacing: -0.5,
+    },
+    closeText: {
+      color: 'rgba(255,255,255,0.4)',
+      fontSize: 14,
+      fontWeight: '500',
+    },
+    priceTag: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(255, 255, 255, 0.03)',
+      padding: 16,
+      borderRadius: 16,
+      marginBottom: 32,
+      gap: 10,
+    },
+    priceText: {
+      color: 'rgba(255, 255, 255, 0.6)',
+      fontSize: 13,
+      fontWeight: '400',
+    },
+    label: {
+      color: 'rgba(255,255,255,0.3)',
+      fontSize: 10,
+      fontWeight: '800',
+      letterSpacing: 2,
+      marginBottom: 12,
+      marginTop: 20,
+    },
+    hintText: {
+      color: 'rgba(255,255,255,0.2)',
+      fontSize: 10,
+      marginTop: 4,
+    },
+    input: {
+      borderBottomWidth: 1,
+      borderBottomColor: 'rgba(255,255,255,0.1)',
+      paddingVertical: 12,
+      color: '#FFFFFF',
+      fontSize: 17,
+      marginBottom: 10,
+    },
+    linkInputContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    processButton: {
+      backgroundColor: '#FFFFFF',
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    tagRow: {
+      flexDirection: 'row',
+      gap: 10,
+      marginBottom: 10,
+      flexWrap: 'wrap',
+    },
+    tag: {
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderRadius: 100,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.1)',
+    },
+    activeTag: {
+      backgroundColor: '#FFFFFF',
+      borderColor: '#FFFFFF',
+    },
+    tagText: {
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    textArea: {
+      minHeight: 80,
+      textAlignVertical: 'top',
+    },
+    submitButton: {
+      backgroundColor: '#FFFFFF',
+      borderRadius: 100,
+      padding: 20,
+      alignItems: 'center',
+      marginTop: 40,
+    },
+    submitButtonText: {
+      color: '#000000',
+      fontSize: 15,
+      fontWeight: '700',
+      letterSpacing: 1,
+    },
+    imagePicker: {
+      width: 80,
+      height: 80,
+      borderRadius: 16,
+      backgroundColor: 'rgba(255,255,255,0.05)',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.1)',
+      borderStyle: 'dashed',
+      justifyContent: 'center',
+      alignItems: 'center',
+      overflow: 'hidden',
+      marginBottom: 10,
+    },
+    pickedImage: {
+      width: '100%',
+      height: '100%',
+    },
+    imagePlaceholder: {
+      alignItems: 'center',
+      gap: 4,
+    },
+    imagePlaceholderText: {
+      color: 'rgba(255,255,255,0.4)',
+      fontSize: 9,
+      fontWeight: '600',
+    },
+  });

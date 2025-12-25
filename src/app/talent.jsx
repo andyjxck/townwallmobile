@@ -199,46 +199,46 @@ export default function LocalTalent() {
     return <Globe size={16} color="rgba(255,255,255,0.5)" />;
   };
 
-  const renderTalentCard = ({ item }) => {
-    return (
-      <TouchableOpacity 
-        activeOpacity={0.7}
-        onPress={() => handleOpenLink(item.link)}
-        style={styles.talentItem}
-      >
-        <View style={styles.talentRow}>
-          <View style={styles.talentMain}>
-            <View style={styles.categoryRow}>
-              <Text style={styles.categoryText}>{item.category?.toUpperCase() || 'TALENT'}</Text>
-              <View style={styles.platformBadge}>
+    const renderTalentCard = ({ item }) => {
+      return (
+        <TouchableOpacity 
+          activeOpacity={0.9}
+          onPress={() => handleOpenLink(item.link)}
+          style={styles.talentCard}
+        >
+          <Image 
+            source={{ uri: item.avatar_url || `https://avatar.vercel.sh/${item.name}.png` }} 
+            style={styles.cardImage} 
+          />
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.8)', '#000000']}
+            style={styles.cardGradient}
+          />
+          <View style={styles.cardContent}>
+            <View style={styles.cardHeader}>
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{item.category?.toUpperCase() || 'TALENT'}</Text>
+              </View>
+              <View style={styles.platformIcon}>
                 {getPlatformIcon(item.platform)}
-                <Text style={styles.platformLabel}>{item.platform?.toUpperCase()}</Text>
               </View>
             </View>
             
-            <Text style={styles.talentNameText}>{item.name}</Text>
-            <Text style={styles.talentTitleText}>{item.title}</Text>
+            <Text style={styles.cardTitle}>{item.name}</Text>
+            <Text style={styles.cardSubtitle}>{item.title}</Text>
             
             {item.description ? (
-              <Text style={styles.talentDescText} numberOfLines={2}>{item.description}</Text>
+              <Text style={styles.cardDescription} numberOfLines={2}>{item.description}</Text>
             ) : null}
 
-            <View style={styles.visitAction}>
-              <Text style={styles.visitText}>VISIT {item.platform?.toUpperCase() || 'LINK'}</Text>
-              <ExternalLink size={12} color="#FFFFFF" strokeWidth={2.5} />
+            <View style={styles.cardFooter}>
+              <Text style={styles.visitLabel}>VIEW {item.platform?.toUpperCase()}</Text>
+              <ExternalLink size={14} color="#FFF" />
             </View>
           </View>
-          
-          <View style={styles.talentSide}>
-            <Image 
-              source={{ uri: item.avatar_url || `https://avatar.vercel.sh/${item.name}.png` }} 
-              style={styles.minimalAvatar} 
-            />
-          </View>
-        </View>
-      </TouchableOpacity>
-    );
-  };
+        </TouchableOpacity>
+      );
+    };
 
   const filteredTalents = talents.filter(t => {
     const matchesSearch = t.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -466,215 +466,191 @@ export default function LocalTalent() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#000000',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
-  },
-  searchSection: {
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
-  },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 12,
-    marginHorizontal: 20,
-    paddingHorizontal: 12,
-    height: 44,
-    gap: 10,
-  },
-  searchInput: {
-    flex: 1,
-    color: '#FFFFFF',
-    fontSize: 14,
-  },
-  categoryScroll: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    gap: 10,
-  },
-  categoryPill: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-  },
-  activeCategoryPill: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#FFFFFF',
-  },
-  categoryPillText: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
-  activeCategoryPillText: {
-    color: '#000000',
-  },
-  headerTitle: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '900',
-    letterSpacing: 2,
-  },
-  backButton: {
-    padding: 5,
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  listContent: {
-    paddingBottom: 120,
-  },
-  talentItem: {
-    paddingHorizontal: 20,
-    paddingVertical: 32,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.08)',
-  },
-  talentRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  talentMain: {
-    flex: 1,
-    paddingRight: 20,
-  },
-  categoryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 8,
-  },
-  platformBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  platformLabel: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  categoryText: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 2,
-  },
-  talentNameText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '400',
-    letterSpacing: 1,
-    marginBottom: 4,
-    opacity: 0.6,
-  },
-  talentTitleText: {
-    color: '#FFFFFF',
-    fontSize: 22,
-    fontWeight: '300',
-    lineHeight: 28,
-    letterSpacing: -0.5,
-  },
-  talentDescText: {
-    color: 'rgba(255,255,255,0.45)',
-    fontSize: 14,
-    lineHeight: 20,
-    marginTop: 12,
-    fontWeight: '400',
-  },
-  visitAction: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 20,
-    alignSelf: 'flex-start',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.2)',
-    paddingBottom: 4,
-  },
-  visitText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
-  talentSide: {
-    alignItems: 'center',
-    gap: 12,
-  },
-  minimalAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-  },
-  linkCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    backgroundColor: '#FFFFFF',
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.5,
-    shadowRadius: 15,
-    elevation: 10,
-  },
-  emptyState: {
-    alignItems: 'center',
-    marginTop: 100,
-  },
-  emptyText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '800',
-    marginTop: 20,
-  },
-  emptySubtext: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 14,
-    marginTop: 5,
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: '#000000',
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      paddingVertical: 15,
+    },
+    headerTitle: {
+      color: '#FFFFFF',
+      fontSize: 18,
+      fontWeight: '900',
+      letterSpacing: 2,
+    },
+    searchSection: {
+      paddingVertical: 10,
+    },
+    searchBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(255,255,255,0.05)',
+      borderRadius: 12,
+      marginHorizontal: 20,
+      paddingHorizontal: 12,
+      height: 44,
+      gap: 10,
+    },
+    searchInput: {
+      flex: 1,
+      color: '#FFFFFF',
+      fontSize: 14,
+    },
+    categoryScroll: {
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+      gap: 10,
+    },
+    categoryPill: {
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 20,
+      backgroundColor: 'rgba(255,255,255,0.03)',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.05)',
+    },
+    activeCategoryPill: {
+      backgroundColor: '#FFFFFF',
+      borderColor: '#FFFFFF',
+    },
+    categoryPillText: {
+      color: 'rgba(255,255,255,0.4)',
+      fontSize: 10,
+      fontWeight: '800',
+      letterSpacing: 1,
+    },
+    activeCategoryPillText: {
+      color: '#000000',
+    },
+    listContent: {
+      paddingHorizontal: 20,
+      paddingBottom: 120,
+      gap: 20,
+    },
+    talentCard: {
+      height: 400,
+      borderRadius: 24,
+      overflow: 'hidden',
+      backgroundColor: '#111',
+    },
+    cardImage: {
+      width: '100%',
+      height: '100%',
+      position: 'absolute',
+    },
+    cardGradient: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      height: '70%',
+    },
+    cardContent: {
+      flex: 1,
+      justifyContent: 'flex-end',
+      padding: 24,
+    },
+    cardHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    badge: {
+      backgroundColor: 'rgba(255,255,255,0.15)',
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 6,
+    },
+    badgeText: {
+      color: '#FFF',
+      fontSize: 9,
+      fontWeight: '900',
+      letterSpacing: 1,
+    },
+    cardTitle: {
+      color: '#FFFFFF',
+      fontSize: 32,
+      fontWeight: '800',
+      letterSpacing: -1,
+    },
+    cardSubtitle: {
+      color: 'rgba(255,255,255,0.7)',
+      fontSize: 16,
+      fontWeight: '500',
+      marginTop: 4,
+    },
+    cardDescription: {
+      color: 'rgba(255,255,255,0.5)',
+      fontSize: 14,
+      lineHeight: 20,
+      marginTop: 12,
+    },
+    cardFooter: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginTop: 20,
+      alignSelf: 'flex-start',
+      backgroundColor: 'rgba(255,255,255,0.1)',
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 100,
+    },
+    visitLabel: {
+      color: '#FFFFFF',
+      fontSize: 10,
+      fontWeight: '900',
+      letterSpacing: 1,
+    },
+    backButton: {
+      padding: 5,
+    },
+    centered: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    fab: {
+      position: 'absolute',
+      right: 20,
+      backgroundColor: '#FFFFFF',
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      justifyContent: 'center',
+      alignItems: 'center',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.5,
+      shadowRadius: 15,
+      elevation: 10,
+    },
+    emptyState: {
+      alignItems: 'center',
+      marginTop: 100,
+    },
+    emptyText: {
+      color: '#FFFFFF',
+      fontSize: 18,
+      fontWeight: '800',
+      marginTop: 20,
+    },
+    emptySubtext: {
+      color: 'rgba(255,255,255,0.5)',
+      fontSize: 14,
+      marginTop: 5,
+    },
+    modalOverlay: {
+      flex: 1,
+      justifyContent: 'flex-end',
+    },
     modalContent: {
       backgroundColor: '#000000',
       borderTopLeftRadius: 40,
@@ -781,36 +757,36 @@ const styles = StyleSheet.create({
       alignItems: 'center',
       marginTop: 40,
     },
-      submitButtonText: {
-        color: '#000000',
-        fontSize: 15,
-        fontWeight: '700',
-        letterSpacing: 1,
-      },
-      imagePicker: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
-        backgroundColor: 'rgba(255,255,255,0.05)',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
-        borderStyle: 'dashed',
-        justifyContent: 'center',
-        alignItems: 'center',
-        overflow: 'hidden',
-        marginBottom: 10,
-      },
-      pickedImage: {
-        width: '100%',
-        height: '100%',
-      },
-      imagePlaceholder: {
-        alignItems: 'center',
-        gap: 4,
-      },
-      imagePlaceholderText: {
-        color: 'rgba(255,255,255,0.4)',
-        fontSize: 10,
-        fontWeight: '600',
-      },
+    submitButtonText: {
+      color: '#000000',
+      fontSize: 15,
+      fontWeight: '700',
+      letterSpacing: 1,
+    },
+    imagePicker: {
+      width: 100,
+      height: 100,
+      borderRadius: 50,
+      backgroundColor: 'rgba(255,255,255,0.05)',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.1)',
+      borderStyle: 'dashed',
+      justifyContent: 'center',
+      alignItems: 'center',
+      overflow: 'hidden',
+      marginBottom: 10,
+    },
+    pickedImage: {
+      width: '100%',
+      height: '100%',
+    },
+    imagePlaceholder: {
+      alignItems: 'center',
+      gap: 4,
+    },
+    imagePlaceholderText: {
+      color: 'rgba(255,255,255,0.4)',
+      fontSize: 10,
+      fontWeight: '600',
+    },
   });

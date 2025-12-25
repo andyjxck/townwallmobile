@@ -267,31 +267,48 @@ export default function HelpContact() {
           </TouchableOpacity>
         </View>
 
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.chatContent}
-          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-          renderItem={({ item }) => {
-            const isMine = !item.is_from_admin;
-            const isResolved = item.status === 'resolved';
-            return (
-              <View style={[
-                styles.messageBubble, 
-                isMine ? styles.myMessage : styles.theirMessage,
-                isResolved && { borderLeftWidth: 4, borderLeftColor: '#10B981' }
-              ]}>
-                {!isMine && <Text style={styles.adminLabel}>SYSTEM</Text>}
-                <Text style={[styles.messageText, { color: isMine ? '#000000' : '#FFFFFF' }]}>
-                  {item.content}
-                </Text>
-                <Text style={[styles.messageTime, { color: isMine ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.4)' }]}>
-                  {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </Text>
-              </View>
-            );
-          }}
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            keyExtractor={(item) => item.id.toString()}
+            contentContainerStyle={styles.chatContent}
+            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+            renderItem={({ item }) => {
+              const isMine = !item.is_from_admin;
+              const isResolved = item.status === 'resolved';
+              
+              // Clean up markdown-style bolding for cleaner display if needed, 
+              // or ensure the styling handles it well.
+              const formattedContent = item.content.replace(/\*\*/g, '');
+
+              return (
+                <View style={[
+                  styles.messageWrapper,
+                  isMine ? styles.myMessageWrapper : styles.theirMessageWrapper
+                ]}>
+                  {!isMine && (
+                    <View style={styles.aiAvatar}>
+                      <MessageSquare size={12} color="#FFF" />
+                    </View>
+                  )}
+                  <View style={[
+                    styles.messageBubble, 
+                    isMine ? styles.myMessage : styles.theirMessage,
+                    isResolved && { borderLeftWidth: 4, borderLeftColor: '#10B981' }
+                  ]}>
+                    {!isMine && <Text style={styles.adminLabel}>AI ASSISTANT</Text>}
+                    <Text style={[styles.messageText, { color: isMine ? '#000000' : '#FFFFFF' }]}>
+                      {item.content}
+                    </Text>
+                    <View style={styles.messageFooter}>
+                      <Text style={[styles.messageTime, { color: isMine ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.3)' }]}>
+                        {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              );
+            }}
           ListFooterComponent={
             showRating ? (
               <View style={styles.inChatRatingContainer}>
@@ -375,173 +392,194 @@ export default function HelpContact() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#000000',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-  },
-  headerTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  headerTitle: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '900',
-    letterSpacing: 2,
-  },
-  headerAction: {
-    padding: 5,
-  },
-  headerActionText: {
-    color: '#10B981',
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
-  backButton: {
-    padding: 5,
-  },
-  chatContent: {
-    padding: 20,
-    gap: 15,
-  },
-  messageBubble: {
-    maxWidth: '85%',
-    padding: 16,
-    borderRadius: 24,
-  },
-  myMessage: {
-    alignSelf: 'flex-end',
-    backgroundColor: '#FFFFFF',
-    borderBottomRightRadius: 4,
-  },
-  theirMessage: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderBottomLeftRadius: 4,
-  },
-  messageText: {
-    fontSize: 16,
-    lineHeight: 22,
-    fontWeight: '500',
-  },
-  messageTime: {
-    fontSize: 10,
-    alignSelf: 'flex-end',
-    marginTop: 6,
-    fontWeight: '700',
-  },
-  adminLabel: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: 'rgba(255,255,255,0.4)',
-    letterSpacing: 1.5,
-    marginBottom: 6,
-    textTransform: 'uppercase',
-  },
-  inChatRatingContainer: {
-    padding: 20,
-    marginTop: 20,
-  },
-  ratingCard: {
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    width: '100%',
-    borderRadius: 30,
-    padding: 30,
-    alignItems: 'center',
-  },
-  ratingTitle: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '900',
-    letterSpacing: 2,
-    textAlign: 'center',
-  },
-  starsContainer: {
-    flexDirection: 'row',
-    gap: 15,
-    marginVertical: 30,
-  },
-  starButton: {
-    padding: 5,
-  },
-  starText: {
-    fontSize: 44,
-    color: 'rgba(255,255,255,0.05)',
-  },
-  starActive: {
-    color: '#FBBF24',
-  },
-  ratingInput: {
-    width: '100%',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 15,
-    padding: 20,
-    color: '#FFFFFF',
-    fontSize: 15,
-    minHeight: 100,
-    textAlignVertical: 'top',
-  },
-  ratingButtons: {
-    width: '100%',
-    marginTop: 30,
-  },
-  submitButton: {
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 18,
-    borderRadius: 15,
-    alignItems: 'center',
-  },
-  submitButtonText: {
-    color: '#000000',
-    fontSize: 14,
-    fontWeight: '900',
-    letterSpacing: 2,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 15,
-    gap: 15,
-    backgroundColor: 'transparent',
-  },
-  input: {
-    flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 30,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    color: '#FFFFFF',
-    fontSize: 16,
-    maxHeight: 120,
-  },
-  sendButton: {
-    backgroundColor: '#FFFFFF',
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyContainer: {
-    paddingVertical: 120,
-    alignItems: 'center',
-  },
-  emptyText: {
-    color: 'rgba(255,255,255,0.3)',
-    textAlign: 'center',
-    paddingHorizontal: 50,
-    fontSize: 15,
-    lineHeight: 22,
-  },
-});
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: '#000000',
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      paddingVertical: 15,
+    },
+    headerTitleContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    headerTitle: {
+      color: '#FFFFFF',
+      fontSize: 16,
+      fontWeight: '900',
+      letterSpacing: 2,
+    },
+    headerAction: {
+      padding: 5,
+    },
+    headerActionText: {
+      color: '#10B981',
+      fontSize: 10,
+      fontWeight: '900',
+      letterSpacing: 1,
+    },
+    backButton: {
+      padding: 5,
+    },
+    chatContent: {
+      padding: 20,
+      gap: 20,
+    },
+    messageWrapper: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      gap: 8,
+      marginVertical: 4,
+    },
+    myMessageWrapper: {
+      justifyContent: 'flex-end',
+    },
+    theirMessageWrapper: {
+      justifyContent: 'flex-start',
+    },
+    aiAvatar: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: 'rgba(255,255,255,0.1)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 4,
+    },
+    messageBubble: {
+      maxWidth: '85%',
+      padding: 16,
+      borderRadius: 20,
+    },
+    myMessage: {
+      backgroundColor: '#FFFFFF',
+      borderBottomRightRadius: 4,
+    },
+    theirMessage: {
+      backgroundColor: 'rgba(255,255,255,0.08)',
+      borderBottomLeftRadius: 4,
+    },
+    messageText: {
+      fontSize: 15,
+      lineHeight: 22,
+      fontWeight: '500',
+    },
+    messageFooter: {
+      marginTop: 8,
+      alignItems: 'flex-end',
+    },
+    messageTime: {
+      fontSize: 9,
+      fontWeight: '700',
+    },
+    adminLabel: {
+      fontSize: 9,
+      fontWeight: '900',
+      color: 'rgba(255,255,255,0.4)',
+      letterSpacing: 1.5,
+      marginBottom: 8,
+      textTransform: 'uppercase',
+    },
+    inChatRatingContainer: {
+      padding: 20,
+      marginTop: 20,
+    },
+    ratingCard: {
+      backgroundColor: 'rgba(255,255,255,0.03)',
+      width: '100%',
+      borderRadius: 30,
+      padding: 30,
+      alignItems: 'center',
+    },
+    ratingTitle: {
+      color: '#FFFFFF',
+      fontSize: 14,
+      fontWeight: '900',
+      letterSpacing: 2,
+      textAlign: 'center',
+    },
+    starsContainer: {
+      flexDirection: 'row',
+      gap: 15,
+      marginVertical: 30,
+    },
+    starButton: {
+      padding: 5,
+    },
+    starText: {
+      fontSize: 44,
+      color: 'rgba(255,255,255,0.05)',
+    },
+    starActive: {
+      color: '#FBBF24',
+    },
+    ratingInput: {
+      width: '100%',
+      backgroundColor: 'rgba(255,255,255,0.05)',
+      borderRadius: 15,
+      padding: 20,
+      color: '#FFFFFF',
+      fontSize: 15,
+      minHeight: 100,
+      textAlignVertical: 'top',
+    },
+    ratingButtons: {
+      width: '100%',
+      marginTop: 30,
+    },
+    submitButton: {
+      backgroundColor: '#FFFFFF',
+      paddingVertical: 18,
+      borderRadius: 15,
+      alignItems: 'center',
+    },
+    submitButtonText: {
+      color: '#000000',
+      fontSize: 14,
+      fontWeight: '900',
+      letterSpacing: 2,
+    },
+    inputContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      paddingTop: 15,
+      gap: 15,
+      backgroundColor: 'transparent',
+    },
+    input: {
+      flex: 1,
+      backgroundColor: 'rgba(255,255,255,0.08)',
+      borderRadius: 24,
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+      color: '#FFFFFF',
+      fontSize: 15,
+      maxHeight: 120,
+    },
+    sendButton: {
+      backgroundColor: '#FFFFFF',
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    emptyContainer: {
+      paddingVertical: 120,
+      alignItems: 'center',
+    },
+    emptyText: {
+      color: 'rgba(255,255,255,0.3)',
+      textAlign: 'center',
+      paddingHorizontal: 50,
+      fontSize: 15,
+      lineHeight: 22,
+    },
+  });
