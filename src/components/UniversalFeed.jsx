@@ -172,36 +172,30 @@ export default function UniversalFeed() {
 
   const fetchPosts = async (isRefreshing = false) => {
     if (!isRefreshing) setLoading(true);
-    try {
-      let query = supabase
-        .from('rposts')
-        .select(`
-          *,
-          user:rusers!rposts_user_id_fkey(username, emoji_icon, avatar_url),
-          zone:rzones(name),
-          tag:rtags(name),
-          reactions:rreactions(count)
-        `)
-        .eq('is_deleted', false);
+      try {
+        let query = supabase
+          .from('rposts')
+          .select(`
+            *,
+            user:rusers!rposts_user_id_fkey(username, emoji_icon, avatar_url),
+            zone:rzones(name),
+            tag:rtags(name),
+            rreactions(reaction_type, device_id)
+          `)
+          .eq('is_deleted', false);
 
-      if (selectedZone) query = query.eq('zone_id', selectedZone);
-      if (selectedTag) query = query.eq('tag_id', selectedTag);
+        if (selectedZone) query = query.eq('zone_id', selectedZone);
+        if (selectedTag) query = query.eq('tag_id', selectedTag);
 
-      if (sortBy === 'newest') query = query.order('created_at', { ascending: false });
-      else if (sortBy === 'oldest') query = query.order('created_at', { ascending: true });
-      else if (sortBy === 'popular') query = query.order('reaction_count', { ascending: false });
+        if (sortBy === 'newest') query = query.order('created_at', { ascending: false });
+        else if (sortBy === 'oldest') query = query.order('created_at', { ascending: true });
+        else if (sortBy === 'popular') query = query.order('created_at', { ascending: false }); // Fallback since reaction_count doesn't exist
 
-      const { data, error } = await query;
-      if (error) throw error;
+        const { data, error } = await query;
+        if (error) throw error;
 
-      // Map reactions count
-      const formattedPosts = data.map(post => ({
-        ...post,
-        reaction_count: post.reaction_count || 0
-      }));
-
-      setPosts(formattedPosts);
-    } catch (error) {
+        setPosts(data || []);
+      } catch (error) {
       console.error("Error fetching posts:", error);
     } finally {
       setLoading(false);
