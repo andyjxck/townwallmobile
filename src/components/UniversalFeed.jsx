@@ -58,6 +58,7 @@ import { fetchNotifications } from "@/utils/notifications";
 import { ShareManager } from "./ShareManager";
 import { BannerAd } from "@/components/BannerAd";
 import { NativeAd } from "@/components/NativeAd";
+import PostItem from "./PostItem";
 
 function SkeletonPost() {
   return (
