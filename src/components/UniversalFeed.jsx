@@ -170,55 +170,31 @@ export default function UniversalFeed() {
     }
   };
 
-  const fetchPosts = async (isRefreshing = false) => {
-    if (!isRefreshing) setLoading(true);
-      try {
-          let query = supabase
-            .from('rposts')
-            .select(`
-              *,
-              rusers (username, emoji_icon, avatar_url),
-              rzones (name),
-              rtags (name),
-              rreactions (reaction_type, device_id)
-            `)
-            .eq('is_deleted', false);
+    const [lastError, setLastError] = useState(null);
 
-          // Only add expiration filter if we want to be strict, 
-          // but let's keep it loose for now to ensure posts show up
-          // .gt('expires_at', new Date().toISOString());
-
-          if (selectedZone) query = query.eq('zone_id', selectedZone);
-          if (selectedTag) query = query.eq('tag_id', selectedTag);
-
-          if (sortBy === 'newest') query = query.order('created_at', { ascending: false });
-          else if (sortBy === 'oldest') query = query.order('created_at', { ascending: true });
-          else query = query.order('created_at', { ascending: false });
-
-          const { data, error } = await query;
-          
-          if (error || !data || data.length === 0) {
-            console.log("Main query failed or empty, trying ultra-fallback...");
-            const { data: fallbackData, error: fallbackError } = await supabase
+    const fetchPosts = async (isRefreshing = false) => {
+      if (!isRefreshing) setLoading(true);
+        setLastError(null);
+        try {
+            const { data, error } = await supabase
               .from('rposts')
               .select('*')
-              .eq('is_deleted', false)
               .order('created_at', { ascending: false })
               .limit(50);
             
-            if (fallbackError) throw fallbackError;
-            setPosts(fallbackData || []);
-          } else {
-            setPosts(data);
-          }
-      } catch (error) {
-        console.error("Error fetching posts:", error);
-        Alert.alert("Feed Error", "Could not load posts. Please try again later.");
-      } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+            if (error) {
+              setLastError(error.message);
+              setPosts([]);
+            } else {
+              setPosts(data || []);
+            }
+        } catch (error) {
+          setLastError(error.message);
+        } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    };
 
   const handleReaction = async (postId, type) => {
     if (!user) {
@@ -559,7 +535,16 @@ export default function UniversalFeed() {
         </View>
       ) : (
         <FlatList
-          ListHeaderComponent={<BannerAd />}
+          ListHeaderComponent={
+            <View>
+              <BannerAd />
+              {__DEV__ && (
+                <View style={{ backgroundColor: 'rgba(255,0,0,0.1)', padding: 10 }}>
+                  <Text style={{ color: '#FF0000', fontSize: 10 }}>DEBUG: posts={posts.length} loading={loading ? 'Y' : 'N'}</Text>
+                </View>
+              )}
+            </View>
+          }
           renderItem={({ item, index }) => (
             <View>
                 <PostItem 
@@ -588,16 +573,16 @@ export default function UniversalFeed() {
             }}
             ListFooterComponent={null}
             ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Search size={40} color="rgba(255,255,255,0.2)" style={{ marginBottom: 16 }} />
-              <Text style={{ color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>
-                No posts found.
-              </Text>
-              <TouchableOpacity onPress={clearFilters} style={styles.clearButton}>
-                <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>CLEAR FILTERS</Text>
-              </TouchableOpacity>
-            </View>
-          }
+              <View style={styles.emptyContainer}>
+                <Search size={40} color="rgba(255,255,255,0.2)" style={{ marginBottom: 16 }} />
+                <Text style={{ color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>
+                  No posts found. {lastError ? `\n\nError: ${lastError}` : ''}
+                </Text>
+                <TouchableOpacity onPress={clearFilters} style={styles.clearButton}>
+                  <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>CLEAR FILTERS</Text>
+                </TouchableOpacity>
+              </View>
+            }
         />
       )}
 
