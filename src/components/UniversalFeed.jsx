@@ -352,7 +352,7 @@ export default function UniversalFeed() {
   };
 
   const handleShare = async (post) => {
-    shareRef.current?.open(post);
+    shareRef.current?.share(post);
   };
 
   const clearFilters = () => {

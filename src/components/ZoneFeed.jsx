@@ -148,12 +148,13 @@ export default function ZoneFeed({ zoneSlug, zoneName }) {
   tag_id,
   image_url,
   image_urls,
-  is_anonymous,
-  moderation_status,
-  is_deleted,
-  zone:rzones!zone_id (name),
-  tag:rtags!tag_id (name),
-  reactions:rreactions!post_id (reaction_type, device_id)
+    is_anonymous,
+    moderation_status,
+    is_deleted,
+    user:rusers!user_id (username, emoji_icon, avatar_url),
+    zone:rzones!zone_id (name),
+    tag:rtags!tag_id (name),
+    reactions:rreactions!post_id (reaction_type, device_id)
 `)
             .eq('zone_id', zoneData.id)
             .eq('is_deleted', false)

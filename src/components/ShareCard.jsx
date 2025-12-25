@@ -22,50 +22,50 @@ export function ShareCard({ post }) {
         {/* Header with Logo */}
         <View style={styles.header}>
           <Text style={styles.logoText}>TOWN WALL</Text>
-          <View style={styles.zoneBadge}>
-            <MapPin size={10} color="#FFFFFF" />
-            <Text style={styles.zoneName}>{post.rzones?.name?.toUpperCase() || 'LOCAL'}</Text>
-          </View>
-        </View>
-
-        {/* Content Section */}
-          <View style={styles.content}>
-            {mainImage && (
-              <Image
-                source={{ uri: mainImage }}
-                style={styles.mainImage}
-                contentFit="cover"
-              />
-            )}
-            
-            <Text style={styles.title}>
-              {post.title || 'Untitled Post'}
-            </Text>
-            
-            <Text style={styles.body}>
-              {post.text}
-            </Text>
+            <View style={styles.zoneBadge}>
+              <MapPin size={10} color="#FFFFFF" />
+              <Text style={styles.zoneName}>{post.zone?.name?.toUpperCase() || 'LOCAL'}</Text>
+            </View>
           </View>
 
-          {/* Footer with Author and App Info */}
-          <View style={styles.footer}>
-            <View style={styles.authorInfo}>
-              {post.rusers?.avatar_url ? (
-                <Image 
-                  source={{ uri: post.rusers.avatar_url }} 
-                  style={styles.avatar} 
+          {/* Content Section */}
+            <View style={styles.content}>
+              {mainImage && (
+                <Image
+                  source={{ uri: mainImage }}
+                  style={styles.mainImage}
+                  contentFit="cover"
                 />
-              ) : post.rusers?.emoji_icon ? (
-                <Text style={styles.emojiIcon}>{post.rusers.emoji_icon}</Text>
-              ) : (
-                <View style={styles.avatarPlaceholder}>
-                  <User size={12} color="rgba(255,255,255,0.4)" />
-                </View>
               )}
-              <Text style={styles.username}>
-                @{post.is_anonymous ? 'anonymous' : (post.rusers?.username || 'user')}
+              
+              <Text style={styles.title}>
+                {post.title || 'Untitled Post'}
+              </Text>
+              
+              <Text style={styles.body}>
+                {post.text}
               </Text>
             </View>
+
+            {/* Footer with Author and App Info */}
+            <View style={styles.footer}>
+              <View style={styles.authorInfo}>
+                {post.user?.avatar_url ? (
+                  <Image 
+                    source={{ uri: post.user.avatar_url }} 
+                    style={styles.avatar} 
+                  />
+                ) : post.user?.emoji_icon ? (
+                  <Text style={styles.emojiIcon}>{post.user.emoji_icon}</Text>
+                ) : (
+                  <View style={styles.avatarPlaceholder}>
+                    <User size={12} color="rgba(255,255,255,0.4)" />
+                  </View>
+                )}
+                <Text style={styles.username}>
+                  @{post.is_anonymous ? 'anonymous' : (post.user?.username || 'user')}
+                </Text>
+              </View>
             
             <View style={styles.appPromo}>
               <Text style={styles.promoText}>Download on iOS</Text>
