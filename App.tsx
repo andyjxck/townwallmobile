@@ -8,8 +8,26 @@ import './src/__create/polyfills';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Toaster } from 'sonner-native';
 import { AlertModal } from './polyfills/web/alerts.web';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Purchases from 'react-native-purchases';
 import './global.css';
+
+// Initialize RevenueCat as early as possible
+const initRevenueCat = async () => {
+  if (Platform.OS === 'web') return;
+  try {
+    const apiKey = process.env.EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY;
+    if (apiKey) {
+      Purchases.setLogLevel(Purchases.LOG_LEVEL.DEBUG);
+      await Purchases.configure({ apiKey });
+      console.log('RevenueCat initialized');
+    }
+  } catch (error) {
+    console.warn('RevenueCat initialization skipped:', error.message);
+  }
+};
+
+initRevenueCat();
 
 const GlobalErrorReporter = () => {
   useEffect(() => {
@@ -37,23 +55,25 @@ const GlobalErrorReporter = () => {
 
 const Wrapper = memo(() => {
   return (
-    <ErrorBoundaryWrapper>
-      <SafeAreaProvider
-        initialMetrics={{
-          insets: { top: 64, bottom: 34, left: 0, right: 0 },
-          frame: {
-            x: 0,
-            y: 0,
-            width: Platform.OS !== 'web' || typeof window === 'undefined' ? 390 : window.innerWidth,
-            height: Platform.OS !== 'web' || typeof window === 'undefined' ? 844 : window.innerHeight,
-          },
-        }}
-      >
-        <App />
-        <GlobalErrorReporter />
-        <Toaster />
-      </SafeAreaProvider>
-    </ErrorBoundaryWrapper>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ErrorBoundaryWrapper>
+        <SafeAreaProvider
+          initialMetrics={{
+            insets: { top: 64, bottom: 34, left: 0, right: 0 },
+            frame: {
+              x: 0,
+              y: 0,
+              width: Platform.OS !== 'web' || typeof window === 'undefined' ? 390 : window.innerWidth,
+              height: Platform.OS !== 'web' || typeof window === 'undefined' ? 844 : window.innerHeight,
+            },
+          }}
+        >
+          <App />
+          <GlobalErrorReporter />
+          <Toaster />
+        </SafeAreaProvider>
+      </ErrorBoundaryWrapper>
+    </GestureHandlerRootView>
   );
 });
 const healthyResponse = {
@@ -86,41 +106,30 @@ const CreateApp = () => {
   const pathname = usePathname();
   useHandshakeParent();
 
-  useEffect(() => {
-    if (Platform.OS === 'web') return;
+    useEffect(() => {
+      if (Platform.OS === 'web') return;
 
-    (async () => {
-      const { status } = await requestTrackingPermissionsAsync();
-      if (status === 'granted') {
-        console.log('Tracking permission granted');
-      }
-      
-      try {
-        const apiKey = process.env.EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY;
-        if (apiKey) {
-          Purchases.setLogLevel(Purchases.LOG_LEVEL.DEBUG);
-          await Purchases.configure({ apiKey });
-          console.log('RevenueCat initialized');
+      (async () => {
+        const { status } = await requestTrackingPermissionsAsync();
+        if (status === 'granted') {
+          console.log('Tracking permission granted');
         }
-      } catch (error) {
-        console.warn('RevenueCat initialization skipped:', error.message);
-      }
-
-      try {
-
+        
+        try {
           // Dynamically require to avoid startup crash if module is missing
           const ads = require('react-native-google-mobile-ads');
-          const mobileAds = ads.default || ads;
-          if (mobileAds && typeof mobileAds === 'function') {
-            await mobileAds().initialize();
-            console.log('AdMob initialized');
+          if (ads) {
+            const mobileAds = ads.default || ads;
+            if (mobileAds && typeof mobileAds === 'function') {
+              await mobileAds().initialize();
+              console.log('AdMob initialized');
+            }
           }
         } catch (error) {
           console.warn('AdMob initialization skipped:', error.message);
         }
-
-    })();
-  }, []);
+      })();
+    }, []);
 
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof window === 'undefined') {

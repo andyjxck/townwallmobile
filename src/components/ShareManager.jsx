@@ -17,13 +17,17 @@ export const ShareManager = forwardRef((props, ref) => {
       // Give it a moment to render
       toast.info("Generating shareable card...");
       
-      setTimeout(async () => {
-        try {
-          const uri = await captureRef(viewRef, {
-            format: 'png',
-            quality: 1,
-            result: 'tmpfile',
-          });
+        setTimeout(async () => {
+          try {
+            if (!viewRef.current) {
+              throw new Error("View is not mounted yet");
+            }
+
+            const uri = await captureRef(viewRef.current, {
+              format: 'png',
+              quality: 1,
+              result: 'tmpfile',
+            });
 
           if (await Sharing.isAvailableAsync()) {
             await Sharing.shareAsync(uri, {
