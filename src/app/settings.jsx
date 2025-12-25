@@ -84,10 +84,19 @@ export default function SettingsScreen() {
 
         <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}>
             <BannerAd />
-            <View style={styles.section}>
-              <Text style={styles.sectionLabel}>PREFERENCES</Text>
-              <SettingsItem 
-                icon={<Bell size={20} color={notificationsEnabled ? "#4ADE80" : "rgba(255,255,255,0.4)"} />}
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>PREFERENCES</Text>
+                <SettingsItem 
+                  icon={<BarChart2 size={20} color="rgba(255,255,255,0.4)" />}
+                  title="Future Features & Polls"
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    router.push("/polls");
+                  }}
+                />
+                <SettingsItem 
+                  icon={<Bell size={20} color={notificationsEnabled ? "#4ADE80" : "rgba(255,255,255,0.4)"} />}
+
                 title={notificationsEnabled ? "Notifications On" : "Notifications Off"}
                 onPress={toggleNotifications}
               />
