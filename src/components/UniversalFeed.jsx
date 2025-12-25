@@ -569,7 +569,7 @@ export default function UniversalFeed() {
             contentContainerStyle={{ 
               paddingBottom: insets.bottom + 100,
             }}
-            ListFooterComponent={posts.length > 0 ? <BannerAd /> : null}
+            ListFooterComponent={null}
             ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Search size={40} color="rgba(255,255,255,0.2)" style={{ marginBottom: 16 }} />
