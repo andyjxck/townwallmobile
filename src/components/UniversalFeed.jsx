@@ -290,6 +290,39 @@ export default function UniversalFeed() {
 
   const handleDeletePost = async (postId) => {
     const post = posts.find(p => p.id === postId);
+    const currentUser = await getStoredUser();
+    
+    // If user is deleting their own post, don't require a moderation reason
+    if (post?.user_id === currentUser?.id) {
+      Alert.alert(
+        "Delete Post",
+        "Are you sure you want to delete your post?",
+        [
+          { text: "Cancel", style: "cancel" },
+          { 
+            text: "Delete", 
+            style: "destructive",
+            onPress: async () => {
+              try {
+                const { error } = await supabase
+                  .from('rposts')
+                  .update({ is_deleted: true })
+                  .eq('id', postId);
+                
+                if (error) throw error;
+                fetchPosts();
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              } catch (error) {
+                console.error("Error deleting post:", error);
+                Alert.alert("Error", "Failed to delete post.");
+              }
+            }
+          }
+        ]
+      );
+      return;
+    }
+
     setModerationTarget({ type: 'post', id: postId, data: post });
     setModerationReason("");
     setShowModerationModal(true);
