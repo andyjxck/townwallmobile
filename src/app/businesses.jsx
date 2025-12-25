@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Modal, Image, Platform, FlatList, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, Globe, Info, Plus, ExternalLink, ShieldCheck, CheckCircle2, Star, Camera, MapPin, Phone, Briefcase, Search, X } from 'lucide-react-native';
@@ -13,6 +13,7 @@ import { decode } from 'base64-arraybuffer';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import MapView, { Marker, Callout } from 'react-native-maps';
+import { NativeAd } from '@/components/NativeAd';
 
 export default function LocalBusinesses() {
   const insets = useSafeAreaInsets();
@@ -294,7 +295,23 @@ export default function LocalBusinesses() {
     b.description?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const renderBusinessCard = ({ item }) => {
+  const displayBusinesses = useMemo(() => {
+    const result = [];
+    filteredBusinesses.forEach((business, index) => {
+      result.push(business);
+      // Add ad every 3 businesses
+      if ((index + 1) % 3 === 0) {
+        result.push({ isAd: true, id: `ad-${index}` });
+      }
+    });
+    return result;
+  }, [filteredBusinesses]);
+
+  const renderItem = ({ item }) => {
+    if (item.isAd) {
+      return <NativeAd />;
+    }
+
     return (
       <TouchableOpacity 
         activeOpacity={0.7}
@@ -436,13 +453,13 @@ export default function LocalBusinesses() {
             <ActivityIndicator color="#FFFFFF" />
           </View>
         ) : (
-          viewMode === 'list' ? (
-            <FlatList
-              data={filteredBusinesses}
-              renderItem={renderBusinessCard}
-              keyExtractor={(item) => item.id.toString()}
-              contentContainerStyle={styles.listContent}
-              ListEmptyComponent={
+            viewMode === 'list' ? (
+              <FlatList
+                data={displayBusinesses}
+                renderItem={renderItem}
+                keyExtractor={(item) => item.id.toString()}
+                contentContainerStyle={styles.listContent}
+                ListEmptyComponent={
                 <View style={styles.emptyState}>
                   <Briefcase size={48} color="rgba(255,255,255,0.1)" />
                   <Text style={styles.emptyText}>No businesses found.</Text>
