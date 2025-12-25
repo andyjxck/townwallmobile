@@ -256,7 +256,6 @@ export default function PostScreen() {
             .from('rposts')
             .insert({
               ...postData,
-              expires_at: new Date(Date.now() + 86400000).toISOString(), // 24 hours
             });
         }
 

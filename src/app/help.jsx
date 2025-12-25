@@ -286,11 +286,11 @@ export default function HelpContact() {
                   styles.messageWrapper,
                   isMine ? styles.myMessageWrapper : styles.theirMessageWrapper
                 ]}>
-                  {!isMine && (
-                    <View style={styles.aiAvatar}>
-                      <MessageSquare size={12} color="#FFF" />
-                    </View>
-                  )}
+                    {!isMine && (
+                      <View style={styles.assistantAvatar}>
+                        <MessageSquare size={12} color="#FFF" />
+                      </View>
+                    )}
                     <View style={[
                       styles.messageBubble, 
                       isMine ? styles.myMessage : styles.theirMessage,
@@ -443,7 +443,7 @@ export default function HelpContact() {
     theirMessageWrapper: {
       justifyContent: 'flex-start',
     },
-    aiAvatar: {
+    assistantAvatar: {
       width: 32,
       height: 32,
       borderRadius: 16,
