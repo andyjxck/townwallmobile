@@ -14,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import MapView, { Marker, Callout } from 'react-native-maps';
 import { NativeAd } from '@/components/NativeAd';
+import { BannerAd } from '@/components/BannerAd';
 
 export default function LocalBusinesses() {
   const insets = useSafeAreaInsets();
@@ -297,13 +298,17 @@ export default function LocalBusinesses() {
 
   const displayBusinesses = useMemo(() => {
     const result = [];
-    filteredBusinesses.forEach((business, index) => {
-      result.push(business);
-      // Add ad every 3 businesses
-      if ((index + 1) % 3 === 0) {
-        result.push({ isAd: true, id: `ad-${index}` });
-      }
-    });
+    if (filteredBusinesses.length > 0) {
+      filteredBusinesses.forEach((business, index) => {
+        result.push(business);
+        // Add ad after the first item if list is short, or every 3 businesses
+        if (index === 0 && filteredBusinesses.length < 3) {
+          result.push({ isAd: true, id: `ad-first` });
+        } else if ((index + 1) % 3 === 0) {
+          result.push({ isAd: true, id: `ad-${index}` });
+        }
+      });
+    }
     return result;
   }, [filteredBusinesses]);
 
@@ -454,19 +459,20 @@ export default function LocalBusinesses() {
           </View>
         ) : (
             viewMode === 'list' ? (
-              <FlatList
-                data={displayBusinesses}
-                renderItem={renderItem}
-                keyExtractor={(item) => item.id.toString()}
-                contentContainerStyle={styles.listContent}
-                ListEmptyComponent={
-                <View style={styles.emptyState}>
-                  <Briefcase size={48} color="rgba(255,255,255,0.1)" />
-                  <Text style={styles.emptyText}>No businesses found.</Text>
-                  <Text style={styles.emptySubtext}>Try a different search term.</Text>
-                </View>
-              }
-            />
+                <FlatList
+                  data={displayBusinesses}
+                  renderItem={renderItem}
+                  keyExtractor={(item) => item.id.toString()}
+                  contentContainerStyle={styles.listContent}
+                  ListFooterComponent={displayBusinesses.length > 0 ? <BannerAd /> : null}
+                  ListEmptyComponent={
+                  <View style={styles.emptyState}>
+                    <Briefcase size={48} color="rgba(255,255,255,0.1)" />
+                    <Text style={styles.emptyText}>No businesses found.</Text>
+                    <Text style={styles.emptySubtext}>Try a different search term.</Text>
+                  </View>
+                }
+              />
           ) : renderMapView()
         )}
 

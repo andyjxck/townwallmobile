@@ -21,10 +21,8 @@ export function NativeAd() {
     }
   }, []);
 
-  if (Platform.OS === 'web') return null;
-
-  // Show placeholder in Expo Go (appOwnership is 'expo')
-  if ((Constants.appOwnership === 'expo' && __DEV__) || !adConfig) {
+  // Show placeholder in Expo Go (appOwnership is 'expo') or Web preview
+  if (Platform.OS === 'web' || (Constants.appOwnership === 'expo' && __DEV__) || !adConfig) {
     return (
       <View style={[styles.container, { borderStyle: 'dashed' }]}>
         <View style={styles.adContent}>
