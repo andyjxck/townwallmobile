@@ -174,23 +174,60 @@ export default function UniversalFeed() {
 
     const fetchPosts = async (isRefreshing = false) => {
       if (!isRefreshing) setLoading(true);
-        setLastError(null);
-        try {
-            const { data, error } = await supabase
+      setLastError(null);
+      try {
+          // Primary robust query (matching Profile.jsx success pattern)
+          let query = supabase
+            .from('rposts')
+            .select(`
+              *,
+              rusers (username, emoji_icon, avatar_url),
+              rzones (name),
+              rtags (name),
+              rreactions (reaction_type, device_id)
+            `)
+            .eq('is_deleted', false);
+
+          if (selectedZone) {
+            query = query.eq('zone_id', selectedZone);
+          }
+          if (selectedTag) {
+            query = query.eq('tag_id', selectedTag);
+          }
+
+          if (sortBy === 'popular') {
+            // Simple sorting by created_at for now as a fallback
+            query = query.order('created_at', { ascending: false });
+          } else if (sortBy === 'oldest') {
+            query = query.order('created_at', { ascending: true });
+          } else {
+            query = query.order('created_at', { ascending: false });
+          }
+
+          const { data, error } = await query.limit(50);
+          
+          if (error) {
+            console.error("Feed error:", error);
+            // Fallback to absolute simplest query if complex join fails
+            const { data: fallbackData, error: fallbackError } = await supabase
               .from('rposts')
               .select('*')
+              .eq('is_deleted', false)
               .order('created_at', { ascending: false })
               .limit(50);
             
-            if (error) {
-              setLastError(error.message);
+            if (fallbackError) {
+              setLastError(fallbackError.message);
               setPosts([]);
             } else {
-              setPosts(data || []);
+              setPosts(fallbackData || []);
             }
-        } catch (error) {
-          setLastError(error.message);
-        } finally {
+          } else {
+            setPosts(data || []);
+          }
+      } catch (error) {
+        setLastError(error.message);
+      } finally {
         setLoading(false);
         setRefreshing(false);
       }
