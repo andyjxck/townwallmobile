@@ -12,7 +12,7 @@ import './global.css';
 
 const GlobalErrorReporter = () => {
   useEffect(() => {
-    if (typeof window === 'undefined') {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') {
       return;
     }
     const errorHandler = (event: ErrorEvent) => {
@@ -43,8 +43,8 @@ const Wrapper = memo(() => {
           frame: {
             x: 0,
             y: 0,
-            width: typeof window === 'undefined' ? 390 : window.innerWidth,
-            height: typeof window === 'undefined' ? 844 : window.innerHeight,
+            width: Platform.OS !== 'web' || typeof window === 'undefined' ? 390 : window.innerWidth,
+            height: Platform.OS !== 'web' || typeof window === 'undefined' ? 844 : window.innerHeight,
           },
         }}
       >
@@ -62,6 +62,9 @@ const healthyResponse = {
 
 const useHandshakeParent = () => {
   useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') {
+      return;
+    }
     const handleMessage = (event: MessageEvent) => {
       if (event.data.type === 'sandbox:mobile:healthcheck') {
         window.parent.postMessage(healthyResponse, '*');
@@ -107,6 +110,9 @@ const CreateApp = () => {
   }, []);
 
   useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') {
+      return;
+    }
     const handleMessage = (event: MessageEvent) => {
       if (event.data.type === 'sandbox:navigation' && event.data.pathname !== pathname) {
         router.push(event.data.pathname);
@@ -121,6 +127,9 @@ const CreateApp = () => {
   }, [router, pathname]);
 
   useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') {
+      return;
+    }
     window.parent.postMessage(
       {
         type: 'sandbox:mobile:navigation',

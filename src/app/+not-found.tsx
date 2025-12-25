@@ -27,8 +27,8 @@ function NotFoundScreen() {
   const expoSitemap = useSitemap();
   const [sitemap, setSitemap] = useState<SitemapType | ParentSitemap | null>(expoSitemap);
 
-  useEffect(() => {
-    if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
+    useEffect(() => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.parent && window.parent !== window) {
       const handler = (event: MessageEvent) => {
         if (event.data.type === 'sandbox:sitemap') {
           window.removeEventListener('message', handler);
