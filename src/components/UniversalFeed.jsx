@@ -171,84 +171,100 @@ export default function UniversalFeed() {
 
     const [lastError, setLastError] = useState(null);
 
-    const fetchPosts = async (isRefreshing = false) => {
-      if (!isRefreshing) setLoading(true);
-      setLastError(null);
-          try {
-              // Use explicit join hints to resolve ambiguity and force LEFT JOINS
-              let query = supabase
-                .from('rposts')
-                .select(`
-                  id, 
-                  title, 
-                  text, 
-                  created_at, 
-                  user_id, 
-                  zone_id, 
-                  tag_id, 
-                  image_url, 
-                  image_urls, 
-                  is_anonymous, 
-                  moderation_status,
-                  is_deleted,
-                  user:rusers!user_id (username, emoji_icon, avatar_url),
-                  zone:rzones!zone_id (name),
-                  tag:rtags!tag_id (name),
-                  reactions:rreactions (reaction_type, device_id)
-                `)
-                .eq('is_deleted', false)
-                .eq('moderation_status', 'approved');
+const fetchPosts = async (isRefreshing = false) => {
+  if (!isRefreshing) setLoading(true);
+  setLastError(null);
 
-          if (selectedZone !== null && selectedZone !== undefined) {
-            query = query.eq('zone_id', selectedZone);
-          }
-          if (selectedTag !== null && selectedTag !== undefined) {
-            query = query.eq('tag_id', selectedTag);
-          }
+  try {
+    console.log("======== FEED DEBUG START ========");
+    console.log("selectedZone:", selectedZone, "selectedTag:", selectedTag, "sortBy:", sortBy);
 
-        if (sortBy === 'oldest') {
-          query = query.order('created_at', { ascending: true });
-        } else {
-          query = query.order('created_at', { ascending: false });
-        }
+    // STEP 0: Can we read ANYTHING from rposts at all?
+    const q0 = await supabase
+      .from("rposts")
+      .select("id", { count: "exact" })
+      .limit(5);
 
-        const { data, error } = await query.limit(50);
-        
-        if (error) {
-          console.error("Feed error:", error);
-                  // Try an absolute bare-bones fallback if the complex one fails
-                  const { data: fallback, error: fbError } = await supabase
-                    .from('rposts')
-                    .select(`
-                      id, title, text, created_at, user_id, zone_id, tag_id, image_url, image_urls, is_anonymous,
-                      user:rusers!user_id (username, emoji_icon, avatar_url),
-                      zone:rzones!zone_id (name),
-                      tag:rtags!tag_id (name)
-                    `)
-                .eq('is_deleted', false)
-                .order('created_at', { ascending: false })
-                .limit(20);
-          
-          if (fallback && !fbError) {
-            setPosts(fallback);
-            setLastError(`Note: Showing simplified feed (${error.message})`);
-          } else {
-            console.error("Fallback error:", fbError);
-            setLastError(fbError?.message || error.message);
-            setPosts([]);
-          }
-        } else {
-          setPosts(data || []);
-          setLastError(null);
-        }
-      } catch (err) {
-        console.error("Fetch catch:", err);
-        setLastError(err.message);
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    };
+    console.log("Q0 rposts ids:", q0.data, "count:", q0.count, "error:", q0.error);
+
+    // STEP 1: Apply only base filters (deleted + approved)
+    const q1 = await supabase
+      .from("rposts")
+      .select("id, is_deleted, moderation_status, created_at", { count: "exact" })
+      .eq("is_deleted", false)
+      .eq("moderation_status", "approved")
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    console.log("Q1 base filters:", q1.data, "count:", q1.count, "error:", q1.error);
+
+    // STEP 2: Add zone/tag filters (still NO joins)
+    let q2builder = supabase
+      .from("rposts")
+      .select("id, title, zone_id, tag_id, created_at", { count: "exact" })
+      .eq("is_deleted", false)
+      .eq("moderation_status", "approved");
+
+    if (selectedZone !== null && selectedZone !== undefined) q2builder = q2builder.eq("zone_id", selectedZone);
+    if (selectedTag !== null && selectedTag !== undefined) q2builder = q2builder.eq("tag_id", selectedTag);
+
+    const q2 = await q2builder
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    console.log("Q2 + zone/tag:", q2.data, "count:", q2.count, "error:", q2.error);
+
+    // STEP 3: Now do your FULL query with joins
+    let query = supabase
+      .from("rposts")
+      .select(`
+        id,
+        title,
+        text,
+        created_at,
+        user_id,
+        zone_id,
+        tag_id,
+        image_url,
+        image_urls,
+        is_anonymous,
+        moderation_status,
+        is_deleted,
+        user:rusers (username, emoji_icon, avatar_url),
+        zone:rzones (name),
+        tag:rtags (name),
+        reactions:rreactions (reaction_type, device_id)
+      `)
+      .eq("is_deleted", false)
+      .eq("moderation_status", "approved");
+
+    if (selectedZone !== null && selectedZone !== undefined) query = query.eq("zone_id", selectedZone);
+    if (selectedTag !== null && selectedTag !== undefined) query = query.eq("tag_id", selectedTag);
+
+    query = query.order("created_at", { ascending: false });
+
+    const { data, error } = await query.limit(50);
+
+    console.log("Q3 full join data len:", (data || []).length, "error:", error);
+    console.log("======== FEED DEBUG END ========");
+
+    if (error) {
+      setLastError(error.message);
+      setPosts([]);
+      return;
+    }
+
+    setPosts(data || []);
+    setLastError(null);
+  } catch (err) {
+    console.error("Fetch catch:", err);
+    setLastError(err?.message || "Unknown error");
+    setPosts([]);
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
+  }
+};
 
   const handleReaction = async (postId, type) => {
     if (!user) {
@@ -589,6 +605,7 @@ export default function UniversalFeed() {
         </View>
       ) : (
         <FlatList
+        data={posts}
           ListHeaderComponent={<BannerAd />}
           renderItem={({ item, index }) => (
             <View>
