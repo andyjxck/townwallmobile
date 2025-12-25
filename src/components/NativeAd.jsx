@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import { NativeAdView, NativeAsset, NativeMediaView, NativeAssetType, TestIds } from 'react-native-google-mobile-ads';
 
-const adUnitId = TestIds.NATIVE;
+const adUnitId = __DEV__ ? TestIds.NATIVE : 'ca-app-pub-1505977777207758/1579458289';
 
 export function NativeAd() {
   if (Platform.OS === 'web') return null;

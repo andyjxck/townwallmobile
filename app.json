@@ -67,10 +67,10 @@
         "expo-web-browser",
         [
           "react-native-google-mobile-ads",
-          {
-            "androidAppId": "ca-app-pub-3940256099942544~3347511713",
-            "iosAppId": "ca-app-pub-3940256099942544~1458002511"
-          }
+            {
+              "androidAppId": "ca-app-pub-1505977777207758~6195707754",
+              "iosAppId": "ca-app-pub-1505977777207758~6195707754"
+            }
         ],
         [
           "expo-tracking-transparency",
