@@ -174,36 +174,37 @@ export default function UniversalFeed() {
     const fetchPosts = async (isRefreshing = false) => {
       if (!isRefreshing) setLoading(true);
       setLastError(null);
-        try {
-          // Use an explicit select string with foreign key hints for maximum robustness
-          let query = supabase
-            .from('rposts')
-            .select(`
-              id, 
-              title, 
-              text, 
-              created_at, 
-              user_id, 
-              zone_id, 
-              tag_id, 
-              image_url, 
-              image_urls, 
-              is_anonymous, 
-              moderation_status,
-              is_deleted,
-              user:rusers!user_id (username, emoji_icon, avatar_url),
-              zone:rzones!zone_id (name),
-              tag:rtags!tag_id (name),
-              reactions:rreactions (reaction_type, device_id)
-            `)
-            .eq('is_deleted', false);
+          try {
+            // Use LEFT JOINS (remove !) for maximum robustness
+            let query = supabase
+              .from('rposts')
+              .select(`
+                id, 
+                title, 
+                text, 
+                created_at, 
+                user_id, 
+                zone_id, 
+                tag_id, 
+                image_url, 
+                image_urls, 
+                is_anonymous, 
+                moderation_status,
+                is_deleted,
+                user:rusers (username, emoji_icon, avatar_url),
+                zone:rzones (name),
+                tag:rtags (name),
+                reactions:rreactions (reaction_type, device_id)
+              `)
+              .eq('is_deleted', false)
+              .eq('moderation_status', 'approved');
 
-        if (selectedZone !== null) {
-          query = query.eq('zone_id', selectedZone);
-        }
-        if (selectedTag !== null) {
-          query = query.eq('tag_id', selectedTag);
-        }
+          if (selectedZone !== null && selectedZone !== undefined) {
+            query = query.eq('zone_id', selectedZone);
+          }
+          if (selectedTag !== null && selectedTag !== undefined) {
+            query = query.eq('tag_id', selectedTag);
+          }
 
         if (sortBy === 'oldest') {
           query = query.order('created_at', { ascending: true });

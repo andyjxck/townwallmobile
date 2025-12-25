@@ -135,28 +135,29 @@ export default function ZoneFeed({ zoneSlug, zoneName }) {
       
       if (!zoneData) return;
 
-      let query = supabase
-        .from('rposts')
-        .select(`
-          id, 
-          title, 
-          text, 
-          created_at, 
-          user_id, 
-          zone_id, 
-          tag_id, 
-          image_url, 
-          image_urls, 
-          is_anonymous, 
-          moderation_status,
-          is_deleted,
-          tag:rtags!tag_id (name),
-          zone:rzones!zone_id (name),
-          user:rusers!user_id (username, emoji_icon, avatar_url),
-          reactions:rreactions (reaction_type, device_id)
-        `)
-        .eq('zone_id', zoneData.id)
-        .eq('is_deleted', false);
+        let query = supabase
+          .from('rposts')
+          .select(`
+            id, 
+            title, 
+            text, 
+            created_at, 
+            user_id, 
+            zone_id, 
+            tag_id, 
+            image_url, 
+            image_urls, 
+            is_anonymous, 
+            moderation_status,
+            is_deleted,
+            tag:rtags (name),
+            zone:rzones (name),
+            user:rusers (username, emoji_icon, avatar_url),
+            reactions:rreactions (reaction_type, device_id)
+          `)
+          .eq('zone_id', zoneData.id)
+          .eq('is_deleted', false)
+          .eq('moderation_status', 'approved');
 
       const { data, error } = await query
         .order('created_at', { ascending: false })
