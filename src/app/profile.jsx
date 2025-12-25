@@ -131,29 +131,29 @@ export default function Profile() {
           const friendIds = friendsList.map(f => f.id);
 
             // Fetch user's own posts AND friends' posts
-              const { data: feedPosts } = await supabase
-                .from('rposts')
-                .select(`
-                  id, 
-                  title, 
-                  text, 
-                  created_at, 
-                  user_id, 
-                  zone_id, 
-                  tag_id, 
-                  image_url, 
-                  image_urls, 
-                  is_anonymous, 
-                  moderation_status,
-                  is_deleted,
-                  user:rusers (username, emoji_icon, avatar_url),
-                  zone:rzones (name),
-                  tag:rtags (name),
-                  reactions:rreactions (reaction_type, device_id)
-                `)
-              .in('user_id', [userData.id, ...friendIds])
-              .eq('is_deleted', false)
-              .order('created_at', { ascending: false });
+                const { data: feedPosts } = await supabase
+                  .from('rposts')
+                  .select(`
+                    id, 
+                    title, 
+                    text, 
+                    created_at, 
+                    user_id, 
+                    zone_id, 
+                    tag_id, 
+                    image_url, 
+                    image_urls, 
+                    is_anonymous, 
+                    moderation_status,
+                    is_deleted,
+                    user:user_id (username, emoji_icon, avatar_url),
+                    zone:zone_id (name),
+                    tag:tag_id (name),
+                    reactions:rreactions (reaction_type, device_id)
+                  `)
+                .in('user_id', [userData.id, ...friendIds])
+                .eq('is_deleted', false)
+                .order('created_at', { ascending: false });
             
             setUserPosts(feedPosts || []);
 
