@@ -220,6 +220,17 @@ export default function ZoneFeed({ zoneSlug, zoneName }) {
     );
   }
 
+  const getFeedData = () => {
+    const data = [];
+    posts.forEach((post, index) => {
+      data.push({ ...post, _isPost: true });
+      if (index === 0 || (index + 1) % 5 === 0) {
+        data.push({ _isAd: true, id: `ad-${index}` });
+      }
+    });
+    return data;
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: "#000000" }}>
       <StatusBar style="light" />
@@ -270,21 +281,23 @@ export default function ZoneFeed({ zoneSlug, zoneName }) {
 
       {/* Feed */}
       <FlatList
-      data={posts}
+        data={getFeedData()}
         ListHeaderComponent={<BannerAd />}
-        data={posts}
-        renderItem={({ item }) => (
-              <PostItem
-                item={item}
-                deviceId={deviceId}
-                onReaction={handleReaction}
-                onDelete={handleDeletePost}
-                onMute={handleMuteUser}
-                onEdit={handleEditPost}
-                onShare={handleShare}
-                user={user}
-              />
-        )}
+        renderItem={({ item }) => {
+          if (item._isAd) return <NativeAd />;
+          return (
+            <PostItem
+              item={item}
+              deviceId={deviceId}
+              onReaction={handleReaction}
+              onDelete={handleDeletePost}
+              onMute={handleMuteUser}
+              onEdit={handleEditPost}
+              onShare={handleShare}
+              user={user}
+            />
+          );
+        }}
         keyExtractor={(item) => item.id.toString()}
         refreshControl={
           <RefreshControl
