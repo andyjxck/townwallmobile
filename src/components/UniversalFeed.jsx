@@ -176,17 +176,19 @@ export default function UniversalFeed() {
       if (!isRefreshing) setLoading(true);
       setLastError(null);
       try {
-          // Primary robust query (matching Profile.jsx success pattern)
-          let query = supabase
-            .from('rposts')
-            .select(`
-              *,
-              rusers (username, emoji_icon, avatar_url),
-              rzones (name),
-              rtags (name),
-              rreactions (reaction_type, device_id)
-            `)
-            .eq('is_deleted', false);
+            // Primary robust query (matching Profile.jsx success pattern)
+            let query = supabase
+              .from('rposts')
+              .select(`
+                *,
+                rusers (username, emoji_icon, avatar_url),
+                rzones (name),
+                rtags (name),
+                rreactions (reaction_type, device_id)
+              `)
+              .eq('is_deleted', false);
+
+            console.log("Fetching posts with filters:", { selectedZone, selectedTag, sortBy });
 
           if (selectedZone) {
             query = query.eq('zone_id', selectedZone);
@@ -204,27 +206,32 @@ export default function UniversalFeed() {
             query = query.order('created_at', { ascending: false });
           }
 
-          const { data, error } = await query.limit(50);
-          
-          if (error) {
-            console.error("Feed error:", error);
-            // Fallback to absolute simplest query if complex join fails
-            const { data: fallbackData, error: fallbackError } = await supabase
+            const { data, error } = await supabase
               .from('rposts')
-              .select('*')
+              .select(`
+                *,
+                rusers (username, emoji_icon, avatar_url),
+                rzones (name),
+                rtags (name),
+                rreactions (reaction_type, device_id)
+              `)
               .eq('is_deleted', false)
-              .order('created_at', { ascending: false })
+              .order('created_at', { ascending: sortBy !== 'oldest' })
               .limit(50);
             
-            if (fallbackError) {
-              setLastError(fallbackError.message);
-              setPosts([]);
+            if (error) {
+              console.error("Feed error:", error);
+              setLastError(error.message);
+              // Fail-safe simple query
+              const { data: fallback } = await supabase.from('rposts').select('*').limit(20);
+              setPosts(fallback || []);
             } else {
-              setPosts(fallbackData || []);
+              // Apply manual client-side filtering if needed, but for now just set data
+              let filtered = data || [];
+              if (selectedZone) filtered = filtered.filter(p => p.zone_id === selectedZone);
+              if (selectedTag) filtered = filtered.filter(p => p.tag_id === selectedTag);
+              setPosts(filtered);
             }
-          } else {
-            setPosts(data || []);
-          }
       } catch (error) {
         setLastError(error.message);
       } finally {
@@ -575,11 +582,6 @@ export default function UniversalFeed() {
           ListHeaderComponent={
             <View>
               <BannerAd />
-              {__DEV__ && (
-                <View style={{ backgroundColor: 'rgba(255,0,0,0.1)', padding: 10 }}>
-                  <Text style={{ color: '#FF0000', fontSize: 10 }}>DEBUG: posts={posts.length} loading={loading ? 'Y' : 'N'}</Text>
-                </View>
-              )}
             </View>
           }
           renderItem={({ item, index }) => (
