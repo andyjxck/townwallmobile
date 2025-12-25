@@ -130,36 +130,8 @@ export default function Profile() {
           setFriends(friendsList);
           const friendIds = friendsList.map(f => f.id);
 
-          // Fetch user's own posts AND friends' posts
-          const { data: feedPosts } = await supabase
-            .from('rposts')
-            .select(`
-              id, 
-              title, 
-              text, 
-              created_at, 
-              user_id, 
-              zone_id, 
-              tag_id, 
-              image_url, 
-              image_urls, 
-              is_anonymous, 
-              moderation_status,
-              is_deleted,
-              rusers (username, emoji_icon, avatar_url),
-              rzones (name),
-              rtags (name),
-              rreactions (reaction_type, device_id)
-            `)
-            .in('user_id', [userData.id, ...friendIds])
-            .eq('is_deleted', false)
-            .order('created_at', { ascending: false });
-          
-          setUserPosts(feedPosts || []);
-
-          // Fetch Friends Only posts for the dedicated feed
-          if (friendIds.length > 0) {
-            const { data: frPosts } = await supabase
+            // Fetch user's own posts AND friends' posts
+            const { data: feedPosts } = await supabase
               .from('rposts')
               .select(`
                 id, 
@@ -174,14 +146,42 @@ export default function Profile() {
                 is_anonymous, 
                 moderation_status,
                 is_deleted,
-                rusers (username, emoji_icon, avatar_url),
-                rzones (name),
-                rtags (name),
-                rreactions (reaction_type, device_id)
+                user:user_id (username, emoji_icon, avatar_url),
+                zone:zone_id (name),
+                tag:tag_id (name),
+                reactions:rreactions (reaction_type, device_id)
               `)
-              .in('user_id', friendIds)
+              .in('user_id', [userData.id, ...friendIds])
               .eq('is_deleted', false)
               .order('created_at', { ascending: false });
+            
+            setUserPosts(feedPosts || []);
+
+            // Fetch Friends Only posts for the dedicated feed
+            if (friendIds.length > 0) {
+              const { data: frPosts } = await supabase
+                .from('rposts')
+                .select(`
+                  id, 
+                  title, 
+                  text, 
+                  created_at, 
+                  user_id, 
+                  zone_id, 
+                  tag_id, 
+                  image_url, 
+                  image_urls, 
+                  is_anonymous, 
+                  moderation_status,
+                  is_deleted,
+                  user:user_id (username, emoji_icon, avatar_url),
+                  zone:zone_id (name),
+                  tag:tag_id (name),
+                  reactions:rreactions (reaction_type, device_id)
+                `)
+                .in('user_id', friendIds)
+                .eq('is_deleted', false)
+                .order('created_at', { ascending: false });
             
             setFriendsPosts(frPosts || []);
           } else {
@@ -194,22 +194,22 @@ export default function Profile() {
           .select('id')
           .eq('user_id', userData.id);
         
-        if (userPostIds && userPostIds.length > 0) {
-          const postIds = userPostIds.map(p => p.id);
-          const { data: replyData } = await supabase
-            .from('rcomments')
-            .select(`
-              *,
-              rusers (username, emoji_icon, avatar_url),
-              rposts (title)
-            `)
-            .in('post_id', postIds)
-            .neq('user_id', userData.id)
-            .order('created_at', { ascending: false })
-            .limit(10);
-          
-          setReplies(replyData || []);
-        }
+          if (userPostIds && userPostIds.length > 0) {
+            const postIds = userPostIds.map(p => p.id);
+            const { data: replyData } = await supabase
+              .from('rcomments')
+              .select(`
+                *,
+                user:user_id (username, emoji_icon, avatar_url),
+                post:post_id (title)
+              `)
+              .in('post_id', postIds)
+              .neq('user_id', userData.id)
+              .order('created_at', { ascending: false })
+              .limit(10);
+            
+            setReplies(replyData || []);
+          }
       }
     } catch (error) {
       console.error("Error loading profile:", error);

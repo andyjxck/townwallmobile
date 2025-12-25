@@ -175,29 +175,29 @@ export default function UniversalFeed() {
     const fetchPosts = async (isRefreshing = false) => {
       if (!isRefreshing) setLoading(true);
       setLastError(null);
-      try {
-        // Use an explicit select string with foreign key hints for maximum robustness
-        let query = supabase
-          .from('rposts')
-          .select(`
-            id, 
-            title, 
-            text, 
-            created_at, 
-            user_id, 
-            zone_id, 
-            tag_id, 
-            image_url, 
-            image_urls, 
-            is_anonymous, 
-            moderation_status,
-            is_deleted,
-            rusers (username, emoji_icon, avatar_url),
-            rzones (name),
-            rtags (name),
-            rreactions (reaction_type, device_id)
-          `)
-          .eq('is_deleted', false);
+        try {
+          // Use an explicit select string with foreign key hints for maximum robustness
+          let query = supabase
+            .from('rposts')
+            .select(`
+              id, 
+              title, 
+              text, 
+              created_at, 
+              user_id, 
+              zone_id, 
+              tag_id, 
+              image_url, 
+              image_urls, 
+              is_anonymous, 
+              moderation_status,
+              is_deleted,
+              user:user_id (username, emoji_icon, avatar_url),
+              zone:zone_id (name),
+              tag:tag_id (name),
+              reactions:rreactions (reaction_type, device_id)
+            `)
+            .eq('is_deleted', false);
 
         if (selectedZone) {
           query = query.eq('zone_id', selectedZone);
@@ -216,18 +216,18 @@ export default function UniversalFeed() {
         
         if (error) {
           console.error("Feed error:", error);
-          // Try an absolute bare-bones fallback if the complex one fails
-          const { data: fallback, error: fbError } = await supabase
-            .from('rposts')
-            .select(`
-              id, title, text, created_at, user_id, zone_id, tag_id, image_urls, is_anonymous,
-              rusers (username, emoji_icon, avatar_url),
-              rzones (name),
-              rtags (name)
-            `)
-            .eq('is_deleted', false)
-            .order('created_at', { ascending: false })
-            .limit(20);
+            // Try an absolute bare-bones fallback if the complex one fails
+            const { data: fallback, error: fbError } = await supabase
+              .from('rposts')
+              .select(`
+                id, title, text, created_at, user_id, zone_id, tag_id, image_urls, is_anonymous,
+                user:user_id (username, emoji_icon, avatar_url),
+                zone:zone_id (name),
+                tag:tag_id (name)
+              `)
+              .eq('is_deleted', false)
+              .order('created_at', { ascending: false })
+              .limit(20);
           
           if (fallback && !fbError) {
             setPosts(fallback);
