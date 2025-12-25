@@ -57,7 +57,6 @@ import NotificationPanel from "./NotificationPanel";
 import { fetchNotifications } from "@/utils/notifications";
 import { ShareManager } from "./ShareManager";
 import { BannerAd } from "@/components/BannerAd";
-import { NativeAd } from "@/components/NativeAd";
 import PostItem from "./PostItem";
 
 function SkeletonPost() {
@@ -177,32 +176,32 @@ export default function UniversalFeed() {
       setLastError(null);
         try {
           // Use an explicit select string with foreign key hints for maximum robustness
-            let query = supabase
-              .from('rposts')
-                    .select(`
-                      id, 
-                      title, 
-                      text, 
-                      created_at, 
-                      user_id, 
-                      zone_id, 
-                      tag_id, 
-                      image_url, 
-                      image_urls, 
-                      is_anonymous, 
-                      moderation_status,
-                      is_deleted,
-                    user:rusers (username, emoji_icon, avatar_url),
-                    zone:rzones (name),
-                    tag:rtags (name),
-                    reactions:rreactions (reaction_type, device_id)
-                  `)
-              .eq('is_deleted', false);
+          let query = supabase
+            .from('rposts')
+            .select(`
+              id, 
+              title, 
+              text, 
+              created_at, 
+              user_id, 
+              zone_id, 
+              tag_id, 
+              image_url, 
+              image_urls, 
+              is_anonymous, 
+              moderation_status,
+              is_deleted,
+              user:rusers!user_id (username, emoji_icon, avatar_url),
+              zone:rzones!zone_id (name),
+              tag:rtags!tag_id (name),
+              reactions:rreactions (reaction_type, device_id)
+            `)
+            .eq('is_deleted', false);
 
-        if (selectedZone !== null && selectedZone !== undefined) {
+        if (selectedZone !== null) {
           query = query.eq('zone_id', selectedZone);
         }
-        if (selectedTag !== null && selectedTag !== undefined) {
+        if (selectedTag !== null) {
           query = query.eq('tag_id', selectedTag);
         }
 
@@ -592,18 +591,16 @@ export default function UniversalFeed() {
           ListHeaderComponent={null}
           renderItem={({ item, index }) => (
             <View>
-                <PostItem 
-                  item={item} 
-                  deviceId={deviceId} 
-                  onReaction={handleReaction} 
-                  onDelete={handleDeletePost}
-                  onMute={handleMuteUser}
-                  onShare={handleShare}
-                  onEdit={handleEditPost}
-                  user={user}
-                />
-                  {/* NativeAd temporarily disabled to rule out crashes */}
-                  {/* index > 0 && index % 3 === 0 && <NativeAd /> */}
+                  <PostItem 
+                    item={item} 
+                    deviceId={deviceId} 
+                    onReaction={handleReaction} 
+                    onDelete={handleDeletePost}
+                    onMute={handleMuteUser}
+                    onShare={handleShare}
+                    onEdit={handleEditPost}
+                    user={user}
+                  />
                 </View>
               )}
             keyExtractor={(item) => item.id.toString()}

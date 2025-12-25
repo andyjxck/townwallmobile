@@ -135,36 +135,35 @@ export default function ZoneFeed({ zoneSlug, zoneName }) {
       
       if (!zoneData) return;
 
-                  const { data, error } = await supabase
-                    .from('rposts')
-                    .select(`
-                      id, 
-                      title, 
-                      text, 
-                      created_at, 
-                      user_id, 
-                      zone_id, 
-                      tag_id, 
-                      image_url, 
-                      image_urls, 
-                      is_anonymous, 
-                      moderation_status,
-                      is_deleted,
-                      tag:rtags (name),
-                      zone:rzones (name),
-                      user:rusers (username, emoji_icon, avatar_url),
-                      reactions:rreactions (reaction_type, device_id)
-                    `)
-              .eq('zone_id', zoneData.id)
-              .eq('is_deleted', false);
+      let query = supabase
+        .from('rposts')
+        .select(`
+          id, 
+          title, 
+          text, 
+          created_at, 
+          user_id, 
+          zone_id, 
+          tag_id, 
+          image_url, 
+          image_urls, 
+          is_anonymous, 
+          moderation_status,
+          is_deleted,
+          tag:rtags!tag_id (name),
+          zone:rzones!zone_id (name),
+          user:rusers!user_id (username, emoji_icon, avatar_url),
+          reactions:rreactions (reaction_type, device_id)
+        `)
+        .eq('zone_id', zoneData.id)
+        .eq('is_deleted', false);
 
-        if (selectedTag !== null && selectedTag !== undefined) {
-          query = query.eq('tag_id', selectedTag);
-        }
+      const { data, error } = await query
+        .order('created_at', { ascending: false })
+        .limit(50);
 
-        const { data: finalData, error: fetchError } = await query.order('created_at', { ascending: false });
-        if (fetchError) throw fetchError;
-        setPosts(finalData || []);
+      if (error) throw error;
+      setPosts(data || []);
     } catch (error) {
       console.error("Error fetching posts:", error);
     } finally {

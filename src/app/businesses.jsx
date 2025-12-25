@@ -13,7 +13,6 @@ import { decode } from 'base64-arraybuffer';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import MapView, { Marker, Callout } from 'react-native-maps';
-import { NativeAd } from '@/components/NativeAd';
 import { BannerAd } from '@/components/BannerAd';
 
 export default function LocalBusinesses() {
@@ -297,26 +296,10 @@ export default function LocalBusinesses() {
   );
 
   const displayBusinesses = useMemo(() => {
-    const result = [];
-    if (filteredBusinesses.length > 0) {
-      filteredBusinesses.forEach((business, index) => {
-        result.push(business);
-        // Add ad after the first item if list is short, or every 3 businesses
-        if (index === 0 && filteredBusinesses.length < 3) {
-          result.push({ isAd: true, id: `ad-first` });
-        } else if ((index + 1) % 3 === 0) {
-          result.push({ isAd: true, id: `ad-${index}` });
-        }
-      });
-    }
-    return result;
+    return filteredBusinesses;
   }, [filteredBusinesses]);
 
   const renderItem = ({ item }) => {
-    if (item.isAd) {
-      return <NativeAd />;
-    }
-
     return (
       <TouchableOpacity 
         activeOpacity={0.7}
