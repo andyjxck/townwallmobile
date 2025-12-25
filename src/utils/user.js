@@ -72,7 +72,7 @@ export const initUser = async () => {
     }
 
     // Sync with RevenueCat
-    if (ruser?.id) {
+    if (ruser?.id && process.env.EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY) {
       try {
         await Purchases.logIn(ruser.id.toString());
       } catch (e) {
