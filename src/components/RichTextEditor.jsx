@@ -26,7 +26,8 @@ import {
   ChevronDown, 
   Undo2, 
   Redo2,
-  Check
+  Check,
+  BarChart2
 } from 'lucide-react-native';
 
 const COLORS = [
@@ -104,19 +105,9 @@ function ToolbarDropdown({ icon: Icon, label, options, onSelect, currentValue, t
   );
 }
 
-export function RichTextEditor({ value, onChange, placeholder, minHeight = 400 }) {
+export function RichTextEditor({ value, onChange, placeholder, onPollPress, minHeight = 400 }) {
   const richText = useRef();
-  const [currentAlignment, setCurrentAlignment] = useState('left');
   const [currentColor, setCurrentColor] = useState('#FFFFFF');
-
-  const handleAlignmentSelect = (alignment) => {
-    setCurrentAlignment(alignment);
-    switch (alignment) {
-      case 'left': richText.current?.executeAction(actions.alignLeft); break;
-      case 'center': richText.current?.executeAction(actions.alignCenter); break;
-      case 'right': richText.current?.executeAction(actions.alignRight); break;
-    }
-  };
 
   const handleListSelect = (type) => {
     if (type === 'bullets') {
@@ -133,18 +124,10 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 400 }
     richText.current?.executeAction(actions.foreColor, color);
   };
 
-  const alignmentOptions = [
-    { label: 'Left', value: 'left', icon: AlignLeft },
-    { label: 'Center', value: 'center', icon: AlignCenter },
-    { label: 'Right', value: 'right', icon: AlignRight },
-  ];
-
   const listOptions = [
     { label: 'Bullets', value: 'bullets', icon: List },
     { label: 'Numbers', value: 'numbers', icon: ListOrdered },
   ];
-
-  const CurrentAlignmentIcon = alignmentOptions.find(o => o.value === currentAlignment)?.icon || AlignLeft;
 
   return (
     <View style={styles.container}>
@@ -154,13 +137,6 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 400 }
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.toolbarContent}
         >
-          <ToolbarDropdown 
-            icon={CurrentAlignmentIcon} 
-            options={alignmentOptions}
-            onSelect={handleAlignmentSelect}
-            currentValue={currentAlignment}
-          />
-
           <ToolbarDropdown 
             icon={List} 
             options={listOptions}
@@ -187,20 +163,17 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 400 }
             iconTint="rgba(255,255,255,0.6)"
           />
 
-          <View style={styles.separator} />
-
-          <RichToolbar
-            editor={richText}
-            actions={[actions.undo, actions.redo]}
-            iconMap={{
-              [actions.undo]: ({ tintColor }) => <Undo2 size={18} color={tintColor} />,
-              [actions.redo]: ({ tintColor }) => <Redo2 size={18} color={tintColor} />,
-            }}
-            style={styles.subToolbar}
-            flatContainerStyle={styles.flatStyle}
-            selectedIconTint="#007AFF"
-            iconTint="rgba(255,255,255,0.6)"
-          />
+          {onPollPress && (
+            <>
+              <View style={styles.separator} />
+              <TouchableOpacity 
+                style={styles.dropdownTrigger}
+                onPress={onPollPress}
+              >
+                <BarChart2 size={18} color="rgba(255,255,255,0.6)" />
+              </TouchableOpacity>
+            </>
+          )}
         </ScrollView>
       </View>
 

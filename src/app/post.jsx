@@ -14,7 +14,7 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { X, ChevronRight, Image as ImageIcon, Trash2, Shield, User, Play } from "lucide-react-native";
+import { X, ChevronRight, Image as ImageIcon, Trash2, Shield, User, Play, BarChart2, Plus, Minus } from "lucide-react-native";
 import { getStoredUser } from "../utils/user";
 import { getDeviceId } from "../utils/deviceId";
 import { supabase } from "../utils/supabase";
@@ -39,10 +39,15 @@ export default function PostScreen() {
   const [selectedTag, setSelectedTag] = useState(null);
   const [loading, setLoading] = useState(false);
   const [deviceId, setDeviceId] = useState(null);
-  const [step, setStep] = useState('write'); // 'write' | 'zone' | 'tag' | 'success'
+  const [step, setStep] = useState('write'); // 'write' | 'zone' | 'tag' | 'success' | 'poll'
   const [media, setMedia] = useState([]);
   const [isAnonymous, setIsAnonymous] = useState(true);
   const [user, setUser] = useState(null);
+
+  // Poll state
+  const [pollQuestion, setPollQuestion] = useState("");
+  const [pollOptions, setPollOptions] = useState(["", ""]);
+  const [hasPoll, setHasPoll] = useState(false);
 
   useEffect(() => {
     getDeviceId().then(setDeviceId);
@@ -147,138 +152,169 @@ export default function PostScreen() {
 
   const [uploadProgress, setUploadProgress] = useState(0);
 
-    const handlePost = async () => {
-      if (!text || !selectedTag || !deviceId) return;
-      setLoading(true);
-      setUploadProgress(0.05);
+  const handlePost = async () => {
+    if (!text || !selectedTag || !deviceId) return;
+    setLoading(true);
+    setUploadProgress(0.05);
 
-      try {
-        const user = await getStoredUser();
-        
-        // Check if muted
-        const { data: userData } = await supabase
-          .from('rusers')
-          .select('is_muted')
-          .eq('id', user?.id)
+    try {
+      const user = await getStoredUser();
+      
+      // Check if muted
+      const { data: userData } = await supabase
+        .from('rusers')
+        .select('is_muted')
+        .eq('id', user?.id)
+        .single();
+      
+      if (userData?.is_muted) {
+        alert("Your account is muted. You cannot create new posts at this time.");
+        setLoading(false);
+        return;
+      }
+
+      // AI Moderation
+      const moderation = await moderateContent(`${title}\n${text}`);
+      if (moderation.status === 'rejected') {
+        alert(`Your post does not meet community standards: ${moderation.reason}`);
+        setLoading(false);
+        return;
+      }
+
+      // Poll Creation logic
+      let createdPollId = null;
+      if (hasPoll && pollQuestion.trim() && pollOptions.filter(o => o.trim()).length >= 2) {
+        const { data: poll, error: pollError } = await supabase
+          .from('rpolls')
+          .insert({
+            question: pollQuestion.trim(),
+            is_active: true
+          })
+          .select()
           .single();
+
+        if (pollError) throw pollError;
+        createdPollId = poll.id;
+
+        const optionsToInsert = pollOptions
+          .filter(o => o.trim())
+          .map(o => ({
+            poll_id: createdPollId,
+            option_text: o.trim()
+          }));
+
+        const { error: optionsError } = await supabase
+          .from('rpoll_options')
+          .insert(optionsToInsert);
+
+        if (optionsError) throw optionsError;
+      }
+
+      const imageUrls = [];
+      let postMediaType = 'image';
+      let currentIdx = 0;
+      
+      for (const item of media) {
+        setUploadProgress(0.1 + (currentIdx / media.length) * 0.8);
         
-        if (userData?.is_muted) {
-          alert("Your account is muted. You cannot create new posts at this time.");
-          setLoading(false);
-          return;
-        }
-
-        // AI Moderation
-        const moderation = await moderateContent(`${title}\n${text}`);
-        if (moderation.status === 'rejected') {
-          alert(`Your post does not meet community standards: ${moderation.reason}`);
-          setLoading(false);
-          return;
-        }
-
-        const imageUrls = [];
-        let postMediaType = 'image';
-        let currentIdx = 0;
-        
-        for (const item of media) {
-          setUploadProgress(0.1 + (currentIdx / media.length) * 0.8);
-          
-          if (item.fromRemote) {
-            imageUrls.push(item.uri);
-            if (item.type === 'video') postMediaType = 'video';
-            currentIdx++;
-            continue;
-          }
-
+        if (item.fromRemote) {
+          imageUrls.push(item.uri);
           if (item.type === 'video') postMediaType = 'video';
+          currentIdx++;
+          continue;
+        }
 
-          const fileExt = item.uri.split('.').pop()?.toLowerCase() || (item.type === 'video' ? 'mp4' : 'jpg');
-          const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
-          const filePath = `${fileName}`;
+        if (item.type === 'video') postMediaType = 'video';
 
-          const arrayBuffer = await new Promise((resolve, reject) => {
-            const xhr = new XMLHttpRequest();
-            xhr.onload = function () {
-              resolve(xhr.response);
-            };
-            xhr.onerror = function (e) {
-              console.error("XHR Error:", e);
-              reject(new TypeError("Network request failed"));
-            };
-            xhr.responseType = "arraybuffer";
-            xhr.open("GET", item.uri, true);
-            xhr.send(null);
+        const fileExt = item.uri.split('.').pop()?.toLowerCase() || (item.type === 'video' ? 'mp4' : 'jpg');
+        const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
+        const filePath = `${fileName}`;
+
+        const arrayBuffer = await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.onload = function () {
+            resolve(xhr.response);
+          };
+          xhr.onerror = function (e) {
+            console.error("XHR Error:", e);
+            reject(new TypeError("Network request failed"));
+          };
+          xhr.responseType = "arraybuffer";
+          xhr.open("GET", item.uri, true);
+          xhr.send(null);
+        });
+
+        const { error: uploadError } = await supabase.storage
+          .from('posts')
+          .upload(filePath, arrayBuffer, {
+            contentType: item.type === 'video' ? `video/${fileExt}` : `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
+            cacheControl: '3600',
+            upsert: false
           });
 
-          const { error: uploadError } = await supabase.storage
-            .from('posts')
-            .upload(filePath, arrayBuffer, {
-              contentType: item.type === 'video' ? `video/${fileExt}` : `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
-              cacheControl: '3600',
-              upsert: false
-            });
+        if (uploadError) throw uploadError;
 
-          if (uploadError) throw uploadError;
-
-          const { data: publicUrlData } = supabase.storage
-            .from('posts')
-            .getPublicUrl(filePath);
-          
-          imageUrls.push(publicUrlData.publicUrl);
-          currentIdx++;
-        }
-
-        setUploadProgress(0.9);
-
-        const postData = {
-          title: title.trim() || text.substring(0, 50),
-          text: text.trim(),
-          zone_id: selectedZone?.id,
-          tag_id: selectedTag.id,
-          device_id: deviceId,
-          user_id: user?.id,
-          is_anonymous: isAnonymous,
-          image_url: imageUrls.length > 0 ? imageUrls[0] : null,
-          image_urls: imageUrls,
-          media_type: postMediaType,
-          moderation_status: moderation.status,
-          moderation_reason: moderation.reason,
-          updated_at: new Date().toISOString(),
-        };
-
-        let result;
-        if (postId) {
-          result = await supabase
-            .from('rposts')
-            .update(postData)
-            .eq('id', postId);
-        } else {
-          result = await supabase
-            .from('rposts')
-            .insert({
-              ...postData,
-            });
-        }
-
-          if (result.error) throw result.error;
-          setUploadProgress(1);
-          Haptics.notificationAsync(Haptics.ImpactFeedbackStyle.Light);
-          
-          if (moderation.status === 'held') {
-            Alert.alert("Post Under Review", "Your post has been held for manual moderation to ensure community safety. It will appear once approved.");
-          } else {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          }
-          
-          setStep('success');
-
-      } catch (error) {
-        console.error("Error creating post:", error);
-        alert("Failed to post. Please try again.");
-      } finally {
-        setLoading(false);
+        const { data: publicUrlData } = supabase.storage
+          .from('posts')
+          .getPublicUrl(filePath);
+        
+        imageUrls.push(publicUrlData.publicUrl);
+        currentIdx++;
       }
-    };
+
+      setUploadProgress(0.9);
+
+      const postData = {
+        title: title.trim() || text.substring(0, 50),
+        text: text.trim(),
+        zone_id: selectedZone?.id,
+        tag_id: selectedTag.id,
+        device_id: deviceId,
+        user_id: user?.id,
+        is_anonymous: isAnonymous,
+        image_url: imageUrls.length > 0 ? imageUrls[0] : null,
+        image_urls: imageUrls,
+        media_type: postMediaType,
+        poll_id: createdPollId,
+        moderation_status: moderation.status,
+        moderation_reason: moderation.reason,
+        updated_at: new Date().toISOString(),
+      };
+
+      let result;
+      if (postId) {
+        result = await supabase
+          .from('rposts')
+          .update(postData)
+          .eq('id', postId);
+      } else {
+        result = await supabase
+          .from('rposts')
+          .insert({
+            ...postData,
+          });
+      }
+
+        if (result.error) throw result.error;
+        setUploadProgress(1);
+        Haptics.notificationAsync(Haptics.ImpactFeedbackStyle.Light);
+        
+        if (moderation.status === 'held') {
+          Alert.alert("Post Under Review", "Your post has been held for manual moderation to ensure community safety. It will appear once approved.");
+        } else {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+        
+        setStep('success');
+
+    } catch (error) {
+      console.error("Error creating post:", error);
+      alert("Failed to post. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   if (step === 'success') {
     return (
@@ -390,12 +426,43 @@ export default function PostScreen() {
                 style={styles.titleInput}
               />
 
-              <RichTextEditor
-                value={text}
-                onChange={setText}
-                placeholder="What's happening?"
-                minHeight={350}
-              />
+                <RichTextEditor
+                  value={text}
+                  onChange={setText}
+                  placeholder="What's happening?"
+                  onPollPress={() => setStep('poll')}
+                  minHeight={350}
+                />
+
+                {hasPoll && (
+                  <View style={styles.pollPreview}>
+                    <View style={styles.pollPreviewHeader}>
+                      <BarChart2 size={16} color="#3B82F6" />
+                      <Text style={styles.pollPreviewTitle}>INTEGRATED POLL</Text>
+                      <TouchableOpacity onPress={() => {
+                        setHasPoll(false);
+                        setPollQuestion("");
+                        setPollOptions(["", ""]);
+                      }}>
+                        <Trash2 size={16} color="#EF4444" />
+                      </TouchableOpacity>
+                    </View>
+                    <Text style={styles.pollPreviewQuestion}>{pollQuestion || "No question set"}</Text>
+                    {pollOptions.filter(o => o.trim()).map((opt, i) => (
+                      <View key={i} style={styles.pollPreviewOption}>
+                        <View style={styles.pollPreviewOptionDot} />
+                        <Text style={styles.pollPreviewOptionText}>{opt}</Text>
+                      </View>
+                    ))}
+                    <TouchableOpacity 
+                      style={styles.pollEditButton}
+                      onPress={() => setStep('poll')}
+                    >
+                      <Text style={styles.pollEditButtonText}>EDIT POLL</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
 
               {media.length > 0 && (
                 <View style={styles.mediaContainer}>
@@ -477,7 +544,107 @@ export default function PostScreen() {
           </View>
         )}
 
-        {/* Tag Picker Overlay */}
+          {/* Poll Picker Overlay */}
+          {step === 'poll' && (
+            <View style={[styles.overlay, { paddingTop: insets.top }]}>
+              <View style={styles.overlayHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <BarChart2 size={24} color="#3B82F6" />
+                  <Text style={styles.overlayTitle}>CREATE POLL</Text>
+                </View>
+                <TouchableOpacity onPress={() => setStep('write')}>
+                  <X size={24} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+              
+              <ScrollView 
+                style={{ flex: 1, padding: 25 }}
+                keyboardShouldPersistTaps="handled"
+              >
+                <Text style={styles.pollLabel}>POLL QUESTION</Text>
+                <TextInput
+                  style={styles.pollInput}
+                  placeholder="What do you want to ask?"
+                  placeholderTextColor="rgba(255,255,255,0.3)"
+                  value={pollQuestion}
+                  onChangeText={setPollQuestion}
+                  multiline
+                  maxLength={100}
+                />
+
+                <Text style={styles.pollLabel}>OPTIONS (MIN 2)</Text>
+                {pollOptions.map((opt, idx) => (
+                  <View key={idx} style={styles.pollOptionWrapper}>
+                    <TextInput
+                      style={styles.pollOptionInput}
+                      placeholder={`Option ${idx + 1}`}
+                      placeholderTextColor="rgba(255,255,255,0.3)"
+                      value={opt}
+                      onChangeText={(text) => {
+                        const newOpts = [...pollOptions];
+                        newOpts[idx] = text;
+                        setPollOptions(newOpts);
+                      }}
+                      maxLength={50}
+                    />
+                    {pollOptions.length > 2 && (
+                      <TouchableOpacity 
+                        onPress={() => {
+                          const newOpts = [...pollOptions];
+                          newOpts.splice(idx, 1);
+                          setPollOptions(newOpts);
+                        }}
+                        style={styles.removeOptionBtn}
+                      >
+                        <Minus size={16} color="#EF4444" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))}
+
+                {pollOptions.length < 5 && (
+                  <TouchableOpacity 
+                    style={styles.addPollOptionBtn} 
+                    onPress={() => setPollOptions([...pollOptions, ''])}
+                  >
+                    <Plus size={16} color="#4ADE80" />
+                    <Text style={styles.addPollOptionText}>ADD OPTION</Text>
+                  </TouchableOpacity>
+                )}
+
+                <TouchableOpacity 
+                  style={[
+                    styles.savePollBtn, 
+                    (!pollQuestion.trim() || pollOptions.filter(o => o.trim()).length < 2) && { opacity: 0.5 }
+                  ]}
+                  onPress={() => {
+                    if (pollQuestion.trim() && pollOptions.filter(o => o.trim()).length >= 2) {
+                      setHasPoll(true);
+                      setStep('write');
+                    }
+                  }}
+                  disabled={!pollQuestion.trim() || pollOptions.filter(o => o.trim()).length < 2}
+                >
+                  <Text style={styles.savePollBtnText}>ATTACH TO POST</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.cancelPollBtn}
+                  onPress={() => {
+                    setHasPoll(false);
+                    setPollQuestion("");
+                    setPollOptions(["", ""]);
+                    setStep('write');
+                  }}
+                >
+                  <Text style={styles.cancelPollBtnText}>REMOVE POLL</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          )}
+
+          {/* Tag Picker Overlay */}
+
         {step === 'tag' && (
           <View style={[styles.overlay, { paddingTop: insets.top }]}>
             <View style={styles.overlayHeader}>
@@ -722,7 +889,144 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 1,
   },
-  overlayItemActive: {
-    color: '#FFFFFF',
-  },
-});
+    overlayItemActive: {
+      color: '#FFFFFF',
+    },
+    pollPreview: {
+      backgroundColor: 'rgba(59, 130, 246, 0.05)',
+      borderRadius: 20,
+      padding: 20,
+      marginTop: 20,
+      borderWidth: 1,
+      borderColor: 'rgba(59, 130, 246, 0.2)',
+    },
+    pollPreviewHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 15,
+      gap: 10,
+    },
+    pollPreviewTitle: {
+      color: '#3B82F6',
+      fontSize: 10,
+      fontWeight: '900',
+      letterSpacing: 2,
+      flex: 1,
+    },
+    pollPreviewQuestion: {
+      color: '#FFFFFF',
+      fontSize: 18,
+      fontWeight: '800',
+      marginBottom: 15,
+    },
+    pollPreviewOption: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 8,
+      backgroundColor: 'rgba(255,255,255,0.03)',
+      padding: 12,
+      borderRadius: 12,
+    },
+    pollPreviewOptionDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: 'rgba(255,255,255,0.2)',
+      marginRight: 12,
+    },
+    pollPreviewOptionText: {
+      color: 'rgba(255,255,255,0.6)',
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    pollEditButton: {
+      marginTop: 10,
+      alignSelf: 'flex-start',
+    },
+    pollEditButtonText: {
+      color: '#3B82F6',
+      fontSize: 11,
+      fontWeight: '900',
+      letterSpacing: 1,
+    },
+    pollLabel: {
+      color: 'rgba(255,255,255,0.4)',
+      fontSize: 10,
+      fontWeight: '900',
+      letterSpacing: 1,
+      marginBottom: 10,
+      marginTop: 20,
+    },
+    pollInput: {
+      backgroundColor: 'rgba(255,255,255,0.05)',
+      borderRadius: 12,
+      padding: 15,
+      color: '#FFFFFF',
+      fontSize: 16,
+      minHeight: 80,
+      textAlignVertical: 'top',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.1)',
+    },
+    pollOptionWrapper: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 10,
+      gap: 10,
+    },
+    pollOptionInput: {
+      flex: 1,
+      backgroundColor: 'rgba(255,255,255,0.05)',
+      borderRadius: 12,
+      padding: 15,
+      color: '#FFFFFF',
+      fontSize: 15,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.1)',
+    },
+    removeOptionBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: 'rgba(239, 68, 68, 0.1)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    addPollOptionBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingVertical: 15,
+    },
+    addPollOptionText: {
+      color: '#4ADE80',
+      fontSize: 12,
+      fontWeight: '900',
+      letterSpacing: 1,
+    },
+    savePollBtn: {
+      backgroundColor: '#3B82F6',
+      paddingVertical: 18,
+      borderRadius: 16,
+      alignItems: 'center',
+      marginTop: 30,
+    },
+    savePollBtnText: {
+      color: '#FFFFFF',
+      fontSize: 14,
+      fontWeight: '900',
+      letterSpacing: 2,
+    },
+    cancelPollBtn: {
+      paddingVertical: 18,
+      alignItems: 'center',
+      marginTop: 10,
+    },
+    cancelPollBtnText: {
+      color: 'rgba(255,255,255,0.4)',
+      fontSize: 12,
+      fontWeight: '800',
+      letterSpacing: 1,
+    },
+  });
+
