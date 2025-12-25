@@ -355,16 +355,6 @@ export default function ZoneFeed({ zoneSlug, zoneName }) {
   );
 }
 
-function getTimeAgo(date) {
-  const seconds = Math.floor((new Date() - date) / 1000);
-
-  if (seconds < 60) return "just now";
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
-  return `${Math.floor(seconds / 604800)}w ago`;
-}
-
 function getTagColor(tagName) {
   const colors = {
     General: "#94A3B8",
@@ -380,27 +370,3 @@ function getTagColor(tagName) {
   return colors[tagName] || "#94A3B8";
 }
 
-function getTimeAgo(date) {
-  const seconds = Math.floor((new Date() - date) / 1000);
-
-  if (seconds < 60) return "just now";
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
-  return `${Math.floor(seconds / 604800)}w ago`;
-}
-
-function getTagColor(tagName) {
-  const colors = {
-    General: "#94A3B8",
-    Traffic: "#F59E0B",
-    "Lost & Found": "#8B5CF6",
-    Complaint: "#EF4444",
-    Incident: "#DC2626",
-    Warning: "#EA580C",
-    Event: "#06B6D4",
-    "Shop / Business": "#10B981",
-    Question: "#60A5FA",
-  };
-  return colors[tagName] || "#94A3B8";
-}
