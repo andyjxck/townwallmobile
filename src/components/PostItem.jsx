@@ -38,16 +38,17 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import { getStoredUser } from "../utils/user";
 import { TextInput } from "react-native-gesture-handler";
 
-export default function PostItem({ item, deviceId, onReaction, onComment, onDelete, onMute, onShare, onEdit, user }) {
-  const [showComments, setShowComments] = useState(false);
-  const [revealed, setRevealed] = useState(false);
-  const [showFullImage, setShowFullImage] = useState(false);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [commentText, setCommentText] = useState("");
-  const [comments, setComments] = useState([]);
-  const [loadingComments, setLoadingComments] = useState(false);
-  const [isSaved, setIsSaved] = useState(false);
-  const flatListRef = useRef(null);
+  export default function PostItem({ item, deviceId, onReaction, onComment, onDelete, onMute, onShare, onEdit, user }) {
+    const [showComments, setShowComments] = useState(false);
+    const [revealed, setRevealed] = useState(false);
+    const [showFullImage, setShowFullImage] = useState(false);
+    const [currentImageIndex, setCurrentImageIndex] = useState(0);
+    const [commentText, setCommentText] = useState("");
+    const [comments, setComments] = useState([]);
+    const [loadingComments, setLoadingComments] = useState(false);
+    const [isSaved, setIsSaved] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(false);
+    const flatListRef = useRef(null);
 
   const isVideo = item.media_type === 'video' || (item.image_url && (item.image_url.endsWith('.mp4') || item.image_url.endsWith('.mov')));
   
@@ -263,13 +264,22 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
                 </View>
               </View>
 
-              <Text style={[styles.postTitle, { color: '#FFFFFF', opacity: shouldBlur ? 0.6 : 1 }]}>
-                {item.title || "Untitled Post"}
-              </Text>
-              
-              <Text style={[styles.postBody, { color: 'rgba(255, 255, 255, 0.8)', marginTop: 8 }]} numberOfLines={3}>
-                {item.text}
-              </Text>
+              <TouchableOpacity 
+                onPress={() => setIsExpanded(!isExpanded)} 
+                activeOpacity={0.7}
+                style={{ flex: 1 }}
+              >
+                <Text style={[styles.postTitle, { color: '#FFFFFF', opacity: shouldBlur ? 0.6 : 1 }]}>
+                  {item.title || "Untitled Post"}
+                </Text>
+                
+                <Text 
+                  style={[styles.postBody, { color: 'rgba(255, 255, 255, 0.8)', marginTop: 8 }]} 
+                  numberOfLines={isExpanded ? undefined : 3}
+                >
+                  {item.text}
+                </Text>
+              </TouchableOpacity>
             </View>
 
             <View style={{ alignItems: 'flex-end', gap: 8 }}>

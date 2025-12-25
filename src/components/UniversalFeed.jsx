@@ -61,26 +61,26 @@ import { BannerAd } from "@/components/BannerAd";
 import { NativeAd } from "@/components/NativeAd";
 import PostItem from "./PostItem";
 
-function SkeletonPost() {
-  return (
-    <View style={styles.skeletonContainer}>
-      <View style={{ flexDirection: 'row', gap: 12 }}>
-        <View style={{ flex: 1 }}>
-          <View style={[styles.postHeader, { gap: 8 }]}>
-            <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.1)' }} />
-            <View style={{ height: 12, width: 100, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 4 }} />
+  export default function UniversalFeed() {
+    function SkeletonPost() {
+      return (
+        <View style={styles.skeletonContainer}>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <View style={{ flex: 1 }}>
+              <View style={[styles.postHeader, { gap: 8 }]}>
+                <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.1)' }} />
+                <View style={{ height: 12, width: 100, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 4 }} />
+              </View>
+              <View style={{ height: 20, width: '80%', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 4, marginTop: 8 }} />
+              <View style={{ height: 20, width: '60%', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 4, marginTop: 4 }} />
+            </View>
+            <View style={{ width: 80, height: 80, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.1)' }} />
           </View>
-          <View style={{ height: 20, width: '80%', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 4, marginTop: 8 }} />
-          <View style={{ height: 20, width: '60%', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 4, marginTop: 4 }} />
         </View>
-        <View style={{ width: 80, height: 80, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.1)' }} />
-      </View>
-    </View>
-  );
-}
+      );
+    }
 
-export default function UniversalFeed() {
-  const insets = useSafeAreaInsets();
+    const insets = useSafeAreaInsets();
   const router = useRouter();
   const { colors } = useTheme();
   const [posts, setPosts] = useState([]);
