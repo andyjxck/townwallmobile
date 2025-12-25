@@ -14,7 +14,7 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { X, ChevronRight, Image as ImageIcon, Trash2, Shield, User } from "lucide-react-native";
+import { X, ChevronRight, Image as ImageIcon, Trash2, Shield, User, Play } from "lucide-react-native";
 import { getStoredUser } from "../utils/user";
 import { getDeviceId } from "../utils/deviceId";
 import { supabase } from "../utils/supabase";
@@ -39,7 +39,7 @@ export default function PostScreen() {
   const [loading, setLoading] = useState(false);
   const [deviceId, setDeviceId] = useState(null);
   const [step, setStep] = useState('write'); // 'write' | 'zone' | 'tag' | 'success'
-  const [images, setImages] = useState([]);
+  const [media, setMedia] = useState([]);
   const [isAnonymous, setIsAnonymous] = useState(true);
   const [user, setUser] = useState(null);
 
@@ -78,9 +78,17 @@ export default function PostScreen() {
         setText(data.text || "");
         setIsAnonymous(data.is_anonymous);
         if (data.image_urls) {
-          setImages(data.image_urls.map(url => ({ uri: url, fromRemote: true })));
+          setMedia(data.image_urls.map(url => ({ 
+            uri: url, 
+            fromRemote: true, 
+            type: data.media_type || 'image' 
+          })));
         } else if (data.image_url) {
-          setImages([{ uri: data.image_url, fromRemote: true }]);
+          setMedia([{ 
+            uri: data.image_url, 
+            fromRemote: true, 
+            type: data.media_type || 'image' 
+          }]);
         }
         
         // Match zone and tag after they are fetched in fetchData
@@ -117,22 +125,22 @@ export default function PostScreen() {
     }
   };
 
-  const pickImage = async () => {
+  const pickMedia = async () => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
+        mediaTypes: ['images', 'videos'],
         allowsMultipleSelection: true,
         quality: 0.8,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setImages([...images, ...result.assets]);
+        setMedia([...media, ...result.assets]);
       }
     } catch (error) {
       console.error("ImagePicker Error:", error);
-      alert("Could not open image library.");
+      alert("Could not open media library.");
     }
   };
 
@@ -168,18 +176,22 @@ export default function PostScreen() {
         }
 
         const imageUrls = [];
+        let postMediaType = 'image';
         let currentIdx = 0;
         
-        for (const img of images) {
-          setUploadProgress(0.1 + (currentIdx / images.length) * 0.8);
+        for (const item of media) {
+          setUploadProgress(0.1 + (currentIdx / media.length) * 0.8);
           
-          if (img.fromRemote) {
-            imageUrls.push(img.uri);
+          if (item.fromRemote) {
+            imageUrls.push(item.uri);
+            if (item.type === 'video') postMediaType = 'video';
             currentIdx++;
             continue;
           }
 
-          const fileExt = img.uri.split('.').pop()?.toLowerCase() || 'jpg';
+          if (item.type === 'video') postMediaType = 'video';
+
+          const fileExt = item.uri.split('.').pop()?.toLowerCase() || (item.type === 'video' ? 'mp4' : 'jpg');
           const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
           const filePath = `${fileName}`;
 
@@ -193,14 +205,14 @@ export default function PostScreen() {
               reject(new TypeError("Network request failed"));
             };
             xhr.responseType = "arraybuffer";
-            xhr.open("GET", img.uri, true);
+            xhr.open("GET", item.uri, true);
             xhr.send(null);
           });
 
           const { error: uploadError } = await supabase.storage
             .from('posts')
             .upload(filePath, arrayBuffer, {
-              contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
+              contentType: item.type === 'video' ? `video/${fileExt}` : `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
               cacheControl: '3600',
               upsert: false
             });
@@ -227,6 +239,7 @@ export default function PostScreen() {
           is_anonymous: isAnonymous,
           image_url: imageUrls.length > 0 ? imageUrls[0] : null,
           image_urls: imageUrls,
+          media_type: postMediaType,
           moderation_status: moderation.status,
           moderation_reason: moderation.reason,
           updated_at: new Date().toISOString(),
@@ -379,14 +392,21 @@ export default function PostScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.imageGrid}
             >
-              {images.map((img, index) => (
+              {media.map((item, index) => (
                 <View key={index} style={styles.imageWrapper}>
-                  <Image source={{ uri: img.uri }} style={styles.previewImage} />
+                  {item.type === 'video' ? (
+                    <View style={[styles.previewImage, { backgroundColor: '#1E293B', justifyContent: 'center', alignItems: 'center' }]}>
+                      <Play size={32} color="rgba(255,255,255,0.2)" fill="rgba(255,255,255,0.1)" />
+                      <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '900', marginTop: 5 }}>VIDEO</Text>
+                    </View>
+                  ) : (
+                    <Image source={{ uri: item.uri }} style={styles.previewImage} />
+                  )}
                   <TouchableOpacity 
                     onPress={() => {
-                      const newImages = [...images];
-                      newImages.splice(index, 1);
-                      setImages(newImages);
+                      const newMedia = [...media];
+                      newMedia.splice(index, 1);
+                      setMedia(newMedia);
                     }}
                     style={styles.removeImageButton}
                   >
@@ -396,11 +416,11 @@ export default function PostScreen() {
               ))}
 
               <TouchableOpacity 
-                onPress={pickImage}
+                onPress={pickMedia}
                 style={styles.addImageButton}
               >
                 <ImageIcon size={24} color="rgba(255,255,255,0.3)" />
-                <Text style={styles.addImageText}>ADD IMAGE</Text>
+                <Text style={styles.addImageText}>ADD MEDIA</Text>
               </TouchableOpacity>
             </ScrollView>
           </ScrollView>

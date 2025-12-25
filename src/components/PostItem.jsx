@@ -9,6 +9,8 @@ import {
   Modal,
   Dimensions,
   Share,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import {
   Heart,
@@ -22,45 +24,98 @@ import {
   User,
   Send,
   Trash2,
-    VolumeX,
-    Pencil,
-  } from "lucide-react-native";
+  VolumeX,
+  Pencil,
+  Bookmark,
+  Play,
+} from "lucide-react-native";
 import { getDeviceId } from "../utils/deviceId";
 import { supabase } from "../utils/supabase";
 import { moderateContent } from "../utils/ai";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { getStoredUser } from "../utils/user";
 import { TextInput } from "react-native-gesture-handler";
 
 export default function PostItem({ item, deviceId, onReaction, onComment, onDelete, onMute, onShare, onEdit, user }) {
-  const [expanded, setExpanded] = useState(false);
+  const [showComments, setShowComments] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [showFullImage, setShowFullImage] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [commentText, setCommentText] = useState("");
   const [comments, setComments] = useState([]);
   const [loadingComments, setLoadingComments] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
   const flatListRef = useRef(null);
 
+  const isVideo = item.media_type === 'video' || (item.image_url && (item.image_url.endsWith('.mp4') || item.image_url.endsWith('.mov')));
+  
+  const videoPlayer = useVideoPlayer(item.image_url, (player) => {
+    player.loop = true;
+  });
+
   useEffect(() => {
-    if (expanded) {
+    if (showComments) {
       fetchComments();
     }
-  }, [expanded]);
+  }, [showComments]);
+
+  useEffect(() => {
+    checkIfSaved();
+  }, [item.id, user?.id]);
+
+  const checkIfSaved = async () => {
+    if (!user?.id) return;
+    const { data } = await supabase
+      .from('rsaved_posts')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('post_id', item.id)
+      .maybeSingle();
+    setIsSaved(!!data);
+  };
+
+  const handleSave = async () => {
+    if (!user?.id) {
+      alert("Please log in to save posts.");
+      return;
+    }
+    
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const originalState = isSaved;
+    setIsSaved(!originalState);
+
+    try {
+      if (originalState) {
+        await supabase
+          .from('rsaved_posts')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('post_id', item.id);
+      } else {
+        await supabase
+          .from('rsaved_posts')
+          .insert({ user_id: user.id, post_id: item.id });
+      }
+    } catch (error) {
+      console.error("Error saving post:", error);
+      setIsSaved(originalState);
+    }
+  };
 
   const fetchComments = async () => {
     setLoadingComments(true);
-      try {
-        const { data } = await supabase
-          .from('rcomments')
-            .select(`
-              *,
-              user:rusers (username, emoji_icon, avatar_url)
-            `)
-          .eq('post_id', item.id)
-          .order('created_at', { ascending: true });
-        setComments(data || []);
+    try {
+      const { data } = await supabase
+        .from('rcomments')
+        .select(`
+          *,
+          user:rusers (username, emoji_icon, avatar_url)
+        `)
+        .eq('post_id', item.id)
+        .order('created_at', { ascending: true });
+      setComments(data || []);
     } catch (error) {
       console.error("Error fetching comments:", error);
     } finally {
@@ -68,59 +123,57 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
     }
   };
 
-    const handleSendComment = async () => {
-      if (!commentText.trim()) return;
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  const handleSendComment = async () => {
+    if (!commentText.trim()) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    try {
+      const storedUser = await getStoredUser();
       
-      try {
-        const user = await getStoredUser();
-        
-        // Check if muted
-        const { data: userData } = await supabase
-          .from('rusers')
-          .select('is_muted')
-          .eq('id', user?.id)
-          .single();
-        
-        if (userData?.is_muted) {
-          alert("Your account is muted. You cannot reply at this time.");
-          return;
-        }
-        
-        // AI Moderation
-        const moderation = await moderateContent(commentText.trim());
-        if (moderation.status === 'rejected') {
-          alert(`Your comment was rejected by our AI moderator: ${moderation.reason}`);
-          return;
-        }
-
-        const { data, error } = await supabase
-          .from('rcomments')
-          .insert({
-            post_id: item.id,
-            user_id: user?.id,
-            text: commentText.trim(),
-            device_id: deviceId,
-            moderation_status: moderation.status,
-            moderation_reason: moderation.reason,
-          })
-          .select(`
-            *,
-            rusers (username, emoji_icon, avatar_url)
-          `)
-          .single();
-        
-        if (error) throw error;
-        setComments([...comments, data]);
-        setCommentText("");
-        if (onComment) onComment(item.id);
-      } catch (error) {
-        console.error("Error sending comment:", error);
+      const { data: userData } = await supabase
+        .from('rusers')
+        .select('is_muted')
+        .eq('id', storedUser?.id)
+        .single();
+      
+      if (userData?.is_muted) {
+        alert("Your account is muted. You cannot reply at this time.");
+        return;
       }
-    };
+      
+      const moderation = await moderateContent(commentText.trim());
+      if (moderation.status === 'rejected') {
+        alert(`Your comment was rejected by our AI moderator: ${moderation.reason}`);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('rcomments')
+        .insert({
+          post_id: item.id,
+          user_id: storedUser?.id,
+          text: commentText.trim(),
+          device_id: deviceId,
+          moderation_status: moderation.status,
+          moderation_reason: moderation.reason,
+        })
+        .select(`
+          *,
+          user:rusers (username, emoji_icon, avatar_url)
+        `)
+        .single();
+      
+      if (error) throw error;
+      setComments([...comments, data]);
+      setCommentText("");
+      if (onComment) onComment(item.id);
+    } catch (error) {
+      console.error("Error sending comment:", error);
+    }
+  };
 
   const images = item.image_urls || (item.image_url ? [item.image_url] : []);
-  const hasMultipleImages = images.length > 1;
+  const hasMultipleImages = images.length > 1 && !isVideo;
 
   useEffect(() => {
     if (showFullImage && flatListRef.current && hasMultipleImages) {
@@ -131,14 +184,14 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
   }, [showFullImage]);
 
   useEffect(() => {
-    if (!hasMultipleImages || showFullImage) return;
+    if (!hasMultipleImages || showFullImage || isVideo) return;
 
     const interval = setInterval(() => {
       setCurrentImageIndex((prev) => (prev + 1) % images.length);
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [hasMultipleImages, images.length, showFullImage]);
+  }, [hasMultipleImages, images.length, showFullImage, isVideo]);
 
   const reactions = item.reactions || item.rreactions || [];
   const helpfulCount = reactions.filter(r => r.reaction_type === 'helpful').length;
@@ -153,14 +206,7 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
 
   const shouldBlur = fakeCount > 5 && fakeCount > (helpfulCount + seenCount);
   const timeAgo = getTimeAgo(new Date(item.created_at));
-  const fullDate = new Date(item.created_at).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-
+  
   return (
     <View style={styles.postContainer}>
       {shouldBlur && !revealed ? (
@@ -180,54 +226,51 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
       ) : (
         <View>
           <View style={{ flexDirection: 'row', gap: 12 }}>
-            <TouchableOpacity
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setExpanded(!expanded);
-              }}
-              activeOpacity={0.8}
-              style={{ flex: 1 }}
-            >
-                  <View style={[styles.postHeader, { gap: 8 }]}>
-                    {!item.is_anonymous && (item.user?.avatar_url || item.user?.emoji_icon) ? (
-                      item.user?.avatar_url ? (
-                        <Image 
-                          source={{ uri: item.user.avatar_url }} 
-                          style={{ width: 24, height: 24, borderRadius: 12 }} 
-                        />
-                      ) : (
-                        <Text style={{ fontSize: 16 }}>{item.user.emoji_icon}</Text>
-                      )
-                    ) : (
-                      <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' }}>
-                        <User size={14} color="rgba(255,255,255,0.4)" />
-                      </View>
-                    )}
-                    
-                    <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <Text style={[styles.zoneText, { color: '#FFFFFF' }]}>
-                          {!item.is_anonymous && item.user?.username ? item.user.username : "Anonymous"}
-                        </Text>
-                        <Text style={[styles.timeText, { color: 'rgba(255, 255, 255, 0.3)' }]}>
-                          · {item.zone?.name}
-                        </Text>
-                        <Text style={[styles.timeText, { color: 'rgba(255, 255, 255, 0.3)' }]}>
-                          · {timeAgo}
-                        </Text>
-                      </View>
-                      {item.tag?.name && (
-                        <Text style={[styles.tagText, { color: 'rgba(255, 255, 255, 0.3)', marginTop: 1 }]}>
-                          #{item.tag.name.replace(/\s+/g, '')}
-                        </Text>
-                      )}
-                    </View>
+            <View style={{ flex: 1 }}>
+              <View style={[styles.postHeader, { gap: 8 }]}>
+                {!item.is_anonymous && (item.user?.avatar_url || item.user?.emoji_icon) ? (
+                  item.user?.avatar_url ? (
+                    <Image 
+                      source={{ uri: item.user.avatar_url }} 
+                      style={{ width: 24, height: 24, borderRadius: 12 }} 
+                    />
+                  ) : (
+                    <Text style={{ fontSize: 16 }}>{item.user.emoji_icon}</Text>
+                  )
+                ) : (
+                  <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' }}>
+                    <User size={14} color="rgba(255,255,255,0.4)" />
                   </View>
+                )}
+                
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={[styles.zoneText, { color: '#FFFFFF' }]}>
+                      {!item.is_anonymous && item.user?.username ? item.user.username : "Anonymous"}
+                    </Text>
+                    <Text style={[styles.timeText, { color: 'rgba(255, 255, 255, 0.3)' }]}>
+                      · {item.zone?.name}
+                    </Text>
+                    <Text style={[styles.timeText, { color: 'rgba(255, 255, 255, 0.3)' }]}>
+                      · {timeAgo}
+                    </Text>
+                  </View>
+                  {item.tag?.name && (
+                    <Text style={[styles.tagText, { color: 'rgba(255, 255, 255, 0.3)', marginTop: 1 }]}>
+                      #{item.tag.name.replace(/\s+/g, '')}
+                    </Text>
+                  )}
+                </View>
+              </View>
 
               <Text style={[styles.postTitle, { color: '#FFFFFF', opacity: shouldBlur ? 0.6 : 1 }]}>
                 {item.title || "Untitled Post"}
               </Text>
-            </TouchableOpacity>
+              
+              <Text style={[styles.postBody, { color: 'rgba(255, 255, 255, 0.8)', marginTop: 8 }]} numberOfLines={3}>
+                {item.text}
+              </Text>
+            </View>
 
             <View style={{ alignItems: 'flex-end', gap: 8 }}>
               {images.length > 0 && (
@@ -239,11 +282,25 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
                   activeOpacity={0.9}
                   style={{ position: 'relative' }}
                 >
-                  <Image
-                    source={{ uri: images[currentImageIndex] }}
-                    style={{ width: 80, height: 80, borderRadius: 8 }}
-                    contentFit="cover"
-                  />
+                  {isVideo ? (
+                    <View style={{ width: 80, height: 110, borderRadius: 8, overflow: 'hidden', backgroundColor: '#000' }}>
+                      <VideoView
+                        player={videoPlayer}
+                        style={{ width: '100%', height: '100%' }}
+                        contentFit="cover"
+                        nativeControls={false}
+                      />
+                      <View style={{ position: 'absolute', top: '50%', left: '50%', transform: [{translateX: -10}, {translateY: -10}], backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 10, padding: 4 }}>
+                        <Play size={12} color="#FFF" fill="#FFF" />
+                      </View>
+                    </View>
+                  ) : (
+                    <Image
+                      source={{ uri: images[currentImageIndex] }}
+                      style={{ width: 80, height: 80, borderRadius: 8 }}
+                      contentFit="cover"
+                    />
+                  )}
                   {hasMultipleImages && (
                     <View style={{
                       position: 'absolute',
@@ -263,151 +320,15 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
               )}
             </View>
           </View>
-
-          {expanded && (
-            <View style={styles.expandedContent}>
-              <Text style={[styles.postBody, { color: 'rgba(255, 255, 255, 0.8)' }]}>
-                {item.text}
-              </Text>
-              
-                <View style={styles.postFooter}>
-                  <Text style={[styles.footerText, { color: 'rgba(255, 255, 255, 0.4)' }]}>
-                    Posted by {!item.is_anonymous && item.user?.username ? item.user.username : "Anonymous"}
-                  </Text>
-                  <Text style={[styles.footerText, { color: 'rgba(255, 255, 255, 0.4)' }]}>
-                    {fullDate}
-                  </Text>
-                </View>
-
-              <View style={styles.commentsSection}>
-                <Text style={styles.commentsHeader}>REPLIES</Text>
-                {loadingComments ? (
-                  <ActivityIndicator size="small" color="rgba(255,255,255,0.2)" />
-                ) : comments.length > 0 ? (
-                  comments.map((c) => (
-                    <View key={c.id} style={styles.commentItem}>
-                      <Text style={styles.commentUser}>
-                        {c.rusers?.emoji_icon} @{c.rusers?.username || "Anon"}
-                      </Text>
-                      <Text style={styles.commentText}>{c.text}</Text>
-                    </View>
-                  ))
-                ) : (
-                  <Text style={styles.noComments}>No replies yet. Be the first!</Text>
-                )}
-
-                <View style={styles.commentInputRow}>
-                  <TextInput
-                    style={styles.commentInput}
-                    placeholder="Write a reply..."
-                    placeholderTextColor="rgba(255,255,255,0.3)"
-                    value={commentText}
-                    onChangeText={setCommentText}
-                    multiline
-                  />
-                  <TouchableOpacity 
-                    style={styles.sendButton} 
-                    onPress={handleSendComment}
-                    disabled={!commentText.trim()}
-                  >
-                    <Send size={18} color={commentText.trim() ? "#FFFFFF" : "rgba(255,255,255,0.2)"} />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          )}
-
-          <Modal visible={showFullImage} transparent animationType="fade">
-            <View style={styles.fullImageContainer}>
-              <TouchableOpacity 
-                style={styles.closeImageButton}
-                onPress={() => setShowFullImage(false)}
-              >
-                <X color="#FFFFFF" size={32} />
-              </TouchableOpacity>
-
-              {hasMultipleImages ? (
-                <>
-                  <FlatList
-                    ref={flatListRef}
-                    data={images}
-                    horizontal
-                    pagingEnabled
-                    showsHorizontalScrollIndicator={false}
-                    onMomentumScrollEnd={(e) => {
-                      const index = Math.round(e.nativeEvent.contentOffset.x / Dimensions.get('window').width);
-                      setCurrentImageIndex(index);
-                    }}
-                    getItemLayout={(_, index) => ({
-                      length: Dimensions.get('window').width,
-                      offset: Dimensions.get('window').width * index,
-                      index,
-                    })}
-                    renderItem={({ item: imgUri }) => (
-                      <View style={{ width: Dimensions.get('window').width, height: '100%', justifyContent: 'center' }}>
-                        <Image
-                          source={{ uri: imgUri }}
-                          style={styles.fullImage}
-                          contentFit="contain"
-                        />
-                      </View>
-                    )}
-                    keyExtractor={(i) => i}
-                  />
-                  
-                  <View style={styles.navOverlay}>
-                    <TouchableOpacity 
-                      style={[styles.navButton, currentImageIndex === 0 && { opacity: 0 }]}
-                      disabled={currentImageIndex === 0}
-                      onPress={() => {
-                        const newIndex = Math.max(0, currentImageIndex - 1);
-                        setCurrentImageIndex(newIndex);
-                        flatListRef.current?.scrollToIndex({ index: newIndex, animated: true });
-                      }}
-                    >
-                      <ChevronLeft color="#FFFFFF" size={40} />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity 
-                      style={[styles.navButton, currentImageIndex === images.length - 1 && { opacity: 0 }]}
-                      disabled={currentImageIndex === images.length - 1}
-                      onPress={() => {
-                        const newIndex = Math.min(images.length - 1, currentImageIndex + 1);
-                        setCurrentImageIndex(newIndex);
-                        flatListRef.current?.scrollToIndex({ index: newIndex, animated: true });
-                      }}
-                    >
-                      <ChevronRight color="#FFFFFF" size={40} />
-                    </TouchableOpacity>
-                  </View>
-
-                  <View style={styles.paginationDots}>
-                    {images.map((_, i) => (
-                      <View 
-                        key={i} 
-                        style={[
-                          styles.dot, 
-                          { backgroundColor: i === currentImageIndex ? '#FFFFFF' : 'rgba(255,255,255,0.3)' }
-                        ]} 
-                      />
-                    ))}
-                  </View>
-                </>
-              ) : (
-                <Image
-                  source={{ uri: images[0] }}
-                  style={styles.fullImage}
-                  contentFit="contain"
-                />
-              )}
-            </View>
-          </Modal>
         </View>
       )}
 
       <View style={styles.actionRow}>
         <TouchableOpacity
-          onPress={() => onReaction(item.id, "helpful", userReactions.helpful)}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            onReaction(item.id, "helpful", userReactions.helpful);
+          }}
           style={styles.actionButton}
         >
           <Heart
@@ -421,31 +342,37 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
         </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={() => onReaction(item.id, "seen", userReactions.seen)}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setShowComments(true);
+          }}
           style={styles.actionButton}
         >
           <Star
             size={18}
-            color={userReactions.seen ? "#F59E0B" : "rgba(255,255,255,0.4)"}
-            fill={userReactions.seen ? "#F59E0B" : "transparent"}
+            color="rgba(255,255,255,0.4)"
           />
-          <Text style={[styles.actionCount, { color: userReactions.seen ? "#F59E0B" : "rgba(255,255,255,0.4)" }]}>
-            {seenCount || 0}
+          <Text style={[styles.actionCount, { color: "rgba(255,255,255,0.4)" }]}>
+            REPLY
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={() => onReaction(item.id, "fake", userReactions.fake)}
+          onPress={handleSave}
           style={styles.actionButton}
         >
-          <Flag
+          <Bookmark
             size={18}
-            color={userReactions.fake ? "#EF4444" : "rgba(255,255,255,0.4)"}
-            fill={userReactions.fake ? "#EF4444" : "transparent"}
+            color={isSaved ? "#3B82F6" : "rgba(255,255,255,0.4)"}
+            fill={isSaved ? "#3B82F6" : "transparent"}
           />
-          <Text style={[styles.actionCount, { color: userReactions.fake ? "#EF4444" : "rgba(255,255,255,0.4)" }]}>
-            {fakeCount || 0}
-          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => onShare(item)}
+          style={styles.actionButton}
+        >
+          <ShareIcon size={18} color="rgba(255,255,255,0.4)" />
         </TouchableOpacity>
 
         {(user?.id === item.user_id || user?.is_admin || user?.is_moderator) && (
@@ -456,44 +383,320 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
             }}
             style={styles.actionButton}
           >
-            <Trash2 size={18} color={user?.id === item.user_id ? "rgba(239, 68, 68, 0.4)" : "#EF4444"} />
+            <Trash2 size={18} color="rgba(239, 68, 68, 0.4)" />
           </TouchableOpacity>
         )}
-
-        {user?.id === item.user_id && (
-          <TouchableOpacity
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              onEdit(item);
-            }}
-            style={styles.actionButton}
-          >
-            <Pencil size={18} color="rgba(255,255,255,0.4)" />
-          </TouchableOpacity>
-        )}
-
-        {(user?.is_admin || user?.is_moderator) && user?.id !== item.user_id && (
-          <TouchableOpacity
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              onMute(item.user_id);
-            }}
-            style={styles.actionButton}
-          >
-            <VolumeX size={18} color="#F59E0B" />
-          </TouchableOpacity>
-        )}
-
-        <TouchableOpacity
-          onPress={() => onShare(item)}
-          style={styles.actionButton}
-        >
-          <ShareIcon size={18} color="rgba(255,255,255,0.4)" />
-        </TouchableOpacity>
       </View>
+
+      {/* Full Screen Image/Video Modal */}
+      <Modal visible={showFullImage} transparent animationType="fade">
+        <View style={styles.fullImageContainer}>
+          <TouchableOpacity 
+            style={styles.closeImageButton}
+            onPress={() => setShowFullImage(false)}
+          >
+            <X color="#FFFFFF" size={32} />
+          </TouchableOpacity>
+
+          {isVideo ? (
+            <VideoView
+              player={videoPlayer}
+              style={{ width: '100%', height: '80%' }}
+              contentFit="contain"
+              nativeControls
+            />
+          ) : hasMultipleImages ? (
+            <>
+              <FlatList
+                ref={flatListRef}
+                data={images}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                onMomentumScrollEnd={(e) => {
+                  const index = Math.round(e.nativeEvent.contentOffset.x / Dimensions.get('window').width);
+                  setCurrentImageIndex(index);
+                }}
+                getItemLayout={(_, index) => ({
+                  length: Dimensions.get('window').width,
+                  offset: Dimensions.get('window').width * index,
+                  index,
+                })}
+                renderItem={({ item: imgUri }) => (
+                  <View style={{ width: Dimensions.get('window').width, height: '100%', justifyContent: 'center' }}>
+                    <Image
+                      source={{ uri: imgUri }}
+                      style={styles.fullImage}
+                      contentFit="contain"
+                    />
+                  </View>
+                )}
+                keyExtractor={(i) => i}
+              />
+              <View style={styles.paginationDots}>
+                {images.map((_, i) => (
+                  <View 
+                    key={i} 
+                    style={[
+                      styles.dot, 
+                      { backgroundColor: i === currentImageIndex ? '#FFFFFF' : 'rgba(255,255,255,0.3)' }
+                    ]} 
+                  />
+                ))}
+              </View>
+            </>
+          ) : (
+            <Image
+              source={{ uri: images[0] }}
+              style={styles.fullImage}
+              contentFit="contain"
+            />
+          )}
+        </View>
+      </Modal>
+
+      {/* Comments / Replies Modal */}
+      <Modal visible={showComments} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={styles.commentsModal}
+          >
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHandle} />
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', paddingHorizontal: 20 }}>
+                <Text style={styles.modalTitle}>REPLIES</Text>
+                <TouchableOpacity onPress={() => setShowComments(false)}>
+                  <X size={24} color="#FFF" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <FlatList
+              data={comments}
+              keyExtractor={(item) => item.id.toString()}
+              contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
+              ListHeaderComponent={() => (
+                <View style={{ marginBottom: 20, paddingBottom: 20, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)' }}>
+                  <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '700' }}>{item.title}</Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.7)', marginTop: 8 }}>{item.text}</Text>
+                </View>
+              )}
+              renderItem={({ item: c }) => (
+                <View style={styles.commentItem}>
+                  <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                    <Text style={{ fontSize: 16 }}>{c.user?.emoji_icon || "👤"}</Text>
+                    <Text style={styles.commentUser}>@{c.user?.username || "Anon"}</Text>
+                  </View>
+                  <Text style={styles.commentText}>{c.text}</Text>
+                </View>
+              )}
+              ListEmptyComponent={() => (
+                loadingComments ? (
+                  <ActivityIndicator color="#FFF" />
+                ) : (
+                  <Text style={styles.noComments}>No replies yet. Be the first!</Text>
+                )
+              )}
+            />
+
+            <View style={styles.modalInputContainer}>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Write a reply..."
+                placeholderTextColor="rgba(255,255,255,0.3)"
+                value={commentText}
+                onChangeText={setCommentText}
+                multiline
+              />
+              <TouchableOpacity 
+                style={styles.modalSendButton} 
+                onPress={handleSendComment}
+                disabled={!commentText.trim()}
+              >
+                <Send size={20} color={commentText.trim() ? "#FFF" : "rgba(255,255,255,0.2)"} />
+              </TouchableOpacity>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
     </View>
   );
 }
+
+function getTimeAgo(date) {
+  const seconds = Math.floor((new Date() - date) / 1000);
+  if (seconds < 60) return "NOW";
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}M`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}H`;
+  return `${Math.floor(seconds / 86400)}D`;
+}
+
+const styles = StyleSheet.create({
+  postContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    marginBottom: 1,
+    position: 'relative',
+  },
+  postHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  zoneText: {
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  timeText: {
+    fontSize: 11,
+    marginLeft: 4,
+  },
+  tagText: {
+    fontSize: 11,
+    marginLeft: 4,
+  },
+  postTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    lineHeight: 24,
+  },
+  postBody: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  actionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 20,
+    marginTop: 16,
+  },
+  actionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  actionCount: {
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  blurBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(239, 68, 68, 0.08)",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "rgba(239, 68, 68, 0.2)",
+    marginBottom: 8,
+    gap: 10,
+  },
+  blurText: {
+    color: "#EF4444",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  commentItem: {
+    marginBottom: 16,
+  },
+  commentUser: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  commentText: {
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 4,
+  },
+  noComments: {
+    color: "rgba(255,255,255,0.2)",
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 20,
+  },
+  fullImageContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeImageButton: {
+    position: 'absolute',
+    top: 50,
+    right: 25,
+    zIndex: 10,
+    padding: 10,
+  },
+  fullImage: {
+    width: '100%',
+    height: '100%',
+  },
+  paginationDots: {
+    position: 'absolute',
+    bottom: 60,
+    flexDirection: 'row',
+    gap: 8,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'flex-end',
+  },
+  commentsModal: {
+    backgroundColor: '#0F172A',
+    height: '80%',
+    borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+  },
+  modalHeader: {
+    alignItems: 'center',
+    paddingTop: 10,
+    paddingBottom: 20,
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 2,
+    marginBottom: 15,
+  },
+  modalTitle: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 2,
+  },
+  modalInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 15,
+    backgroundColor: '#1E293B',
+    marginHorizontal: 20,
+    borderRadius: 15,
+    gap: 12,
+  },
+  modalInput: {
+    flex: 1,
+    color: '#FFF',
+    fontSize: 15,
+    maxHeight: 100,
+  },
+  modalSendButton: {
+    padding: 5,
+  },
+});
+
 
 function getTimeAgo(date) {
   const seconds = Math.floor((new Date() - date) / 1000);

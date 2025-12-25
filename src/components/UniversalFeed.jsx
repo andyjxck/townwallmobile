@@ -90,44 +90,92 @@ export default function UniversalFeed() {
   const [deviceId, setDeviceId] = useState(null);
   
   const [selectedZone, setSelectedZone] = useState(null);
-  const [selectedTag, setSelectedTag] = useState(null);
-  const [sortBy, setSortBy] = useState('newest');
+    const [selectedTag, setSelectedTag] = useState(null);
+    const [sortBy, setSortBy] = useState('newest');
+    const [searchQuery, setSearchQuery] = useState("");
+    const [showSearch, setShowSearch] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
     const [showZones, setShowZones] = useState(false);
     const [showTags, setShowTags] = useState(false);
     const [isModerator, setIsModerator] = useState(false);
-  const user = useAuthStore(state => state.auth);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const shareRef = useRef();
+    const user = useAuthStore(state => state.auth);
+    const [showNotifications, setShowNotifications] = useState(false);
+    const [unreadCount, setUnreadCount] = useState(0);
+    const shareRef = useRef();
 
-  useEffect(() => {
-    getDeviceId().then(setDeviceId);
-    fetchFilterData();
-    checkModerator();
-    loadUnreadCount();
+    useEffect(() => {
+      const delayDebounceFn = setTimeout(() => {
+        if (showSearch) fetchPosts();
+      }, 500);
 
-    // Subscribe to new notifications for the current user
-    const setupNotificationSubscription = async () => {
-      if (!user) return;
+      return () => clearTimeout(delayDebounceFn);
+    }, [searchQuery]);
 
-      const subscription = supabase
-        .channel(`notifications_${user.id}`)
-        .on('postgres_changes', 
-          { 
-            event: 'INSERT', 
-            schema: 'public', 
-            table: 'rnotifications',
-            filter: `user_id=eq.${user.id}`
-          }, 
-          () => {
-            loadUnreadCount();
-          }
-        )
-        .subscribe();
+  const fetchPosts = async (isRefreshing = false) => {
+    if (!isRefreshing) setLoading(true);
+    setLastError(null);
 
-      return subscription;
-    };
+    try {
+      let query = supabase
+        .from("rposts")
+        .select(`
+          id,
+          title,
+          text,
+          created_at,
+          user_id,
+          zone_id,
+          tag_id,
+          image_url,
+          image_urls,
+          media_type,
+          is_anonymous,
+          moderation_status,
+          is_deleted,
+          user:rusers (username, emoji_icon, avatar_url),
+          zone:rzones (name),
+          tag:rtags (name),
+          reactions:rreactions (reaction_type, device_id)
+        `)
+        .eq("is_deleted", false)
+        .eq("moderation_status", "approved");
+
+      if (selectedZone !== null && selectedZone !== undefined) query = query.eq("zone_id", selectedZone);
+      if (selectedTag !== null && selectedTag !== undefined) query = query.eq("tag_id", selectedTag);
+      
+      if (searchQuery.trim()) {
+        query = query.or(`title.ilike.%${searchQuery}%,text.ilike.%${searchQuery}%`);
+      }
+
+      if (sortBy === 'popular') {
+        // In a real app, you'd sort by reaction count. 
+        // For simplicity, we'll just keep newest for now or use a different logic if available.
+        query = query.order("created_at", { ascending: false });
+      } else if (sortBy === 'oldest') {
+        query = query.order("created_at", { ascending: true });
+      } else {
+        query = query.order("created_at", { ascending: false });
+      }
+
+      const { data, error } = await query.limit(50);
+
+      if (error) {
+        setLastError(error.message);
+        setPosts([]);
+        return;
+      }
+
+      setPosts(data || []);
+      setLastError(null);
+    } catch (err) {
+      console.error("Fetch catch:", err);
+      setLastError(err?.message || "Unknown error");
+      setPosts([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
     let sub;
     setupNotificationSubscription().then(s => sub = s);
@@ -445,17 +493,30 @@ const fetchPosts = async (isRefreshing = false) => {
                 >
                   <LayoutGrid size={22} color={showZones ? "#FFFFFF" : "rgba(255,255,255,0.4)"} />
                 </TouchableOpacity>
-                <TouchableOpacity 
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setShowTags(!showTags);
-                    setShowZones(false);
-                  }}
-                  style={{ padding: 4 }}
-                >
-                  <Hash size={22} color={showTags ? "#FFFFFF" : "rgba(255,255,255,0.4)"} />
-                </TouchableOpacity>
-              </View>
+                  <TouchableOpacity 
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setShowTags(!showTags);
+                      setShowZones(false);
+                    }}
+                    style={{ padding: 4 }}
+                  >
+                    <Hash size={22} color={showTags ? "#FFFFFF" : "rgba(255,255,255,0.4)"} />
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setShowSearch(!showSearch);
+                      if (!showSearch) {
+                        setShowZones(false);
+                        setShowTags(false);
+                      }
+                    }}
+                    style={{ padding: 4 }}
+                  >
+                    <Search size={22} color={showSearch ? "#FFFFFF" : "rgba(255,255,255,0.4)"} />
+                  </TouchableOpacity>
+                </View>
                 <View style={styles.headerActions}>
                   <TouchableOpacity 
                     onPress={() => {
@@ -553,8 +614,24 @@ const fetchPosts = async (isRefreshing = false) => {
             </View>
           )}
 
-          <View style={styles.filterSection}>
-            {showZones && (
+            <View style={styles.filterSection}>
+              {showSearch && (
+                <View style={styles.searchContainer}>
+                  <TextInput
+                    style={styles.searchInput}
+                    placeholder="Search posts..."
+                    placeholderTextColor="rgba(255,255,255,0.3)"
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                    autoFocus
+                  />
+                  <TouchableOpacity onPress={() => { setSearchQuery(""); setShowSearch(false); fetchPosts(); }}>
+                    <X size={20} color="rgba(255,255,255,0.4)" />
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {showZones && (
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <FlatList
                   horizontal
@@ -817,9 +894,26 @@ const fetchPosts = async (isRefreshing = false) => {
       fontWeight: '900',
     },
     filterSection: {
-    paddingBottom: 10,
-  },
-  filterList: {
+      paddingBottom: 10,
+    },
+    searchContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(255,255,255,0.05)',
+      marginHorizontal: 20,
+      marginBottom: 10,
+      paddingHorizontal: 15,
+      paddingVertical: 10,
+      borderRadius: 12,
+      gap: 10,
+    },
+    searchInput: {
+      flex: 1,
+      color: '#FFFFFF',
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    filterList: {
     paddingHorizontal: 20,
     gap: 15,
   },

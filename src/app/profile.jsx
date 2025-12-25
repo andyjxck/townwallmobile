@@ -56,167 +56,198 @@ export default function Profile() {
   const [friends, setFriends] = useState([]);
   const [personalFeed, setPersonalFeed] = useState([]);
   const [addingFriend, setAddingFriend] = useState(false);
-  const [userPosts, setUserPosts] = useState([]);
-  const [friendsPosts, setFriendsPosts] = useState([]);
-  const [pendingRequests, setPendingRequests] = useState([]);
-  const [activeTab, setActiveTab] = useState("posts"); // posts, friends, replies
-  const [deviceId, setDeviceId] = useState(null);
-  const shareRef = useRef();
+    const [userPosts, setUserPosts] = useState([]);
+    const [savedPosts, setSavedPosts] = useState([]);
+    const [friendsPosts, setFriendsPosts] = useState([]);
+    const [pendingRequests, setPendingRequests] = useState([]);
+    const [activeTab, setActiveTab] = useState("posts"); // posts, friends, replies, saved
+    const [deviceId, setDeviceId] = useState(null);
+    const shareRef = useRef();
 
-  useEffect(() => {
-    getDeviceId().then(setDeviceId);
-    loadData();
-  }, []);
+    useEffect(() => {
+      getDeviceId().then(setDeviceId);
+      loadData();
+    }, []);
 
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      let userData = await getStoredUser();
-      
-      if (userData?.id) {
-        const { data: freshUser, error } = await supabase
-          .from('rusers')
-          .select('*')
-          .eq('id', userData.id)
-          .single();
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        let userData = await getStoredUser();
         
-        if (freshUser && !error) {
-          userData = freshUser;
-          await AsyncStorage.setItem("@redditch_user_data", JSON.stringify(freshUser));
+        if (userData?.id) {
+          const { data: freshUser, error } = await supabase
+            .from('rusers')
+            .select('*')
+            .eq('id', userData.id)
+            .single();
+          
+          if (freshUser && !error) {
+            userData = freshUser;
+            await AsyncStorage.setItem("@redditch_user_data", JSON.stringify(freshUser));
+          }
         }
-      }
 
-      if (!userData) {
-        userData = await initUser();
-      }
-      
-      setUser(userData);
+        if (!userData) {
+          userData = await initUser();
+        }
+        
+        setUser(userData);
 
-        if (userData) {
-          // Fetch stats
-          const { count: postCount } = await supabase
+          if (userData) {
+            // Fetch stats
+            const { count: postCount } = await supabase
+              .from('rposts')
+              .select('*', { count: 'exact', head: true })
+              .eq('user_id', userData.id);
+            
+            const { count: reactionCount } = await supabase
+              .from('rreactions')
+              .select('*, rposts!inner(user_id)', { count: 'exact', head: true })
+              .eq('rposts.user_id', userData.id);
+            
+            setStats({ 
+              posts: postCount || 0,
+              reactions: reactionCount || 0,
+              joined: new Date(userData.created_at).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
+            });
+
+            // Fetch Saved Posts
+            const { data: savedData } = await supabase
+              .from('rsaved_posts')
+              .select(`
+                post:post_id (
+                  id, 
+                  title, 
+                  text, 
+                  created_at, 
+                  user_id, 
+                  zone_id, 
+                  tag_id, 
+                  image_url, 
+                  image_urls, 
+                  media_type,
+                  is_anonymous, 
+                  moderation_status,
+                  is_deleted,
+                  user:rusers!user_id (username, emoji_icon, avatar_url),
+                  zone:rzones!zone_id (name),
+                  tag:rtags!tag_id (name),
+                  reactions:rreactions (reaction_type, device_id)
+                )
+              `)
+              .eq('user_id', userData.id);
+            
+            setSavedPosts(savedData?.map(s => s.post).filter(p => p && !p.is_deleted) || []);
+
+            // Fetch Pending Requests (where current user is the friend_id)
+            const { data: requestsData } = await supabase
+              .from('friends')
+              .select('id, user_id, rusers!friends_user_id_fkey(id, username, emoji_icon, avatar_url)')
+              .eq('friend_id', userData.id)
+              .eq('status', 'pending');
+            
+            setPendingRequests(requestsData?.map(r => ({ ...r.rusers, requestId: r.id })) || []);
+
+            // Fetch Friends
+            const { data: friendData } = await supabase
+              .from('friends')
+              .select('friend_id, rusers!friends_friend_id_fkey(id, username, emoji_icon, avatar_url)')
+              .eq('user_id', userData.id)
+              .eq('status', 'accepted');
+            
+            const friendsList = friendData?.map(f => f.rusers) || [];
+            setFriends(friendsList);
+            const friendIds = friendsList.map(f => f.id);
+
+              // Fetch user's own posts AND friends' posts
+                  const { data: feedPosts } = await supabase
+                    .from('rposts')
+                    .select(`
+                      id, 
+                      title, 
+                      text, 
+                      created_at, 
+                      user_id, 
+                      zone_id, 
+                      tag_id, 
+                      image_url, 
+                      image_urls, 
+                      media_type,
+                      is_anonymous, 
+                      moderation_status,
+                      is_deleted,
+                      user:rusers!user_id (username, emoji_icon, avatar_url),
+                      zone:rzones!zone_id (name),
+                      tag:rtags!tag_id (name),
+                      reactions:rreactions (reaction_type, device_id)
+                    `)
+                  .in('user_id', [userData.id, ...friendIds])
+                  .eq('is_deleted', false)
+                  .order('created_at', { ascending: false });
+              
+              setUserPosts(feedPosts || []);
+
+              // Fetch Friends Only posts for the dedicated feed
+              if (friendIds.length > 0) {
+                const { data: frPosts } = await supabase
+                  .from('rposts')
+                    .select(`
+                      id, 
+                      title, 
+                      text, 
+                      created_at, 
+                      user_id, 
+                      zone_id, 
+                      tag_id, 
+                      image_url, 
+                      image_urls, 
+                      media_type,
+                      is_anonymous, 
+                      moderation_status,
+                      is_deleted,
+                      user:rusers (username, emoji_icon, avatar_url),
+                      zone:rzones (name),
+                      tag:rtags (name),
+                      reactions:rreactions (reaction_type, device_id)
+                    `)
+                  .in('user_id', friendIds)
+                  .eq('is_deleted', false)
+                  .order('created_at', { ascending: false });
+              
+              setFriendsPosts(frPosts || []);
+            } else {
+              setFriendsPosts([]);
+            }
+
+          // Fetch replies to user's posts
+          const { data: userPostIds } = await supabase
             .from('rposts')
-            .select('*', { count: 'exact', head: true })
+            .select('id')
             .eq('user_id', userData.id);
           
-          const { count: reactionCount } = await supabase
-            .from('rreactions')
-            .select('*, rposts!inner(user_id)', { count: 'exact', head: true })
-            .eq('rposts.user_id', userData.id);
-          
-          setStats({ 
-            posts: postCount || 0,
-            reactions: reactionCount || 0,
-            joined: new Date(userData.created_at).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
-          });
-
-          // Fetch Pending Requests (where current user is the friend_id)
-          const { data: requestsData } = await supabase
-            .from('friends')
-            .select('id, user_id, rusers!friends_user_id_fkey(id, username, emoji_icon, avatar_url)')
-            .eq('friend_id', userData.id)
-            .eq('status', 'pending');
-          
-          setPendingRequests(requestsData?.map(r => ({ ...r.rusers, requestId: r.id })) || []);
-
-          // Fetch Friends
-          const { data: friendData } = await supabase
-            .from('friends')
-            .select('friend_id, rusers!friends_friend_id_fkey(id, username, emoji_icon, avatar_url)')
-            .eq('user_id', userData.id)
-            .eq('status', 'accepted');
-          
-          const friendsList = friendData?.map(f => f.rusers) || [];
-          setFriends(friendsList);
-          const friendIds = friendsList.map(f => f.id);
-
-            // Fetch user's own posts AND friends' posts
-                const { data: feedPosts } = await supabase
-                  .from('rposts')
+            if (userPostIds && userPostIds.length > 0) {
+              const postIds = userPostIds.map(p => p.id);
+              const { data: replyData } = await supabase
+                .from('rcomments')
                   .select(`
-                    id, 
-                    title, 
-                    text, 
-                    created_at, 
-                    user_id, 
-                    zone_id, 
-                    tag_id, 
-                    image_url, 
-                    image_urls, 
-                    is_anonymous, 
-                    moderation_status,
-                    is_deleted,
-                    user:rusers!user_id (username, emoji_icon, avatar_url),
-                    zone:rzones!zone_id (name),
-                    tag:rtags!tag_id (name),
-                    reactions:rreactions (reaction_type, device_id)
-                  `)
-                .in('user_id', [userData.id, ...friendIds])
-                .eq('is_deleted', false)
-                .order('created_at', { ascending: false });
-            
-            setUserPosts(feedPosts || []);
-
-            // Fetch Friends Only posts for the dedicated feed
-            if (friendIds.length > 0) {
-              const { data: frPosts } = await supabase
-                .from('rposts')
-                  .select(`
-                    id, 
-                    title, 
-                    text, 
-                    created_at, 
-                    user_id, 
-                    zone_id, 
-                    tag_id, 
-                    image_url, 
-                    image_urls, 
-                    is_anonymous, 
-                    moderation_status,
-                    is_deleted,
+                    *,
                     user:rusers (username, emoji_icon, avatar_url),
-                    zone:rzones (name),
-                    tag:rtags (name),
-                    reactions:rreactions (reaction_type, device_id)
+                    post:post_id (title)
                   `)
-                .in('user_id', friendIds)
-                .eq('is_deleted', false)
-                .order('created_at', { ascending: false });
-            
-            setFriendsPosts(frPosts || []);
-          } else {
-            setFriendsPosts([]);
-          }
-
-        // Fetch replies to user's posts
-        const { data: userPostIds } = await supabase
-          .from('rposts')
-          .select('id')
-          .eq('user_id', userData.id);
-        
-          if (userPostIds && userPostIds.length > 0) {
-            const postIds = userPostIds.map(p => p.id);
-            const { data: replyData } = await supabase
-              .from('rcomments')
-                .select(`
-                  *,
-                  user:rusers (username, emoji_icon, avatar_url),
-                  post:post_id (title)
-                `)
-              .in('post_id', postIds)
-              .neq('user_id', userData.id)
-              .order('created_at', { ascending: false })
-              .limit(10);
-            
-            setReplies(replyData || []);
-          }
+                .in('post_id', postIds)
+                .neq('user_id', userData.id)
+                .order('created_at', { ascending: false })
+                .limit(10);
+              
+              setReplies(replyData || []);
+            }
+        }
+      } catch (error) {
+        console.error("Error loading profile:", error);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error("Error loading profile:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
 
     const handlePickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -545,47 +576,73 @@ export default function Profile() {
               </View>
             </View>
 
-            {/* Tabs */}
-            <View style={styles.tabContainer}>
-              {[
-                { id: 'posts', label: 'FEED' },
-                { id: 'replies', label: 'MY REPLIES' },
-                { id: 'friends', label: 'FRIENDS' }
-              ].map(tab => (
-                <TouchableOpacity 
-                  key={tab.id}
-                  style={[styles.tab, activeTab === tab.id && styles.activeTab]}
-                  onPress={() => setActiveTab(tab.id)}
-                >
-                  <Text style={[styles.tabText, activeTab === tab.id && styles.activeTabText]}>{tab.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {activeTab === "posts" && (
-              <View style={styles.tabContentFull}>
-                {userPosts.length > 0 ? (
-                    userPosts.map((post) => (
-                      <PostItem 
-                        key={post.id}
-                        item={post}
-                        deviceId={deviceId}
-                        onReaction={handleReaction}
-                        onDelete={handleDeletePost}
-                        onShare={handleShare}
-                        onEdit={handleEditPost}
-                        user={user}
-                        onComment={() => loadData()}
-                      />
-                    ))
-                ) : (
-                  <View style={styles.emptyContainer}>
-                    <MessageSquare size={40} color="rgba(255,255,255,0.1)" />
-                    <Text style={styles.emptyText}>No posts in your feed yet.</Text>
-                  </View>
-                )}
+              {/* Tabs */}
+              <View style={styles.tabContainer}>
+                {[
+                  { id: 'posts', label: 'FEED' },
+                  { id: 'saved', label: 'SAVED' },
+                  { id: 'replies', label: 'MY REPLIES' },
+                  { id: 'friends', label: 'FRIENDS' }
+                ].map(tab => (
+                  <TouchableOpacity 
+                    key={tab.id}
+                    style={[styles.tab, activeTab === tab.id && styles.activeTab]}
+                    onPress={() => setActiveTab(tab.id)}
+                  >
+                    <Text style={[styles.tabText, activeTab === tab.id && styles.activeTabText]}>{tab.label}</Text>
+                  </TouchableOpacity>
+                ))}
               </View>
-            )}
+
+              {activeTab === "posts" && (
+                <View style={styles.tabContentFull}>
+                  {userPosts.length > 0 ? (
+                      userPosts.map((post) => (
+                        <PostItem 
+                          key={post.id}
+                          item={post}
+                          deviceId={deviceId}
+                          onReaction={handleReaction}
+                          onDelete={handleDeletePost}
+                          onShare={handleShare}
+                          onEdit={handleEditPost}
+                          user={user}
+                          onComment={() => loadData()}
+                        />
+                      ))
+                  ) : (
+                    <View style={styles.emptyContainer}>
+                      <MessageSquare size={40} color="rgba(255,255,255,0.1)" />
+                      <Text style={styles.emptyText}>No posts in your feed yet.</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {activeTab === "saved" && (
+                <View style={styles.tabContentFull}>
+                  {savedPosts.length > 0 ? (
+                      savedPosts.map((post) => (
+                        <PostItem 
+                          key={post.id}
+                          item={post}
+                          deviceId={deviceId}
+                          onReaction={handleReaction}
+                          onDelete={handleDeletePost}
+                          onShare={handleShare}
+                          onEdit={handleEditPost}
+                          user={user}
+                          onComment={() => loadData()}
+                        />
+                      ))
+                  ) : (
+                    <View style={styles.emptyContainer}>
+                      <Heart size={40} color="rgba(255,255,255,0.1)" />
+                      <Text style={styles.emptyText}>No saved posts yet.</Text>
+                    </View>
+                  )}
+                </View>
+              )}
 
             {activeTab === "replies" && (
               <View style={styles.tabContent}>
