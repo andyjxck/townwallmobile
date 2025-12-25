@@ -134,10 +134,21 @@ export default function Profile() {
           const { data: feedPosts } = await supabase
             .from('rposts')
             .select(`
-              *,
-              rusers (username, emoji_icon, avatar_url),
-              rzones (name),
-              rtags (name),
+              id, 
+              title, 
+              text, 
+              created_at, 
+              user_id, 
+              zone_id, 
+              tag_id, 
+              image_url, 
+              image_urls, 
+              is_anonymous, 
+              moderation_status,
+              is_deleted,
+              rusers:user_id (username, emoji_icon, avatar_url),
+              rzones:zone_id (name),
+              rtags:tag_id (name),
               rreactions (reaction_type, device_id)
             `)
             .in('user_id', [userData.id, ...friendIds])
@@ -151,10 +162,21 @@ export default function Profile() {
             const { data: frPosts } = await supabase
               .from('rposts')
               .select(`
-                *,
-                rusers (username, emoji_icon, avatar_url),
-                rzones (name),
-                rtags (name),
+                id, 
+                title, 
+                text, 
+                created_at, 
+                user_id, 
+                zone_id, 
+                tag_id, 
+                image_url, 
+                image_urls, 
+                is_anonymous, 
+                moderation_status,
+                is_deleted,
+                rusers:user_id (username, emoji_icon, avatar_url),
+                rzones:zone_id (name),
+                rtags:tag_id (name),
                 rreactions (reaction_type, device_id)
               `)
               .in('user_id', friendIds)

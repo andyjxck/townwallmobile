@@ -138,10 +138,21 @@ export default function ZoneFeed({ zoneSlug, zoneName }) {
       const { data, error } = await supabase
         .from('rposts')
         .select(`
-          *,
-          rtags (name),
-          rzones (name),
-          rusers (username, emoji_icon, avatar_url),
+          id, 
+          title, 
+          text, 
+          created_at, 
+          user_id, 
+          zone_id, 
+          tag_id, 
+          image_url, 
+          image_urls, 
+          is_anonymous, 
+          moderation_status,
+          is_deleted,
+          rtags:tag_id (name),
+          rzones:zone_id (name),
+          rusers:user_id (username, emoji_icon, avatar_url),
           rreactions (reaction_type, device_id)
         `)
         .eq('zone_id', zoneData.id)

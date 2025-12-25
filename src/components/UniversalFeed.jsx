@@ -176,13 +176,25 @@ export default function UniversalFeed() {
       if (!isRefreshing) setLoading(true);
       setLastError(null);
       try {
+        // Use an explicit select string with foreign key hints for maximum robustness
         let query = supabase
           .from('rposts')
           .select(`
-            *,
-            rusers (username, emoji_icon, avatar_url),
-            rzones (name),
-            rtags (name),
+            id, 
+            title, 
+            text, 
+            created_at, 
+            user_id, 
+            zone_id, 
+            tag_id, 
+            image_url, 
+            image_urls, 
+            is_anonymous, 
+            moderation_status,
+            is_deleted,
+            rusers:user_id (username, emoji_icon, avatar_url),
+            rzones:zone_id (name),
+            rtags:tag_id (name),
             rreactions (reaction_type, device_id)
           `)
           .eq('is_deleted', false);
@@ -207,7 +219,7 @@ export default function UniversalFeed() {
           // Try an absolute bare-bones fallback if the complex one fails
           const { data: fallback, error: fbError } = await supabase
             .from('rposts')
-            .select('id, title, text, created_at, user_id, zone_id, tag_id')
+            .select('id, title, text, created_at, user_id, zone_id, tag_id, image_urls, is_anonymous')
             .eq('is_deleted', false)
             .order('created_at', { ascending: false })
             .limit(20);
@@ -216,6 +228,7 @@ export default function UniversalFeed() {
             setPosts(fallback);
             setLastError(`Note: Showing simplified feed (${error.message})`);
           } else {
+            console.error("Fallback error:", fbError);
             setLastError(fbError?.message || error.message);
             setPosts([]);
           }
