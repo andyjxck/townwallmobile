@@ -64,26 +64,26 @@ import { BannerAd } from "@/components/BannerAd";
 import { NativeAd } from "@/components/NativeAd";
 import PostItem from "./PostItem";
 
-  export default function UniversalFeed() {
-    function SkeletonPost() {
-      return (
-        <View style={styles.skeletonContainer}>
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            <View style={{ flex: 1 }}>
-              <View style={[styles.postHeader, { gap: 8 }]}>
-                <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.1)' }} />
-                <View style={{ height: 12, width: 100, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 4 }} />
-              </View>
-              <View style={{ height: 20, width: '80%', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 4, marginTop: 8 }} />
-              <View style={{ height: 20, width: '60%', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 4, marginTop: 4 }} />
+export default function UniversalFeed() {
+  function SkeletonPost() {
+    return (
+      <View style={styles.skeletonContainer}>
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          <View style={{ flex: 1 }}>
+            <View style={[styles.postHeader, { gap: 8 }]}>
+              <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.1)' }} />
+              <View style={{ height: 12, width: 100, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 4 }} />
             </View>
-            <View style={{ width: 80, height: 80, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.1)' }} />
+            <View style={{ height: 20, width: '80%', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 4, marginTop: 8 }} />
+            <View style={{ height: 20, width: '60%', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 4, marginTop: 4 }} />
           </View>
+          <View style={{ width: 80, height: 80, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.1)' }} />
         </View>
-      );
-    }
+      </View>
+    );
+  }
 
-    const insets = useSafeAreaInsets();
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { colors } = useTheme();
   const [posts, setPosts] = useState([]);
@@ -97,10 +97,8 @@ import PostItem from "./PostItem";
   const [selectedTag, setSelectedTag] = useState(null);
   const [sortBy, setSortBy] = useState('newest');
   const [showMenu, setShowMenu] = useState(false);
-    const [showZones, setShowZones] = useState(false);
-    const [showTags, setShowTags] = useState(false);
-    const [showFilterSort, setShowFilterSort] = useState(false);
-    const [isModerator, setIsModerator] = useState(false);
+  const [showFilterSort, setShowFilterSort] = useState(false);
+  const [isModerator, setIsModerator] = useState(false);
   const user = useAuthStore(state => state.auth);
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -112,7 +110,6 @@ import PostItem from "./PostItem";
     checkModerator();
     loadUnreadCount();
 
-    // Subscribe to new notifications for the current user
     const setupNotificationSubscription = async () => {
       const currentUser = await getStoredUser();
       if (!currentUser) return;
@@ -210,7 +207,6 @@ import PostItem from "./PostItem";
       if (selectedTag !== null && selectedTag !== undefined) query = query.eq("tag_id", selectedTag);
 
       if (sortBy === 'popular') {
-        // Sort logic usually handled by counts in SQL or just newest for now
         query = query.order("created_at", { ascending: false });
       } else if (sortBy === 'oldest') {
         query = query.order("created_at", { ascending: true });
@@ -310,9 +306,7 @@ import PostItem from "./PostItem";
       if (moderationTarget.type === 'post') {
         const { error: postError } = await supabase
           .from('rposts')
-          .update({ 
-            is_deleted: true,
-          })
+          .update({ is_deleted: true })
           .eq('id', moderationTarget.id);
         
         if (postError) throw postError;
@@ -328,9 +322,7 @@ import PostItem from "./PostItem";
       } else if (moderationTarget.type === 'user') {
         const { error: userError } = await supabase
           .from('rusers')
-          .update({ 
-            is_muted: true,
-          })
+          .update({ is_muted: true })
           .eq('id', moderationTarget.id);
         
         if (userError) throw userError;
@@ -376,204 +368,205 @@ import PostItem from "./PostItem";
       />
       <StatusBar style="light" />
       
-        <View style={{ paddingTop: insets.top }}>
-            <View style={styles.header}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 15 }}>
-                <Image 
-                  source={require('../../assets/images/icon.png')} 
-                  style={{ width: 32, height: 32, borderRadius: 8 }}
-                  contentFit="contain"
-                />
-                  <View style={styles.headerActions}>
-                    <TouchableOpacity 
-                      onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        setShowFilterSort(!showFilterSort);
-                        setShowMenu(false);
-                      }} 
-                      style={styles.iconButton}
-                    >
-                      <ListFilter size={24} color={showFilterSort || selectedZone || selectedTag ? "#FFFFFF" : "rgba(255,255,255,0.4)"} />
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                      onPress={() => {
-                        setShowMenu(!showMenu);
-                        setShowFilterSort(false);
-                      }} 
-                      style={styles.iconButton}
-                    >
-                      <Menu size={24} color="#FFFFFF" />
-                    </TouchableOpacity>
-                  </View>
-            </View>
+      <View style={{ paddingTop: insets.top }}>
+        <View style={styles.header}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 15 }}>
+            <Image 
+              source={require('../../assets/images/icon.png')} 
+              style={{ width: 32, height: 32, borderRadius: 8 }}
+              contentFit="contain"
+            />
+          </View>
+          
+          <View style={styles.headerActions}>
+            <TouchableOpacity 
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setShowFilterSort(!showFilterSort);
+                setShowMenu(false);
+              }} 
+              style={styles.iconButton}
+            >
+              <ListFilter size={24} color={showFilterSort || selectedZone || selectedTag ? "#FFFFFF" : "rgba(255,255,255,0.4)"} />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              onPress={() => {
+                setShowMenu(!showMenu);
+                setShowFilterSort(false);
+              }} 
+              style={styles.iconButton}
+            >
+              <Menu size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+        </View>
 
-          {/* Dropdown Menu */}
-          {showMenu && (
-            <View style={[styles.dropdownContainer, { top: insets.top + 55 }]}>
-                <TouchableOpacity 
-                  style={styles.dropdownItem} 
-                  onPress={() => { setShowMenu(false); router.push("/profile"); }}
-                >
-                  {user?.avatar_url ? (
-                    <Image source={{ uri: user.avatar_url }} style={{ width: 18, height: 18, borderRadius: 9 }} />
-                  ) : user?.emoji_icon ? (
-                    <Text style={{ fontSize: 16 }}>{user.emoji_icon}</Text>
-                  ) : (
-                    <User size={18} color="#FFFFFF" />
-                  )}
-                  <Text style={styles.dropdownText}>PROFILE</Text>
-                </TouchableOpacity>
+        {showMenu && (
+          <View style={[styles.dropdownContainer, { top: 55 }]}>
+            <TouchableOpacity 
+              style={styles.dropdownItem} 
+              onPress={() => { setShowMenu(false); router.push("/profile"); }}
+            >
+              {user?.avatar_url ? (
+                <Image source={{ uri: user.avatar_url }} style={{ width: 18, height: 18, borderRadius: 9 }} />
+              ) : user?.emoji_icon ? (
+                <Text style={{ fontSize: 16 }}>{user.emoji_icon}</Text>
+              ) : (
+                <User size={18} color="#FFFFFF" />
+              )}
+              <Text style={styles.dropdownText}>PROFILE</Text>
+            </TouchableOpacity>
 
-                {user?.supabase_uid ? (
-                  <TouchableOpacity 
-                    style={styles.dropdownItem} 
-                    onPress={() => { setShowMenu(false); logoutUser(); }}
-                  >
-                    <User size={18} color="#EF4444" />
-                    <Text style={[styles.dropdownText, { color: '#EF4444' }]}>SIGN OUT</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity 
-                    style={styles.dropdownItem} 
-                    onPress={() => { setShowMenu(false); router.push("/auth?mode=login"); }}
-                  >
-                    <User size={18} color="#4ADE80" />
-                    <Text style={[styles.dropdownText, { color: '#4ADE80' }]}>SIGN IN</Text>
-                  </TouchableOpacity>
-                )}
-
-                  <View style={styles.dropdownDivider} />
-
-                <TouchableOpacity 
-                  style={styles.dropdownItem} 
-                  onPress={() => { setShowMenu(false); router.push("/polls"); }}
-                >
-                  <Vote size={18} color="#FBBF24" />
-                  <Text style={styles.dropdownText}>FUTURE FEATURES</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity 
-                  style={styles.dropdownItem} 
-                  onPress={() => { setShowMenu(false); router.push("/talent"); }}
-                >
-                <Music size={18} color="#A855F7" />
-                <Text style={styles.dropdownText}>LOCAL TALENT</Text>
-              </TouchableOpacity>
-
+            {user?.supabase_uid ? (
               <TouchableOpacity 
                 style={styles.dropdownItem} 
-                onPress={() => { setShowMenu(false); router.push("/businesses"); }}
+                onPress={() => { setShowMenu(false); logoutUser(); }}
               >
-                <Briefcase size={18} color="#3B82F6" />
-                <Text style={styles.dropdownText}>BUSINESSES</Text>
+                <User size={18} color="#EF4444" />
+                <Text style={[styles.dropdownText, { color: '#EF4444' }]}>SIGN OUT</Text>
               </TouchableOpacity>
-
+            ) : (
               <TouchableOpacity 
                 style={styles.dropdownItem} 
-                onPress={() => { setShowMenu(false); router.push("/help"); }}
+                onPress={() => { setShowMenu(false); router.push("/auth?mode=login"); }}
               >
-                <HelpCircle size={18} color="#10B981" />
-                <Text style={styles.dropdownText}>HELP / CONTACT</Text>
+                <User size={18} color="#4ADE80" />
+                <Text style={[styles.dropdownText, { color: '#4ADE80' }]}>SIGN IN</Text>
               </TouchableOpacity>
+            )}
 
-                {isModerator && (
-                  <TouchableOpacity 
-                    style={styles.dropdownItem} 
-                    onPress={() => { setShowMenu(false); router.push("/admin"); }}
-                  >
-                    <Shield size={18} color="#EF4444" />
-                    <Text style={styles.dropdownText}>MODERATION</Text>
-                  </TouchableOpacity>
-                )}
+            <View style={styles.dropdownDivider} />
+
+            <TouchableOpacity 
+              style={styles.dropdownItem} 
+              onPress={() => { setShowMenu(false); router.push("/polls"); }}
+            >
+              <Vote size={18} color="#FBBF24" />
+              <Text style={styles.dropdownText}>FUTURE FEATURES</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.dropdownItem} 
+              onPress={() => { setShowMenu(false); router.push("/talent"); }}
+            >
+              <Music size={18} color="#A855F7" />
+              <Text style={styles.dropdownText}>LOCAL TALENT</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.dropdownItem} 
+              onPress={() => { setShowMenu(false); router.push("/businesses"); }}
+            >
+              <Briefcase size={18} color="#3B82F6" />
+              <Text style={styles.dropdownText}>BUSINESSES</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.dropdownItem} 
+              onPress={() => { setShowMenu(false); router.push("/help"); }}
+            >
+              <HelpCircle size={18} color="#10B981" />
+              <Text style={styles.dropdownText}>HELP / CONTACT</Text>
+            </TouchableOpacity>
+
+            {isModerator && (
+              <TouchableOpacity 
+                style={styles.dropdownItem} 
+                onPress={() => { setShowMenu(false); router.push("/admin"); }}
+              >
+                <Shield size={18} color="#EF4444" />
+                <Text style={styles.dropdownText}>MODERATION</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        {showFilterSort && (
+          <View style={[styles.filterSortDropdown, { top: 55 }]}>
+            <View style={styles.dropdownHeader}>
+              <Text style={[styles.dropdownLabel, { color: '#FFFFFF' }]}>SORT BY</Text>
             </View>
-          )}
-
-          {showFilterSort && (
-            <View style={[styles.filterSortDropdown, { top: insets.top + 55 }]}>
-              <View style={styles.dropdownHeader}>
-                <Text style={styles.dropdownLabel}>SORT BY</Text>
-              </View>
-              <View style={styles.sortOptionsRow}>
-                {['newest', 'popular', 'oldest'].map(option => (
-                  <TouchableOpacity 
-                    key={option} 
-                    onPress={() => {
-                      setSortBy(option);
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    }}
-                    style={[styles.sortOptionPill, sortBy === option && styles.activeSortPill]}
-                  >
-                    <Text style={[styles.sortOptionText, sortBy === option && styles.activeSortOptionText]}>
-                      {option.toUpperCase()}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <View style={styles.dropdownDivider} />
-
-              <View style={styles.dropdownHeader}>
-                <Text style={styles.dropdownLabel}>ZONE</Text>
-                {selectedZone && (
-                  <TouchableOpacity onPress={() => setSelectedZone(null)}>
-                    <Text style={styles.clearText}>CLEAR</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dropdownScroll}>
-                {zones.map(zone => (
-                  <TouchableOpacity 
-                    key={zone.id} 
-                    onPress={() => {
-                      setSelectedZone(zone.id);
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    }}
-                    style={[styles.filterPill, selectedZone === zone.id && styles.activeFilterPill]}
-                  >
-                    <Text style={[styles.filterText, selectedZone === zone.id && styles.activeFilterText]}>
-                      {zone.name.toUpperCase()}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-
-              <View style={styles.dropdownDivider} />
-
-                <View style={styles.dropdownHeader}>
-                  <Text style={styles.dropdownLabel}>HASHTAGS</Text>
-                  {selectedTag && (
-                  <TouchableOpacity onPress={() => setSelectedTag(null)}>
-                    <Text style={styles.clearText}>CLEAR</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dropdownScroll}>
-                {tags.map(tag => (
-                  <TouchableOpacity 
-                    key={tag.id} 
-                    onPress={() => {
-                      setSelectedTag(tag.id);
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    }}
-                    style={[styles.filterPill, selectedTag === tag.id && styles.activeFilterPill]}
-                  >
-                    <Text style={[styles.filterText, selectedTag === tag.id && styles.activeFilterText]}>
-                      #{tag.name.toUpperCase().replace(/\s+/g, '')}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-
-              {(selectedZone || selectedTag) && (
+            <View style={styles.sortOptionsRow}>
+              {['newest', 'popular', 'oldest'].map(option => (
                 <TouchableOpacity 
-                  style={styles.applyButton} 
-                  onPress={() => setShowFilterSort(false)}
+                  key={option}
+                  onPress={() => {
+                    setSortBy(option);
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  }}
+                  style={[styles.sortOptionPill, sortBy === option && styles.activeSortPill]}
                 >
-                  <Text style={styles.applyButtonText}>CLOSE</Text>
+                  <Text style={[styles.sortOptionText, sortBy === option && styles.activeSortOptionText]}>
+                    {option.toUpperCase()}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={styles.dropdownDivider} />
+
+            <View style={styles.dropdownHeader}>
+              <Text style={[styles.dropdownLabel, { color: '#FFFFFF' }]}>ZONE</Text>
+              {selectedZone && (
+                <TouchableOpacity onPress={() => setSelectedZone(null)}>
+                  <Text style={styles.clearText}>CLEAR</Text>
                 </TouchableOpacity>
               )}
             </View>
-          )}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dropdownScroll}>
+              {zones.map(zone => (
+                <TouchableOpacity 
+                  key={zone.id} 
+                  onPress={() => {
+                    setSelectedZone(zone.id);
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  }}
+                  style={[styles.filterPill, selectedZone === zone.id && styles.activeFilterPill]}
+                >
+                  <Text style={[styles.filterText, selectedZone === zone.id && styles.activeFilterText]}>
+                    {zone.name.toUpperCase()}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <View style={styles.dropdownDivider} />
+
+            <View style={styles.dropdownHeader}>
+              <Text style={[styles.dropdownLabel, { color: '#FFFFFF' }]}>HASHTAGS</Text>
+              {selectedTag && (
+                <TouchableOpacity onPress={() => setSelectedTag(null)}>
+                  <Text style={styles.clearText}>CLEAR</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dropdownScroll}>
+              {tags.map(tag => (
+                <TouchableOpacity 
+                  key={tag.id} 
+                  onPress={() => {
+                    setSelectedTag(tag.id);
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  }}
+                  style={[styles.filterPill, selectedTag === tag.id && styles.activeFilterPill]}
+                >
+                  <Text style={[styles.filterText, selectedTag === tag.id && styles.activeFilterText]}>
+                    #{tag.name.toUpperCase().replace(/\s+/g, '')}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            {(selectedZone || selectedTag) && (
+              <TouchableOpacity 
+                style={styles.applyButton} 
+                onPress={() => setShowFilterSort(false)}
+              >
+                <Text style={styles.applyButtonText}>CLOSE</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
       </View>
 
       {loading && !refreshing ? (
@@ -748,21 +741,25 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.05)',
     marginVertical: 8,
   },
-  filterSection: {
-    paddingBottom: 10,
-  },
-  filterList: {
-    paddingHorizontal: 20,
-    gap: 15,
-  },
   filterPill: {
-    paddingVertical: 5,
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    marginRight: 10,
   },
-    filterText: {
-      color: '#FFFFFF',
-      fontSize: 12,
-      letterSpacing: 0.5,
-    },
+  filterText: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  activeFilterPill: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  activeFilterText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+  },
   skeletonContainer: {
     paddingHorizontal: 20,
     paddingVertical: 20,
@@ -854,95 +851,88 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
   },
-    modalButtonText: {
-      color: '#FFFFFF',
-      fontSize: 14,
-      fontWeight: '800',
-      letterSpacing: 1,
-    },
-    filterSortDropdown: {
-      position: 'absolute',
-      right: 20,
-      width: 280,
-      backgroundColor: '#0F172A',
-      borderRadius: 20,
-      padding: 15,
-      zIndex: 1000,
-      borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.08)',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 20 },
-      shadowOpacity: 0.6,
-      shadowRadius: 30,
-      elevation: 20,
-    },
-    dropdownHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 10,
-    },
-    dropdownLabel: {
-      color: '#FFFFFF',
-      fontSize: 10,
-      fontWeight: '900',
-      letterSpacing: 1.5,
-    },
-    sortOptionsRow: {
-      flexDirection: 'row',
-      gap: 8,
-      marginBottom: 5,
-    },
-    sortOptionPill: {
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 20,
-      backgroundColor: 'rgba(255,255,255,0.05)',
-      borderWidth: 1,
-      borderColor: 'transparent',
-    },
-    activeSortPill: {
-      backgroundColor: 'rgba(255,255,255,0.1)',
-      borderColor: 'rgba(255,255,255,0.2)',
-    },
-    sortOptionText: {
-      color: 'rgba(255,255,255,0.4)',
-      fontSize: 10,
-      fontWeight: '700',
-    },
-    activeSortOptionText: {
-      color: '#FFFFFF',
-    },
-    clearText: {
-      color: '#EF4444',
-      fontSize: 10,
-      fontWeight: '800',
-    },
-    dropdownScroll: {
-      gap: 10,
-      paddingRight: 10,
-    },
-    activeFilterPill: {
-      backgroundColor: 'rgba(255,255,255,0.1)',
-    },
-    activeFilterText: {
-      color: '#FFFFFF',
-      fontWeight: '800',
-    },
-    applyButton: {
-      marginTop: 15,
-      paddingVertical: 12,
-      backgroundColor: 'rgba(255,255,255,0.05)',
-      borderRadius: 12,
-      alignItems: 'center',
-    },
-    applyButtonText: {
-      color: '#FFFFFF',
-      fontSize: 11,
-      fontWeight: '800',
-      letterSpacing: 1,
-    },
-  });
+  modalButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  filterSortDropdown: {
+    position: 'absolute',
+    right: 20,
+    width: 280,
+    backgroundColor: '#0F172A',
+    borderRadius: 20,
+    padding: 15,
+    zIndex: 1000,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.6,
+    shadowRadius: 30,
+    elevation: 20,
+  },
+  dropdownHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  dropdownLabel: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+  },
+  sortOptionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 5,
+  },
+  sortOptionPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  activeSortPill: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  sortOptionText: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  activeSortOptionText: {
+    color: '#FFFFFF',
+  },
+  clearText: {
+    color: '#EF4444',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  dropdownScroll: {
+    gap: 10,
+    paddingRight: 10,
+  },
+  applyButton: {
+    marginTop: 15,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  applyButtonText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+});
 
 function getTimeAgo(date) {
   const seconds = Math.floor((new Date() - date) / 1000);
