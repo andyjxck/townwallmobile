@@ -198,9 +198,10 @@ export default function UniversalFeed() {
           is_deleted,
           user:rusers (username, emoji_icon, avatar_url),
           zone:rzones (name),
-          tag:rtags (name),
-          reactions:rreactions (reaction_type, device_id)
-        `)
+            tag:rtags (name),
+            poll_id,
+            reactions:rreactions (reaction_type, device_id)
+          `)
         .eq("is_deleted", false)
         .eq("moderation_status", "approved");
 

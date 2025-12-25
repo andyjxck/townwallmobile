@@ -39,6 +39,7 @@ import { getStoredUser } from "../utils/user";
 import { TextInput } from "react-native-gesture-handler";
 import RenderHtml from 'react-native-render-html';
 import { useWindowDimensions } from 'react-native';
+import PollComponent from "./PollComponent";
 
   export default function PostItem({ item, deviceId, onReaction, onComment, onDelete, onMute, onShare, onEdit, user }) {
     const { width } = useWindowDimensions();
@@ -299,10 +300,14 @@ import { useWindowDimensions } from 'react-native';
                       style={[styles.postBody, { color: 'rgba(255, 255, 255, 0.8)', marginTop: 8 }]} 
                       numberOfLines={3}
                     >
-                      {item.text.replace(/<[^>]*>?/gm, '')}
-                    </Text>
+                        {item.text.replace(/<[^>]*>?/gm, '')}
+                      </Text>
+                    )}
+                  
+                  {item.poll_id && (
+                    <PollComponent pollId={item.poll_id} />
                   )}
-              </TouchableOpacity>
+                </TouchableOpacity>
             </View>
 
             <View style={{ alignItems: 'flex-end', gap: 8 }}>

@@ -33,10 +33,11 @@ function ToolbarDropdown({ icon: Icon, label, options, onSelect, currentValue })
     if (visible) {
       setVisible(false);
     } else {
-      triggerRef.current.measure((x, y, width, height, pageX, pageY) => {
-        setPos({ top: pageY + height + 5, left: pageX });
-        setVisible(true);
-      });
+    triggerRef.current.measure((x, y, width, height, pageX, pageY) => {
+          setPos({ top: pageY + height, left: pageX - 10 });
+          setVisible(true);
+        });
+
     }
   };
 
