@@ -259,10 +259,18 @@ export default function PostScreen() {
             });
         }
 
-        if (result.error) throw result.error;
-        setUploadProgress(1);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        setStep('success');
+          if (result.error) throw result.error;
+          setUploadProgress(1);
+          Haptics.notificationAsync(Haptics.ImpactFeedbackStyle.Light);
+          
+          if (moderation.status === 'held') {
+            Alert.alert("Post Under Review", "Your post has been held for manual moderation to ensure community safety. It will appear once approved.");
+          } else {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          }
+          
+          setStep('success');
+
       } catch (error) {
         console.error("Error creating post:", error);
         alert("Failed to post. Please try again.");

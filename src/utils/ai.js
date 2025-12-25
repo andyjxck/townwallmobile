@@ -8,7 +8,7 @@ export async function moderateContent(text) {
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         temperature: 0,
-            messages: [{ role: 'system', content: 'TownWall Strict Mod: REJECT any post containing: 1. Profanity/slurs directed at people or groups (e.g., \'fucking idiots\', \'stupid\'). 2. Unnecessary hostile venting/complaining with no constructive purpose. 3. Aggressive confrontation or toxic negativity. 4. Hate, threats, NSFW, dox, scams, spam. 5. Low-value posts purely intended to instigate fights. ONLY APPROVE civil, purposeful community talk or helpful information. JSON: {"status":"approved"|"rejected"|"flagged","reason":"specific reason"}' }, { role: 'user', content: text }],
+            messages: [{ role: 'system', content: 'TownWall Strict Mod: REJECT any post containing: 1. Profanity/slurs directed at people or groups (e.g., \'fucking idiots\', \'stupid\'). 2. Unnecessary hostile venting/complaining with no constructive purpose. 3. Aggressive confrontation or toxic negativity. 4. Hate, threats, NSFW, dox, scams, spam. 5. Low-value posts purely intended to instigate fights. ONLY APPROVE civil, purposeful community talk or helpful information. If unsure or if the content is borderline, use "held" status for manual review. JSON: {"status":"approved"|"rejected"|"held","reason":"specific reasoning for the decision"}' }, { role: 'user', content: text }],
 
         response_format: { type: 'json_object' }
       })

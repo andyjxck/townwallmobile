@@ -39,12 +39,13 @@ export default function ModerationAdmin() {
   const [expandedChatId, setExpandedChatId] = useState(null);
   const [transcripts, setTranscripts] = useState({});
   const [replyText, setReplyText] = useState('');
+  const [aiFilter, setAiFilter] = useState('held');
 
     const TABS = [
       { id: 'talent', label: 'TALENT', icon: Star },
       { id: 'help', label: 'HELP CHATS', icon: MessageSquare },
       { id: 'business', label: 'BUSINESS', icon: Briefcase },
-      { id: 'ai', label: 'HELD', icon: AlertCircle },
+      { id: 'ai', label: 'AI LOGS', icon: Bot },
       { id: 'news', label: 'FAKE NEWS', icon: Flag },
     ];
 
@@ -61,7 +62,7 @@ export default function ModerationAdmin() {
     if (isAdmin) {
       fetchData();
     }
-  }, [activeTab, isAdmin]);
+  }, [activeTab, isAdmin, aiFilter]);
 
   const checkAdminStatus = async () => {
     try {
@@ -131,15 +132,21 @@ export default function ModerationAdmin() {
           }
         });
         result = uniqueChats;
-      } else if (activeTab === 'ai') {
-        const { data: ai, error } = await supabase
-          .from('rposts')
-          .select(`*, rusers(username), rzones(name)`)
-          .eq('moderation_status', 'held')
-          .order('created_at', { ascending: false });
-        if (error) throw error;
-        result = ai;
-      } else if (activeTab === 'news') {
+        } else if (activeTab === 'ai') {
+          let query = supabase
+            .from('rposts')
+            .select(`*, rusers(username), rzones(name)`)
+            .order('created_at', { ascending: false });
+          
+          if (aiFilter === 'approved') query = query.eq('moderation_status', 'approved');
+          else if (aiFilter === 'rejected') query = query.eq('moderation_status', 'rejected');
+          else query = query.eq('moderation_status', 'held');
+
+          const { data: ai, error } = await query;
+          if (error) throw error;
+          result = ai;
+        } else if (activeTab === 'news') {
+
         const { data: news, error } = await supabase
           .from('rposts')
           .select(`*, rusers(username), rzones(name)`)
@@ -292,11 +299,18 @@ export default function ModerationAdmin() {
           <Text style={styles.date}>{new Date(item.created_at).toLocaleDateString()}</Text>
         </View>
 
-        <View style={styles.contentPadding}>
-          {item.title && <Text style={styles.title}>{item.title}</Text>}
-          {item.name && <Text style={styles.title}>{item.name}</Text>}
-          <Text style={styles.description}>{item.text || item.description || item.content}</Text>
-        </View>
+          <View style={styles.contentPadding}>
+            {item.title && <Text style={styles.title}>{item.title}</Text>}
+            {item.name && <Text style={styles.title}>{item.name}</Text>}
+            <Text style={styles.description}>{item.text || item.description || item.content}</Text>
+            {activeTab === 'ai' && item.moderation_reason && (
+              <View style={styles.aiReasonContainer}>
+                <Bot size={12} color="#4ADE80" />
+                <Text style={styles.aiReasonText}>AI REASON: {item.moderation_reason}</Text>
+              </View>
+            )}
+          </View>
+
 
         <View style={styles.actionRow}>
           <TouchableOpacity style={[styles.actionButton, styles.approveButton]} onPress={() => handleAction(item.id, 'approve')}>
@@ -348,9 +362,29 @@ export default function ModerationAdmin() {
               );
             })}
           </ScrollView>
-        </View>
+          </View>
 
-        {activeTab === 'analytics' && analytics ? (
+          {activeTab === 'ai' && (
+            <View style={styles.aiFilterContainer}>
+              {['held', 'approved', 'rejected'].map((filter) => (
+                <TouchableOpacity
+                  key={filter}
+                  style={[styles.aiFilterButton, aiFilter === filter && styles.aiFilterButtonActive]}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setAiFilter(filter);
+                  }}
+                >
+                  <Text style={[styles.aiFilterText, aiFilter === filter && styles.aiFilterTextActive]}>
+                    {filter.toUpperCase()}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          {activeTab === 'analytics' && analytics ? (
+
           <ScrollView style={styles.analyticsScroll}>
             <View style={styles.analyticsGrid}>
               <View style={styles.statCard}><Text style={styles.statValue}>{analytics.users}</Text><Text style={styles.statLabel}>USERS</Text></View>
@@ -418,5 +452,13 @@ const styles = StyleSheet.create({
   analyticsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 15 },
   statCard: { width: (Dimensions.get('window').width - 55) / 2, backgroundColor: 'rgba(255,255,255,0.05)', padding: 20, borderRadius: 20, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
   statValue: { color: '#FFFFFF', fontSize: 32, fontWeight: '900' },
-  statLabel: { color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '800', letterSpacing: 2, marginTop: 4 }
-});
+    statLabel: { color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '800', letterSpacing: 2, marginTop: 4 },
+    aiReasonContainer: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12, padding: 10, backgroundColor: 'rgba(74, 222, 128, 0.05)', borderRadius: 8, borderWidth: 1, borderColor: 'rgba(74, 222, 128, 0.1)' },
+    aiReasonText: { color: '#4ADE80', fontSize: 11, fontWeight: '700', flex: 1 },
+    aiFilterContainer: { flexDirection: 'row', paddingHorizontal: 20, paddingBottom: 15, gap: 10 },
+    aiFilterButton: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+    aiFilterButtonActive: { backgroundColor: '#4ADE80', borderColor: '#4ADE80' },
+    aiFilterText: { color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '900', letterSpacing: 1 },
+    aiFilterTextActive: { color: '#000000' }
+  });
+
