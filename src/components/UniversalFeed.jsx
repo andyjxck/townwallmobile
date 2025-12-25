@@ -192,17 +192,17 @@ export default function UniversalFeed() {
                       is_anonymous, 
                       moderation_status,
                       is_deleted,
-                      user:rusers!user_id (username, emoji_icon, avatar_url),
-                      zone:rzones!zone_id (name),
-                      tag:rtags!tag_id (name),
-                      reactions:rreactions (reaction_type, device_id)
-                    `)
+                    user:rusers (username, emoji_icon, avatar_url),
+                    zone:rzones (name),
+                    tag:rtags (name),
+                    reactions:rreactions (reaction_type, device_id)
+                  `)
               .eq('is_deleted', false);
 
-        if (selectedZone) {
+        if (selectedZone !== null && selectedZone !== undefined) {
           query = query.eq('zone_id', selectedZone);
         }
-        if (selectedTag) {
+        if (selectedTag !== null && selectedTag !== undefined) {
           query = query.eq('tag_id', selectedTag);
         }
 

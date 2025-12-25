@@ -156,11 +156,15 @@ export default function ZoneFeed({ zoneSlug, zoneName }) {
                       reactions:rreactions (reaction_type, device_id)
                     `)
               .eq('zone_id', zoneData.id)
-              .eq('is_deleted', false)
-              .order('created_at', { ascending: false });
+              .eq('is_deleted', false);
 
-      if (error) throw error;
-      setPosts(data || []);
+        if (selectedTag !== null && selectedTag !== undefined) {
+          query = query.eq('tag_id', selectedTag);
+        }
+
+        const { data: finalData, error: fetchError } = await query.order('created_at', { ascending: false });
+        if (fetchError) throw fetchError;
+        setPosts(finalData || []);
     } catch (error) {
       console.error("Error fetching posts:", error);
     } finally {
