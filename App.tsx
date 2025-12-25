@@ -8,6 +8,7 @@ import './src/__create/polyfills';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Toaster } from 'sonner-native';
 import { AlertModal } from './polyfills/web/alerts.web';
+import Purchases from 'react-native-purchases';
 import './global.css';
 
 const GlobalErrorReporter = () => {
@@ -94,7 +95,19 @@ const CreateApp = () => {
         console.log('Tracking permission granted');
       }
       
-        try {
+      try {
+        const apiKey = process.env.EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY;
+        if (apiKey) {
+          Purchases.setLogLevel(Purchases.LOG_LEVEL.DEBUG);
+          await Purchases.configure({ apiKey });
+          console.log('RevenueCat initialized');
+        }
+      } catch (error) {
+        console.warn('RevenueCat initialization skipped:', error.message);
+      }
+
+      try {
+
           // Dynamically require to avoid startup crash if module is missing
           const ads = require('react-native-google-mobile-ads');
           const mobileAds = ads.default || ads;

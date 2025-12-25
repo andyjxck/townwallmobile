@@ -157,6 +157,103 @@ export default function UniversalFeed() {
     }
   };
 
+  const fetchFilterData = async () => {
+    try {
+      const [zonesRes, tagsRes] = await Promise.all([
+        supabase.from('rzones').select('*').order('name'),
+        supabase.from('rtags').select('*').order('name')
+      ]);
+      if (zonesRes.data) setZones(zonesRes.data);
+      if (tagsRes.data) setTags(tagsRes.data);
+    } catch (error) {
+      console.error("Error fetching filter data:", error);
+    }
+  };
+
+  const fetchPosts = async (isRefreshing = false) => {
+    if (!isRefreshing) setLoading(true);
+    try {
+      let query = supabase
+        .from('rposts')
+        .select(`
+          *,
+          user:rusers!rposts_user_id_fkey(username, emoji_icon, avatar_url),
+          zone:rzones(name),
+          tag:rtags(name),
+          reactions:rreactions(count)
+        `)
+        .eq('is_deleted', false);
+
+      if (selectedZone) query = query.eq('zone_id', selectedZone);
+      if (selectedTag) query = query.eq('tag_id', selectedTag);
+
+      if (sortBy === 'newest') query = query.order('created_at', { ascending: false });
+      else if (sortBy === 'oldest') query = query.order('created_at', { ascending: true });
+      else if (sortBy === 'popular') query = query.order('reaction_count', { ascending: false });
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      // Map reactions count
+      const formattedPosts = data.map(post => ({
+        ...post,
+        reaction_count: post.reaction_count || 0
+      }));
+
+      setPosts(formattedPosts);
+    } catch (error) {
+      console.error("Error fetching posts:", error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const handleReaction = async (postId, type) => {
+    if (!user) {
+      Alert.alert("Sign In", "Please sign in to react to posts.");
+      return;
+    }
+
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      
+      const { data: existing } = await supabase
+        .from('rreactions')
+        .select('*')
+        .eq('post_id', postId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (existing) {
+        if (existing.type === type) {
+          await supabase.from('rreactions').delete().eq('id', existing.id);
+        } else {
+          await supabase.from('rreactions').update({ type }).eq('id', existing.id);
+        }
+      } else {
+        await supabase.from('rreactions').insert({
+          post_id: postId,
+          user_id: user.id,
+          type
+        });
+      }
+
+      fetchPosts(true);
+    } catch (error) {
+      console.error("Error reacting:", error);
+    }
+  };
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchPosts(true);
+  }, [selectedZone, selectedTag, sortBy]);
+
+  useEffect(() => {
+    fetchPosts();
+  }, [selectedZone, selectedTag, sortBy]);
+
     const [moderationTarget, setModerationTarget] = useState(null); // { type: 'post' | 'user', id: string, data?: any }
     const [moderationReason, setModerationReason] = useState("");
     const [showModerationModal, setShowModerationModal] = useState(false);

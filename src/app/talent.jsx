@@ -36,24 +36,9 @@ export default function LocalTalent() {
 
   useEffect(() => {
     fetchTalents();
-    setupRevenueCat();
   }, []);
 
-  const setupRevenueCat = async () => {
-    try {
-      Purchases.setLogLevel(Purchases.LOG_LEVEL.DEBUG);
-      if (Platform.OS === 'ios') {
-        const apiKey = process.env.EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY;
-        if (apiKey) {
-          await Purchases.configure({ apiKey });
-        }
-      }
-    } catch (e) {
-      console.log("RevenueCat Setup Error:", e);
-    }
-  };
-
-    const fetchTalents = async () => {
+  const fetchTalents = async () => {
     try {
       const { data, error } = await supabase
         .from('rtalent')
