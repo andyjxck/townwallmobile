@@ -13,15 +13,25 @@ export function ShareCard({ post }) {
   const images = post.image_urls || (post.image_url ? [post.image_url] : []);
   const mainImage = images[0];
 
-  const stripHtml = (html) => {
-    if (!html) return '';
-    return html.replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').replace(/&quot;/g, '"').replace(/&amp;/g, '&');
-  };
+    const stripHtml = (html) => {
+      if (!html) return '';
+      // Strip HTML tags
+      let cleaned = html.replace(/<[^>]*>?/gm, '');
+      // Strip common Markdown patterns (bold, italic, links)
+      cleaned = cleaned
+        .replace(/(\*\*|__)(.*?)\1/g, '$2') // bold
+        .replace(/(\*|_)(.*?)\1/g, '$2')    // italic
+        .replace(/\[(.*?)\]\(.*?\)/g, '$1') // links
+        .replace(/#{1,6}\s+(.*)/g, '$1')     // headers
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&quot;/g, '"')
+        .replace(/&amp;/g, '&');
+      return cleaned;
+    };
 
-  const plainText = stripHtml(post.text);
-  const truncatedText = plainText.length > 500 ? plainText.substring(0, 500) + '...' : plainText;
+    const plainText = stripHtml(post.text);
 
-  return (
+    return (
     <View style={styles.container}>
       <LinearGradient
         colors={['#1E293B', '#0F172A']}
@@ -50,9 +60,9 @@ export function ShareCard({ post }) {
                 {post.title || 'Untitled Post'}
               </Text>
               
-              <Text style={styles.body}>
-                {truncatedText}
-              </Text>
+                <Text style={styles.body}>
+                  {plainText}
+                </Text>
             </View>
 
             {/* Footer with Author and App Info */}
