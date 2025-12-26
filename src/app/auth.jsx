@@ -41,34 +41,72 @@ export default function Auth() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
-      const email = `${username.toLowerCase()}@anon.app`;
       const deviceId = await getDeviceId();
 
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) throw error;
-      } else {
-        // Sign up
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-          email,
-          password,
-        });
-        if (authError) throw authError;
+        // Sign in: Find user with matching username and password
+        const { data: user, error } = await supabase
+          .from('rusers')
+          .select('*')
+          .eq('username', username)
+          .eq('password', password)
+          .single();
 
-        if (authData.user) {
-          // Update rusers table
-          const { error: updateError } = await supabase
+        if (error || !user) {
+          throw new Error("Invalid username or password");
+        }
+
+        // Link this device to the logged-in user
+        await supabase
+          .from('rusers')
+          .update({ device_id: deviceId })
+          .eq('id', user.id);
+
+        useAuthStore.getState().setAuth(user);
+      } else {
+        // Sign up: Check if username is taken
+        const { data: existingUser } = await supabase
+          .from('rusers')
+          .select('id')
+          .eq('username', username)
+          .single();
+
+        if (existingUser) {
+          throw new Error("Username is already taken");
+        }
+
+        // Get current anonymous user to upgrade it, or create new
+        const { auth: currentAuth } = useAuthStore.getState();
+        
+        if (currentAuth && !currentAuth.password) {
+          // Upgrade current anonymous user
+          const { data: updatedUser, error: updateError } = await supabase
             .from('rusers')
             .update({ 
               username: username,
-              supabase_uid: authData.user.id 
+              password: password
             })
-            .eq('device_id', deviceId);
+            .eq('id', currentAuth.id)
+            .select()
+            .single();
           
           if (updateError) throw updateError;
+          useAuthStore.getState().setAuth(updatedUser);
+        } else {
+          // Create a new user profile
+          const { data: newUser, error: createError } = await supabase
+            .from('rusers')
+            .insert({ 
+              username: username,
+              password: password,
+              device_id: deviceId,
+              emoji_icon: '👤'
+            })
+            .select()
+            .single();
+          
+          if (createError) throw createError;
+          useAuthStore.getState().setAuth(newUser);
         }
       }
 

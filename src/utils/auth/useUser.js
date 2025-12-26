@@ -3,7 +3,7 @@ import { useAuth } from './useAuth';
 
 export const useUser = () => {
 	const { auth, isReady } = useAuth();
-	const user = auth?.user || null;
+	const user = auth || null;
 	const fetchUser = useCallback(async () => {
 		return user;
 	}, [user]);

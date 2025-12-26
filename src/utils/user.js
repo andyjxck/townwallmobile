@@ -9,20 +9,21 @@ const USER_DATA_KEY = "@redditch_user_data";
 export const initUser = async () => {
   try {
     const deviceId = await getDeviceId();
-    const { data: { user: authUser } } = await supabase.auth.getUser();
     
+    // Check if we have a stored session user
+    const { auth: sessionUser } = useAuthStore.getState();
     let ruser = null;
 
-    if (authUser) {
-      // 1. Try to find by supabase_uid if logged in
-      const { data: userByUid } = await supabase
+    if (sessionUser && sessionUser.id) {
+      // 1. Refresh user data from DB if logged in
+      const { data: userById } = await supabase
         .from('rusers')
         .select('*')
-        .eq('supabase_uid', authUser.id)
+        .eq('id', sessionUser.id)
         .single();
       
-      if (userByUid) {
-        ruser = userByUid;
+      if (userById) {
+        ruser = userById;
         // Update device_id to current device if it changed
         if (ruser.device_id !== deviceId) {
           await supabase.from('rusers').update({ device_id: deviceId }).eq('id', ruser.id);
@@ -32,8 +33,8 @@ export const initUser = async () => {
     }
 
     if (!ruser) {
-      // 2. Try to find by device_id (for anonymous or pre-linked users)
-      const { data: userByDevice, error: deviceError } = await supabase
+      // 2. Try to find by device_id (for anonymous users)
+      const { data: userByDevice } = await supabase
         .from('rusers')
         .select('*')
         .eq('device_id', deviceId)
@@ -41,16 +42,6 @@ export const initUser = async () => {
       
       if (userByDevice) {
         ruser = userByDevice;
-        // If we have an authUser but ruser has no supabase_uid, link them
-        if (authUser && !ruser.supabase_uid) {
-          const { data: linkedUser } = await supabase
-            .from('rusers')
-            .update({ supabase_uid: authUser.id })
-            .eq('id', ruser.id)
-            .select()
-            .single();
-          if (linkedUser) ruser = linkedUser;
-        }
       }
     }
 
@@ -61,8 +52,7 @@ export const initUser = async () => {
         .insert({ 
           device_id: deviceId,
           username: `Anon${Math.floor(Math.random() * 10000)}`,
-          emoji_icon: '👤',
-          supabase_uid: authUser?.id || null
+          emoji_icon: '👤'
         })
         .select()
         .single();
@@ -115,5 +105,4 @@ export const logoutUser = async () => {
   }
   await AsyncStorage.removeItem(USER_DATA_KEY);
   useAuthStore.getState().setAuth(null);
-  await supabase.auth.signOut();
 };
