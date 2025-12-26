@@ -27,6 +27,7 @@ export const ShareManager = forwardRef((props, ref) => {
               format: 'png',
               quality: 1,
               result: 'tmpfile',
+              useRenderInContext: true,
             });
 
           if (await Sharing.isAvailableAsync()) {
@@ -62,8 +63,10 @@ export const ShareManager = forwardRef((props, ref) => {
 const styles = StyleSheet.create({
   hiddenContainer: {
     position: 'absolute',
-    left: -9999,
-    top: -9999,
-    opacity: 1, // Must be 1 for captureRef to work on some versions
+    left: 0,
+    top: 0,
+    opacity: 0,
+    zIndex: -1000,
+    pointerEvents: 'none',
   }
 });
