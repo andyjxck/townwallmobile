@@ -17,6 +17,7 @@ import { getDeviceId } from "@/utils/deviceId";
 import { initUser } from "@/utils/user";
 import { ChevronLeft } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
+import bcrypt from 'bcryptjs';
 
 export default function Auth() {
   const router = useRouter();
@@ -45,15 +46,20 @@ export default function Auth() {
       const deviceId = await getDeviceId();
 
       if (isLogin) {
-        // Sign in: Find user with matching username and password
+        // Sign in: Find user with matching username
         const { data: user, error } = await supabase
           .from('rusers')
           .select('*')
           .eq('username', username)
-          .eq('password', password)
           .single();
 
         if (error || !user) {
+          throw new Error("Invalid username or password");
+        }
+
+        // Compare hashed password
+        const isMatch = bcrypt.compareSync(password, user.password);
+        if (!isMatch) {
           throw new Error("Invalid username or password");
         }
 
@@ -76,6 +82,10 @@ export default function Auth() {
           throw new Error("Username is already taken");
         }
 
+        // Hash the password
+        const salt = bcrypt.genSaltSync(10);
+        const hashedPassword = bcrypt.hashSync(password, salt);
+
         // Get current anonymous user to upgrade it, or create new
         const { auth: currentAuth } = useAuthStore.getState();
         
@@ -85,7 +95,7 @@ export default function Auth() {
             .from('rusers')
             .update({ 
               username: username,
-              password: password
+              password: hashedPassword
             })
             .eq('id', currentAuth.id)
             .select()
@@ -99,7 +109,7 @@ export default function Auth() {
             .from('rusers')
             .insert({ 
               username: username,
-              password: password,
+              password: hashedPassword,
               device_id: deviceId,
               emoji_icon: '👤'
             })
