@@ -56,7 +56,7 @@ import { useTheme } from "../utils/theme";
 import { Image } from "expo-image";
 import { LinearGradient } from 'expo-linear-gradient';
 import { getStoredUser, logoutUser } from "../utils/user";
-import { useAuthStore } from "../utils/auth/store";
+import { useAuthStore } from "../utils/auth";
 import { TextInput } from "react-native-gesture-handler";
 import NotificationPanel from "./NotificationPanel";
 import { fetchNotifications } from "@/utils/notifications";

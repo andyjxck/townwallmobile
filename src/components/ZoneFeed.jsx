@@ -26,7 +26,7 @@ import { supabase } from "../utils/supabase";
 import * as Haptics from "expo-haptics";
 import PostItem from "./PostItem";
 import { getStoredUser } from "../utils/user";
-import { useAuthStore } from "../utils/auth/store";
+import { useAuthStore } from "../utils/auth";
 import { ShareManager } from "./ShareManager";
 import { BannerAd } from "./BannerAd";
 import { NativeAd } from "./NativeAd";

@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { supabase } from "@/utils/supabase";
+import { useAuthStore } from "@/utils/auth";
 import { getDeviceId } from "@/utils/deviceId";
 import { initUser } from "@/utils/user";
 import { ChevronLeft } from "lucide-react-native";
