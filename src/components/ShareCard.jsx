@@ -15,8 +15,12 @@ export function ShareCard({ post }) {
 
     const stripHtml = (html) => {
       if (!html) return '';
-      // Strip HTML tags
-      let cleaned = html.replace(/<[^>]*>?/gm, '');
+      // Replace block tags and line breaks with newlines before stripping
+      let cleaned = html
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<\/(p|div|h[1-6]|li)>/gi, '\n')
+        .replace(/<[^>]*>?/gm, '');
+        
       // Strip common Markdown patterns (bold, italic, links)
       cleaned = cleaned
         .replace(/(\*\*|__)(.*?)\1/g, '$2') // bold
@@ -26,7 +30,8 @@ export function ShareCard({ post }) {
         .replace(/&nbsp;/g, ' ')
         .replace(/&quot;/g, '"')
         .replace(/&amp;/g, '&');
-      return cleaned;
+      
+      return cleaned.trim();
     };
 
     const plainText = stripHtml(post.text);
