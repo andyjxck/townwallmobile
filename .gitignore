@@ -1,44 +1,63 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+# -------------------------------------------------
+# Environment variables (NEVER COMMIT)
+# -------------------------------------------------
+.env
+.env.*
+.env*.local
 
-# dependencies
+# -------------------------------------------------
+# Dependencies
+# -------------------------------------------------
 node_modules/
 
+# -------------------------------------------------
 # Expo
+# -------------------------------------------------
 .expo/
 dist/
 web-build/
 expo-env.d.ts
 
-# Native
-*.orig.*
+# -------------------------------------------------
+# Metro / React Native
+# -------------------------------------------------
+.metro-health-check*
+.metro-virtual/*
+caches/*
+
+# -------------------------------------------------
+# Native / Mobile credentials (DO NOT COMMIT)
+# -------------------------------------------------
 *.jks
 *.p8
 *.p12
 *.key
 *.mobileprovision
+*.orig.*
 
-# Metro
-.metro-health-check*
-
-# debug
+# -------------------------------------------------
+# Debug / Logs
+# -------------------------------------------------
 npm-debug.*
 yarn-debug.*
 yarn-error.*
 
-# macOS
-.DS_Store
-*.pem
-
-# local env files
-.env*.local
-
-# typescript
+# -------------------------------------------------
+# TypeScript / Build
+# -------------------------------------------------
 *.tsbuildinfo
 
+# -------------------------------------------------
+# macOS
+# -------------------------------------------------
+.DS_Store
+
+# -------------------------------------------------
+# Certificates / Keys (extra safety)
+# -------------------------------------------------
+*.pem
+
+# -------------------------------------------------
+# Examples / Scratch
+# -------------------------------------------------
 app-example
-
-.env
-
-.metro-virtual/*
-
-caches/*

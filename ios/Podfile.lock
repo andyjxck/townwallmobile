@@ -1477,6 +1477,8 @@ PODS:
     - ReactNativeDependencies
   - react-native-maps (1.20.1):
     - React-Core
+  - react-native-render-html (6.3.4):
+    - React-Core
   - react-native-safe-area-context (5.6.1):
     - hermes-engine
     - RCTRequired
@@ -2467,6 +2469,7 @@ DEPENDENCIES:
   - React-Mapbuffer (from `../node_modules/react-native/ReactCommon`)
   - React-microtasksnativemodule (from `../node_modules/react-native/ReactCommon/react/nativemodule/microtasks`)
   - react-native-maps (from `../node_modules/react-native-maps`)
+  - react-native-render-html (from `../node_modules/react-native-render-html`)
   - react-native-safe-area-context (from `../node_modules/react-native-safe-area-context`)
   - "react-native-skia (from `../node_modules/@shopify/react-native-skia`)"
   - "react-native-slider (from `../node_modules/@react-native-community/slider`)"
@@ -2694,6 +2697,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon/react/nativemodule/microtasks"
   react-native-maps:
     :path: "../node_modules/react-native-maps"
+  react-native-render-html:
+    :path: "../node_modules/react-native-render-html"
   react-native-safe-area-context:
     :path: "../node_modules/react-native-safe-area-context"
   react-native-skia:
@@ -2879,6 +2884,7 @@ SPEC CHECKSUMS:
   React-Mapbuffer: 85140be073ac6c3fd2c74dead95fbab2f02e6821
   React-microtasksnativemodule: 76142165bc0f6ea98eae79e06c071c1e3aa3ae85
   react-native-maps: 9febd31278b35cd21e4fad2cf6fa708993be5dab
+  react-native-render-html: 5afc4751f1a98621b3009432ef84c47019dcb2bd
   react-native-safe-area-context: 8dc43e60dd67fd2be098486fd8195e143fb47c6f
   react-native-skia: 5d024324ef7b19f8fd70868458b0d7b2cb6644b5
   react-native-slider: ae14f6462a8a9afd94cdf269f23a365e19976645
