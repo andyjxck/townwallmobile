@@ -13,6 +13,14 @@ export function ShareCard({ post }) {
   const images = post.image_urls || (post.image_url ? [post.image_url] : []);
   const mainImage = images[0];
 
+  const stripHtml = (html) => {
+    if (!html) return '';
+    return html.replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+  };
+
+  const plainText = stripHtml(post.text);
+  const truncatedText = plainText.length > 500 ? plainText.substring(0, 500) + '...' : plainText;
+
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -38,12 +46,12 @@ export function ShareCard({ post }) {
                 />
               )}
               
-              <Text style={styles.title}>
+              <Text style={styles.title} numberOfLines={2}>
                 {post.title || 'Untitled Post'}
               </Text>
               
               <Text style={styles.body}>
-                {post.text}
+                {truncatedText}
               </Text>
             </View>
 
