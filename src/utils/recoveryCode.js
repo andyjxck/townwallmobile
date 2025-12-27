@@ -2,11 +2,19 @@ import { supabase } from './supabase';
 import bcrypt from 'bcryptjs';
 import * as Crypto from 'expo-crypto';
 
-// Set random fallback for bcryptjs using expo-crypto
-bcrypt.setRandomFallback((len) => {
-  const bytes = Crypto.getRandomBytes(len);
-  return Array.from(bytes);
-});
+// Polyfill for bcryptjs in React Native/Expo
+if (typeof global.crypto !== 'object') {
+  global.crypto = {};
+}
+if (typeof global.crypto.getRandomValues !== 'function') {
+  global.crypto.getRandomValues = (array) => {
+    const randomBytes = Crypto.getRandomBytes(array.length);
+    for (let i = 0; i < array.length; i++) {
+      array[i] = randomBytes[i];
+    }
+    return array;
+  };
+}
 
 export const generateRecoveryCodes = (count = 10) => {
   const codes = [];

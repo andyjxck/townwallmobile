@@ -11,12 +11,23 @@ import * as Haptics from "expo-haptics";
 import bcrypt from 'bcryptjs';
 import * as Crypto from 'expo-crypto';
 import { logoutUser, initUser } from "../utils/user";
+import { supabase } from "../utils/supabase";
+import { generateRecoveryCodes, storeRecoveryCodes } from "../utils/recoveryCode";
+import { RecoveryCodesDisplay } from "../components/RecoveryCodesDisplay";
 
-// Set random fallback for bcryptjs
-bcrypt.setRandomFallback((len) => {
-  const bytes = Crypto.getRandomBytes(len);
-  return Array.from(bytes);
-});
+// Polyfill for bcryptjs in React Native/Expo
+if (typeof global.crypto !== 'object') {
+  global.crypto = {};
+}
+if (typeof global.crypto.getRandomValues !== 'function') {
+  global.crypto.getRandomValues = (array) => {
+    const randomBytes = Crypto.getRandomBytes(array.length);
+    for (let i = 0; i < array.length; i++) {
+      array[i] = randomBytes[i];
+    }
+    return array;
+  };
+}
 
 export default function SettingsScreen() {
 

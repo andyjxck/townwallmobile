@@ -1,3 +1,4 @@
+import * as Crypto from 'expo-crypto';
 import { useState, useEffect } from "react";
 import {
   View,
@@ -25,6 +26,20 @@ import { theme } from "../utils/theme";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
+
+// Polyfill for bcryptjs in React Native/Expo
+if (typeof global.crypto !== 'object') {
+  global.crypto = {};
+}
+if (typeof global.crypto.getRandomValues !== 'function') {
+  global.crypto.getRandomValues = (array) => {
+    const randomBytes = Crypto.getRandomBytes(array.length);
+    for (let i = 0; i < array.length; i++) {
+      array[i] = randomBytes[i];
+    }
+    return array;
+  };
+}
 
 export default function Auth() {
   const router = useRouter();
