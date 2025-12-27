@@ -83,10 +83,11 @@
       "bundler": "metro",
       "favicon": "./assets/images/favicon.png"
     },
-      "experiments": {
-        "typedRoutes": true,
-        "tsconfigPaths": true
-      },
+    "experiments": {
+      "typedRoutes": true,
+      "tsconfigPaths": true,
+      "srcDir": "src"
+    },
     "extra": {
       "router": {
         "origin": false

@@ -1,10 +1,8 @@
-import { usePathname, useRouter } from 'expo-router';
 import { App } from 'expo-router/build/qualified-entry';
-import React, { memo, useEffect, useState } from 'react';
+import React, { memo, useEffect } from 'react';
 import { Platform } from 'react-native';
 import { requestTrackingPermissionsAsync } from 'expo-tracking-transparency';
 import { ErrorBoundaryWrapper } from './__create/SharedErrorBoundary';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Toaster } from 'sonner-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Purchases from 'react-native-purchases';
@@ -36,7 +34,6 @@ const GlobalErrorReporter = () => {
       if (typeof event.preventDefault === 'function') event.preventDefault();
       console.error(event.error);
     };
-    // unhandled promises happen all the time, so we just log them
     const unhandledRejectionHandler = (event: PromiseRejectionEvent) => {
       if (typeof event.preventDefault === 'function') event.preventDefault();
       console.error('Unhandled promise rejection:', event.reason);
@@ -55,115 +52,41 @@ const Wrapper = memo(() => {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ErrorBoundaryWrapper>
-        <SafeAreaProvider
-          initialMetrics={{
-            insets: { top: 64, bottom: 34, left: 0, right: 0 },
-            frame: {
-              x: 0,
-              y: 0,
-              width: Platform.OS !== 'web' || typeof window === 'undefined' ? 390 : window.innerWidth,
-              height: Platform.OS !== 'web' || typeof window === 'undefined' ? 844 : window.innerHeight,
-            },
-          }}
-        >
-          <App />
-          <GlobalErrorReporter />
-          <Toaster />
-        </SafeAreaProvider>
+        <App />
+        <GlobalErrorReporter />
+        <Toaster />
       </ErrorBoundaryWrapper>
     </GestureHandlerRootView>
   );
 });
-const healthyResponse = {
-  type: 'sandbox:mobile:healthcheck:response',
-  healthy: true,
-};
-
-const useHandshakeParent = () => {
-  useEffect(() => {
-    if (Platform.OS !== 'web' || typeof window === 'undefined') {
-      return;
-    }
-    const handleMessage = (event: MessageEvent) => {
-      if (event.data.type === 'sandbox:mobile:healthcheck') {
-        window.parent.postMessage(healthyResponse, '*');
-      }
-    };
-    window.addEventListener('message', handleMessage);
-    // Immediately respond to the parent window with a healthy response in
-    // case we missed the healthcheck message
-    window.parent.postMessage(healthyResponse, '*');
-    return () => {
-      window.removeEventListener('message', handleMessage);
-    };
-  }, []);
-};
 
 const CreateApp = () => {
-  const router = useRouter();
-  const pathname = usePathname();
-  useHandshakeParent();
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
 
-    useEffect(() => {
-      if (Platform.OS === 'web') return;
-
-      (async () => {
+    (async () => {
+      try {
         const { status } = await requestTrackingPermissionsAsync();
         if (status === 'granted') {
           console.log('Tracking permission granted');
         }
         
-        try {
-          // Dynamically require to avoid startup crash if module is missing
-          const ads = require('react-native-google-mobile-ads');
-          if (ads) {
-            const mobileAds = ads.default || ads;
-            if (mobileAds && typeof mobileAds === 'function') {
-              await mobileAds().initialize();
-              console.log('AdMob initialized');
-            }
+        // Dynamically require to avoid startup crash if module is missing
+        const ads = require('react-native-google-mobile-ads');
+        if (ads) {
+          const mobileAds = ads.default || ads;
+          if (mobileAds && typeof mobileAds === 'function') {
+            await mobileAds().initialize();
+            console.log('AdMob initialized');
           }
-        } catch (error) {
-          console.warn('AdMob initialization skipped:', error.message);
         }
-      })();
-    }, []);
-
-  useEffect(() => {
-    if (Platform.OS !== 'web' || typeof window === 'undefined') {
-      return;
-    }
-    const handleMessage = (event: MessageEvent) => {
-      if (event.data.type === 'sandbox:navigation' && event.data.pathname !== pathname) {
-        router.push(event.data.pathname);
+      } catch (error) {
+        console.warn('AdMob initialization skipped:', error.message);
       }
-    };
+    })();
+  }, []);
 
-    window.addEventListener('message', handleMessage);
-    window.parent.postMessage({ type: 'sandbox:mobile:ready' }, '*');
-    return () => {
-      window.removeEventListener('message', handleMessage);
-    };
-  }, [router, pathname]);
-
-  useEffect(() => {
-    if (Platform.OS !== 'web' || typeof window === 'undefined') {
-      return;
-    }
-    window.parent.postMessage(
-      {
-        type: 'sandbox:mobile:navigation',
-        pathname,
-      },
-      '*'
-    );
-  }, [pathname]);
-
-  return (
-    <>
-      <Wrapper />
-    </>
-  );
+  return <Wrapper />;
 };
 
 export default CreateApp;
