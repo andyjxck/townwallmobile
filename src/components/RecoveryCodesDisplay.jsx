@@ -1,9 +1,10 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
-import { Copy, Download, CheckCircle, RefreshCcw } from 'lucide-react-native';
+import { Copy, Download, CheckCircle, RefreshCcw, Check } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import * as Haptics from 'expo-haptics';
 import { theme } from '../utils/theme';
 
 export default function RecoveryCodesDisplay({ 
@@ -15,10 +16,14 @@ export default function RecoveryCodesDisplay({
 }) {
   const isViewMode = !!statuses && !codes;
 
+  const [copied, setCopied] = React.useState(false);
+
   const copyToClipboard = async () => {
     if (!codes) return;
     await Clipboard.setStringAsync(codes.join('\n'));
-    Alert.alert("Copied", "Recovery codes copied to clipboard");
+    setCopied(true);
+    setTimeout(() => setCopied(false), 3000);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
   const downloadCodes = async () => {
@@ -65,9 +70,12 @@ export default function RecoveryCodesDisplay({
 
       {isRegeneration && (
         <View style={styles.actions}>
-          <TouchableOpacity style={styles.actionButton} onPress={copyToClipboard}>
-            <Copy size={20} color="#000000" />
-            <Text style={styles.actionText}>Copy All</Text>
+          <TouchableOpacity 
+            style={[styles.actionButton, copied && { backgroundColor: '#22c55e' }]} 
+            onPress={copyToClipboard}
+          >
+            {copied ? <Check size={20} color="#000000" /> : <Copy size={20} color="#000000" />}
+            <Text style={styles.actionText}>{copied ? "Copied!" : "Copy All"}</Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.actionButton} onPress={downloadCodes}>
@@ -87,7 +95,26 @@ export default function RecoveryCodesDisplay({
         </TouchableOpacity>
       )}
 
-      <TouchableOpacity style={styles.confirmButton} onPress={onConfirm}>
+      <TouchableOpacity 
+        style={[
+          styles.confirmButton, 
+          isRegeneration && !copied && { opacity: 0.7 }
+        ]} 
+        onPress={() => {
+          if (isRegeneration && !copied) {
+            Alert.alert(
+              "Save Codes", 
+              "Please copy or download your recovery codes before continuing to ensure you don't lose access to your account.",
+              [
+                { text: "I'll save them first", style: "cancel" },
+                { text: "I've already saved them", onPress: onConfirm }
+              ]
+            );
+          } else {
+            onConfirm();
+          }
+        }}
+      >
         <CheckCircle size={24} color="#000000" />
         <Text style={styles.confirmButtonText}>
           {isRegeneration ? "I've saved these codes" : "Close"}
@@ -99,6 +126,7 @@ export default function RecoveryCodesDisplay({
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
     padding: 20,
     backgroundColor: theme.colors.background,
   },
