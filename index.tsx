@@ -7,33 +7,23 @@ if (__DEV__) {
 }
 
 import 'react-native-url-polyfill/auto';
-import './src/__create/polyfills';
 global.Buffer = require('buffer').Buffer;
 
 import CreateApp from './App';
 import type { ReactNode } from 'react';
 import { AppRegistry, LogBox } from 'react-native';
 import { DeviceErrorBoundaryWrapper } from './__create/DeviceErrorBoundary';
-import AnythingMenu from './src/__create/anything-menu';
 
 
-function AnythingMenuWrapper({ children }: { children: ReactNode }) {
-  return (
-    <AnythingMenu>
-      {children}
-    </AnythingMenu>
-  );
-};
-
-let WrapperComponentProvider = AnythingMenuWrapper;
+let WrapperComponentProvider: any = ({ children }: { children: ReactNode }) => children;
 
 if (__DEV__) {
   LogBox.ignoreAllLogs();
   LogBox.uninstall();
-  WrapperComponentProvider = ({ children }) => {
+  WrapperComponentProvider = ({ children }: { children: ReactNode }) => {
     return (
       <DeviceErrorBoundaryWrapper>
-        <AnythingMenuWrapper>{children}</AnythingMenuWrapper>
+        {children}
       </DeviceErrorBoundaryWrapper>
     );
   };

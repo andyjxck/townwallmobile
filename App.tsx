@@ -4,10 +4,8 @@ import React, { memo, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import { requestTrackingPermissionsAsync } from 'expo-tracking-transparency';
 import { ErrorBoundaryWrapper } from './__create/SharedErrorBoundary';
-import './src/__create/polyfills';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Toaster } from 'sonner-native';
-import { AlertModal } from './polyfills/web/alerts.web';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Purchases from 'react-native-purchases';
 import './global.css';
@@ -164,7 +162,6 @@ const CreateApp = () => {
   return (
     <>
       <Wrapper />
-      <AlertModal />
     </>
   );
 };
