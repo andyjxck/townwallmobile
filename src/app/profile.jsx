@@ -345,19 +345,26 @@ export default function Profile() {
           <ChevronLeft color={theme.colors.text} size={28} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Profile</Text>
-        <View style={{ flexDirection: 'row', gap: 10 }}>
-          {isOwnProfile && (
-            <TouchableOpacity onPress={() => router.push("/settings")} style={styles.headerIcon}>
-              <SettingsIcon color={theme.colors.text} size={24} />
-            </TouchableOpacity>
-          )}
-          {isOwnProfile && (
-            <TouchableOpacity onPress={handleLogout} style={styles.headerIcon}>
-              <LogOut color={theme.colors.error} size={24} />
-            </TouchableOpacity>
-          )}
-          {!isOwnProfile && <View style={{ width: 40 }} />}
-        </View>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            {isOwnProfile && (
+              <TouchableOpacity onPress={() => router.push("/settings")} style={styles.headerIcon}>
+                <SettingsIcon color={theme.colors.text} size={24} />
+              </TouchableOpacity>
+            )}
+            {isOwnProfile && (
+              user?.supabase_uid ? (
+                <TouchableOpacity onPress={handleLogout} style={styles.headerIcon}>
+                  <LogOut color={theme.colors.error} size={24} />
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity onPress={() => router.push("/auth")} style={[styles.headerIcon, { flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+                  <UserPlus color={theme.colors.primary} size={24} />
+                  <Text style={{ color: theme.colors.primary, fontWeight: 'bold' }}>Sign In</Text>
+                </TouchableOpacity>
+              )
+            )}
+            {!isOwnProfile && <View style={{ width: 40 }} />}
+          </View>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -378,10 +385,7 @@ export default function Profile() {
                       <ImageIcon size={12} color="#FFF" />
                     </View>
                   )}
-              </TouchableOpacity>
-              
-            
-              
+                </TouchableOpacity>
                 <View style={styles.nameSection}>
                 {editingUsername ? (
                   <View style={styles.editRow}>
@@ -585,11 +589,6 @@ const styles = StyleSheet.create({
   avatarEmoji: { fontSize: 60 },
   editBadge: { position: 'absolute', bottom: 0, right: 0, width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: '#FFF' },
   photoActions: { width: '100%', alignItems: 'center', marginBottom: 20 },
-  quickEmojis: { flexDirection: 'row', gap: 12, marginBottom: 12 },
-  quickEmojiItem: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
-  quickEmojiText: { fontSize: 24 },
-  inlineUploadBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(0,0,0,0.1)' },
-  inlineUploadBtnText: { fontSize: 14, fontWeight: '600' },
   nameSection: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   username: { fontSize: 24, fontWeight: 'bold' },
   onlineDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#10B981', marginLeft: 4 },
