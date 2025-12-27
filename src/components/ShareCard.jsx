@@ -44,9 +44,9 @@ export const ShareCard = ({ post }) => {
           </View>
         </View>
 
-        <View style={styles.branding}>
-          <Text style={styles.url}>townwall.app</Text>
-        </View>
+          <View style={styles.branding}>
+            <Text style={styles.url}>theandysocial.website/townwall</Text>
+          </View>
       </LinearGradient>
     </View>
   );
