@@ -264,9 +264,16 @@ export default function PostScreen() {
 
       setUploadProgress(0.9);
 
+      // Clean HTML from rich text editor
+      const cleanedText = text.trim()
+        .replace(/(&nbsp;)+$/, '') // Remove trailing &nbsp;
+        .replace(/(<br\s*\/?>)+$/, '') // Remove trailing <br>
+        .replace(/<p>(&nbsp;|\s|<br\s*\/?>)*<\/p>$/, '') // Remove empty trailing paragraphs
+        .trim();
+
       const postData = {
-        title: title.trim() || text.substring(0, 50),
-        text: text.trim(),
+        title: title.trim() || cleanedText.replace(/<[^>]*>?/gm, '').substring(0, 50),
+        text: cleanedText,
         zone_id: selectedZone?.id,
         tag_id: selectedTag.id,
         device_id: deviceId,

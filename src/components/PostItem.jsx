@@ -41,11 +41,13 @@ import { TextInput } from "react-native-gesture-handler";
 import RenderHtml from 'react-native-render-html';
 import { useWindowDimensions } from 'react-native';
 import PollComponent from "./PollComponent";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams, usePathname } from "expo-router";
 
   export default function PostItem({ item, deviceId, onReaction, onComment, onDelete, onMute, onShare, onEdit, user }) {
     const { width } = useWindowDimensions();
     const router = useRouter();
+    const pathname = usePathname();
+    const params = useLocalSearchParams();
     const [revealed, setRevealed] = useState(false);
     const [showFullImage, setShowFullImage] = useState(false);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -134,6 +136,16 @@ import { useRouter } from "expo-router";
 
   const navigateToProfile = (userId) => {
     if (!userId) return;
+    
+    // Prevent redundant navigation if we're already on this user's profile
+    if (pathname === '/profile' && params.userId === String(userId)) {
+      return;
+    }
+    // Also handle the case where we are on our own profile and clicking our own name
+    if (pathname === '/profile' && !params.userId && user?.id === userId) {
+      return;
+    }
+
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push(`/profile?userId=${userId}`);
   };
@@ -366,12 +378,13 @@ import { useRouter } from "expo-router";
                       }}
                     />
                   ) : (
-                    <Text 
-                      style={[styles.postBody, { color: 'rgba(255, 255, 255, 0.8)', marginTop: 8 }]} 
-                      numberOfLines={3}
-                    >
-                        {item.text.replace(/<[^>]*>?/gm, '')}
-                      </Text>
+                      <Text 
+                        style={[styles.postBody, { color: 'rgba(255, 255, 255, 0.8)', marginTop: 8 }]} 
+                        numberOfLines={3}
+                      >
+                          {item.text.replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').trim()}
+                        </Text>
+
                     )}
                   
                   {item.poll_id && (
