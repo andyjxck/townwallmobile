@@ -18,6 +18,13 @@ config.watchFolders = [...config.watchFolders, VIRTUAL_ROOT, VIRTUAL_ROOT_UNRESO
 // Add web-specific alias configuration through resolveRequest
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   try {
+    // Handle @/ alias manually to ensure it works
+    if (moduleName.startsWith('@/')) {
+      const relativePath = moduleName.replace('@/', '');
+      const absolutePath = path.resolve(__dirname, 'src', relativePath);
+      return context.resolveRequest(context, absolutePath, platform);
+    }
+
     // Wildcard alias for Expo Google Fonts
     if (moduleName.startsWith('@expo-google-fonts/') && moduleName !== '@expo-google-fonts/dev') {
       return context.resolveRequest(context, '@expo-google-fonts/dev', platform);
