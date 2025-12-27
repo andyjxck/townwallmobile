@@ -22,5 +22,63 @@ export const storeRecoveryCodes = async (userId, codes) => {
     .from('recovery_codes')
     .insert(hashes);
 
-  if (error) throw error;
-};
+    if (error) throw error;
+  };
+
+  export const verifyRecoveryCode = async (username, code) => {
+    try {
+      // 1. Find user by username
+      const { data: user, error: userError } = await supabase
+        .from('rusers')
+        .select('id')
+        .ilike('username', username.trim())
+        .single();
+
+      if (userError || !user) return { success: false, message: "User not found" };
+
+      // 2. Get all unused recovery codes for this user
+      const { data: codes, error: codesError } = await supabase
+        .from('recovery_codes')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('used', false);
+
+      if (codesError || !codes || codes.length === 0) {
+        return { success: false, message: "No valid recovery codes found" };
+      }
+
+      // 3. Compare provided code with stored hashes
+      let matchedCode = null;
+      for (const storedCode of codes) {
+        if (bcrypt.compareSync(code.trim().toUpperCase(), storedCode.code_hash)) {
+          matchedCode = storedCode;
+          break;
+        }
+      }
+
+      if (!matchedCode) return { success: false, message: "Invalid recovery code" };
+
+      // 4. Mark code as used
+      const { error: updateError } = await supabase
+        .from('recovery_codes')
+        .update({ 
+          used: true, 
+          used_at: new Date().toISOString() 
+        })
+        .eq('id', matchedCode.id);
+
+      if (updateError) throw updateError;
+
+      // 5. Get the full user object for login
+      const { data: fullUser } = await supabase
+        .from('rusers')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      return { success: true, user: fullUser };
+    } catch (error) {
+      console.error("Recovery verification error:", error);
+      return { success: false, message: "Something went wrong during verification" };
+    }
+  };
