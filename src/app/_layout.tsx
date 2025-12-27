@@ -199,15 +199,17 @@ export default function RootLayout() {
                 animation: "slide_from_right",
               }}
             >
-              <Stack.Screen name="index" />
-              <Stack.Screen name="onboarding/welcome" />
-              <Stack.Screen
-                name="post"
-                options={{
-                  presentation: "modal",
-                  animation: "slide_from_bottom",
-                }}
-              />
+                <Stack.Screen name="index" />
+                <Stack.Screen name="auth" />
+                <Stack.Screen name="onboarding/welcome" />
+                <Stack.Screen name="onboarding/zones" />
+                <Stack.Screen
+                  name="post"
+                  options={{
+                    presentation: "modal",
+                    animation: "slide_from_bottom",
+                  }}
+                />
             </Stack>
           </SafeAreaProvider>
         </ErrorBoundaryWrapper>
