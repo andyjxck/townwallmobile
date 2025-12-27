@@ -46,6 +46,8 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
   const [comments, setComments] = useState([]);
   const [loadingComments, setLoadingComments] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isAnonComment, setIsAnonComment] = useState(false);
+  const [userNickname, setUserNickname] = useState("");
 
   const [loadingLikers, setLoadingLikers] = useState(false);
   const [likers, setLikers] = useState([]);
@@ -76,26 +78,34 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
     if (isExpanded) fetchComments();
   }, [isExpanded, item.id]);
 
-  const fetchComments = async () => {
-    setLoadingComments(true);
-    try {
-      const { data } = await supabase.from('rcomments').select(`*, user:rusers (username, emoji_icon, avatar_url)`).eq('post_id', item.id).order('created_at', { ascending: true });
-      setComments(data || []);
-    } catch (error) { console.error(error); }
-    finally { setLoadingComments(false); }
-  };
+    const fetchComments = async () => {
+      setLoadingComments(true);
+      try {
+        const { data } = await supabase.from('rcomments').select(`*, user:rusers (username, emoji_icon, avatar_url, nickname)`).eq('post_id', item.id).order('created_at', { ascending: true });
+        setComments(data || []);
+        
+        const storedUser = await getStoredUser();
+        if (storedUser) {
+          const { data: profile } = await supabase.from('rusers').select('nickname').eq('id', storedUser.id).single();
+          setUserNickname(profile?.nickname || "");
+        }
+      } catch (error) { console.error(error); }
+      finally { setLoadingComments(false); }
+    };
 
-  const handleSendComment = async () => {
-    if (!commentText.trim()) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    try {
-      const storedUser = await getStoredUser();
-      const { data: commentData } = await supabase.from('rcomments').insert({
-        post_id: item.id,
-        user_id: storedUser?.id,
-        text: commentText.trim(),
-        device_id: deviceId,
-      }).select(`*, user:rusers (username, emoji_icon, avatar_url)`).single();
+    const handleSendComment = async () => {
+      if (!commentText.trim()) return;
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      try {
+        const storedUser = await getStoredUser();
+        const { data: commentData } = await supabase.from('rcomments').insert({
+          post_id: item.id,
+          user_id: storedUser?.id,
+          text: commentText.trim(),
+          device_id: deviceId,
+          is_anonymous: isAnonComment,
+          nickname: isAnonComment ? userNickname : null
+        }).select(`*, user:rusers (username, emoji_icon, avatar_url, nickname)`).single();
 
       if (item.user_id) {
         await supabase.from('rnotifications').insert({
@@ -221,20 +231,50 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
               </TouchableOpacity>
             </View>
 
-          {isExpanded && (
-            <View style={styles.commentsSection}>
-              {loadingComments ? <ActivityIndicator size="small" /> : comments.map(c => (
-                <View key={c.id} style={styles.comment}>
-                  <Text style={styles.commentUser}>@{c.user?.username}</Text>
-                  <Text style={styles.commentText}>{c.text}</Text>
+            {isExpanded && (
+              <View style={styles.commentsSection}>
+                {loadingComments ? <ActivityIndicator size="small" /> : comments.map(c => (
+                  <View key={c.id} style={styles.comment}>
+                    <Text style={styles.commentUser}>
+                      {c.is_anonymous ? `@${c.nickname || "Anonymous"}` : `@${c.user?.username}`}
+                    </Text>
+                    <Text style={styles.commentText}>{c.text}</Text>
+                  </View>
+                ))}
+                
+                <View style={styles.inputRow}>
+                  <View style={{ flex: 1 }}>
+                    <TextInput 
+                      style={styles.input} 
+                      placeholder="Comment..." 
+                      value={commentText} 
+                      onChangeText={setCommentText} 
+                    />
+                    <TouchableOpacity 
+                      onPress={() => setIsAnonComment(!isAnonComment)} 
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 }}
+                    >
+                      <View style={{ 
+                        width: 16, 
+                        height: 16, 
+                        borderRadius: 4, 
+                        borderWidth: 1, 
+                        borderColor: theme.colors.textSecondary,
+                        backgroundColor: isAnonComment ? theme.colors.primary : 'transparent',
+                        justifyContent: 'center',
+                        alignItems: 'center'
+                      }}>
+                        {isAnonComment && <X size={12} color="#000" />}
+                      </View>
+                      <Text style={{ fontSize: 12, color: theme.colors.textSecondary }}>
+                        Comment as {userNickname ? `@${userNickname}` : "Anonymous"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                  <TouchableOpacity onPress={handleSendComment} style={styles.sendBtn}><Send size={18} color="#FFF" /></TouchableOpacity>
                 </View>
-              ))}
-              <View style={styles.inputRow}>
-                <TextInput style={styles.input} placeholder="Comment..." value={commentText} onChangeText={setCommentText} />
-                <TouchableOpacity onPress={handleSendComment} style={styles.sendBtn}><Send size={18} color="#FFF" /></TouchableOpacity>
               </View>
-            </View>
-          )}
+            )}
         </View>
       )}
 

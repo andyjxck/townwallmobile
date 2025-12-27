@@ -15,6 +15,9 @@ import Purchases from "react-native-purchases";
 import Constants from "expo-constants";
 import { ErrorBoundaryWrapper } from "../../__create/SharedErrorBoundary";
 
+import NotificationPanel from "@/components/NotificationPanel";
+import FloatingChat from "@/components/FloatingChat";
+
 const isExpoGo = Constants.appOwnership === "expo";
 
 const queryClient = new QueryClient({
@@ -201,30 +204,31 @@ export default function RootLayout() {
             <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
             <SandboxHandler />
             <GlobalErrorReporter />
-            <Toaster />
-            <Stack
-                screenOptions={{
-                  headerShown: false,
-                  animation: "slide_from_right",
-                }}
-              >
-                  <Stack.Screen name="index" />
-                  <Stack.Screen name="auth" />
-                  <Stack.Screen name="help" />
-                  <Stack.Screen name="profile" />
-                  <Stack.Screen name="settings" />
-                  <Stack.Screen name="admin" />
-                  <Stack.Screen name="onboarding/welcome" />
-                  <Stack.Screen name="onboarding/zones" />
-                  <Stack.Screen
-                    name="post"
-                    options={{
-                      presentation: "modal",
-                      animation: "slide_from_bottom",
-                    }}
-                  />
-              </Stack>
-          </SafeAreaProvider>
+              <Toaster />
+              <Stack
+                  screenOptions={{
+                    headerShown: false,
+                    animation: "slide_from_right",
+                  }}
+                >
+                    <Stack.Screen name="index" />
+                    <Stack.Screen name="auth" />
+                    <Stack.Screen name="help" />
+                    <Stack.Screen name="profile" />
+                    <Stack.Screen name="settings" />
+                    <Stack.Screen name="admin" />
+                    <Stack.Screen name="onboarding/welcome" />
+                    <Stack.Screen name="onboarding/zones" />
+                    <Stack.Screen
+                      name="post"
+                      options={{
+                        presentation: "modal",
+                        animation: "slide_from_bottom",
+                      }}
+                    />
+                </Stack>
+              <FloatingChat />
+            </SafeAreaProvider>
         </ErrorBoundaryWrapper>
       </GestureHandlerRootView>
     </QueryClientProvider>

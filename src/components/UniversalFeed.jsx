@@ -149,6 +149,9 @@ export default function UniversalFeed() {
             <Image source={require("../../assets/images/icon.png")} style={{ width: 32, height: 32 }} contentFit="contain" />
           </View>
         <View style={styles.headerActions}>
+          <TouchableOpacity onPress={() => setShowFilterSort(true)} style={styles.headerIcon}>
+            <ListFilter color={theme.colors.text} size={24} />
+          </TouchableOpacity>
           <TouchableOpacity onPress={() => setShowNotifications(true)} style={styles.headerIcon}>
             <Bell color={theme.colors.text} size={24} />
             {unreadCount > 0 && <View style={[styles.badge, { backgroundColor: theme.colors.error }]} />}
@@ -157,25 +160,6 @@ export default function UniversalFeed() {
             <Menu color={theme.colors.text} size={24} />
           </TouchableOpacity>
         </View>
-      </View>
-
-      <View style={styles.filterBar}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
-          {['newest', 'oldest'].map(s => (
-            <TouchableOpacity key={s} onPress={() => setSortBy(s)} style={[styles.filterPill, sortBy === s && styles.filterPillActive]}>
-              <Text style={[styles.filterPillText, sortBy === s && styles.filterPillTextActive]}>{s}</Text>
-            </TouchableOpacity>
-          ))}
-          <View style={styles.filterDivider} />
-          <TouchableOpacity onPress={() => setSelectedZone(null)} style={[styles.filterPill, !selectedZone && styles.filterPillActive]}>
-            <Text style={[styles.filterPillText, !selectedZone && styles.filterPillTextActive]}>All</Text>
-          </TouchableOpacity>
-          {zones.map(z => (
-            <TouchableOpacity key={z.id} onPress={() => setSelectedZone(z.id)} style={[styles.filterPill, selectedZone === z.id && styles.filterPillActive]}>
-              <Text style={[styles.filterPillText, selectedZone === z.id && styles.filterPillTextActive]}>{z.name}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
       </View>
 
       {showMenu && (

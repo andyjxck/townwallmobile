@@ -104,15 +104,17 @@ export default function SettingsScreen() {
       </View>
 
         <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}>
-          <View style={styles.section}>
-            <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>SECURITY</Text>
-            {auth?.password && (
-              <>
-                <SettingsItem icon={<Key size={20} color={theme.colors.textSecondary} />} title="Change Password" onPress={() => { setShowChangePassword(true); setPasswordError(""); }} />
-                <SettingsItem icon={<Shield size={20} color={theme.colors.textSecondary} />} title="Recovery Codes" onPress={handleRegenerateRecoveryCodes} />
-              </>
-            )}
-          </View>
+            <View style={styles.section}>
+              <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>SECURITY</Text>
+              {auth?.password ? (
+                <>
+                  <SettingsItem icon={<Key size={20} color={theme.colors.textSecondary} />} title="Change Password" onPress={() => { setShowChangePassword(true); setPasswordError(""); }} />
+                  <SettingsItem icon={<Shield size={20} color={theme.colors.textSecondary} />} title="Recovery Codes" onPress={handleRegenerateRecoveryCodes} />
+                </>
+              ) : (
+                <SettingsItem icon={<Key size={20} color={theme.colors.textSecondary} />} title="Set Account Password" onPress={() => { setShowChangePassword(true); setPasswordError(""); }} />
+              )}
+            </View>
 
           <View style={styles.section}>
             <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>LEGAL</Text>

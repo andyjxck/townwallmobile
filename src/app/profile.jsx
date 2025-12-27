@@ -63,9 +63,13 @@ export default function Profile() {
   const [pendingRequests, setPendingRequests] = useState([]);
   const [activeTab, setActiveTab] = useState("posts");
   const [deviceId, setDeviceId] = useState(null);
-  const [editingBio, setEditingBio] = useState(false);
-  const [bioText, setBioText] = useState("");
-  const shareRef = useRef();
+    const [editingBio, setEditingBio] = useState(false);
+    const [editingUsername, setEditingUsername] = useState(false);
+    const [editingNickname, setEditingNickname] = useState(false);
+    const [bioText, setBioText] = useState("");
+    const [usernameText, setUsernameText] = useState("");
+    const [nicknameText, setNicknameText] = useState("");
+    const shareRef = useRef();
 
   useEffect(() => {
     getDeviceId().then(setDeviceId);
@@ -122,6 +126,8 @@ export default function Profile() {
       if (!userData && viewingOwnProfile) userData = await initUser();
       setUser(userData);
       setBioText(userData?.bio || "");
+      setUsernameText(userData?.username || "");
+      setNicknameText(userData?.nickname || "");
 
       if (userData) {
         const { count: postCount } = await supabase.from('rposts').select('*', { count: 'exact', head: true }).eq('user_id', userData.id);
@@ -191,6 +197,49 @@ export default function Profile() {
     } catch (error) { Alert.alert("Error", "Failed to update bio"); }
   };
 
+  const handleUpdateUsername = async () => {
+    if (usernameText.length < 3) { Alert.alert("Error", "Username too short"); return; }
+    if (user.last_username_change) {
+      const lastChange = new Date(user.last_username_change);
+      const diff = (new Date() - lastChange) / (1000 * 60 * 60 * 24);
+      if (diff < 30) {
+        Alert.alert("Error", `You can only change your username once every 30 days. Try again in ${Math.ceil(30 - diff)} days.`);
+        return;
+      }
+    }
+    try {
+      const { data: existing } = await supabase.from('rusers').select('id').eq('username', usernameText).neq('id', user.id).single();
+      if (existing) { Alert.alert("Error", "Username taken"); return; }
+      
+      await supabase.from('rusers').update({ 
+        username: usernameText, 
+        last_username_change: new Date().toISOString() 
+      }).eq('id', user.id);
+      setEditingUsername(false);
+      loadData();
+    } catch (error) { Alert.alert("Error", "Failed to update username"); }
+  };
+
+  const handleUpdateNickname = async () => {
+    if (nicknameText.length < 2) { Alert.alert("Error", "Nickname too short"); return; }
+    if (user.last_nickname_change) {
+      const lastChange = new Date(user.last_nickname_change);
+      const diff = (new Date() - lastChange) / (1000 * 60 * 60 * 24);
+      if (diff < 30) {
+        Alert.alert("Error", `You can only change your nickname once every 30 days. Try again in ${Math.ceil(30 - diff)} days.`);
+        return;
+      }
+    }
+    try {
+      await supabase.from('rusers').update({ 
+        nickname: nicknameText, 
+        last_nickname_change: new Date().toISOString() 
+      }).eq('id', user.id);
+      setEditingNickname(false);
+      loadData();
+    } catch (error) { Alert.alert("Error", "Failed to update nickname"); }
+  };
+
   const handleSelectEmoji = async (emoji) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
@@ -253,6 +302,32 @@ export default function Profile() {
     } catch (error) { Alert.alert("Error", "Failed to reject request"); }
   };
 
+  const handleMessageUser = async () => {
+    try {
+      const storedUser = await getStoredUser();
+      if (!storedUser) return;
+      
+      // Check if chat exists
+      const { data: existing } = await supabase
+        .from('rchats')
+        .select('id')
+        .or(`and(user1_id.eq.${storedUser.id},user2_id.eq.${user.id}),and(user1_id.eq.${user.id},user2_id.eq.${storedUser.id})`)
+        .single();
+      
+      if (existing) {
+        // Chat exists, the floating bubble will pick it up or we can trigger it
+        Alert.alert("Chat", "You already have a chat with this user. Click the chat bubble to continue.");
+      } else {
+        await supabase.from('rchats').insert({
+          user1_id: Math.min(storedUser.id, user.id),
+          user2_id: Math.max(storedUser.id, user.id),
+          last_message: "Chat started"
+        });
+        Alert.alert("Success", "Chat started! Click the bubble to message.");
+      }
+    } catch (error) { console.error(error); }
+  };
+
   if (loading && !user) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
@@ -304,15 +379,56 @@ export default function Profile() {
             </TouchableOpacity>
             
               <View style={styles.nameSection}>
-                <Text style={[styles.username, { color: theme.colors.text }]}>@{user?.username}</Text>
+                {editingUsername ? (
+                  <View style={styles.editRow}>
+                    <RNTextInput
+                      style={[styles.usernameInput, { color: theme.colors.text, borderColor: theme.colors.border }]}
+                      value={usernameText}
+                      onChangeText={setUsernameText}
+                      autoCapitalize="none"
+                      autoFocus
+                    />
+                    <TouchableOpacity onPress={handleUpdateUsername} style={styles.saveIcon}><Check size={20} color={theme.colors.success} /></TouchableOpacity>
+                    <TouchableOpacity onPress={() => setEditingUsername(false)} style={styles.saveIcon}><XIcon size={20} color={theme.colors.error} /></TouchableOpacity>
+                  </View>
+                ) : (
+                  <TouchableOpacity onPress={() => isOwnProfile && setEditingUsername(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={[styles.username, { color: theme.colors.text }]}>@{user?.username}</Text>
+                    {isOwnProfile && <Pencil size={14} color={theme.colors.textSecondary} />}
+                  </TouchableOpacity>
+                )}
                 {isOnline(user?.last_seen) && <View style={styles.onlineDot} />}
-                {user?.is_admin && (
-                  <TouchableOpacity onPress={() => router.push('/admin')} style={styles.adminBadge}>
-                    <Shield size={12} color="#FFF" />
-                    <Text style={styles.adminText}>MOD</Text>
+              </View>
+
+              <View style={styles.nicknameSection}>
+                {editingNickname ? (
+                  <View style={styles.editRow}>
+                    <RNTextInput
+                      style={[styles.usernameInput, { color: theme.colors.text, borderColor: theme.colors.border }]}
+                      value={nicknameText}
+                      onChangeText={setNicknameText}
+                      placeholder="Set nickname..."
+                      autoFocus
+                    />
+                    <TouchableOpacity onPress={handleUpdateNickname} style={styles.saveIcon}><Check size={20} color={theme.colors.success} /></TouchableOpacity>
+                    <TouchableOpacity onPress={() => setEditingNickname(false)} style={styles.saveIcon}><XIcon size={20} color={theme.colors.error} /></TouchableOpacity>
+                  </View>
+                ) : (
+                  <TouchableOpacity onPress={() => isOwnProfile && setEditingNickname(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={[styles.nickname, { color: theme.colors.textSecondary }]}>
+                      {user?.nickname ? `${user.nickname}` : (isOwnProfile ? "Set nickname" : "")}
+                    </Text>
+                    {isOwnProfile && <Pencil size={12} color={theme.colors.textSecondary} />}
                   </TouchableOpacity>
                 )}
               </View>
+
+              {user?.is_admin && (
+                <TouchableOpacity onPress={() => router.push('/admin')} style={styles.adminBadge}>
+                  <Shield size={12} color="#FFF" />
+                  <Text style={styles.adminText}>MOD</Text>
+                </TouchableOpacity>
+              )}
 
             {editingBio ? (
               <View style={styles.bioEditContainer}>
@@ -338,10 +454,19 @@ export default function Profile() {
             )}
           </View>
 
-            <View style={styles.statsRow}>
-              <View style={styles.statItem}><Text style={[styles.statValue, { color: theme.colors.text }]}>{stats.posts}</Text><Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Posts</Text></View>
-              <View style={styles.statItem}><Text style={[styles.statValue, { color: theme.colors.text }]}>{friends.length}</Text><Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Friends</Text></View>
-            </View>
+              <View style={styles.statsRow}>
+                <View style={styles.statItem}><Text style={[styles.statValue, { color: theme.colors.text }]}>{stats.posts}</Text><Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Posts</Text></View>
+                <View style={styles.statItem}><Text style={[styles.statValue, { color: theme.colors.text }]}>{friends.length}</Text><Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Friends</Text></View>
+              </View>
+
+              {!isOwnProfile && (
+                <View style={styles.actionRow}>
+                  <TouchableOpacity onPress={handleMessageUser} style={[styles.messageBtn, { backgroundColor: theme.colors.primary }]}>
+                    <MessageCircle size={20} color="#000" />
+                    <Text style={styles.messageBtnText}>Message</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
 
             <View style={styles.tabBar}>
               <TouchableOpacity onPress={() => setActiveTab("posts")} style={[styles.tab, activeTab === "posts" && { borderBottomColor: theme.colors.primary }]}><Text style={[styles.tabText, { color: activeTab === "posts" ? theme.colors.primary : theme.colors.textSecondary }]}>FEED</Text></TouchableOpacity>
@@ -458,8 +583,13 @@ const styles = StyleSheet.create({
   nameSection: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   username: { fontSize: 24, fontWeight: 'bold' },
   onlineDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#10B981', marginLeft: 4 },
-  adminBadge: { backgroundColor: '#6366f1', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  adminBadge: { backgroundColor: '#6366f1', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'center', marginTop: 4 },
   adminText: { color: '#FFF', fontSize: 10, fontWeight: 'bold' },
+  editRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  usernameInput: { borderBottomWidth: 1, fontSize: 18, paddingVertical: 4, minWidth: 150 },
+  saveIcon: { padding: 4 },
+  nicknameSection: { marginBottom: 12 },
+  nickname: { fontSize: 16, fontWeight: '500' },
   bio: { fontSize: 16, textAlign: 'center', paddingHorizontal: 20 },
   bioEditContainer: { width: '100%', gap: 10 },
   bioInput: { borderWidth: 1, borderRadius: 10, padding: 12, fontSize: 16, minHeight: 80, textAlignVertical: 'top' },
