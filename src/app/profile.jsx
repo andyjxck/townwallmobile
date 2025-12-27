@@ -380,24 +380,7 @@ export default function Profile() {
                   )}
               </TouchableOpacity>
               
-              {isOwnProfile && (
-                <View style={styles.photoActions}>
-                  <View style={styles.quickEmojis}>
-                    {EMOJIS.slice(0, 5).map(emoji => (
-                      <TouchableOpacity key={emoji} onPress={() => handleSelectEmoji(emoji)} style={styles.quickEmojiItem}>
-                        <Text style={styles.quickEmojiText}>{emoji}</Text>
-                      </TouchableOpacity>
-                    ))}
-                    <TouchableOpacity onPress={() => setShowEmojiPicker(true)} style={styles.quickEmojiItem}>
-                      <Text style={[styles.quickEmojiText, { color: theme.colors.primary }]}>+</Text>
-                    </TouchableOpacity>
-                  </View>
-                  <TouchableOpacity onPress={handlePickAvatar} style={[styles.inlineUploadBtn, { backgroundColor: theme.colors.surface }]}>
-                    <Camera size={16} color={theme.colors.text} />
-                    <Text style={[styles.inlineUploadBtnText, { color: theme.colors.text }]}>upload image</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
+            
               
                 <View style={styles.nameSection}>
                 {editingUsername ? (
