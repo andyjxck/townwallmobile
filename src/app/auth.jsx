@@ -11,19 +11,22 @@ import {
   Platform,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { supabase } from "@/utils/supabase";
-import { useAuthStore } from "@/utils/auth";
-import { getDeviceId } from "@/utils/deviceId";
-import { initUser } from "@/utils/user";
-import { ChevronLeft } from "lucide-react-native";
+import { supabase } from "../utils/supabase";
+import { useAuthStore } from "../utils/auth";
+import { getDeviceId } from "../utils/deviceId";
+import { initUser } from "../utils/user";
+import { ChevronLeft, User, Lock } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import bcrypt from 'bcryptjs';
-import { generateRecoveryCodes, storeRecoveryCodes } from "@/utils/recoveryCode";
-import { RecoveryCodesDisplay } from "@/components/RecoveryCodesDisplay";
+import { generateRecoveryCodes, storeRecoveryCodes } from "../utils/recoveryCode";
+import { RecoveryCodesDisplay } from "../components/RecoveryCodesDisplay";
+import { useTheme } from "../utils/theme";
 
 export default function Auth() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const { colors, spacing, borderRadius, typography } = useTheme();
+  
   const [isLogin, setIsLogin] = useState(params.mode === "login");
   const [loading, setLoading] = useState(false);
   const [username, setUsername] = useState("");
@@ -144,98 +147,111 @@ export default function Auth() {
 
   if (showRecoveryCodes) {
     return (
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.container}
-      >
-        <View style={styles.header}>
-          <View style={{ width: 28 }} />
-          <Text style={styles.headerTitle}>Save Recovery Codes</Text>
-          <View style={{ width: 28 }} />
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.header, { borderBottomColor: colors.border }]}>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Recovery Codes</Text>
         </View>
         <RecoveryCodesDisplay 
           codes={recoveryCodes}
           onConfirm={handleRecoveryCodesConfirmed}
         />
-      </KeyboardAvoidingView>
+      </View>
     );
   }
 
   return (
     <KeyboardAvoidingView 
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.background }]}
     >
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <ChevronLeft color="#FFFFFF" size={28} />
+        <TouchableOpacity 
+          onPress={() => router.back()}
+          style={[styles.backButton, { backgroundColor: colors.surface }]}
+        >
+          <ChevronLeft color={colors.text} size={24} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{isLogin ? "Welcome Back" : "Create Account"}</Text>
-        <View style={{ width: 28 }} />
+        <View style={{ flex: 1 }} />
       </View>
 
       <View style={styles.content}>
-        <Text style={styles.description}>
-          {isLogin 
-            ? "Enter your details to sign in." 
-            : "Choose a username and password. No email or personal data required."}
-        </Text>
-
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Username</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Choose a username"
-            placeholderTextColor="rgba(255,255,255,0.3)"
-            value={username}
-            onChangeText={setUsername}
-            autoCapitalize="none"
-          />
-        </View>
-
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Password</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter password"
-            placeholderTextColor="rgba(255,255,255,0.3)"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
-        </View>
-
-        <TouchableOpacity 
-          style={styles.button} 
-          onPress={handleAuth}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="#000000" />
-          ) : (
-            <Text style={styles.buttonText}>{isLogin ? "SIGN IN" : "CREATE ACCOUNT"}</Text>
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={styles.toggle} 
-          onPress={() => setIsLogin(!isLogin)}
-        >
-          <Text style={styles.toggleText}>
-            {isLogin ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
+        <View style={styles.titleContainer}>
+          <Text style={[styles.title, { color: colors.text, ...typography.h1 }]}>
+            {isLogin ? "Welcome Back" : "Create Account"}
           </Text>
-        </TouchableOpacity>
+          <Text style={[styles.description, { color: colors.textSecondary }]}>
+            {isLogin 
+              ? "Sign in to join the community." 
+              : "Choose a username and password. No personal data required."}
+          </Text>
+        </View>
 
-        {isLogin && (
+        <View style={styles.form}>
+          <View style={styles.inputGroup}>
+            <View style={styles.inputWrapper}>
+              <User size={20} color={colors.textTertiary} style={styles.inputIcon} />
+              <TextInput
+                style={[styles.input, { color: colors.text, backgroundColor: colors.surface, borderColor: colors.border }]}
+                placeholder="Username"
+                placeholderTextColor={colors.textTertiary}
+                value={username}
+                onChangeText={setUsername}
+                autoCapitalize="none"
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <View style={styles.inputWrapper}>
+              <Lock size={20} color={colors.textTertiary} style={styles.inputIcon} />
+              <TextInput
+                style={[styles.input, { color: colors.text, backgroundColor: colors.surface, borderColor: colors.border }]}
+                placeholder="Password"
+                placeholderTextColor={colors.textTertiary}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+              />
+            </View>
+          </View>
+
           <TouchableOpacity 
-            style={styles.forgotPassword} 
-            onPress={() => router.push("/forgot-password")}
+            style={[styles.button, { backgroundColor: colors.primary, borderRadius: borderRadius.xl }]} 
+            onPress={handleAuth}
+            disabled={loading}
           >
-            <Text style={styles.forgotPasswordText}>
-              Forgotten your password?
+            {loading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={[styles.buttonText, { ...typography.button }]}>
+                {isLogin ? "SIGN IN" : "CREATE ACCOUNT"}
+              </Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.toggle} 
+            onPress={() => setIsLogin(!isLogin)}
+          >
+            <Text style={[styles.toggleText, { color: colors.textSecondary }]}>
+              {isLogin ? "New here? " : "Joined already? "}
+              <Text style={{ color: colors.primary, fontWeight: '700' }}>
+                {isLogin ? "Sign up" : "Sign in"}
+              </Text>
             </Text>
           </TouchableOpacity>
-        )}
+
+          {isLogin && (
+            <TouchableOpacity 
+              style={styles.forgotPassword} 
+              onPress={() => router.push("/forgot-password")}
+            >
+              <Text style={[styles.forgotPasswordText, { color: colors.primary }]}>
+                Forgotten your password?
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -244,80 +260,90 @@ export default function Auth() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000000",
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     paddingTop: 60,
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     paddingBottom: 20,
   },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   headerTitle: {
-    color: "#FFFFFF",
     fontSize: 18,
     fontWeight: "700",
+    textAlign: 'center',
+    flex: 1,
   },
   content: {
     flex: 1,
-    paddingHorizontal: 30,
-    paddingTop: 40,
+    paddingHorizontal: 32,
+    paddingTop: 20,
   },
-  description: {
-    color: "rgba(255,255,255,0.6)",
-    fontSize: 15,
-    lineHeight: 22,
+  titleContainer: {
     marginBottom: 40,
   },
-  inputContainer: {
-    marginBottom: 25,
+  title: {
+    marginBottom: 12,
   },
-  label: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "600",
-    marginBottom: 10,
-    textTransform: "uppercase",
-    letterSpacing: 1,
+  description: {
+    fontSize: 16,
+    lineHeight: 24,
+  },
+  form: {
+    gap: 16,
+  },
+  inputGroup: {
+    gap: 8,
+  },
+  inputWrapper: {
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  inputIcon: {
+    position: 'absolute',
+    left: 16,
+    zIndex: 10,
   },
   input: {
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
-    color: "#FFFFFF",
+    paddingLeft: 48,
     fontSize: 16,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
   },
   button: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    padding: 18,
+    padding: 20,
     alignItems: "center",
-    marginTop: 20,
+    marginTop: 12,
+    shadowColor: "#6366F1",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 8,
   },
   buttonText: {
-    color: "#000000",
-    fontSize: 14,
-    fontWeight: "800",
-    letterSpacing: 1,
+    color: "#FFFFFF",
   },
   toggle: {
-    marginTop: 30,
+    marginTop: 24,
     alignItems: "center",
   },
   toggleText: {
-    color: "rgba(255,255,255,0.4)",
-    fontSize: 14,
+    fontSize: 15,
   },
   forgotPassword: {
-    marginTop: 20,
+    marginTop: 16,
     alignItems: "center",
   },
   forgotPasswordText: {
-    color: "#3B82F6",
     fontSize: 14,
-    fontWeight: "500",
+    fontWeight: "600",
   },
 });

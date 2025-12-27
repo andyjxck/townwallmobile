@@ -1,5 +1,35 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap");
 
+:root {
+  --background: #0F172A;
+  --surface: #1E293B;
+  --primary: #6366F1;
+  --secondary: #EC4899;
+  --text: #F8FAFC;
+  --text-secondary: #94A3B8;
+  --border: #334155;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --background: #F8FAFC;
+    --surface: #FFFFFF;
+    --primary: #6366F1;
+    --secondary: #EC4899;
+    --text: #0F172A;
+    --text-secondary: #475569;
+    --border: #E2E8F0;
+  }
+}
+
 body {
-  font-family: "Inter", sans-serif !important;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+  background-color: var(--background);
+  color: var(--text);
+  margin: 0;
+  padding: 0;
+}
+
+* {
+  box-sizing: border-box;
 }

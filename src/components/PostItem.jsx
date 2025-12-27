@@ -8,7 +8,6 @@ import {
   StyleSheet,
   Modal,
   Dimensions,
-  Share,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -20,15 +19,12 @@ import {
   Share as ShareIcon,
   AlertTriangle,
   X,
-  ChevronLeft,
-  ChevronRight,
   User,
   Send,
   Trash2,
-  VolumeX,
   Pencil,
-  Bookmark,
   Play,
+  MessageCircle,
 } from "lucide-react-native";
 import { getDeviceId } from "../utils/deviceId";
 import { supabase } from "../utils/supabase";
@@ -42,26 +38,29 @@ import RenderHtml from 'react-native-render-html';
 import { useWindowDimensions } from 'react-native';
 import PollComponent from "./PollComponent";
 import { useRouter, useLocalSearchParams, usePathname } from "expo-router";
+import { useTheme, getTagColor } from "../utils/theme";
 
-  export default function PostItem({ item, deviceId, onReaction, onComment, onDelete, onMute, onShare, onEdit, user }) {
-    const { width } = useWindowDimensions();
-    const router = useRouter();
-    const pathname = usePathname();
-    const params = useLocalSearchParams();
-    const [revealed, setRevealed] = useState(false);
-    const [showFullImage, setShowFullImage] = useState(false);
-    const [currentImageIndex, setCurrentImageIndex] = useState(0);
-    const [commentText, setCommentText] = useState("");
-    const [comments, setComments] = useState([]);
-    const [loadingComments, setLoadingComments] = useState(false);
-    const [isSaved, setIsSaved] = useState(false);
-    const [isExpanded, setIsExpanded] = useState(false);
-    const [showReactorsList, setShowReactorsList] = useState(false);
-    const [reactorsListType, setReactorsListType] = useState(null);
-    const [reactorsList, setReactorsList] = useState([]);
-    const [loadingReactors, setLoadingReactors] = useState(false);
-    const [shareCount, setShareCount] = useState(0);
-    const flatListRef = useRef(null);
+export default function PostItem({ item, deviceId, onReaction, onComment, onDelete, onMute, onShare, onEdit, user }) {
+  const { width } = useWindowDimensions();
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useLocalSearchParams();
+  const { colors, spacing, borderRadius, typography } = useTheme();
+  
+  const [revealed, setRevealed] = useState(false);
+  const [showFullImage, setShowFullImage] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [commentText, setCommentText] = useState("");
+  const [comments, setComments] = useState([]);
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [showReactorsList, setShowReactorsList] = useState(false);
+  const [reactorsListType, setReactorsListType] = useState(null);
+  const [reactorsList, setReactorsList] = useState([]);
+  const [loadingReactors, setLoadingReactors] = useState(false);
+  const [shareCount, setShareCount] = useState(0);
+  const flatListRef = useRef(null);
 
   const isVideo = item.media_type === 'video' || (item.image_url && (item.image_url.endsWith('.mp4') || item.image_url.endsWith('.mov')));
   
@@ -69,50 +68,46 @@ import { useRouter, useLocalSearchParams, usePathname } from "expo-router";
     player.loop = true;
   });
 
-    useEffect(() => {
-      let sub;
-      if (isExpanded) {
-        fetchComments();
-        
-        sub = supabase
-          .channel(`post_comments_${item.id}`)
-          .on('postgres_changes', { 
-            event: '*', 
-            schema: 'public', 
-            table: 'rcomments', 
-            filter: `post_id=eq.${item.id}` 
-          }, () => {
-            fetchComments();
-          })
-          .subscribe();
-      }
-      return () => {
-        if (sub) supabase.removeChannel(sub);
-      };
-    }, [isExpanded, item.id]);
-
-
-    useEffect(() => {
-      checkIfSaved();
-      fetchShareCount();
-
-      // Realtime subscription for shares
-      const sharesSub = supabase
-        .channel(`post_shares_${item.id}`)
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'rshares',
-          filter: `post_id=eq.${item.id}`
+  useEffect(() => {
+    let sub;
+    if (isExpanded) {
+      fetchComments();
+      sub = supabase
+        .channel(`post_comments_${item.id}`)
+        .on('postgres_changes', { 
+          event: '*', 
+          schema: 'public', 
+          table: 'rcomments', 
+          filter: `post_id=eq.${item.id}` 
         }, () => {
-          fetchShareCount();
+          fetchComments();
         })
         .subscribe();
+    }
+    return () => {
+      if (sub) supabase.removeChannel(sub);
+    };
+  }, [isExpanded, item.id]);
 
-      return () => {
-        supabase.removeChannel(sharesSub);
-      };
-    }, [item.id, user?.id]);
+  useEffect(() => {
+    checkIfSaved();
+    fetchShareCount();
+    const sharesSub = supabase
+      .channel(`post_shares_${item.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'rshares',
+        filter: `post_id=eq.${item.id}`
+      }, () => {
+        fetchShareCount();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(sharesSub);
+    };
+  }, [item.id, user?.id]);
 
   const checkIfSaved = async () => {
     if (!user?.id) return;
@@ -153,46 +148,10 @@ import { useRouter, useLocalSearchParams, usePathname } from "expo-router";
 
   const navigateToProfile = (userId) => {
     if (!userId) return;
-    
-    // Prevent redundant navigation if we're already on this user's profile
-    if (pathname === '/profile' && params.userId === String(userId)) {
-      return;
-    }
-    // Also handle the case where we are on our own profile and clicking our own name
-    if (pathname === '/profile' && !params.userId && user?.id === userId) {
-      return;
-    }
-
+    if (pathname === '/profile' && params.userId === String(userId)) return;
+    if (pathname === '/profile' && !params.userId && user?.id === userId) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push(`/profile?userId=${userId}`);
-  };
-
-  const handleSave = async () => {
-    if (!user?.id) {
-      alert("Please log in to save posts.");
-      return;
-    }
-    
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    const originalState = isSaved;
-    setIsSaved(!originalState);
-
-    try {
-      if (originalState) {
-        await supabase
-          .from('rsaved_posts')
-          .delete()
-          .eq('user_id', user.id)
-          .eq('post_id', item.id);
-      } else {
-        await supabase
-          .from('rsaved_posts')
-          .insert({ user_id: user.id, post_id: item.id });
-      }
-    } catch (error) {
-      console.error("Error saving post:", error);
-      setIsSaved(originalState);
-    }
   };
 
   const fetchComments = async () => {
@@ -200,10 +159,7 @@ import { useRouter, useLocalSearchParams, usePathname } from "expo-router";
     try {
       const { data } = await supabase
         .from('rcomments')
-        .select(`
-          *,
-          user:rusers (username, emoji_icon, avatar_url)
-        `)
+        .select(`*, user:rusers (username, emoji_icon, avatar_url)`)
         .eq('post_id', item.id)
         .order('created_at', { ascending: true });
       setComments(data || []);
@@ -220,23 +176,17 @@ import { useRouter, useLocalSearchParams, usePathname } from "expo-router";
     
     try {
       const storedUser = await getStoredUser();
-      
-      const { data: userData } = await supabase
-        .from('rusers')
-        .select('is_muted')
-        .eq('id', storedUser?.id)
-        .single();
-      
+      const { data: userData } = await supabase.from('rusers').select('is_muted').eq('id', storedUser?.id).single();
       if (userData?.is_muted) {
-        alert("Your account is muted. You cannot reply at this time.");
+        alert("Your account is muted.");
         return;
       }
       
-        const moderation = await moderateContent(commentText.trim());
-        if (moderation.status === 'rejected') {
-          alert(`Your comment does not meet community standards: ${moderation.reason}`);
-          return;
-        }
+      const moderation = await moderateContent(commentText.trim());
+      if (moderation.status === 'rejected') {
+        alert(`Rejected: ${moderation.reason}`);
+        return;
+      }
 
       const { data, error } = await supabase
         .from('rcomments')
@@ -248,10 +198,7 @@ import { useRouter, useLocalSearchParams, usePathname } from "expo-router";
           moderation_status: moderation.status,
           moderation_reason: moderation.reason,
         })
-        .select(`
-          *,
-          user:rusers (username, emoji_icon, avatar_url)
-        `)
+        .select(`*, user:rusers (username, emoji_icon, avatar_url)`)
         .single();
       
       if (error) throw error;
@@ -276,11 +223,9 @@ import { useRouter, useLocalSearchParams, usePathname } from "expo-router";
 
   useEffect(() => {
     if (!hasMultipleImages || showFullImage || isVideo) return;
-
     const interval = setInterval(() => {
       setCurrentImageIndex((prev) => (prev + 1) % images.length);
-    }, 2000);
-
+    }, 2500);
     return () => clearInterval(interval);
   }, [hasMultipleImages, images.length, showFullImage, isVideo]);
 
@@ -297,9 +242,10 @@ import { useRouter, useLocalSearchParams, usePathname } from "expo-router";
 
   const shouldBlur = fakeCount > 5 && fakeCount > (helpfulCount + seenCount);
   const timeAgo = getTimeAgo(new Date(item.created_at));
-  
+  const tagBg = item.tag?.name ? getTagColor(item.tag.name, colors) : colors.tagGeneral;
+
   return (
-    <View style={styles.postContainer}>
+    <View style={[styles.container, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       {shouldBlur && !revealed ? (
         <TouchableOpacity
           onPress={() => {
@@ -307,623 +253,495 @@ import { useRouter, useLocalSearchParams, usePathname } from "expo-router";
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
           }}
           activeOpacity={0.8}
-          style={styles.blurBanner}
+          style={[styles.blurBanner, { backgroundColor: colors.danger + '1A', borderColor: colors.danger + '33' }]}
         >
-          <AlertTriangle size={16} color="#EF4444" />
-          <Text style={styles.blurText}>
-            Reported as misleading by the community. Tap to reveal.
+          <AlertTriangle size={18} color={colors.danger} />
+          <Text style={[styles.blurText, { color: colors.danger }]}>
+            Reported as misleading. Tap to reveal.
           </Text>
         </TouchableOpacity>
-        ) : (
-          <View>
-            <View style={{ flexDirection: 'row', gap: 12 }}>
-              <View style={{ flex: 1 }}>
-                <View style={[styles.postHeader, { gap: 8 }]}>
-                  <TouchableOpacity 
-                    onPress={() => !item.is_anonymous && item.user_id && navigateToProfile(item.user_id)}
-                    disabled={item.is_anonymous || !item.user_id}
-                    activeOpacity={0.7}
-                  >
-                    {!item.is_anonymous && (item.user?.avatar_url || item.user?.emoji_icon) ? (
-                      item.user?.avatar_url ? (
-                        <Image 
-                          source={{ uri: item.user.avatar_url }} 
-                          style={{ width: 24, height: 24, borderRadius: 12 }} 
-                        />
-                      ) : (
-                        <Text style={{ fontSize: 16 }}>{item.user.emoji_icon}</Text>
-                      )
-                    ) : (
-                      <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' }}>
-                        <User size={14} color="rgba(255,255,255,0.4)" />
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                  
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <TouchableOpacity 
-                        onPress={() => !item.is_anonymous && item.user_id && navigateToProfile(item.user_id)}
-                        disabled={item.is_anonymous || !item.user_id}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={[styles.zoneText, { color: '#FFFFFF' }]}>
-                          {!item.is_anonymous && item.user?.username ? item.user.username : "Anonymous"}
-                        </Text>
-                      </TouchableOpacity>
-                      <Text style={[styles.timeText, { color: 'rgba(255, 255, 255, 0.3)' }]}>
-                        · {item.zone?.name}
-                      </Text>
-                      <Text style={[styles.timeText, { color: 'rgba(255, 255, 255, 0.3)' }]}>
-                        · {timeAgo}
-                      </Text>
-                    </View>
-                    {item.tag?.name && (
-                      <Text style={[styles.tagText, { color: 'rgba(255, 255, 255, 0.3)', marginTop: 1 }]}>
-                        #{item.tag.name.replace(/\s+/g, '')}
-                      </Text>
-                    )}
-                  </View>
+      ) : (
+        <View style={styles.contentWrapper}>
+          <View style={styles.header}>
+            <TouchableOpacity 
+              onPress={() => !item.is_anonymous && item.user_id && navigateToProfile(item.user_id)}
+              disabled={item.is_anonymous || !item.user_id}
+              activeOpacity={0.7}
+              style={styles.avatarContainer}
+            >
+              {!item.is_anonymous && (item.user?.avatar_url || item.user?.emoji_icon) ? (
+                item.user?.avatar_url ? (
+                  <Image source={{ uri: item.user.avatar_url }} style={styles.avatar} />
+                ) : (
+                  <Text style={styles.emojiAvatar}>{item.user.emoji_icon}</Text>
+                )
+              ) : (
+                <View style={[styles.defaultAvatar, { backgroundColor: colors.background }]}>
+                  <User size={16} color={colors.textSecondary} />
                 </View>
-
-              <TouchableOpacity 
-                onPress={() => setIsExpanded(!isExpanded)} 
-                activeOpacity={0.7}
-                style={{ flex: 1 }}
-              >
-                <Text style={[styles.postTitle, { color: '#FFFFFF', opacity: shouldBlur ? 0.6 : 1 }]}>
-                  {item.title || "Untitled Post"}
-                </Text>
-                
-                  {isExpanded ? (
-                    <RenderHtml
-                      contentWidth={width - 40}
-                      source={{ html: item.text }}
-                      tagsStyles={{
-                        body: {
-                          color: 'rgba(255, 255, 255, 0.8)',
-                          fontSize: 14,
-                          lineHeight: 20,
-                        },
-                        p: {
-                          marginBottom: 8,
-                        },
-                        img: {
-                          borderRadius: 8,
-                          marginVertical: 10,
-                        }
-                      }}
-                    />
-                  ) : (
-                      <Text 
-                        style={[styles.postBody, { color: 'rgba(255, 255, 255, 0.8)', marginTop: 8 }]} 
-                        numberOfLines={3}
-                      >
-                          {item.text.replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').trim()}
-                        </Text>
-
-                    )}
-                  
-                  {item.poll_id && (
-                    <PollComponent pollId={item.poll_id} />
-                  )}
-                </TouchableOpacity>
-            </View>
-
-            <View style={{ alignItems: 'flex-end', gap: 8 }}>
-              {images.length > 0 && (
-                <TouchableOpacity 
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                    setShowFullImage(true);
-                  }}
-                  activeOpacity={0.9}
-                  style={{ position: 'relative' }}
-                >
-                  {isVideo ? (
-                    <View style={{ width: 80, height: 110, borderRadius: 8, overflow: 'hidden', backgroundColor: '#000' }}>
-                      <VideoView
-                        player={videoPlayer}
-                        style={{ width: '100%', height: '100%' }}
-                        contentFit="cover"
-                        nativeControls={false}
-                      />
-                      <View style={{ position: 'absolute', top: '50%', left: '50%', transform: [{translateX: -10}, {translateY: -10}], backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 10, padding: 4 }}>
-                        <Play size={12} color="#FFF" fill="#FFF" />
-                      </View>
-                    </View>
-                  ) : (
-                    <Image
-                      source={{ uri: images[currentImageIndex] }}
-                      style={{ width: 80, height: 80, borderRadius: 8 }}
-                      contentFit="cover"
-                    />
-                  )}
-                  {hasMultipleImages && (
-                    <View style={{
-                      position: 'absolute',
-                      bottom: 4,
-                      right: 4,
-                      backgroundColor: 'rgba(0,0,0,0.6)',
-                      paddingHorizontal: 4,
-                      paddingVertical: 2,
-                      borderRadius: 4,
-                    }}>
-                      <Text style={{ color: '#FFFFFF', fontSize: 8, fontWeight: '700' }}>
-                        {currentImageIndex + 1}/{images.length}
-                      </Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
               )}
+            </TouchableOpacity>
+            
+            <View style={styles.headerInfo}>
+              <View style={styles.metaRow}>
+                <TouchableOpacity 
+                  onPress={() => !item.is_anonymous && item.user_id && navigateToProfile(item.user_id)}
+                  disabled={item.is_anonymous || !item.user_id}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.username, { color: colors.text }]}>
+                    {!item.is_anonymous && item.user?.username ? item.user.username : "Anonymous"}
+                  </Text>
+                </TouchableOpacity>
+                <Text style={[styles.dot, { color: colors.textTertiary }]}>•</Text>
+                <Text style={[styles.metaText, { color: colors.textSecondary }]}>{timeAgo}</Text>
+              </View>
+              <View style={styles.metaRow}>
+                <Text style={[styles.zoneText, { color: colors.primary }]}>{item.zone?.name}</Text>
+                {item.tag?.name && (
+                  <>
+                    <Text style={[styles.dot, { color: colors.textTertiary }]}>•</Text>
+                    <View style={[styles.tagPill, { backgroundColor: tagBg }]}>
+                      <Text style={[styles.tagLabel, { color: colors.textSecondary }]}>#{item.tag.name}</Text>
+                    </View>
+                  </>
+                )}
+              </View>
             </View>
-          </View>
-        </View>
-      )}
 
-        <View style={styles.actionRow}>
-          <View style={styles.actionButton}>
-            <TouchableOpacity
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                onReaction(item.id, "helpful", userReactions.helpful);
-              }}
-            >
-              <Heart
-                size={20}
-                color={userReactions.helpful ? "#F43F5E" : "rgba(255,255,255,0.4)"}
-                fill={userReactions.helpful ? "#F43F5E" : "transparent"}
-              />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => helpfulCount > 0 && fetchReactorsList("helpful")}>
-              <Text style={[styles.actionCount, { color: userReactions.helpful ? "#F43F5E" : "rgba(255,255,255,0.4)" }]}>
-                {helpfulCount || 0}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.actionButton}>
-            <TouchableOpacity
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                onReaction(item.id, "seen", userReactions.seen);
-              }}
-            >
-              <Star
-                size={20}
-                color={userReactions.seen ? "#FBBF24" : "rgba(255,255,255,0.4)"}
-                fill={userReactions.seen ? "#FBBF24" : "transparent"}
-              />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => seenCount > 0 && fetchReactorsList("seen")}>
-              <Text style={[styles.actionCount, { color: userReactions.seen ? "#FBBF24" : "rgba(255,255,255,0.4)" }]}>
-                {seenCount || 0}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <TouchableOpacity
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              onReaction(item.id, "fake", userReactions.fake);
-            }}
-            style={styles.actionButton}
-          >
-            <Flag
-              size={20}
-              color={userReactions.fake ? "#EF4444" : "rgba(255,255,255,0.4)"}
-              fill={userReactions.fake ? "#EF4444" : "transparent"}
-            />
-            <Text style={[styles.actionCount, { color: userReactions.fake ? "#EF4444" : "rgba(255,255,255,0.4)" }]}>
-              REPORT
-            </Text>
-          </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => onShare(item)}
-              style={styles.actionButton}
-            >
-              <ShareIcon size={20} color="rgba(255,255,255,0.4)" />
-              <Text style={[styles.actionCount, { color: "rgba(255,255,255,0.4)" }]}>
-                {shareCount || 0}
-              </Text>
-            </TouchableOpacity>
-
-          {(user?.id === item.user_id || user?.is_admin || user?.is_moderator) && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            {(user?.id === item.user_id || user?.is_admin || user?.is_moderator) && (
               <TouchableOpacity
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                   onEdit(item);
                 }}
-                style={styles.actionButton}
+                style={styles.editButton}
               >
-                <Pencil size={20} color="rgba(255, 255, 255, 0.4)" />
+                <Pencil size={18} color={colors.textTertiary} />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <TouchableOpacity 
+            onPress={() => setIsExpanded(!isExpanded)} 
+            activeOpacity={0.8}
+            style={styles.bodyContainer}
+          >
+            <Text style={[styles.title, { color: colors.text, ...typography.h3 }]}>
+              {item.title || "Untitled Post"}
+            </Text>
+            
+            {isExpanded ? (
+              <View style={styles.htmlContainer}>
+                <RenderHtml
+                  contentWidth={width - 64}
+                  source={{ html: item.text }}
+                  tagsStyles={{
+                    body: { color: colors.text, fontSize: 15, lineHeight: 22 },
+                    p: { marginBottom: 12 },
+                    img: { borderRadius: borderRadius.md, marginVertical: 12 }
+                  }}
+                />
+              </View>
+            ) : (
+              <Text style={[styles.bodyText, { color: colors.textSecondary }]} numberOfLines={3}>
+                {item.text.replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').trim()}
+              </Text>
+            )}
+            
+            {item.poll_id && <PollComponent pollId={item.poll_id} />}
+          </TouchableOpacity>
+
+          {images.length > 0 && (
+            <TouchableOpacity 
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                setShowFullImage(true);
+              }}
+              activeOpacity={0.9}
+              style={[styles.mediaContainer, { borderRadius: borderRadius.xl }]}
+            >
+              {isVideo ? (
+                <View style={[styles.videoPreview, { backgroundColor: colors.background }]}>
+                  <VideoView
+                    player={videoPlayer}
+                    style={styles.fullMedia}
+                    contentFit="cover"
+                    nativeControls={false}
+                  />
+                  <View style={styles.playOverlay}>
+                    <Play size={24} color="#FFF" fill="#FFF" />
+                  </View>
+                </View>
+              ) : (
+                <Image
+                  source={{ uri: images[currentImageIndex] }}
+                  style={styles.fullMedia}
+                  contentFit="cover"
+                />
+              )}
+              {hasMultipleImages && (
+                <View style={[styles.imageCountPill, { borderRadius: borderRadius.full }]}>
+                  <Text style={styles.imageCountText}>{currentImageIndex + 1}/{images.length}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          )}
+
+          <View style={[styles.footer, { borderTopColor: colors.separator }]}>
+            <View style={styles.actionGroup}>
+              <TouchableOpacity
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  onReaction(item.id, "helpful", userReactions.helpful);
+                }}
+                style={[styles.reactionButton, userReactions.helpful && { backgroundColor: colors.reactionActive }]}
+              >
+                <Heart
+                  size={20}
+                  color={userReactions.helpful ? colors.secondary : colors.textTertiary}
+                  fill={userReactions.helpful ? colors.secondary : "transparent"}
+                />
+                <Text style={[styles.reactionCount, { color: userReactions.helpful ? colors.text : colors.textSecondary }]}>
+                  {helpfulCount || 0}
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  onDelete(item.id);
-                }}
-                style={styles.actionButton}
+                onPress={() => setIsExpanded(!isExpanded)}
+                style={styles.reactionButton}
               >
-                <Trash2 size={20} color="rgba(239, 68, 68, 0.4)" />
+                <MessageCircle size={20} color={colors.textTertiary} />
+                <Text style={[styles.reactionCount, { color: colors.textSecondary }]}>
+                  {comments.length || 0}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => onShare(item)}
+                style={styles.reactionButton}
+              >
+                <ShareIcon size={20} color={colors.textTertiary} />
+                <Text style={[styles.reactionCount, { color: colors.textSecondary }]}>
+                  {shareCount || 0}
+                </Text>
               </TouchableOpacity>
             </View>
-          )}
-        </View>
 
-      {isExpanded && (
-        <View style={styles.expandedContent}>
-          <View style={styles.commentsDivider} />
-          <Text style={styles.commentsHeader}>COMMENTS</Text>
-          
-          {loadingComments ? (
-            <ActivityIndicator color="#FFF" style={{ marginVertical: 20 }} />
-          ) : (
-            <View style={styles.commentsList}>
-              {comments.map((c) => (
-                <View key={c.id} style={styles.commentItem}>
-                  <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-                    <Text style={{ fontSize: 16 }}>{c.user?.emoji_icon || "👤"}</Text>
-                    <Text style={styles.commentUser}>@{c.user?.username || "Anon"}</Text>
-                  </View>
-                  <Text style={styles.commentText}>{c.text}</Text>
-                </View>
-              ))}
-              {comments.length === 0 && (
-                <Text style={styles.noComments}>No comments yet.</Text>
-              )}
-            </View>
-          )}
-
-          <View style={styles.commentInputRow}>
-            <TextInput
-              style={styles.inlineInput}
-              placeholder="Add a comment..."
-              placeholderTextColor="rgba(255,255,255,0.3)"
-              value={commentText}
-              onChangeText={setCommentText}
-              multiline
-            />
-            <TouchableOpacity 
-              style={styles.inlineSendButton} 
-              onPress={handleSendComment}
-              disabled={!commentText.trim()}
+            <TouchableOpacity
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                onReaction(item.id, "fake", userReactions.fake);
+              }}
+              style={styles.reportButton}
             >
-              <Send size={18} color={commentText.trim() ? "#FFF" : "rgba(255,255,255,0.2)"} />
+              <Flag size={18} color={userReactions.fake ? colors.danger : colors.textTertiary} />
             </TouchableOpacity>
           </View>
         </View>
       )}
 
-      {/* Full Screen Image/Video Modal */}
-      <Modal visible={showFullImage} transparent animationType="fade">
-        <View style={styles.fullImageContainer}>
-          <TouchableOpacity 
-            style={styles.closeImageButton}
-            onPress={() => setShowFullImage(false)}
-          >
-            <X color="#FFFFFF" size={32} />
-          </TouchableOpacity>
-
-          {isVideo ? (
-            <VideoView
-              player={videoPlayer}
-              style={{ width: '100%', height: '80%' }}
-              contentFit="contain"
-              nativeControls
-            />
-          ) : hasMultipleImages ? (
-            <>
-              <FlatList
-                ref={flatListRef}
-                data={images}
-                horizontal
-                pagingEnabled
-                showsHorizontalScrollIndicator={false}
-                onMomentumScrollEnd={(e) => {
-                  const index = Math.round(e.nativeEvent.contentOffset.x / Dimensions.get('window').width);
-                  setCurrentImageIndex(index);
-                }}
-                getItemLayout={(_, index) => ({
-                  length: Dimensions.get('window').width,
-                  offset: Dimensions.get('window').width * index,
-                  index,
-                })}
-                renderItem={({ item: imgUri }) => (
-                  <View style={{ width: Dimensions.get('window').width, height: '100%', justifyContent: 'center' }}>
-                    <Image
-                      source={{ uri: imgUri }}
-                      style={styles.fullImage}
-                      contentFit="contain"
-                    />
-                  </View>
-                )}
-                keyExtractor={(i) => i}
-              />
-              <View style={styles.paginationDots}>
-                {images.map((_, i) => (
-                  <View 
-                    key={i} 
-                    style={[
-                      styles.dot, 
-                      { backgroundColor: i === currentImageIndex ? '#FFFFFF' : 'rgba(255,255,255,0.3)' }
-                    ]} 
-                  />
-                ))}
-              </View>
-            </>
+      {isExpanded && (
+        <View style={[styles.expandedContent, { backgroundColor: colors.background }]}>
+          <Text style={[styles.commentsTitle, { color: colors.textSecondary }]}>COMMENTS</Text>
+          
+          {loadingComments ? (
+            <ActivityIndicator color={colors.primary} style={{ marginVertical: 20 }} />
           ) : (
-            <Image
-              source={{ uri: images[0] }}
-              style={styles.fullImage}
-              contentFit="contain"
-            />
-            )}
-          </View>
-        </Modal>
-
-        <Modal visible={showReactorsList} transparent animationType="slide">
-          <View style={styles.reactorsModalOverlay}>
-            <View style={styles.reactorsModalContent}>
-              <View style={styles.reactorsHeader}>
-                <Text style={styles.reactorsTitle}>
-                  {reactorsListType === 'helpful' ? '❤️ LIKES' : '⭐ SUPERLIKES'}
-                </Text>
-                <TouchableOpacity onPress={() => setShowReactorsList(false)}>
-                  <X color="#FFF" size={24} />
-                </TouchableOpacity>
-              </View>
-              
-              {loadingReactors ? (
-                <ActivityIndicator color="#FFF" style={{ marginVertical: 30 }} />
-              ) : reactorsList.length === 0 ? (
-                <Text style={styles.noReactors}>No users found.</Text>
-              ) : (
-                <ScrollView style={{ maxHeight: 400 }}>
-                  {reactorsList.map((reactor, idx) => (
-                    <TouchableOpacity 
-                      key={idx} 
-                      style={styles.reactorItem}
-                      onPress={() => {
-                        setShowReactorsList(false);
-                        navigateToProfile(reactor.id);
-                      }}
-                    >
-                      {reactor.avatar_url ? (
-                        <Image source={{ uri: reactor.avatar_url }} style={styles.reactorAvatar} />
-                      ) : (
-                        <Text style={{ fontSize: 24 }}>{reactor.emoji_icon || "👤"}</Text>
-                      )}
-                      <Text style={styles.reactorUsername}>@{reactor.username}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
+            <View style={styles.commentsList}>
+              {comments.map((c) => (
+                <View key={c.id} style={styles.commentItem}>
+                  <View style={styles.commentHeader}>
+                    <Text style={{ fontSize: 16 }}>{c.user?.emoji_icon || "👤"}</Text>
+                    <Text style={[styles.commentUser, { color: colors.text }]}>@{c.user?.username}</Text>
+                  </View>
+                  <Text style={[styles.commentText, { color: colors.textSecondary }]}>{c.text}</Text>
+                </View>
+              ))}
+              {comments.length === 0 && (
+                <Text style={[styles.noComments, { color: colors.textTertiary }]}>No comments yet.</Text>
               )}
             </View>
+          )}
+
+          <View style={[styles.commentInputWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <TextInput
+              style={[styles.commentInput, { color: colors.text }]}
+              placeholder="Add a comment..."
+              placeholderTextColor={colors.textTertiary}
+              value={commentText}
+              onChangeText={setCommentText}
+              multiline
+            />
+            <TouchableOpacity 
+              onPress={handleSendComment}
+              disabled={!commentText.trim()}
+              style={[styles.sendButton, { backgroundColor: commentText.trim() ? colors.primary : colors.separator }]}
+            >
+              <Send size={16} color="#FFF" />
+            </TouchableOpacity>
           </View>
-        </Modal>
-      </View>
-    );
-  }
+        </View>
+      )}
+
+      <Modal visible={showFullImage} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity style={styles.modalClose} onPress={() => setShowFullImage(false)}>
+            <X color="#FFF" size={32} />
+          </TouchableOpacity>
+          {isVideo ? (
+            <VideoView player={videoPlayer} style={styles.fullModalMedia} contentFit="contain" nativeControls />
+          ) : (
+            <Image source={{ uri: images[currentImageIndex] }} style={styles.fullModalMedia} contentFit="contain" />
+          )}
+        </View>
+      </Modal>
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
-  postContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    backgroundColor: 'rgba(255,255,255,0.02)',
-    marginBottom: 1,
-    position: 'relative',
+  container: {
+    marginHorizontal: 16,
+    marginVertical: 8,
+    borderRadius: 24,
+    borderWidth: 1,
+    overflow: 'hidden',
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 5,
   },
-  postHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
+  contentWrapper: {
+    padding: 16,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  avatarContainer: {
+    marginRight: 12,
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  emojiAvatar: {
+    fontSize: 28,
+  },
+  defaultAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerInfo: {
+    flex: 1,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  username: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  dot: {
+    marginHorizontal: 6,
+    fontSize: 12,
+  },
+  metaText: {
+    fontSize: 13,
   },
   zoneText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  tagPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  tagLabel: {
     fontSize: 11,
+    fontWeight: '600',
+  },
+  editButton: {
+    padding: 8,
+  },
+  bodyContainer: {
+    marginBottom: 16,
+  },
+  title: {
+    marginBottom: 8,
+  },
+  bodyText: {
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  mediaContainer: {
+    height: 240,
+    width: '100%',
+    marginBottom: 16,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  videoPreview: {
+    width: '100%',
+    height: '100%',
+  },
+  fullMedia: {
+    width: '100%',
+    height: '100%',
+  },
+  playOverlay: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -24 }, { translateY: -24 }],
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageCountPill: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  imageCountText: {
+    color: '#FFF',
+    fontSize: 10,
     fontWeight: '700',
-    textTransform: 'uppercase',
   },
-  timeText: {
-    fontSize: 11,
-    marginLeft: 4,
-  },
-  tagText: {
-    fontSize: 11,
-    marginLeft: 4,
-  },
-  postTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    lineHeight: 24,
-  },
-  postBody: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  actionRow: {
-    flexDirection: "row",
-    alignItems: "center",
+  footer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 16,
     paddingTop: 16,
+    borderTopWidth: 1,
+  },
+  actionGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  reactionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  reactionCount: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  reportButton: {
+    padding: 8,
+  },
+  expandedContent: {
+    padding: 16,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.05)',
   },
-  actionButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  actionCount: {
-    fontSize: 12,
-    fontWeight: "800",
-  },
-  expandedContent: {
-    marginTop: 20,
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    borderRadius: 12,
-    padding: 16,
-  },
-  commentsDivider: {
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    marginBottom: 16,
-  },
-  commentsHeader: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: 10,
+  commentsTitle: {
+    fontSize: 11,
     fontWeight: '900',
-    letterSpacing: 2,
+    letterSpacing: 1.5,
     marginBottom: 16,
   },
   commentsList: {
     gap: 16,
+    marginBottom: 16,
   },
   commentItem: {
     gap: 4,
   },
-  commentUser: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  commentText: {
-    color: "rgba(255,255,255,0.7)",
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  commentInputRow: {
+  commentHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginTop: 20,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 24,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    gap: 6,
   },
-  inlineInput: {
-    flex: 1,
-    color: '#FFF',
-    fontSize: 14,
-    maxHeight: 100,
-  },
-  inlineSendButton: {
-    padding: 4,
-  },
-  blurBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(239, 68, 68, 0.08)",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "rgba(239, 68, 68, 0.2)",
-    marginBottom: 8,
-    gap: 10,
-  },
-  blurText: {
-    color: "#EF4444",
+  commentUser: {
     fontSize: 13,
-    fontWeight: "600",
+    fontWeight: '700',
+  },
+  commentText: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginLeft: 26,
   },
   noComments: {
-    color: "rgba(255,255,255,0.2)",
-    fontSize: 14,
     textAlign: 'center',
-    paddingVertical: 10,
+    paddingVertical: 12,
+    fontSize: 14,
   },
-  fullImageContainer: {
+  commentInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 24,
+    borderWidth: 1,
+  },
+  commentInput: {
+    flex: 1,
+    fontSize: 14,
+    paddingHorizontal: 12,
+    maxHeight: 100,
+  },
+  sendButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.95)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  closeImageButton: {
+  modalClose: {
     position: 'absolute',
-    top: 50,
-    right: 25,
+    top: 60,
+    right: 20,
     zIndex: 10,
-    padding: 10,
   },
-  fullImage: {
+  fullModalMedia: {
     width: '100%',
-    height: '100%',
+    height: '80%',
   },
-  paginationDots: {
-    position: 'absolute',
-    bottom: 60,
-    flexDirection: 'row',
-    gap: 8,
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  reactorsModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.85)',
-    justifyContent: 'flex-end',
-  },
-  reactorsModalContent: {
-    backgroundColor: '#0F172A',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 20,
-    maxHeight: '70%',
-  },
-  reactorsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-    paddingBottom: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
-  },
-  reactorsTitle: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
-  noReactors: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: 14,
-    textAlign: 'center',
-    paddingVertical: 30,
-  },
-  reactorItem: {
+  blurBanner: {
     flexDirection: 'row',
     alignItems: 'center',
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
     gap: 12,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
   },
-  reactorAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-  },
-  reactorUsername: {
-    color: '#FFFFFF',
+  blurText: {
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '600',
   },
 });
 
 function getTimeAgo(date) {
   const seconds = Math.floor((new Date() - date) / 1000);
   if (seconds < 60) return "NOW";
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}M`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}H`;
-  return `${Math.floor(seconds / 86400)}D`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
+  return `${Math.floor(seconds / 86400)}d`;
 }
-
