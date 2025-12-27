@@ -234,17 +234,17 @@ export default function UniversalFeed() {
             <Text style={styles.modalTitle}>Filters & Sorting</Text>
             <Text style={styles.label}>Sort By</Text>
             <View style={styles.row}>
-              {['newest', 'oldest'].map(s => (
-                <TouchableOpacity key={s} onPress={() => setSortBy(s)} style={[styles.pill, sortBy === s && { backgroundColor: theme.colors.primary }]}><Text style={[styles.pillText, sortBy === s && { color: '#FFF' }]}>{s}</Text></TouchableOpacity>
-              ))}
-            </View>
-            <Text style={styles.label}>Zone</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.row}>
-              <TouchableOpacity onPress={() => setSelectedZone(null)} style={[styles.pill, !selectedZone && { backgroundColor: theme.colors.primary }]}><Text style={[styles.pillText, !selectedZone && { color: '#FFF' }]}>All</Text></TouchableOpacity>
-              {zones.map(z => (
-                <TouchableOpacity key={z.id} onPress={() => setSelectedZone(z.id)} style={[styles.pill, selectedZone === z.id && { backgroundColor: theme.colors.primary }]}><Text style={[styles.pillText, selectedZone === z.id && { color: '#FFF' }]}>{z.name}</Text></TouchableOpacity>
-              ))}
-            </ScrollView>
+                {['newest', 'oldest'].map(s => (
+                  <TouchableOpacity key={s} onPress={() => setSortBy(s)} style={[styles.pill, sortBy === s && { backgroundColor: theme.colors.primary }]}><Text style={[styles.pillText, sortBy === s && { color: '#000' }]}>{s}</Text></TouchableOpacity>
+                ))}
+              </View>
+              <Text style={styles.label}>Zone</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.row}>
+                <TouchableOpacity onPress={() => setSelectedZone(null)} style={[styles.pill, !selectedZone && { backgroundColor: theme.colors.primary }]}><Text style={[styles.pillText, !selectedZone && { color: '#000' }]}>All</Text></TouchableOpacity>
+                {zones.map(z => (
+                  <TouchableOpacity key={z.id} onPress={() => setSelectedZone(z.id)} style={[styles.pill, selectedZone === z.id && { backgroundColor: theme.colors.primary }]}><Text style={[styles.pillText, selectedZone === z.id && { color: '#000' }]}>{z.name}</Text></TouchableOpacity>
+                ))}
+              </ScrollView>
             <TouchableOpacity onPress={() => setShowFilterSort(false)} style={[styles.closeBtn, { backgroundColor: theme.colors.primary }]}><Text style={styles.closeBtnText}>Apply</Text></TouchableOpacity>
           </View>
         </View>
@@ -284,5 +284,5 @@ const styles = StyleSheet.create({
   pill: { paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20, backgroundColor: '#EEE' },
   pillText: { fontSize: 14 },
   closeBtn: { marginTop: 30, padding: 15, borderRadius: 10, alignItems: 'center' },
-  closeBtnText: { color: '#FFF', fontWeight: 'bold' },
+    closeBtnText: { color: '#000', fontWeight: 'bold' },
 });

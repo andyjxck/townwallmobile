@@ -524,38 +524,38 @@ export default function PollsScreen() {
               {showFilterSortMenu && (
                 <View style={styles.dropdownContainer}>
                   <Text style={styles.dropdownHeader}>SORT BY</Text>
-                  <TouchableOpacity 
-                    style={styles.dropdownItem} 
-                    onPress={() => { setSortBy('newest'); setShowFilterSortMenu(false); }}
-                  >
-                    <Text style={[styles.dropdownText, sortBy === 'newest' && { color: '#4ADE80' }]}>NEWEST</Text>
-                    {sortBy === 'newest' && <Check size={14} color="#4ADE80" />}
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={styles.dropdownItem} 
-                    onPress={() => { setSortBy('oldest'); setShowFilterSortMenu(false); }}
-                  >
-                    <Text style={[styles.dropdownText, sortBy === 'oldest' && { color: '#4ADE80' }]}>OLDEST</Text>
-                    {sortBy === 'oldest' && <Check size={14} color="#4ADE80" />}
-                  </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[styles.dropdownItem, sortBy === 'newest' && { backgroundColor: '#FFF' }]} 
+                      onPress={() => { setSortBy('newest'); setShowFilterSortMenu(false); }}
+                    >
+                      <Text style={[styles.dropdownText, sortBy === 'newest' && { color: '#000' }]}>NEWEST</Text>
+                      {sortBy === 'newest' && <Check size={14} color="#000" />}
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[styles.dropdownItem, sortBy === 'oldest' && { backgroundColor: '#FFF' }]} 
+                      onPress={() => { setSortBy('oldest'); setShowFilterSortMenu(false); }}
+                    >
+                      <Text style={[styles.dropdownText, sortBy === 'oldest' && { color: '#000' }]}>OLDEST</Text>
+                      {sortBy === 'oldest' && <Check size={14} color="#000" />}
+                    </TouchableOpacity>
 
-                  <View style={styles.dropdownDivider} />
-                  
-                  <Text style={styles.dropdownHeader}>FILTER BY</Text>
-                  <TouchableOpacity 
-                    style={styles.dropdownItem} 
-                    onPress={() => { setFilterBy('all'); setShowFilterSortMenu(false); }}
-                  >
-                    <Text style={[styles.dropdownText, filterBy === 'all' && { color: '#4ADE80' }]}>ALL IDEAS</Text>
-                    {filterBy === 'all' && <Check size={14} color="#4ADE80" />}
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={styles.dropdownItem} 
-                    onPress={() => { setFilterBy('mine'); setShowFilterSortMenu(false); }}
-                  >
-                    <Text style={[styles.dropdownText, filterBy === 'mine' && { color: '#4ADE80' }]}>MY IDEAS</Text>
-                    {filterBy === 'mine' && <Check size={14} color="#4ADE80" />}
-                  </TouchableOpacity>
+                    <View style={styles.dropdownDivider} />
+                    
+                    <Text style={styles.dropdownHeader}>FILTER BY</Text>
+                    <TouchableOpacity 
+                      style={[styles.dropdownItem, filterBy === 'all' && { backgroundColor: '#FFF' }]} 
+                      onPress={() => { setFilterBy('all'); setShowFilterSortMenu(false); }}
+                    >
+                      <Text style={[styles.dropdownText, filterBy === 'all' && { color: '#000' }]}>ALL IDEAS</Text>
+                      {filterBy === 'all' && <Check size={14} color="#000" />}
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[styles.dropdownItem, filterBy === 'mine' && { backgroundColor: '#FFF' }]} 
+                      onPress={() => { setFilterBy('mine'); setShowFilterSortMenu(false); }}
+                    >
+                      <Text style={[styles.dropdownText, filterBy === 'mine' && { color: '#000' }]}>MY IDEAS</Text>
+                      {filterBy === 'mine' && <Check size={14} color="#000" />}
+                    </TouchableOpacity>
                 </View>
               )}
 

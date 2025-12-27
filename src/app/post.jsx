@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
   anonOption: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#F5F5F5', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
   anonOptionActive: { backgroundColor: theme.colors.primary },
   anonOptionText: { fontSize: 13, fontWeight: '600', color: '#666' },
-  anonOptionTextActive: { color: '#FFF' },
+    anonOptionTextActive: { color: '#000' },
   titleInput: { fontSize: 24, fontWeight: 'bold', marginBottom: 15 },
   mediaSection: { flexDirection: 'row', gap: 10, flexWrap: 'wrap', marginTop: 20 },
   mediaThumb: { width: 80, height: 80, borderRadius: 8 },
