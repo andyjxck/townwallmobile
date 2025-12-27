@@ -19,37 +19,57 @@ export default function Guidelines() {
         <View style={{ width: 44 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.iconContainer}>
-          <Info size={64} color={theme.colors.primary} />
-        </View>
-        
-        <Text style={[styles.title, { color: theme.colors.text }]}>The Rules of the Wall</Text>
-        
-        <Section title="1. Be Helpful">
-          The Wall is a community resource. Aim to provide value, whether it's news, advice, or support for local businesses and talent.
-        </Section>
+        <ScrollView contentContainerStyle={styles.content}>
+          <View style={styles.iconContainer}>
+            <Info size={64} color={theme.colors.primary} />
+          </View>
+          
+          <Text style={[styles.title, { color: theme.colors.text }]}>The Rules of the Wall</Text>
+          
+          <Section title="🌟 The Heart of the Wall">
+            TownWall is built on the idea that local communities are stronger when we talk to each other. We're here to celebrate local talent, support neighborhood businesses, and keep everyone informed. Our goal is to be the digital equivalent of a friendly neighborhood chat over a garden fence.
+          </Section>
 
-        <Section title="2. No Harassment">
-          We have zero tolerance for bullying, harassment, or hate speech. Content that targets individuals or groups will be removed.
-        </Section>
+          <Section title="🤝 Be Neighborly & Kind">
+            This is a space for everyone. Treat others with the same respect you'd give a neighbor in person. We have zero tolerance for bullying, harassment, hate speech, or any form of discrimination. If you wouldn't say it at a town hall meeting, it probably doesn't belong here.
+          </Section>
 
-        <Section title="3. Local Focus">
-          Keep it relevant to your local area and the community zones.
-        </Section>
+          <Section title="💎 Quality over Quantity">
+            We love a good update, but let's keep the Wall valuable! Aim to provide context, share useful advice, or offer genuine support. High-quality posts help your local zone thrive and make the experience better for everyone.
+          </Section>
 
-        <Section title="4. Misinformation">
-          Deliberately posting false news ("Fake News") will result in content being blurred or removed. Users can flag content they believe is incorrect.
-        </Section>
+          <Section title="📍 Keep it Local">
+            The magic of TownWall is in the "Local." Please keep your posts relevant to your community zones. Global news is great, but how does it affect our streets? The more local and specific, the better!
+          </Section>
 
-        <Section title="5. Moderation">
-          Our MOD team and AI filters monitor the Wall. If your content is flagged, it may be held for review.
-        </Section>
+          <Section title="🛡️ Respect Privacy">
+            Protect your neighbors' privacy as much as your own. Never post private contact information, addresses, or sensitive personal details without explicit permission. Let's keep the Wall a safe space for everyone to participate.
+          </Section>
 
-        <Text style={[styles.footer, { color: theme.colors.textSecondary }]}>
-          Help us keep the Wall a great place for everyone.
-        </Text>
-      </ScrollView>
+          <Section title="📢 Promotions & Hustles">
+            We LOVE local businesses and talent! If you're a local pro, feel free to share what you do. However, please avoid "spammy" behavior. Engage with the community first, and let your promotions be a natural part of the conversation. Repetitive or purely automated ads will be removed.
+          </Section>
+
+          <Section title="🚫 No Misinformation">
+            Trust is everything. Deliberately posting false news or misleading information hurts the community. If you're sharing news, try to verify it first. Content flagged as significantly inaccurate may be blurred or removed to prevent confusion.
+          </Section>
+
+          <Section title="🤖 Fair Moderation">
+            Our MOD team and AI filters work together to keep the Wall clean and friendly. If your content is flagged, don't take it personally—it might just need a quick review. You can always appeal a decision if you think we got it wrong.
+          </Section>
+
+          <Section title="🚨 See Something? Say Something!">
+            You are the guardians of your community wall. If you see something that breaks these rules or just feels "off," please use the report button. Your flags help our team keep the environment positive for everyone.
+          </Section>
+
+          <Section title="✨ Have Fun!">
+            At the end of the day, TownWall is your space. Share your wins, ask for help, find a local gig, or just say hello. We're glad you're here!
+          </Section>
+
+          <Text style={[styles.footer, { color: theme.colors.textSecondary }]}>
+            Together, let's make the Wall the best place on the internet.
+          </Text>
+        </ScrollView>
     </View>
   );
 }
