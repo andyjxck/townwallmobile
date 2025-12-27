@@ -1,8 +1,8 @@
 :root {
-  --background: #F8FAFC;
-  --foreground: #0F172A;
-  --primary: #0EA5E9;
-  --border: #E2E8F0;
+  --background: #000000;
+  --foreground: #FFFFFF;
+  --primary: #FFFFFF;
+  --border: rgba(255,255,255,0.1);
 }
 
 body {

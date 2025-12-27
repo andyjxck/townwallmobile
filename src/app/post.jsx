@@ -168,9 +168,22 @@ export default function PostScreen() {
         </View>
 
         <TextInput placeholder="Title" value={title} onChangeText={setTitle} style={styles.titleInput} />
-        <RichTextEditor value={text} onChange={setText} placeholder="What's happening?" onPollPress={() => setStep('poll')} />
+          <RichTextEditor value={text} onChange={setText} placeholder="What's happening?" onPollPress={() => setStep('poll')} />
 
-        <View style={styles.mediaSection}>
+          <View style={styles.anonRow}>
+            <Text style={styles.anonLabel}>Post Anonymously</Text>
+            <TouchableOpacity 
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setIsAnonymous(!isAnonymous);
+              }}
+              style={[styles.toggle, isAnonymous && styles.toggleActive]}
+            >
+              <View style={[styles.toggleDot, isAnonymous && styles.toggleDotActive]} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.mediaSection}>
           {media.map((m, i) => <Image key={i} source={{ uri: m.uri }} style={styles.mediaThumb} />)}
           <TouchableOpacity onPress={pickMedia} style={styles.addMedia}><Plus size={24} color="#666" /></TouchableOpacity>
         </View>
@@ -193,6 +206,12 @@ const styles = StyleSheet.create({
   mediaSection: { flexDirection: 'row', gap: 10, flexWrap: 'wrap', marginTop: 20 },
   mediaThumb: { width: 80, height: 80, borderRadius: 8 },
   addMedia: { width: 80, height: 80, borderRadius: 8, backgroundColor: '#F5F5F5', justifyContent: 'center', alignItems: 'center', borderStyle: 'dashed', borderWidth: 1, borderColor: '#CCC' },
+  anonRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 15, borderTopWidth: 1, borderTopColor: '#EEE', marginTop: 20 },
+  anonLabel: { fontSize: 16, fontWeight: '600', color: '#333' },
+  toggle: { width: 50, height: 30, borderRadius: 15, backgroundColor: '#E2E8F0', padding: 2, justifyContent: 'center' },
+  toggleActive: { backgroundColor: theme.colors.primary },
+  toggleDot: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#FFF' },
+  toggleDotActive: { alignSelf: 'flex-end' },
   overlayHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, borderBottomWidth: 1, borderBottomColor: '#EEE' },
   overlayTitle: { fontSize: 18, fontWeight: 'bold' },
   item: { padding: 20, borderBottomWidth: 1, borderBottomColor: '#EEE' },

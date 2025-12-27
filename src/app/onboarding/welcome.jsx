@@ -52,122 +52,80 @@ export default function WelcomeScreen() {
           </Text>
         </View>
 
-        {/* Features */}
-        <View style={{ gap: 32 }}>
-          <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
-            <View
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 22,
-                backgroundColor: "rgba(255,255,255,0.06)",
-                justifyContent: "center",
-                alignItems: "center",
-                marginRight: 16,
-              }}
-            >
-              <MapPin size={22} color="#FFFFFF" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text
+          {/* Features */}
+          <View style={{ gap: 32 }}>
+            <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+              <View
                 style={{
-                  color: "#FFFFFF",
-                  fontSize: 17,
-                  fontWeight: "600",
-                  marginBottom: 6,
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  backgroundColor: "rgba(255,255,255,0.06)",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  marginRight: 16,
                 }}
               >
-                Local & Live
-              </Text>
-              <Text
-                style={{
-                  color: "rgba(255,255,255,0.5)",
-                  fontSize: 15,
-                  lineHeight: 22,
-                }}
-              >
-                See what people are posting in your area right now
-              </Text>
-            </View>
-          </View>
-
-          <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
-            <View
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 22,
-                backgroundColor: "rgba(255,255,255,0.06)",
-                justifyContent: "center",
-                alignItems: "center",
-                marginRight: 16,
-              }}
-            >
-              <View style={{ flexDirection: "row", gap: 4 }}>
-                <ThumbsUp size={14} color="#4ADE80" />
-                <Flag size={14} color="#EF4444" />
+                <MapPin size={22} color="#FFFFFF" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: "#FFFFFF", fontSize: 17, fontWeight: "600", marginBottom: 6 }}>
+                  Connect Locally
+                </Text>
+                <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 15, lineHeight: 22 }}>
+                  Your town's digital wall. See real-time updates from neighbors, businesses, and talent.
+                </Text>
               </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text
-                style={{
-                  color: "#FFFFFF",
-                  fontSize: 17,
-                  fontWeight: "600",
-                  marginBottom: 6,
-                }}
-              >
-                Community Truth
-              </Text>
-              <Text
-                style={{
-                  color: "rgba(255,255,255,0.5)",
-                  fontSize: 15,
-                  lineHeight: 22,
-                }}
-              >
-                React to posts - the community decides what's real
-              </Text>
-            </View>
-          </View>
 
-          <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
-            <View
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 22,
-                backgroundColor: "rgba(255,255,255,0.06)",
-                justifyContent: "center",
-                alignItems: "center",
-                marginRight: 16,
-              }}
-            >
-              <Clock size={22} color="#FFFFFF" />
+            <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+              <View
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  backgroundColor: "rgba(255,255,255,0.06)",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  marginRight: 16,
+                }}
+              >
+                <Shield size={22} color="#4ADE80" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: "#FFFFFF", fontSize: 17, fontWeight: "600", marginBottom: 6 }}>
+                  Pure Privacy
+                </Text>
+                <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 15, lineHeight: 22 }}>
+                  We don't collect emails, numbers, or personal info. Just a username and password. Post anonymously anytime.
+                </Text>
+              </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text
+
+            <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+              <View
                 style={{
-                  color: "#FFFFFF",
-                  fontSize: 17,
-                  fontWeight: "600",
-                  marginBottom: 6,
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  backgroundColor: "rgba(255,255,255,0.06)",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  marginRight: 16,
                 }}
               >
-                Fast & Anonymous
-              </Text>
-              <Text
-                style={{
-                  color: "rgba(255,255,255,0.5)",
-                  fontSize: 15,
-                  lineHeight: 22,
-                }}
-              >
-                Post without an account. No signup required.
-              </Text>
+                <ThumbsUp size={22} color="#FFFFFF" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: "#FFFFFF", fontSize: 17, fontWeight: "600", marginBottom: 6 }}>
+                  Community Led
+                </Text>
+                <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 15, lineHeight: 22 }}>
+                  Helpful posts rise, misinformation gets flagged. You decide what matters.
+                </Text>
+              </View>
             </View>
           </View>
-        </View>
 
         {/* Spacer */}
         <View style={{ flex: 1 }} />

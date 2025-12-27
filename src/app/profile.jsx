@@ -102,10 +102,17 @@ export default function Profile() {
       setCurrentUser(storedUser);
       
       let profileUserId = userId ? parseInt(userId) : storedUser?.id;
-      const viewingOwnProfile = !userId || (storedUser?.id && parseInt(userId) === storedUser.id);
-      setIsOwnProfile(viewingOwnProfile);
-      
-      let userData;
+    const viewingOwnProfile = !userId || (storedUser?.id && parseInt(userId) === storedUser.id);
+    setIsOwnProfile(viewingOwnProfile);
+    
+    const isOnline = (lastSeen) => {
+      if (!lastSeen) return false;
+      const lastSeenDate = new Date(lastSeen);
+      const now = new Date();
+      return (now - lastSeenDate) < 1000 * 60 * 5; // 5 minutes
+    };
+
+    let userData;
       if (viewingOwnProfile && storedUser?.id) {
         const { data: freshUser } = await supabase.from('rusers').select('*').eq('id', storedUser.id).single();
         if (freshUser) {
@@ -303,10 +310,16 @@ export default function Profile() {
               )}
             </TouchableOpacity>
             
-            <View style={styles.nameSection}>
-              <Text style={[styles.username, { color: theme.colors.text }]}>@{user?.username}</Text>
-              {user?.is_admin && <View style={styles.adminBadge}><Shield size={12} color="#FFF" /><Text style={styles.adminText}>MOD</Text></View>}
-            </View>
+              <View style={styles.nameSection}>
+                <Text style={[styles.username, { color: theme.colors.text }]}>@{user?.username}</Text>
+                {isOnline(user?.last_seen) && <View style={styles.onlineDot} />}
+                {user?.is_admin && (
+                  <TouchableOpacity onPress={() => router.push('/admin')} style={styles.adminBadge}>
+                    <Shield size={12} color="#FFF" />
+                    <Text style={styles.adminText}>MOD</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
 
             {editingBio ? (
               <View style={styles.bioEditContainer}>
@@ -332,33 +345,32 @@ export default function Profile() {
             )}
           </View>
 
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}><Text style={[styles.statValue, { color: theme.colors.text }]}>{stats.posts}</Text><Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Posts</Text></View>
-            <View style={styles.statItem}><Text style={[styles.statValue, { color: theme.colors.text }]}>{stats.reactions}</Text><Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Karma</Text></View>
-            <View style={styles.statItem}><Text style={[styles.statValue, { color: theme.colors.text }]}>{stats.joined}</Text><Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Joined</Text></View>
-          </View>
+            <View style={styles.statsRow}>
+              <View style={styles.statItem}><Text style={[styles.statValue, { color: theme.colors.text }]}>{stats.posts}</Text><Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Posts</Text></View>
+              <View style={styles.statItem}><Text style={[styles.statValue, { color: theme.colors.text }]}>{friends.length}</Text><Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Friends</Text></View>
+            </View>
 
-          <View style={styles.tabBar}>
-            <TouchableOpacity onPress={() => setActiveTab("posts")} style={[styles.tab, activeTab === "posts" && { borderBottomColor: theme.colors.primary }]}><Text style={[styles.tabText, { color: activeTab === "posts" ? theme.colors.primary : theme.colors.textSecondary }]}>FEED</Text></TouchableOpacity>
-            {isOwnProfile && <TouchableOpacity onPress={() => setActiveTab("saved")} style={[styles.tab, activeTab === "saved" && { borderBottomColor: theme.colors.primary }]}><Text style={[styles.tabText, { color: activeTab === "saved" ? theme.colors.primary : theme.colors.textSecondary }]}>SAVED</Text></TouchableOpacity>}
-            {isOwnProfile && <TouchableOpacity onPress={() => setActiveTab("friends")} style={[styles.tab, activeTab === "friends" && { borderBottomColor: theme.colors.primary }]}><Text style={[styles.tabText, { color: activeTab === "friends" ? theme.colors.primary : theme.colors.textSecondary }]}>FRIENDS</Text></TouchableOpacity>}
-          </View>
+            <View style={styles.tabBar}>
+              <TouchableOpacity onPress={() => setActiveTab("posts")} style={[styles.tab, activeTab === "posts" && { borderBottomColor: theme.colors.primary }]}><Text style={[styles.tabText, { color: activeTab === "posts" ? theme.colors.primary : theme.colors.textSecondary }]}>FEED</Text></TouchableOpacity>
+              {isOwnProfile && <TouchableOpacity onPress={() => setActiveTab("starred")} style={[styles.tab, activeTab === "starred" && { borderBottomColor: theme.colors.primary }]}><Text style={[styles.tabText, { color: activeTab === "starred" ? theme.colors.primary : theme.colors.textSecondary }]}>STARRED</Text></TouchableOpacity>}
+              {isOwnProfile && <TouchableOpacity onPress={() => setActiveTab("friends")} style={[styles.tab, activeTab === "friends" && { borderBottomColor: theme.colors.primary }]}><Text style={[styles.tabText, { color: activeTab === "friends" ? theme.colors.primary : theme.colors.textSecondary }]}>FRIENDS</Text></TouchableOpacity>}
+            </View>
 
-          <View style={styles.tabContent}>
-            {activeTab === "posts" && (
-              userPosts.length > 0 ? (
-                userPosts.map(post => <PostItem key={post.id} item={post} deviceId={deviceId} onReaction={handleReaction} user={currentUser} onComment={loadData} />)
-              ) : (
-                <View style={styles.emptyContainer}><Text style={styles.emptyText}>No posts yet</Text></View>
-              )
-            )}
-            {activeTab === "saved" && (
-              savedPosts.length > 0 ? (
-                savedPosts.map(post => <PostItem key={post.id} item={post} deviceId={deviceId} onReaction={handleReaction} user={currentUser} onComment={loadData} />)
-              ) : (
-                <View style={styles.emptyContainer}><Text style={styles.emptyText}>No saved posts</Text></View>
-              )
-            )}
+            <View style={styles.tabContent}>
+              {activeTab === "posts" && (
+                userPosts.length > 0 ? (
+                  userPosts.map(post => <PostItem key={post.id} item={post} deviceId={deviceId} onReaction={handleReaction} user={currentUser} onComment={loadData} />)
+                ) : (
+                  <View style={styles.emptyContainer}><Text style={styles.emptyText}>No posts yet</Text></View>
+                )
+              )}
+              {activeTab === "starred" && (
+                savedPosts.length > 0 ? (
+                  savedPosts.map(post => <PostItem key={post.id} item={post} deviceId={deviceId} onReaction={handleReaction} user={currentUser} onComment={loadData} />)
+                ) : (
+                  <View style={styles.emptyContainer}><Text style={styles.emptyText}>No starred posts</Text></View>
+                )
+              )}
             {activeTab === "friends" && (
               <View style={styles.friendsContainer}>
                 <View style={styles.addFriendSection}>
@@ -395,19 +407,28 @@ export default function Profile() {
                 )}
 
                 <Text style={[styles.sectionTitle, { color: theme.colors.text, marginTop: 20 }]}>Friends ({friends.length})</Text>
-                {friends.map(f => (
-                  <TouchableOpacity key={f.id} style={styles.friendItem} onPress={() => router.push(`/profile?userId=${f.id}`)}>
-                    <Text style={{ fontSize: 24 }}>{f.emoji_icon || "👤"}</Text>
-                    <Text style={[styles.friendName, { color: theme.colors.text }]}>@{f.username}</Text>
-                  </TouchableOpacity>
-                ))}
+                  {friends.map(f => (
+                    <TouchableOpacity key={f.id} style={styles.friendItem} onPress={() => router.push(`/profile?userId=${f.id}`)}>
+                      <View style={styles.friendAvatarContainer}>
+                        <Text style={{ fontSize: 24 }}>{f.emoji_icon || "👤"}</Text>
+                        {isOnline(f.last_seen) && <View style={styles.friendOnlineDot} />}
+                      </View>
+                      <Text style={[styles.friendName, { color: theme.colors.text }]}>@{f.username}</Text>
+                    </TouchableOpacity>
+                  ))}
               </View>
             )}
           </View>
         </View>
-      </ScrollView>
+        </ScrollView>
 
-      {showEmojiPicker && (
+        <View style={styles.footer}>
+          <Text style={[styles.footerText, { color: theme.colors.textSecondary }]}>
+            You've been on the wall since {stats.joined}
+          </Text>
+        </View>
+
+        {showEmojiPicker && (
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: theme.colors.background }]}>
             <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Choose Icon</Text>
@@ -443,6 +464,7 @@ const styles = StyleSheet.create({
   editBadge: { position: 'absolute', bottom: 0, right: 0, width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: '#FFF' },
   nameSection: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   username: { fontSize: 24, fontWeight: 'bold' },
+  onlineDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#10B981', marginLeft: 4 },
   adminBadge: { backgroundColor: '#6366f1', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, flexDirection: 'row', alignItems: 'center', gap: 4 },
   adminText: { color: '#FFF', fontSize: 10, fontWeight: 'bold' },
   bio: { fontSize: 16, textAlign: 'center', paddingHorizontal: 20 },
@@ -474,7 +496,11 @@ const styles = StyleSheet.create({
   acceptBtn: { padding: 8, borderRadius: 8 },
   rejectBtn: { padding: 8, borderRadius: 8 },
   friendItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
+  friendAvatarContainer: { position: 'relative' },
+  friendOnlineDot: { position: 'absolute', bottom: 0, right: 0, width: 8, height: 8, borderRadius: 4, backgroundColor: '#10B981', borderWidth: 1, borderColor: '#000' },
   friendName: { fontWeight: 'bold' },
+  footer: { paddingVertical: 30, alignItems: 'center', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' },
+  footerText: { fontSize: 12, fontWeight: '600' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { width: '80%', padding: 20, borderRadius: 20 },
   modalTitle: { fontSize: 18, fontWeight: 'bold', textAlign: 'center', marginBottom: 20 },

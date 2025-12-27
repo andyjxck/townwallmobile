@@ -435,12 +435,12 @@ export default function PollsScreen() {
       <View style={styles.container}>
         <LinearGradient colors={['#0F172A', '#000000', '#000000']} style={StyleSheet.absoluteFill} />
         <View style={{ paddingTop: insets.top, flex: 1 }}>
-          <View style={styles.header}>
-            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-              <ChevronLeft color="#FFFFFF" size={28} />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>FUTURE FEATURES</Text>
-            {user?.is_admin ? (
+            <View style={styles.header}>
+              <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                <ChevronLeft color="#FFFFFF" size={28} />
+              </TouchableOpacity>
+              <Text style={styles.headerTitle}>POLLS & FEATURES</Text>
+              {user?.is_admin ? (
               <TouchableOpacity onPress={() => setShowAdminForm(!showAdminForm)} style={styles.backButton}>
                 <Plus color={showAdminForm ? "#EF4444" : "#4ADE80"} size={28} />
               </TouchableOpacity>

@@ -26,7 +26,11 @@ import {
     ListFilter,
     User,
     Search,
+    Star,
+    Briefcase,
+    Vote,
 } from "lucide-react-native";
+import { Image } from "expo-image";
 import { getDeviceId } from "../utils/deviceId";
 import { supabase } from "../utils/supabase";
 import * as Haptics from "expo-haptics";
@@ -110,12 +114,29 @@ export default function UniversalFeed() {
   const handleReaction = async (postId, type, currentlyReacted) => {
     if (!deviceId) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (currentlyReacted) {
-      await supabase.from('rreactions').delete().match({ post_id: postId, reaction_type: type, device_id: deviceId });
-    } else {
-      await supabase.from('rreactions').insert({ post_id: postId, reaction_type: type, device_id: deviceId });
-    }
-    fetchPosts(true);
+    try {
+      if (currentlyReacted) {
+        await supabase.from('rreactions').delete().match({ post_id: postId, reaction_type: type, device_id: deviceId });
+      } else {
+        const { data: reactionData } = await supabase.from('rreactions').insert({ 
+          post_id: postId, 
+          reaction_type: type, 
+          device_id: deviceId,
+          user_id: user?.id 
+        }).select('*, post:rposts(user_id, title)').single();
+
+        if (reactionData?.post?.user_id) {
+          await supabase.from('rnotifications').insert({
+            user_id: reactionData.post.user_id,
+            title: `New ${type === 'helpful' ? 'Like' : 'Superlike'}!`,
+            message: `@${user?.username || 'Someone'} ${type === 'helpful' ? 'liked' : 'superliked'} your post: "${reactionData.post.title || 'Untitled'}"`,
+            type: 'reaction',
+            link: `/post?id=${postId}`
+          });
+        }
+      }
+      fetchPosts(true);
+    } catch (e) { console.error(e); }
   };
 
   const onRefresh = useCallback(() => { setRefreshing(true); fetchPosts(true); }, [selectedZone, sortBy]);
@@ -124,7 +145,10 @@ export default function UniversalFeed() {
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
-        <Text style={[styles.logo, { color: theme.colors.primary }]}>TownWall</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <Image source={require("../../assets/images/icon.png")} style={{ width: 32, height: 32 }} contentFit="contain" />
+          <Text style={[styles.logo, { color: theme.colors.text }]}>TownWall</Text>
+        </View>
         <View style={styles.headerActions}>
           <TouchableOpacity onPress={() => setShowNotifications(true)} style={styles.headerIcon}>
             <Bell color={theme.colors.text} size={24} />
@@ -140,6 +164,9 @@ export default function UniversalFeed() {
         <View style={[styles.menu, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
           <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/profile"); }} style={styles.menuItem}><User size={20} color={theme.colors.text} /><Text style={styles.menuText}>Profile</Text></TouchableOpacity>
           <TouchableOpacity onPress={() => { setShowMenu(false); setShowFilterSort(true); }} style={styles.menuItem}><ListFilter size={20} color={theme.colors.text} /><Text style={styles.menuText}>Filters</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/talent"); }} style={styles.menuItem}><Star size={20} color={theme.colors.text} /><Text style={styles.menuText}>Local Talent</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/businesses"); }} style={styles.menuItem}><Briefcase size={20} color={theme.colors.text} /><Text style={styles.menuText}>Local Business</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/polls"); }} style={styles.menuItem}><Vote size={20} color={theme.colors.text} /><Text style={styles.menuText}>Polls & Features</Text></TouchableOpacity>
           {isModerator && <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/admin"); }} style={styles.menuItem}><Shield size={20} color={theme.colors.error} /><Text style={styles.menuText}>Admin</Text></TouchableOpacity>}
           <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/help"); }} style={styles.menuItem}><HelpCircle size={20} color={theme.colors.text} /><Text style={styles.menuText}>Help</Text></TouchableOpacity>
         </View>

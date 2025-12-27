@@ -103,26 +103,22 @@ export default function SettingsScreen() {
         <View style={{ width: 44 }} />
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}>
-        <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>PREFERENCES</Text>
-          <SettingsItem icon={<BarChart2 size={20} color={theme.colors.textSecondary} />} title="Polls & Features" onPress={() => router.push("/polls")} />
-          <SettingsItem icon={<Bell size={20} color={notificationsEnabled ? theme.colors.success : theme.colors.textSecondary} />} title="Notifications" onPress={() => setNotificationsEnabled(!notificationsEnabled)} />
-        </View>
-
-        {auth?.password && (
+        <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}>
           <View style={styles.section}>
             <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>SECURITY</Text>
-            <SettingsItem icon={<Key size={20} color={theme.colors.textSecondary} />} title="Change Password" onPress={() => { setShowChangePassword(true); setPasswordError(""); }} />
-            <SettingsItem icon={<Shield size={20} color={theme.colors.textSecondary} />} title="Recovery Codes" onPress={handleRegenerateRecoveryCodes} />
+            {auth?.password && (
+              <>
+                <SettingsItem icon={<Key size={20} color={theme.colors.textSecondary} />} title="Change Password" onPress={() => { setShowChangePassword(true); setPasswordError(""); }} />
+                <SettingsItem icon={<Shield size={20} color={theme.colors.textSecondary} />} title="Recovery Codes" onPress={handleRegenerateRecoveryCodes} />
+              </>
+            )}
           </View>
-        )}
 
-        <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>LEGAL</Text>
-          <SettingsItem icon={<Shield size={20} color={theme.colors.textSecondary} />} title="Privacy Policy" onPress={() => {}} />
-          <SettingsItem icon={<Info size={20} color={theme.colors.textSecondary} />} title="Guidelines" onPress={() => {}} />
-        </View>
+          <View style={styles.section}>
+            <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>LEGAL</Text>
+            <SettingsItem icon={<Shield size={20} color={theme.colors.textSecondary} />} title="Privacy Policy" onPress={() => router.push("/privacy")} />
+            <SettingsItem icon={<Info size={20} color={theme.colors.textSecondary} />} title="Guidelines" onPress={() => router.push("/guidelines")} />
+          </View>
 
         <TouchableOpacity onPress={handleSignOut} style={styles.signOutBtn}>
           <LogOut size={20} color={theme.colors.error} />

@@ -1,4 +1,5 @@
 import { useAuth } from "@/utils/auth/useAuth";
+import { supabase } from "@/utils/supabase";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
@@ -22,12 +23,31 @@ const queryClient = new QueryClient({
 });
 
 export default function RootLayout() {
-  const { initiate, isReady } = useAuth();
+  const { initiate, isReady, auth } = useAuth();
   const colorScheme = useColorScheme();
 
   useEffect(() => {
     initiate();
   }, [initiate]);
+
+  useEffect(() => {
+    if (isReady && auth?.id) {
+      const updateLastSeen = async () => {
+        try {
+          await supabase
+            .from('rusers')
+            .update({ last_seen: new Date().toISOString() })
+            .eq('id', auth.id);
+        } catch (e) {
+          console.error("Error updating last seen:", e);
+        }
+      };
+      
+      updateLastSeen();
+      const interval = setInterval(updateLastSeen, 1000 * 60 * 5); // every 5 mins
+      return () => clearInterval(interval);
+    }
+  }, [isReady, auth]);
 
   useEffect(() => {
     if (isReady) {

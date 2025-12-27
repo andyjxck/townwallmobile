@@ -12,13 +12,23 @@ export const ShareManager = forwardRef((props, ref) => {
   const [sharingPost, setSharingPost] = useState(null);
   const viewRef = useRef();
 
-  const trackShare = async (postId) => {
+  const trackShare = async (post) => {
     try {
       const user = await getStoredUser();
       await supabase.from('rshares').insert({
-        post_id: postId,
+        post_id: post.id,
         user_id: user?.id || null
       });
+
+      if (post.user_id) {
+        await supabase.from('rnotifications').insert({
+          user_id: post.user_id,
+          title: `Post Shared!`,
+          message: `@${user?.username || 'Someone'} shared your post: "${post.title || 'Untitled'}"`,
+          type: 'share',
+          link: `/post?id=${post.id}`
+        });
+      }
     } catch (error) {
       console.error("Failed to track share:", error);
     }
@@ -49,7 +59,7 @@ export const ShareManager = forwardRef((props, ref) => {
               dialogTitle: `Share "${post.title}"`,
               UTI: 'public.png',
             });
-            await trackShare(post.id);
+            await trackShare(post);
           } else {
             toast.error("Sharing is not available on this device");
           }
