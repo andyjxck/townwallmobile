@@ -157,7 +157,7 @@ export default function UniversalFeed() {
         keyExtractor={item => item.id.toString()}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         contentContainerStyle={{ paddingBottom: 100 }}
-        ListEmptyComponent={loading ? <ActivityIndicator style={{ marginTop: 20 }} /> : <View style={styles.empty}><Text style={styles.emptyText}>No posts found</Text></TouchableOpacity>}
+        ListEmptyComponent={loading ? <ActivityIndicator style={{ marginTop: 20 }} /> : <View style={styles.empty}><Text style={styles.emptyText}>No posts found</Text></View>}
       />
 
       <TouchableOpacity onPress={() => router.push("/post")} style={[styles.fab, { backgroundColor: theme.colors.primary }]}>
