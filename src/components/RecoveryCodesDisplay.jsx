@@ -1,18 +1,28 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
-import { Copy, Download, CheckCircle } from 'lucide-react-native';
+import { Copy, Download, CheckCircle, RefreshCcw } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { theme } from '../utils/theme';
 
-export default function RecoveryCodesDisplay({ codes, onConfirm }) {
+export default function RecoveryCodesDisplay({ 
+  codes, 
+  onConfirm, 
+  isRegeneration, 
+  statuses, 
+  onRegenerate 
+}) {
+  const isViewMode = !!statuses && !codes;
+
   const copyToClipboard = async () => {
+    if (!codes) return;
     await Clipboard.setStringAsync(codes.join('\n'));
     Alert.alert("Copied", "Recovery codes copied to clipboard");
   };
 
   const downloadCodes = async () => {
+    if (!codes) return;
     const fileUri = `${FileSystem.documentDirectory}recovery_codes.txt`;
     await FileSystem.writeAsStringAsync(fileUri, codes.join('\n'));
     await Sharing.shareAsync(fileUri);
@@ -21,17 +31,39 @@ export default function RecoveryCodesDisplay({ codes, onConfirm }) {
   return (
     <View style={styles.container}>
       <Text style={styles.description}>
-        Please save these recovery codes in a safe place. You can use them to access your account if you lose your password.
+        {isRegeneration 
+          ? "Please save these recovery codes in a safe place. You can use them to access your account if you lose your password."
+          : "These codes allow you to access your account if you lose your password. Each code can only be used once."}
       </Text>
       
       <ScrollView style={styles.codesContainer}>
-        {codes.map((code, index) => (
-          <View key={index} style={styles.codeItem}>
-            <Text style={styles.codeText}>{code}</Text>
-          </View>
-        ))}
+        {isViewMode ? (
+          statuses.map((item, index) => (
+            <View key={item.id || index} style={styles.codeItem}>
+              <Text style={styles.indexText}>#{index + 1}</Text>
+              <View style={[
+                styles.statusBadge, 
+                { backgroundColor: item.used ? 'rgba(239, 68, 68, 0.1)' : 'rgba(34, 197, 94, 0.1)' }
+              ]}>
+                <Text style={[
+                  styles.statusText, 
+                  { color: item.used ? theme.colors.error : '#22c55e' }
+                ]}>
+                  {item.used ? 'USED' : 'AVAILABLE'}
+                </Text>
+              </View>
+            </View>
+          ))
+        ) : (
+          codes.map((code, index) => (
+            <View key={index} style={styles.codeItem}>
+              <Text style={styles.codeText}>{code}</Text>
+            </View>
+          ))
+        )}
       </ScrollView>
 
+      {isRegeneration && (
         <View style={styles.actions}>
           <TouchableOpacity style={styles.actionButton} onPress={copyToClipboard}>
             <Copy size={20} color="#000000" />
@@ -43,11 +75,24 @@ export default function RecoveryCodesDisplay({ codes, onConfirm }) {
             <Text style={styles.actionText}>Download</Text>
           </TouchableOpacity>
         </View>
+      )}
 
-        <TouchableOpacity style={styles.confirmButton} onPress={onConfirm}>
-          <CheckCircle size={24} color="#000000" />
-          <Text style={styles.confirmButtonText}>I've saved these codes</Text>
+      {!isRegeneration && onRegenerate && (
+        <TouchableOpacity 
+          style={[styles.confirmButton, { backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border, marginBottom: 12 }]} 
+          onPress={onRegenerate}
+        >
+          <RefreshCcw size={20} color={theme.colors.text} />
+          <Text style={[styles.confirmButtonText, { color: theme.colors.text }]}>Regenerate All Codes</Text>
         </TouchableOpacity>
+      )}
+
+      <TouchableOpacity style={styles.confirmButton} onPress={onConfirm}>
+        <CheckCircle size={24} color="#000000" />
+        <Text style={styles.confirmButtonText}>
+          {isRegeneration ? "I've saved these codes" : "Close"}
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -67,15 +112,19 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surface,
     borderRadius: 12,
     padding: 15,
-    maxHeight: 300,
+    maxHeight: 400,
     borderWidth: 1,
     borderColor: theme.colors.border,
+    marginBottom: 20,
   },
   codeItem: {
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 15,
   },
   codeText: {
     fontSize: 18,
@@ -83,11 +132,26 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     letterSpacing: 1,
   },
+  indexText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: theme.colors.text,
+    width: 40,
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
   actions: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginTop: 20,
-    marginBottom: 30,
+    marginTop: 10,
+    marginBottom: 20,
   },
   actionButton: {
     flexDirection: 'row',

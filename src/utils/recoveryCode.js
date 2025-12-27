@@ -40,6 +40,17 @@ export const storeRecoveryCodes = async (userId, codes) => {
     if (error) throw error;
   };
 
+  export const getRecoveryCodesStatus = async (userId) => {
+    const { data, error } = await supabase
+      .from('recovery_codes')
+      .select('id, used, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+    return data;
+  };
+
   export const verifyRecoveryCode = async (username, code) => {
     try {
       // 1. Find user by username

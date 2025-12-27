@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, ScrollView, Alert, StyleSheet, TextInput, Modal, ActivityIndicator } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -12,7 +12,7 @@ import bcrypt from 'bcryptjs';
 import * as Crypto from 'expo-crypto';
 import { logoutUser, initUser } from "../utils/user";
 import { supabase } from "../utils/supabase";
-import { generateRecoveryCodes, storeRecoveryCodes } from "../utils/recoveryCode";
+import { generateRecoveryCodes, storeRecoveryCodes, getRecoveryCodesStatus } from "../utils/recoveryCode";
 import RecoveryCodesDisplay from "../components/RecoveryCodesDisplay";
 
 // Polyfill for bcryptjs in React Native/Expo
@@ -39,19 +39,38 @@ export default function SettingsScreen() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showRecoveryCodes, setShowRecoveryCodes] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newRecoveryCodes, setNewRecoveryCodes] = useState([]);
+  const [recoveryStatus, setRecoveryStatus] = useState([]);
   const [loading, setLoading] = useState(false);
   const [passwordError, setPasswordError] = useState("");
 
-  const handleRegenerateRecoveryCodes = () => {
+  const fetchRecoveryStatus = async () => {
+    if (!auth?.id) return;
+    try {
+      const data = await getRecoveryCodesStatus(auth.id);
+      setRecoveryStatus(data);
+    } catch (error) {
+      console.error("Error fetching recovery status:", error);
+    }
+  };
+
+  const handleOpenRecoveryStatus = () => {
     if (!auth?.password) {
       Alert.alert("Not Available", "Recovery codes are only available for accounts with a password.");
       return;
     }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    fetchRecoveryStatus();
+    setShowStatusModal(true);
+  };
+
+  const handleRegenerateRecoveryCodes = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setShowStatusModal(false);
     setShowPasswordModal(true);
     setCurrentPassword("");
     setPasswordError("");
@@ -138,7 +157,7 @@ export default function SettingsScreen() {
               {auth?.password ? (
                 <>
                   <SettingsItem icon={<Key size={20} color={theme.colors.textSecondary} />} title="Change Password" onPress={() => { setShowChangePassword(true); setPasswordError(""); }} />
-                  <SettingsItem icon={<Shield size={20} color={theme.colors.textSecondary} />} title="Recovery Codes" onPress={handleRegenerateRecoveryCodes} />
+                  <SettingsItem icon={<Shield size={20} color={theme.colors.textSecondary} />} title="Recovery Codes" onPress={handleOpenRecoveryStatus} />
                 </>
               ) : (
                 <SettingsItem icon={<Key size={20} color={theme.colors.textSecondary} />} title="Set Account Password" onPress={() => { setShowChangePassword(true); setPasswordError(""); }} />
@@ -184,6 +203,22 @@ export default function SettingsScreen() {
               <Text style={{ color: theme.colors.textSecondary, fontWeight: '700' }}>CANCEL</Text>
             </TouchableOpacity>
           </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showStatusModal} animationType="slide">
+        <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+          <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+            <TouchableOpacity onPress={() => setShowStatusModal(false)} style={styles.backBtn}>
+              <ChevronLeft size={28} color={theme.colors.text} />
+            </TouchableOpacity>
+            <Text style={[styles.headerTitle, { color: theme.colors.text, flex: 1, textAlign: 'center', marginRight: 44 }]}>Recovery Status</Text>
+          </View>
+          <RecoveryCodesDisplay 
+            statuses={recoveryStatus} 
+            onConfirm={() => setShowStatusModal(false)} 
+            onRegenerate={handleRegenerateRecoveryCodes}
+          />
         </View>
       </Modal>
 
