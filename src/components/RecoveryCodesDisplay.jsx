@@ -32,22 +32,22 @@ export function RecoveryCodesDisplay({ codes, onConfirm }) {
         ))}
       </ScrollView>
 
-      <View style={styles.actions}>
-        <TouchableOpacity style={styles.actionButton} onPress={copyToClipboard}>
-          <Copy size={20} color={theme.colors.primary} />
-          <Text style={styles.actionText}>Copy All</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.actionButton} onPress={downloadCodes}>
-          <Download size={20} color={theme.colors.primary} />
-          <Text style={styles.actionText}>Download</Text>
-        </TouchableOpacity>
-      </View>
+        <View style={styles.actions}>
+          <TouchableOpacity style={styles.actionButton} onPress={copyToClipboard}>
+            <Copy size={20} color="#000000" />
+            <Text style={styles.actionText}>Copy All</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.actionButton} onPress={downloadCodes}>
+            <Download size={20} color="#000000" />
+            <Text style={styles.actionText}>Download</Text>
+          </TouchableOpacity>
+        </View>
 
-      <TouchableOpacity style={styles.confirmButton} onPress={onConfirm}>
-        <CheckCircle size={24} color="#FFFFFF" />
-        <Text style={styles.confirmButtonText}>I've saved these codes</Text>
-      </TouchableOpacity>
+        <TouchableOpacity style={styles.confirmButton} onPress={onConfirm}>
+          <CheckCircle size={24} color="#000000" />
+          <Text style={styles.confirmButtonText}>I've saved these codes</Text>
+        </TouchableOpacity>
     </View>
   );
 }
@@ -92,11 +92,15 @@ const styles = StyleSheet.create({
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 10,
+    padding: 12,
+    backgroundColor: theme.colors.primary,
+    borderRadius: 12,
+    minWidth: '45%',
+    justifyContent: 'center',
   },
   actionText: {
     marginLeft: 8,
-    color: theme.colors.primary,
+    color: '#000000',
     fontWeight: '600',
   },
   confirmButton: {
@@ -108,7 +112,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   confirmButtonText: {
-    color: '#FFFFFF',
+    color: '#000000',
     fontSize: 18,
     fontWeight: '700',
     marginLeft: 10,
