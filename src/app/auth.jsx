@@ -18,6 +18,8 @@ import { initUser } from "@/utils/user";
 import { ChevronLeft } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import bcrypt from 'bcryptjs';
+import { generateRecoveryCodes, storeRecoveryCodes } from "@/utils/recoveryCode";
+import { RecoveryCodesDisplay } from "@/components/RecoveryCodesDisplay";
 
 export default function Auth() {
   const router = useRouter();
@@ -26,12 +28,23 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showRecoveryCodes, setShowRecoveryCodes] = useState(false);
+  const [recoveryCodes, setRecoveryCodes] = useState([]);
+  const [pendingUser, setPendingUser] = useState(null);
 
   useEffect(() => {
     if (params.mode === "login") {
       setIsLogin(true);
     }
   }, [params.mode]);
+
+  const handleRecoveryCodesConfirmed = async () => {
+    if (pendingUser) {
+      useAuthStore.getState().setAuth(pendingUser);
+      await initUser();
+      router.replace("/profile");
+    }
+  };
 
   const handleAuth = async () => {
     if (!username || !password) {
@@ -46,7 +59,6 @@ export default function Auth() {
       const deviceId = await getDeviceId();
 
       if (isLogin) {
-        // Sign in: Find user with matching username
         const { data: user, error } = await supabase
           .from('rusers')
           .select('*')
@@ -57,21 +69,20 @@ export default function Auth() {
           throw new Error("Invalid username or password");
         }
 
-        // Compare hashed password
         const isMatch = bcrypt.compareSync(password, user.password);
         if (!isMatch) {
           throw new Error("Invalid username or password");
         }
 
-        // Link this device to the logged-in user
         await supabase
           .from('rusers')
           .update({ device_id: deviceId })
           .eq('id', user.id);
 
         useAuthStore.getState().setAuth(user);
+        await initUser();
+        router.replace("/profile");
       } else {
-        // Sign up: Check if username is taken
         const { data: existingUser } = await supabase
           .from('rusers')
           .select('id')
@@ -82,15 +93,13 @@ export default function Auth() {
           throw new Error("Username is already taken");
         }
 
-        // Hash the password
         const salt = bcrypt.genSaltSync(10);
         const hashedPassword = bcrypt.hashSync(password, salt);
 
-        // Get current anonymous user to upgrade it, or create new
         const { auth: currentAuth } = useAuthStore.getState();
         
+        let newUser;
         if (currentAuth && !currentAuth.password) {
-          // Upgrade current anonymous user
           const { data: updatedUser, error: updateError } = await supabase
             .from('rusers')
             .update({ 
@@ -102,10 +111,9 @@ export default function Auth() {
             .single();
           
           if (updateError) throw updateError;
-          useAuthStore.getState().setAuth(updatedUser);
+          newUser = updatedUser;
         } else {
-          // Create a new user profile
-          const { data: newUser, error: createError } = await supabase
+          const { data: createdUser, error: createError } = await supabase
             .from('rusers')
             .insert({ 
               username: username,
@@ -117,18 +125,41 @@ export default function Auth() {
             .single();
           
           if (createError) throw createError;
-          useAuthStore.getState().setAuth(newUser);
+          newUser = createdUser;
         }
+        
+        const codes = generateRecoveryCodes();
+        await storeRecoveryCodes(newUser.id, codes);
+        
+        setPendingUser(newUser);
+        setRecoveryCodes(codes);
+        setShowRecoveryCodes(true);
       }
-
-      await initUser();
-      router.replace("/profile");
     } catch (error) {
       Alert.alert("Error", error.message);
     } finally {
       setLoading(false);
     }
   };
+
+  if (showRecoveryCodes) {
+    return (
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.container}
+      >
+        <View style={styles.header}>
+          <View style={{ width: 28 }} />
+          <Text style={styles.headerTitle}>Save Recovery Codes</Text>
+          <View style={{ width: 28 }} />
+        </View>
+        <RecoveryCodesDisplay 
+          codes={recoveryCodes}
+          onConfirm={handleRecoveryCodesConfirmed}
+        />
+      </KeyboardAvoidingView>
+    );
+  }
 
   return (
     <KeyboardAvoidingView 
@@ -194,6 +225,17 @@ export default function Auth() {
             {isLogin ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
           </Text>
         </TouchableOpacity>
+
+        {isLogin && (
+          <TouchableOpacity 
+            style={styles.forgotPassword} 
+            onPress={() => router.push("/forgot-password")}
+          >
+            <Text style={styles.forgotPasswordText}>
+              Forgotten your password?
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
     </KeyboardAvoidingView>
   );
@@ -268,5 +310,14 @@ const styles = StyleSheet.create({
   toggleText: {
     color: "rgba(255,255,255,0.4)",
     fontSize: 14,
+  },
+  forgotPassword: {
+    marginTop: 20,
+    alignItems: "center",
+  },
+  forgotPasswordText: {
+    color: "#3B82F6",
+    fontSize: 14,
+    fontWeight: "500",
   },
 });
