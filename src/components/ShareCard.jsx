@@ -14,7 +14,7 @@ export const ShareCard = ({ post }) => {
         style={styles.card}
       >
         <View style={styles.header}>
-          <Text style={styles.appTitle}>TOWNWALL</Text>
+            <Text style={styles.appTitle}>TOWN WALL</Text>
           <View style={styles.tag}>
             <Text style={styles.tagText}>{post.zone?.name || "Featured"}</Text>
           </View>
@@ -26,7 +26,7 @@ export const ShareCard = ({ post }) => {
           </Text>
           
           <Text style={styles.body} numberOfLines={5}>
-            {post.text?.replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').substring(0, 200) || "Check out this update on TownWall!"}
+            {post.text?.replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').substring(0, 200) || "Check out this update on Town Wall!"}
           </Text>
 
           <View style={styles.footer}>

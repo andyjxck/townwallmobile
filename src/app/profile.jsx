@@ -356,12 +356,11 @@ export default function Profile() {
                 <TouchableOpacity onPress={handleLogout} style={styles.headerIcon}>
                   <LogOut color={theme.colors.error} size={24} />
                 </TouchableOpacity>
-              ) : (
-                <TouchableOpacity onPress={() => router.push("/auth")} style={[styles.headerIcon, { flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
-                  <UserPlus color={theme.colors.primary} size={24} />
-                  <Text style={{ color: theme.colors.primary, fontWeight: 'bold' }}>Sign In</Text>
-                </TouchableOpacity>
-              )
+                ) : (
+                  <TouchableOpacity onPress={() => router.push("/auth")} style={styles.headerIcon}>
+                    <UserPlus color={theme.colors.primary} size={24} />
+                  </TouchableOpacity>
+                )
             )}
             {!isOwnProfile && <View style={{ width: 40 }} />}
           </View>

@@ -55,33 +55,36 @@ export default function Auth() {
     }
   };
 
-  const handleAuth = async () => {
-    if (!username || !password) {
-      Alert.alert("Error", "Please fill in all fields");
-      return;
-    }
+    const handleAuth = async () => {
+      const trimmedUsername = username.trim();
+      const trimmedPassword = password.trim();
 
-    setLoading(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      if (!trimmedUsername || !trimmedPassword) {
+        Alert.alert("Error", "Please fill in all fields");
+        return;
+      }
 
-    try {
-      const deviceId = await getDeviceId();
+      setLoading(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-      if (isLogin) {
-        const { data: user, error } = await supabase
-          .from('rusers')
-          .select('*')
-          .eq('username', username)
-          .single();
+      try {
+        const deviceId = await getDeviceId();
 
-        if (error || !user) {
-          throw new Error("Invalid username or password");
-        }
+        if (isLogin) {
+          const { data: user, error } = await supabase
+            .from('rusers')
+            .select('*')
+            .ilike('username', trimmedUsername)
+            .single();
 
-        const isMatch = bcrypt.compareSync(password, user.password);
-        if (!isMatch) {
-          throw new Error("Invalid username or password");
-        }
+          if (error || !user) {
+            throw new Error("Invalid username or password");
+          }
+
+          const isMatch = bcrypt.compareSync(trimmedPassword, user.password);
+          if (!isMatch) {
+            throw new Error("Invalid username or password");
+          }
 
         await supabase
           .from('rusers')
@@ -91,51 +94,51 @@ export default function Auth() {
         useAuthStore.getState().setAuth(user);
         await initUser();
         router.replace("/");
-      } else {
-        const { data: existingUser } = await supabase
-          .from('rusers')
-          .select('id')
-          .eq('username', username)
-          .single();
-
-        if (existingUser) {
-          throw new Error("Username is already taken");
-        }
-
-        const salt = bcrypt.genSaltSync(10);
-        const hashedPassword = bcrypt.hashSync(password, salt);
-
-        const { auth: currentAuth } = useAuthStore.getState();
-        
-        let newUser;
-        if (currentAuth && !currentAuth.password) {
-          const { data: updatedUser, error: updateError } = await supabase
-            .from('rusers')
-            .update({ 
-              username: username,
-              password: hashedPassword
-            })
-            .eq('id', currentAuth.id)
-            .select()
-            .single();
-          
-          if (updateError) throw updateError;
-          newUser = updatedUser;
         } else {
-          const { data: createdUser, error: createError } = await supabase
+          const { data: existingUser } = await supabase
             .from('rusers')
-            .insert({ 
-              username: username,
-              password: hashedPassword,
-              device_id: deviceId,
-              emoji_icon: '👤'
-            })
-            .select()
+            .select('id')
+            .ilike('username', trimmedUsername)
             .single();
+
+          if (existingUser) {
+            throw new Error("Username is already taken");
+          }
+
+          const salt = bcrypt.genSaltSync(10);
+          const hashedPassword = bcrypt.hashSync(trimmedPassword, salt);
+
+          const { auth: currentAuth } = useAuthStore.getState();
           
-          if (createError) throw createError;
-          newUser = createdUser;
-        }
+          let newUser;
+          if (currentAuth && !currentAuth.password) {
+            const { data: updatedUser, error: updateError } = await supabase
+              .from('rusers')
+              .update({ 
+                username: trimmedUsername,
+                password: hashedPassword
+              })
+              .eq('id', currentAuth.id)
+              .select()
+              .single();
+            
+            if (updateError) throw updateError;
+            newUser = updatedUser;
+          } else {
+            const { data: createdUser, error: createError } = await supabase
+              .from('rusers')
+              .insert({ 
+                username: trimmedUsername,
+                password: hashedPassword,
+                device_id: deviceId,
+                emoji_icon: '👤'
+              })
+              .select()
+              .single();
+            
+            if (createError) throw createError;
+            newUser = createdUser;
+          }
         
         const codes = generateRecoveryCodes();
         await storeRecoveryCodes(newUser.id, codes);
@@ -189,14 +192,14 @@ export default function Auth() {
         </TouchableOpacity>
 
         <View style={styles.content}>
-          <View style={styles.titleSection}>
-            <Text style={styles.title}>{isLogin ? "Welcome Back" : "Join TownWall"}</Text>
-            <Text style={styles.subtitle}>
-              {isLogin 
-                ? "Sign in to continue sharing with your community" 
-                : "Create an account to start posting and interacting locally"}
-            </Text>
-          </View>
+            <View style={styles.titleSection}>
+              <Text style={styles.title}>{isLogin ? "Welcome Back" : "Join Town Wall"}</Text>
+              <Text style={styles.subtitle}>
+                {isLogin 
+                  ? "Sign in to continue sharing with your community" 
+                  : "Create an account to start posting and interacting locally"}
+              </Text>
+            </View>
 
           <View style={styles.form}>
             <View style={styles.inputContainer}>
@@ -262,7 +265,7 @@ export default function Auth() {
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>
-            TownWall is private by design. We never ask for your email or phone number.
+            Town Wall is private by design. We never ask for your email or phone number.
           </Text>
         </View>
       </ScrollView>

@@ -302,7 +302,7 @@ export default function HelpContact() {
                       isMine ? styles.myMessage : styles.theirMessage,
                       isResolved && { borderLeftWidth: 4, borderLeftColor: '#10B981' }
                     ]}>
-                      {!isMine && <Text style={styles.adminLabel}>TOWNWALL ASSISTANT</Text>}
+                        {!isMine && <Text style={styles.adminLabel}>TOWN WALL ASSISTANT</Text>}
                       <Text style={[styles.messageText, { color: isMine ? '#000000' : '#FFFFFF' }]}>
                         {item.content}
                       </Text>
