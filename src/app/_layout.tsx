@@ -9,8 +9,6 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useColorScheme } from "react-native";
 
-SplashScreen.preventAutoHideAsync();
-
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -51,19 +49,14 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (isReady) {
-      SplashScreen.hideAsync().catch((e) => {
-        console.warn("Error hiding splash screen:", e);
-      });
+      const timer = setTimeout(() => {
+        SplashScreen.hideAsync().catch((e) => {
+          console.warn("Error hiding splash screen:", e);
+        });
+      }, 100);
+      return () => clearTimeout(timer);
     }
   }, [isReady]);
-
-  // Safety fallback to hide splash screen after 5 seconds
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      SplashScreen.hideAsync().catch(() => {});
-    }, 5000);
-    return () => clearTimeout(timer);
-  }, []);
 
   if (!isReady) {
     return null;
@@ -74,25 +67,24 @@ export default function RootLayout() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
           <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                animation: "slide_from_right",
-              }}
-            >
-              <Stack.Screen name="index" />
-              <Stack.Screen name="onboarding/welcome" />
-              <Stack.Screen name="onboarding/zones" />
-              <Stack.Screen
-                name="post"
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              animation: "slide_from_right",
+            }}
+          >
+            <Stack.Screen name="index" />
+            <Stack.Screen name="onboarding/welcome" />
+            <Stack.Screen
+              name="post"
               options={{
-                  presentation: "modal",
-                  animation: "slide_from_bottom",
-                }}
-              />
-            </Stack>
-          </SafeAreaProvider>
-        </GestureHandlerRootView>
-      </QueryClientProvider>
-    );
-  }
+                presentation: "modal",
+                animation: "slide_from_bottom",
+              }}
+            />
+          </Stack>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    </QueryClientProvider>
+  );
+}
