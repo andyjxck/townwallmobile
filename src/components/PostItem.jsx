@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import {
   Heart,
+  Star,
   Flag,
   Share as ShareIcon,
   AlertTriangle,
@@ -119,10 +120,12 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
   const images = item.image_urls || (item.image_url ? [item.image_url] : []);
   const reactions = item.reactions || item.rreactions || [];
   const helpfulCount = reactions.filter(r => r.reaction_type === 'helpful').length;
+  const superlikeCount = reactions.filter(r => r.reaction_type === 'superlike').length;
   const fakeCount = reactions.filter(r => r.reaction_type === 'fake').length;
   
   const userReactions = {
     helpful: reactions.some(r => r.reaction_type === 'helpful' && r.device_id === deviceId),
+    superlike: reactions.some(r => r.reaction_type === 'superlike' && r.device_id === deviceId),
     fake: reactions.some(r => r.reaction_type === 'fake' && r.device_id === deviceId),
   };
 
@@ -233,6 +236,39 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
           ) : (
             <Image source={{ uri: images[0] }} style={styles.fullMedia} contentFit="contain" />
           )}
+        </View>
+      </Modal>
+
+      <Modal visible={showLikersModal || showSuperlikersModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{showSuperlikersModal ? 'Superlikes' : 'Likes'}</Text>
+              <TouchableOpacity onPress={() => { setShowLikersModal(false); setShowSuperlikersModal(false); }}>
+                <X color="#FFF" size={24} />
+              </TouchableOpacity>
+            </View>
+            
+            {loadingLikers ? (
+              <ActivityIndicator size="large" color={theme.colors.primary} />
+            ) : (
+              <View>
+                {(showSuperlikersModal ? superlikers : likers).map((u, i) => (
+                  <TouchableOpacity key={i} style={styles.userRow} onPress={() => { setShowLikersModal(false); setShowSuperlikersModal(false); router.push(`/profile?userId=${u.id}`); }}>
+                    {u.avatar_url ? (
+                      <Image source={{ uri: u.avatar_url }} style={styles.userAvatar} />
+                    ) : (
+                      <Text style={styles.userEmoji}>{u.emoji_icon || '👤'}</Text>
+                    )}
+                    <Text style={styles.userName}>@{u.username}</Text>
+                  </TouchableOpacity>
+                ))}
+                {(showSuperlikersModal ? superlikers : likers).length === 0 && (
+                  <Text style={styles.emptyText}>No reactions yet</Text>
+                )}
+              </View>
+            )}
+          </View>
         </View>
       </Modal>
     </View>

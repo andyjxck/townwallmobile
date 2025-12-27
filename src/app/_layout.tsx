@@ -1,5 +1,5 @@
 import { useAuth } from "@/utils/auth/useAuth";
-import { initUser } from "@/utils/user";
+import * as UserUtils from "../utils/user";
 import { supabase } from "@/utils/supabase";
 import { Stack, usePathname, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
@@ -125,7 +125,7 @@ export default function RootLayout() {
     const init = async () => {
       await initiate();
       try {
-        await initUser();
+        await UserUtils.initUser();
       } catch (e) {
         console.error("Failed to init user:", e);
       }
