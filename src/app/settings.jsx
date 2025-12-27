@@ -46,7 +46,24 @@ export default function SettingsScreen() {
   const [newRecoveryCodes, setNewRecoveryCodes] = useState([]);
   const [recoveryStatus, setRecoveryStatus] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [passwordError, setPasswordError] = useState("");
+  const [hasPasswordLocal, setHasPasswordLocal] = useState(!!auth?.password);
+
+  useEffect(() => {
+    setHasPasswordLocal(!!auth?.password);
+  }, [auth?.password]);
+
+  useEffect(() => {
+    const checkPassword = async () => {
+      if (!auth?.password && auth?.id) {
+        const { data } = await supabase.from('rusers').select('password').eq('id', auth.id).single();
+        if (data?.password) {
+          setHasPasswordLocal(true);
+          useAuthStore.getState().setAuth({ ...auth, password: data.password });
+        }
+      }
+    };
+    checkPassword();
+  }, []);
 
   const fetchRecoveryStatus = async () => {
     if (!auth?.id) return;
@@ -58,8 +75,22 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleOpenRecoveryStatus = () => {
-    if (!auth?.password) {
+    const handleOpenRecoveryStatus = async () => {
+      let hasPassword = !!auth?.password;
+      
+      // If password not in store, double check DB to be absolutely sure
+      if (!hasPassword && auth?.id) {
+        setLoading(true);
+        const { data } = await supabase.from('rusers').select('password').eq('id', auth.id).single();
+        if (data?.password) {
+          hasPassword = true;
+          // Sync store if we found it
+          useAuthStore.getState().setAuth({ ...auth, password: data.password });
+        }
+        setLoading(false);
+      }
+
+      if (!hasPassword) {
       Alert.alert(
         "Password Required", 
         "To use recovery codes, you first need to set a password for your account. This helps keep your account secure!",
@@ -166,7 +197,7 @@ export default function SettingsScreen() {
         <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}>
               <View style={styles.section}>
                 <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>SECURITY</Text>
-                <SettingsItem icon={<Key size={20} color={theme.colors.textSecondary} />} title={auth?.password ? "Change Password" : "Set Account Password"} onPress={() => { setShowChangePassword(true); setPasswordError(""); }} />
+                <SettingsItem icon={<Key size={20} color={theme.colors.textSecondary} />} title={hasPasswordLocal ? "Change Password" : "Set Account Password"} onPress={() => { setShowChangePassword(true); setPasswordError(""); }} />
                 <SettingsItem icon={<Shield size={20} color={theme.colors.textSecondary} />} title="Recovery Codes" onPress={handleOpenRecoveryStatus} />
               </View>
 
