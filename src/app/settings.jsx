@@ -49,6 +49,26 @@ export default function SettingsScreen() {
   const [hasPasswordLocal, setHasPasswordLocal] = useState(!!auth?.password);
   const [passwordError, setPasswordError] = useState("");
 
+  const loadingMessages = [
+    "Generating your secure recovery codes...",
+    "I know this can take a while.. I promise it's working!",
+    "Almost there... securing your account...",
+    "Encryption in progress...",
+  ];
+  const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
+
+  useEffect(() => {
+    let interval;
+    if (loading) {
+      interval = setInterval(() => {
+        setLoadingMessageIndex((prev) => (prev + 1) % loadingMessages.length);
+      }, 2500);
+    } else {
+      setLoadingMessageIndex(0);
+    }
+    return () => clearInterval(interval);
+  }, [loading]);
+
   useEffect(() => {
     setHasPasswordLocal(!!auth?.password);
   }, [auth?.password]);
@@ -229,13 +249,24 @@ export default function SettingsScreen() {
               autoFocus
             />
             {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
-                <TouchableOpacity 
-                  style={[styles.modalBtn, { backgroundColor: theme.colors.primary }]}
-                  onPress={showChangePassword ? handleChangePassword : handlePasswordConfirm}
-                  disabled={loading}
-                >
-                  {loading ? <ActivityIndicator color="#000000" /> : <Text style={[styles.modalBtnText, { color: "#000000" }]}>{showChangePassword ? "UPDATE" : "CONFIRM"}</Text>}
-                </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.modalBtn, { backgroundColor: theme.colors.primary }]}
+                    onPress={showChangePassword ? handleChangePassword : handlePasswordConfirm}
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <View style={{ alignItems: 'center', gap: 10 }}>
+                        <ActivityIndicator color="#000000" />
+                        <Text style={{ color: '#000000', fontSize: 13, fontWeight: '500', textAlign: 'center', marginTop: 8 }}>
+                          {loadingMessages[loadingMessageIndex]}
+                        </Text>
+                      </View>
+                    ) : (
+                      <Text style={[styles.modalBtnText, { color: "#000000" }]}>
+                        {showChangePassword ? "UPDATE" : "CONFIRM"}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
 
             <TouchableOpacity onPress={() => { setShowPasswordModal(false); setShowChangePassword(false); }} style={styles.closeBtn}>
               <Text style={{ color: theme.colors.textSecondary, fontWeight: '700' }}>CANCEL</Text>
