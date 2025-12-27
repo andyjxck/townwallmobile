@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
   badge: { position: 'absolute', top: -2, right: -2, width: 10, height: 10, borderRadius: 5, borderWidth: 2, borderColor: '#FFF' },
   menu: { position: 'absolute', top: 100, right: 20, width: 180, borderRadius: 10, padding: 10, zIndex: 100, borderWidth: 1, elevation: 5 },
   menuItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 },
-  menuText: { fontSize: 16 },
+  menuText: { fontSize: 16, color: theme.colors.text },
   fab: { position: 'absolute', bottom: 30, right: 20, width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', elevation: 5 },
   empty: { padding: 40, alignItems: 'center' },
   emptyText: { fontSize: 16, color: '#666' },
