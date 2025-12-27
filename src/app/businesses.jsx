@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Modal, Image, Platform, FlatList, Linking } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Modal, Image, Platform, FlatList, Linking, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, Globe, Info, Plus, ExternalLink, ShieldCheck, CheckCircle2, Star, Camera, MapPin, Phone, Briefcase, Search, X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -26,6 +26,7 @@ export default function LocalBusinesses() {
   const [showModal, setShowModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState('list'); // 'list' or 'map'
+  const { width } = Dimensions.get('window');
   
   const [form, setForm] = useState({
     name: '',
@@ -308,14 +309,26 @@ export default function LocalBusinesses() {
   );
 
   const displayBusinesses = useMemo(() => {
-    const data = [];
+    if (!filteredBusinesses || filteredBusinesses.length === 0) return [];
+    
+    const interleaved = [];
+    let itemsSinceLastAd = 0;
+    let nextAdThreshold = Math.floor(Math.random() * (11 - 5 + 1)) + 5;
+    
+    const firstAdIndex = 1; // Show first ad after 2 items
+
     filteredBusinesses.forEach((b, index) => {
-      data.push({ ...b, _isBusiness: true });
-      if ((index + 1) % 4 === 0) {
-        data.push({ _isAd: true, id: `ad-${index}` });
+      interleaved.push({ ...b, _isBusiness: true });
+      itemsSinceLastAd++;
+      
+      if (index === firstAdIndex || itemsSinceLastAd >= nextAdThreshold) {
+        interleaved.push({ _isAd: true, id: `ad-${b.id || index}` });
+        itemsSinceLastAd = 0;
+        nextAdThreshold = Math.floor(Math.random() * (11 - 5 + 1)) + 5;
       }
     });
-    return data;
+    
+    return interleaved;
   }, [filteredBusinesses]);
 
   const renderItem = ({ item }) => {

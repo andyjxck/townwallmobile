@@ -26,6 +26,7 @@ import {
   X as XIcon,
   Settings as SettingsIcon,
   Search,
+  Pencil,
 } from "lucide-react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";

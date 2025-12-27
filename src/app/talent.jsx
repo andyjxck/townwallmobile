@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Modal, Image, Platform, FlatList, Linking } from 'react-native';
+import React, { useState, useEffect, useMemo } from 'react';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Modal, Image, Platform, FlatList, Linking, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, Music, Youtube, Globe, Info, Plus, ExternalLink, ShieldCheck, Instagram, CheckCircle2, Star, Camera, Search, X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,6 +11,8 @@ import { supabase } from '@/utils/supabase';
 import { decode } from 'base64-arraybuffer';
 import * as ImagePicker from 'expo-image-picker';
 import { getStoredUser } from '@/utils/user';
+import { NativeAd } from '@/components/NativeAd';
+import { BannerAd } from '@/components/BannerAd';
 
 export default function LocalTalent() {
   const insets = useSafeAreaInsets();
@@ -21,6 +23,7 @@ export default function LocalTalent() {
   const [showModal, setShowModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const { width } = Dimensions.get('window');
   
   const categories = ['YouTuber', 'Podcaster', 'Musician', 'Artist', 'Developer', 'Photography', 'Other'];
 
@@ -210,36 +213,6 @@ export default function LocalTalent() {
     return <Globe size={16} color="rgba(255,255,255,0.5)" />;
   };
 
-    const renderTalentCard = ({ item }) => {
-      return (
-        <TouchableOpacity 
-          activeOpacity={0.9}
-          onPress={() => handleOpenLink(item.link)}
-          style={styles.talentCard}
-        >
-          <View style={styles.cardImageContainer}>
-            <Image 
-              source={{ uri: item.avatar_url || `https://avatar.vercel.sh/${item.name}.png` }} 
-              style={styles.cardImage} 
-              resizeMode="cover"
-            />
-            <LinearGradient
-              colors={['transparent', 'rgba(0,0,0,0.8)']}
-              style={styles.cardGradient}
-            />
-            <View style={styles.cardPlatformBadge}>
-              {getPlatformIcon(item.platform)}
-            </View>
-          </View>
-          
-          <View style={styles.cardInfo}>
-            <Text style={styles.talentNameSmall} numberOfLines={1}>{item.name}</Text>
-            <Text style={styles.talentTitleSmall} numberOfLines={1}>{item.category || 'Talent'}</Text>
-          </View>
-        </TouchableOpacity>
-      );
-    };
-
   const filteredTalents = talents.filter(t => {
     const matchesSearch = t.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                          t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -247,6 +220,67 @@ export default function LocalTalent() {
     const matchesCategory = !selectedCategory || t.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
+
+  const displayTalents = useMemo(() => {
+    if (!filteredTalents || filteredTalents.length === 0) return [];
+    
+    const interleaved = [];
+    let itemsSinceLastAd = 0;
+    let nextAdThreshold = Math.floor(Math.random() * (11 - 5 + 1)) + 5;
+    
+    const firstAdIndex = 1; // Show first ad after 2 items
+
+    filteredTalents.forEach((t, index) => {
+      interleaved.push({ ...t, _isTalent: true });
+      itemsSinceLastAd++;
+      
+      if (index === firstAdIndex || itemsSinceLastAd >= nextAdThreshold) {
+        interleaved.push({ _isAd: true, id: `ad-${t.id || index}` });
+        itemsSinceLastAd = 0;
+        nextAdThreshold = Math.floor(Math.random() * (11 - 5 + 1)) + 5;
+      }
+    });
+    
+    return interleaved;
+  }, [filteredTalents]);
+
+  const renderTalentCard = ({ item }) => {
+    if (item._isAd) {
+      return (
+        <View style={{ width: width - 24, marginHorizontal: 6, marginVertical: 6 }}>
+          <NativeAd />
+        </View>
+      );
+    }
+
+    return (
+      <TouchableOpacity 
+        activeOpacity={0.9}
+        onPress={() => handleOpenLink(item.link)}
+        style={styles.talentCard}
+      >
+        <View style={styles.cardImageContainer}>
+          <Image 
+            source={{ uri: item.avatar_url || `https://avatar.vercel.sh/${item.name}.png` }} 
+            style={styles.cardImage} 
+            resizeMode="cover"
+          />
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.8)']}
+            style={styles.cardGradient}
+          />
+          <View style={styles.cardPlatformBadge}>
+            {getPlatformIcon(item.platform)}
+          </View>
+        </View>
+        
+        <View style={styles.cardInfo}>
+          <Text style={styles.talentNameSmall} numberOfLines={1}>{item.name}</Text>
+          <Text style={styles.talentTitleSmall} numberOfLines={1}>{item.category || 'Talent'}</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -317,7 +351,7 @@ export default function LocalTalent() {
           </View>
         ) : (
           <FlatList
-            data={filteredTalents}
+            data={displayTalents}
             renderItem={renderTalentCard}
             keyExtractor={(item) => item.id.toString()}
             numColumns={2}

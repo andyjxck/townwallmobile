@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
     View,
     Text,
@@ -60,10 +60,33 @@ export default function UniversalFeed() {
   const [isModerator, setIsModerator] = useState(false);
   const user = useAuthStore(state => state.auth);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const shareRef = useRef();
+    const [unreadCount, setUnreadCount] = useState(0);
+    const shareRef = useRef();
+  
+    const postsWithAds = useMemo(() => {
+      if (!posts || posts.length === 0) return [];
+      
+      const interleaved = [];
+      let postsSinceLastAd = 0;
+      let nextAdThreshold = Math.floor(Math.random() * (11 - 5 + 1)) + 5;
+      
+      const firstAdIndex = 1; // Show first ad after 2 posts
+  
+      posts.forEach((post, index) => {
+        interleaved.push(post);
+        postsSinceLastAd++;
+        
+        if (index === firstAdIndex || postsSinceLastAd >= nextAdThreshold) {
+          interleaved.push({ isAd: true, id: `ad-${post.id}` });
+          postsSinceLastAd = 0;
+          nextAdThreshold = Math.floor(Math.random() * (11 - 5 + 1)) + 5;
+        }
+      });
+      
+      return interleaved;
+    }, [posts]);
 
-  useEffect(() => {
+    useEffect(() => {
     getDeviceId().then(setDeviceId);
     fetchZones();
     checkModerator();
@@ -174,29 +197,32 @@ export default function UniversalFeed() {
       )}
 
         <FlatList
-          data={posts}
-          renderItem={({ item, index }) => (
-            <View>
-              {index === 0 && <BannerAd />}
-              <PostItem 
-                item={item} 
-                deviceId={deviceId} 
-                onReaction={handleReaction} 
-                user={user} 
-                onComment={() => fetchPosts(true)} 
-                onShare={(p) => shareRef.current?.share(p)} 
-                onEdit={(p) => router.push(`/post?id=${p.id}`)}
-                onFilterZone={(zoneId) => setSelectedZone(zoneId)}
-                onFilterTag={() => {}}
-              />
-              {(index + 1) % 5 === 0 && <NativeAd />}
-            </View>
-          )}
-        keyExtractor={item => item.id.toString()}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        contentContainerStyle={{ paddingBottom: 100 }}
-        ListEmptyComponent={loading ? <ActivityIndicator style={{ marginTop: 20 }} /> : <View style={styles.empty}><Text style={styles.emptyText}>No posts found</Text></View>}
-      />
+          data={postsWithAds}
+          renderItem={({ item, index }) => {
+            if (item.isAd) return <NativeAd />;
+            
+            return (
+              <View>
+                {index === 0 && <BannerAd />}
+                <PostItem 
+                  item={item} 
+                  deviceId={deviceId} 
+                  onReaction={handleReaction} 
+                  user={user} 
+                  onComment={() => fetchPosts(true)} 
+                  onShare={(p) => shareRef.current?.share(p)} 
+                  onEdit={(p) => router.push(`/post?id=${p.id}`)}
+                  onFilterZone={(zoneId) => setSelectedZone(zoneId)}
+                  onFilterTag={() => {}}
+                />
+              </View>
+            );
+          }}
+          keyExtractor={item => item.id.toString()}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          contentContainerStyle={{ paddingBottom: 100 }}
+          ListEmptyComponent={loading ? <ActivityIndicator style={{ marginTop: 20 }} /> : <View style={styles.empty}><Text style={styles.emptyText}>No posts found</Text></View>}
+        />
 
         <TouchableOpacity onPress={() => router.push("/post")} style={[styles.fab, { backgroundColor: theme.colors.primary }]}>
           <Plus color="#000" size={30} />
