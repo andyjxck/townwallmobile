@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { supabase } from "../utils/supabase";
-import { getStoredUser, logoutUser, initUser } from "../utils/user";
+import { getStoredUser, logoutUser, initUser, isOnline } from "../utils/user";
 import { getDeviceId } from "../utils/deviceId";
 import { 
   ChevronLeft, 
@@ -105,13 +105,6 @@ export default function Profile() {
     const viewingOwnProfile = !userId || (storedUser?.id && parseInt(userId) === storedUser.id);
     setIsOwnProfile(viewingOwnProfile);
     
-    const isOnline = (lastSeen) => {
-      if (!lastSeen) return false;
-      const lastSeenDate = new Date(lastSeen);
-      const now = new Date();
-      return (now - lastSeenDate) < 1000 * 60 * 5; // 5 minutes
-    };
-
     let userData;
       if (viewingOwnProfile && storedUser?.id) {
         const { data: freshUser } = await supabase.from('rusers').select('*').eq('id', storedUser.id).single();

@@ -27,7 +27,7 @@ import { moderateContent } from "../utils/ai";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { getStoredUser } from "../utils/user";
+import { getStoredUser, isOnline } from "../utils/user";
 import { TextInput } from "react-native-gesture-handler";
 import RenderHtml from 'react-native-render-html';
 import { useWindowDimensions } from 'react-native';
@@ -51,14 +51,10 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
   const [likers, setLikers] = useState([]);
   const [superlikers, setSuperlikers] = useState([]);
   const [showLikersModal, setShowLikersModal] = useState(false);
-  const [showSuperlikersModal, setShowSuperlikersModal] = useState(false);
+    const [showSuperlikersModal, setShowSuperlikersModal] = useState(false);
+  
+    const fetchLikers = async (type) => {
 
-  const isOnline = (lastSeen) => {
-    if (!lastSeen) return false;
-    return (new Date() - new Date(lastSeen)) < 1000 * 60 * 5;
-  };
-
-  const fetchLikers = async (type) => {
     setLoadingLikers(true);
     try {
       const { data } = await supabase

@@ -82,6 +82,13 @@ export const initUser = async () => {
   }
 };
 
+export const isOnline = (lastSeen) => {
+  if (!lastSeen) return false;
+  const lastSeenDate = new Date(lastSeen);
+  const now = new Date();
+  return (now - lastSeenDate) < 1000 * 60 * 5; // 5 minutes
+};
+
 export const getStoredUser = async () => {
   const data = await AsyncStorage.getItem(USER_DATA_KEY);
   return data ? JSON.parse(data) : null;
