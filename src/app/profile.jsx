@@ -8,6 +8,7 @@ import {
   Alert,
   ActivityIndicator,
   Dimensions,
+  TextInput as RNTextInput,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { supabase } from "../utils/supabase";
@@ -27,6 +28,7 @@ import {
   Settings as SettingsIcon,
   Search,
   Pencil,
+  MessageCircle,
 } from "lucide-react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
@@ -34,7 +36,6 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as Haptics from "expo-haptics";
 import { decode } from "base64-arraybuffer";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { TextInput } from "react-native-gesture-handler";
 import { Image } from "expo-image";
 import PostItem from "../components/PostItem";
 import { ShareManager } from "../components/ShareManager";
@@ -361,25 +362,44 @@ export default function Profile() {
 
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.profileInfo}>
-          <View style={styles.avatarSection}>
-            <TouchableOpacity 
-              onPress={() => isOwnProfile && setShowEmojiPicker(true)} 
-              disabled={!isOwnProfile}
-              style={[styles.avatarContainer, { backgroundColor: theme.colors.surface }]}
-            >
-              {user?.avatar_url ? (
-                <Image source={{ uri: user.avatar_url }} style={styles.avatar} />
-              ) : (
-                <Text style={styles.avatarEmoji}>{user?.emoji_icon || "👤"}</Text>
-              )}
-              {isOwnProfile && (
-                  <View style={[styles.editBadge, { backgroundColor: '#000' }]}>
-                    <ImageIcon size={12} color="#FFF" />
-                  </View>
+            <View style={styles.avatarSection}>
+              <TouchableOpacity 
+                onPress={() => isOwnProfile && setShowEmojiPicker(true)} 
+                disabled={!isOwnProfile}
+                style={[styles.avatarContainer, { backgroundColor: theme.colors.surface }]}
+              >
+                {user?.avatar_url ? (
+                  <Image source={{ uri: user.avatar_url }} style={styles.avatar} />
+                ) : (
+                  <Text style={styles.avatarEmoji}>{user?.emoji_icon || "👤"}</Text>
                 )}
-            </TouchableOpacity>
-            
-              <View style={styles.nameSection}>
+                {isOwnProfile && (
+                    <View style={[styles.editBadge, { backgroundColor: '#000' }]}>
+                      <ImageIcon size={12} color="#FFF" />
+                    </View>
+                  )}
+              </TouchableOpacity>
+              
+              {isOwnProfile && (
+                <View style={styles.photoActions}>
+                  <View style={styles.quickEmojis}>
+                    {EMOJIS.slice(0, 5).map(emoji => (
+                      <TouchableOpacity key={emoji} onPress={() => handleSelectEmoji(emoji)} style={styles.quickEmojiItem}>
+                        <Text style={styles.quickEmojiText}>{emoji}</Text>
+                      </TouchableOpacity>
+                    ))}
+                    <TouchableOpacity onPress={() => setShowEmojiPicker(true)} style={styles.quickEmojiItem}>
+                      <Text style={[styles.quickEmojiText, { color: theme.colors.primary }]}>+</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <TouchableOpacity onPress={handlePickAvatar} style={[styles.inlineUploadBtn, { backgroundColor: theme.colors.surface }]}>
+                    <Camera size={16} color={theme.colors.text} />
+                    <Text style={[styles.inlineUploadBtnText, { color: theme.colors.text }]}>upload image</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              
+                <View style={styles.nameSection}>
                 {editingUsername ? (
                   <View style={styles.editRow}>
                     <RNTextInput
@@ -431,16 +451,16 @@ export default function Profile() {
                 </TouchableOpacity>
               )}
 
-            {editingBio ? (
-              <View style={styles.bioEditContainer}>
-                <TextInput
-                  style={[styles.bioInput, { color: theme.colors.text, borderColor: theme.colors.border }]}
-                  value={bioText}
-                  onChangeText={setBioText}
-                  multiline
-                  maxLength={160}
-                  placeholder="Tell us about yourself..."
-                />
+              {editingBio ? (
+                <View style={styles.bioEditContainer}>
+                  <RNTextInput
+                    style={[styles.bioInput, { color: theme.colors.text, borderColor: theme.colors.border }]}
+                    value={bioText}
+                    onChangeText={setBioText}
+                    multiline
+                    maxLength={160}
+                    placeholder="Tell us about yourself..."
+                  />
                 <View style={styles.bioButtons}>
                   <TouchableOpacity onPress={() => setEditingBio(false)} style={styles.bioCancel}><Text style={styles.bioCancelText}>Cancel</Text></TouchableOpacity>
                   <TouchableOpacity onPress={handleUpdateBio} style={[styles.bioSave, { backgroundColor: theme.colors.primary }]}><Text style={styles.bioSaveText}>Save</Text></TouchableOpacity>
@@ -490,16 +510,16 @@ export default function Profile() {
                   <View style={styles.emptyContainer}><Text style={styles.emptyText}>No starred posts</Text></View>
                 )
               )}
-            {activeTab === "friends" && (
-              <View style={styles.friendsContainer}>
-                <View style={styles.addFriendSection}>
-                  <TextInput
-                    style={[styles.friendInput, { color: theme.colors.text, borderColor: theme.colors.border }]}
-                    placeholder="Add by username..."
-                    value={friendUsername}
-                    onChangeText={setFriendUsername}
-                    autoCapitalize="none"
-                  />
+              {activeTab === "friends" && (
+                <View style={styles.friendsContainer}>
+                  <View style={styles.addFriendSection}>
+                    <RNTextInput
+                      style={[styles.friendInput, { color: theme.colors.text, borderColor: theme.colors.border }]}
+                      placeholder="Add by username..."
+                      value={friendUsername}
+                      onChangeText={setFriendUsername}
+                      autoCapitalize="none"
+                    />
                   <TouchableOpacity 
                       onPress={handleAddFriend} 
                       disabled={addingFriend}
@@ -558,7 +578,7 @@ export default function Profile() {
                 </TouchableOpacity>
               ))}
             </View>
-            <TouchableOpacity onPress={handlePickAvatar} style={[styles.photoBtn, { backgroundColor: theme.colors.surface }]}><Camera size={20} color={theme.colors.text} /><Text style={[styles.photoBtnText, { color: theme.colors.text }]}>Upload Photo</Text></TouchableOpacity>
+            <TouchableOpacity onPress={handlePickAvatar} style={[styles.photoBtn, { backgroundColor: theme.colors.surface }]}><Camera size={20} color={theme.colors.text} /><Text style={[styles.photoBtnText, { color: theme.colors.text }]}>upload image</Text></TouchableOpacity>
             <TouchableOpacity onPress={() => setShowEmojiPicker(false)} style={styles.closeBtn}><Text style={styles.closeBtnText}>Cancel</Text></TouchableOpacity>
           </View>
         </View>
@@ -581,6 +601,12 @@ const styles = StyleSheet.create({
   avatar: { width: 100, height: 100, borderRadius: 50 },
   avatarEmoji: { fontSize: 60 },
   editBadge: { position: 'absolute', bottom: 0, right: 0, width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: '#FFF' },
+  photoActions: { width: '100%', alignItems: 'center', marginBottom: 20 },
+  quickEmojis: { flexDirection: 'row', gap: 12, marginBottom: 12 },
+  quickEmojiItem: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
+  quickEmojiText: { fontSize: 24 },
+  inlineUploadBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(0,0,0,0.1)' },
+  inlineUploadBtnText: { fontSize: 14, fontWeight: '600' },
   nameSection: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   username: { fontSize: 24, fontWeight: 'bold' },
   onlineDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#10B981', marginLeft: 4 },
