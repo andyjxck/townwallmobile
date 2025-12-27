@@ -9,12 +9,17 @@ import { useAuth } from "../utils/auth/useAuth";
 import { useAuthStore } from "../utils/auth";
 import * as Haptics from "expo-haptics";
 import bcrypt from 'bcryptjs';
+import * as Crypto from 'expo-crypto';
 import { logoutUser, initUser } from "../utils/user";
-import { generateRecoveryCodes, storeRecoveryCodes } from "../utils/recoveryCode";
-import { RecoveryCodesDisplay } from "../components/RecoveryCodesDisplay";
-import { supabase } from "../utils/supabase";
+
+// Set random fallback for bcryptjs
+bcrypt.setRandomFallback((len) => {
+  const bytes = Crypto.getRandomBytes(len);
+  return Array.from(bytes);
+});
 
 export default function SettingsScreen() {
+
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { signOut } = useAuth();
@@ -156,13 +161,14 @@ export default function SettingsScreen() {
               autoFocus
             />
             {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
-              <TouchableOpacity 
-                style={[styles.modalBtn, { backgroundColor: theme.colors.primary }]}
-                onPress={showChangePassword ? handleChangePassword : handlePasswordConfirm}
-                disabled={loading}
-              >
-                {loading ? <ActivityIndicator color="#000" /> : <Text style={styles.modalBtnText}>{showChangePassword ? "UPDATE" : "CONFIRM"}</Text>}
-              </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.modalBtn, { backgroundColor: theme.colors.primary }]}
+                  onPress={showChangePassword ? handleChangePassword : handlePasswordConfirm}
+                  disabled={loading}
+                >
+                  {loading ? <ActivityIndicator color="#000000" /> : <Text style={[styles.modalBtnText, { color: "#000000" }]}>{showChangePassword ? "UPDATE" : "CONFIRM"}</Text>}
+                </TouchableOpacity>
+
             <TouchableOpacity onPress={() => { setShowPasswordModal(false); setShowChangePassword(false); }} style={styles.closeBtn}>
               <Text style={{ color: theme.colors.textSecondary, fontWeight: '700' }}>CANCEL</Text>
             </TouchableOpacity>

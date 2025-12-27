@@ -14,15 +14,18 @@ import {
 import { useRouter } from 'expo-router';
 import { ChevronLeft, User, Key } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
+import bcrypt from 'bcryptjs';
+import * as Crypto from 'expo-crypto';
 import { verifyRecoveryCode } from '../utils/recoveryCode';
-import { useAuthStore } from '../utils/auth';
-import { initUser } from '../utils/user';
-import { theme } from '../utils/theme';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { StatusBar } from 'expo-status-bar';
+
+// Set random fallback for bcryptjs
+bcrypt.setRandomFallback((len) => {
+  const bytes = Crypto.getRandomBytes(len);
+  return Array.from(bytes);
+});
 
 export default function ForgotPassword() {
+
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(false);

@@ -1,5 +1,12 @@
 import { supabase } from './supabase';
 import bcrypt from 'bcryptjs';
+import * as Crypto from 'expo-crypto';
+
+// Set random fallback for bcryptjs using expo-crypto
+bcrypt.setRandomFallback((len) => {
+  const bytes = Crypto.getRandomBytes(len);
+  return Array.from(bytes);
+});
 
 export const generateRecoveryCodes = (count = 10) => {
   const codes = [];
