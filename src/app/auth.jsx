@@ -70,36 +70,36 @@ export default function Auth() {
     }
   };
 
-    const handleAuth = async () => {
-      const trimmedUsername = username.trim();
-      const trimmedPassword = password.trim();
+  const handleAuth = async () => {
+    const trimmedUsername = username.trim();
+    const trimmedPassword = password.trim();
 
-      if (!trimmedUsername || !trimmedPassword) {
-        Alert.alert("Error", "Please fill in all fields");
-        return;
-      }
+    if (!trimmedUsername || !trimmedPassword) {
+      Alert.alert("Error", "Please fill in all fields");
+      return;
+    }
 
-      setLoading(true);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setLoading(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-      try {
-        const deviceId = await getDeviceId();
+    try {
+      const deviceId = await getDeviceId();
 
-        if (isLogin) {
-          const { data: user, error } = await supabase
-            .from('rusers')
-            .select('*')
-            .ilike('username', trimmedUsername)
-            .single();
+      if (isLogin) {
+        const { data: user, error } = await supabase
+          .from('rusers')
+          .select('*')
+          .ilike('username', trimmedUsername)
+          .single();
 
-          if (error || !user) {
-            throw new Error("Invalid username or password");
-          }
+        if (error || !user) {
+          throw new Error("Invalid username or password");
+        }
 
-          const isMatch = bcrypt.compareSync(trimmedPassword, user.password);
-          if (!isMatch) {
-            throw new Error("Invalid username or password");
-          }
+        const isMatch = bcrypt.compareSync(trimmedPassword, user.password);
+        if (!isMatch) {
+          throw new Error("Invalid username or password");
+        }
 
         await supabase
           .from('rusers')
@@ -109,52 +109,52 @@ export default function Auth() {
         useAuthStore.getState().setAuth(user);
         await initUser();
         router.replace("/");
-        } else {
-          const { data: existingUser } = await supabase
-            .from('rusers')
-            .select('id')
-            .ilike('username', trimmedUsername)
-            .single();
+      } else {
+        const { data: existingUser } = await supabase
+          .from('rusers')
+          .select('id')
+          .ilike('username', trimmedUsername)
+          .single();
 
-          if (existingUser) {
-            throw new Error("Username is already taken");
-          }
+        if (existingUser) {
+          throw new Error("Username is already taken");
+        }
 
-          const salt = bcrypt.genSaltSync(10);
-          const hashedPassword = bcrypt.hashSync(trimmedPassword, salt);
+        const salt = bcrypt.genSaltSync(10);
+        const hashedPassword = bcrypt.hashSync(trimmedPassword, salt);
 
-          const { auth: currentAuth } = useAuthStore.getState();
-          
-          let newUser;
-          if (currentAuth && !currentAuth.password) {
-            const { data: updatedUser, error: updateError } = await supabase
-              .from('rusers')
-              .update({ 
-                username: trimmedUsername,
-                password: hashedPassword
-              })
-              .eq('id', currentAuth.id)
-              .select()
-              .single();
-            
-            if (updateError) throw updateError;
-            newUser = updatedUser;
-          } else {
-            const { data: createdUser, error: createError } = await supabase
-              .from('rusers')
-              .insert({ 
-                username: trimmedUsername,
-                password: hashedPassword,
-                device_id: deviceId,
-                emoji_icon: '👤'
-              })
-              .select()
-              .single();
-            
-            if (createError) throw createError;
-            newUser = createdUser;
-          }
+        const { auth: currentAuth } = useAuthStore.getState();
         
+        let newUser;
+        if (currentAuth && !currentAuth.password) {
+          const { data: updatedUser, error: updateError } = await supabase
+            .from('rusers')
+            .update({ 
+              username: trimmedUsername,
+              password: hashedPassword
+            })
+            .eq('id', currentAuth.id)
+            .select()
+            .single();
+          
+          if (updateError) throw updateError;
+          newUser = updatedUser;
+        } else {
+          const { data: createdUser, error: createError } = await supabase
+            .from('rusers')
+            .insert({ 
+              username: trimmedUsername,
+              password: hashedPassword,
+              device_id: deviceId,
+              emoji_icon: '👤'
+            })
+            .select()
+            .single();
+          
+          if (createError) throw createError;
+          newUser = createdUser;
+        }
+      
         const codes = generateRecoveryCodes();
         await storeRecoveryCodes(newUser.id, codes);
         
@@ -207,14 +207,14 @@ export default function Auth() {
         </TouchableOpacity>
 
         <View style={styles.content}>
-            <View style={styles.titleSection}>
-              <Text style={styles.title}>{isLogin ? "Welcome Back" : "Join Town Wall"}</Text>
-              <Text style={styles.subtitle}>
-                {isLogin 
-                  ? "Sign in to continue sharing with your community" 
-                  : "Create an account to start posting and interacting locally"}
-              </Text>
-            </View>
+          <View style={styles.titleSection}>
+            <Text style={styles.title}>{isLogin ? "Welcome Back" : "Join Town Wall"}</Text>
+            <Text style={styles.subtitle}>
+              {isLogin 
+                ? "Sign in to continue sharing with your community" 
+                : "Create an account to start posting and interacting locally"}
+            </Text>
+          </View>
 
           <View style={styles.form}>
             <View style={styles.inputContainer}>
