@@ -13,7 +13,7 @@ import * as Crypto from 'expo-crypto';
 import { logoutUser, initUser } from "../utils/user";
 import { supabase } from "../utils/supabase";
 import { generateRecoveryCodes, storeRecoveryCodes } from "../utils/recoveryCode";
-import { RecoveryCodesDisplay } from "../components/RecoveryCodesDisplay";
+import RecoveryCodesDisplay from "../components/RecoveryCodesDisplay";
 
 // Polyfill for bcryptjs in React Native/Expo
 if (typeof global.crypto !== 'object') {

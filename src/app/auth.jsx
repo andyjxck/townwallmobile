@@ -21,7 +21,7 @@ import { ChevronLeft, User, Lock } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import bcrypt from 'bcryptjs';
 import { generateRecoveryCodes, storeRecoveryCodes } from "../utils/recoveryCode";
-import { RecoveryCodesDisplay } from "../components/RecoveryCodesDisplay";
+import RecoveryCodesDisplay from "../components/RecoveryCodesDisplay";
 import { theme } from "../utils/theme";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";

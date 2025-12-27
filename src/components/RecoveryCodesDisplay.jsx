@@ -6,7 +6,7 @@ import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { theme } from '../utils/theme';
 
-export function RecoveryCodesDisplay({ codes, onConfirm }) {
+export default function RecoveryCodesDisplay({ codes, onConfirm }) {
   const copyToClipboard = async () => {
     await Clipboard.setStringAsync(codes.join('\n'));
     Alert.alert("Copied", "Recovery codes copied to clipboard");
