@@ -1,11 +1,13 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { Copy, Download, CheckCircle, RefreshCcw, Check } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
-import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as Haptics from 'expo-haptics';
+import { captureRef } from 'react-native-view-shot';
 import { theme } from '../utils/theme';
+import { RecoveryCodesCard } from './RecoveryCodesCard';
+import { toast } from 'sonner-native';
 
 export default function RecoveryCodesDisplay({ 
   codes, 
@@ -15,6 +17,7 @@ export default function RecoveryCodesDisplay({
   onRegenerate 
 }) {
   const isViewMode = !!statuses && !codes;
+  const cardRef = useRef();
 
   const [copied, setCopied] = React.useState(false);
 
@@ -28,9 +31,37 @@ export default function RecoveryCodesDisplay({
 
   const downloadCodes = async () => {
     if (!codes) return;
-    const fileUri = `${FileSystem.documentDirectory}recovery_codes.txt`;
-    await FileSystem.writeAsStringAsync(fileUri, codes.join('\n'));
-    await Sharing.shareAsync(fileUri);
+    
+    try {
+      toast.info("Generating secure image...");
+      
+      // Small delay to ensure the hidden view is rendered if it was just added
+      setTimeout(async () => {
+        try {
+          const uri = await captureRef(cardRef, {
+            format: 'png',
+            quality: 1,
+            result: 'tmpfile',
+          });
+
+          if (await Sharing.isAvailableAsync()) {
+            await Sharing.shareAsync(uri, {
+              mimeType: 'image/png',
+              dialogTitle: 'Your Recovery Codes',
+              UTI: 'public.png',
+            });
+          } else {
+            toast.error("Sharing is not available on this device");
+          }
+        } catch (error) {
+          console.error("Capture failed:", error);
+          toast.error("Failed to generate image");
+        }
+      }, 100);
+    } catch (error) {
+      console.error("Download failed:", error);
+      toast.error("Failed to process download");
+    }
   };
 
   return (
@@ -120,6 +151,15 @@ export default function RecoveryCodesDisplay({
           {isRegeneration ? "I've saved these codes" : "Close"}
         </Text>
       </TouchableOpacity>
+
+      {/* Hidden view for capturing shareable image */}
+      {!isViewMode && codes && (
+        <View style={styles.hiddenContainer} pointerEvents="none">
+          <View ref={cardRef} collapsable={false}>
+            <RecoveryCodesCard codes={codes} />
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -129,6 +169,14 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
     backgroundColor: theme.colors.background,
+  },
+  hiddenContainer: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    opacity: 0,
+    zIndex: -1000,
+    pointerEvents: 'none',
   },
   description: {
     fontSize: 16,
