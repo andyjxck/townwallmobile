@@ -49,19 +49,32 @@ export default function SettingsScreen() {
     setLoading(true);
     setPasswordError("");
     try {
-      const { data: user } = await supabase.from('rusers').select('password').eq('id', auth.id).single();
-      if (!user || !bcrypt.compareSync(currentPassword, user.password)) {
+      const { data: user, error: userError } = await supabase.from('rusers').select('password').eq('id', auth.id).single();
+      if (userError || !user) {
+        setPasswordError("Incorrect password or user not found");
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        return;
+      }
+
+      if (!bcrypt.compareSync(currentPassword, user.password)) {
         setPasswordError("Incorrect password");
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         return;
       }
+
       const codes = generateRecoveryCodes();
+      // Delete old codes before storing new ones
+      await supabase.from('recovery_codes').delete().eq('user_id', auth.id);
       await storeRecoveryCodes(auth.id, codes);
+      
       setNewRecoveryCodes(codes);
       setShowPasswordModal(false);
       setShowRecoveryCodes(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (error) { setPasswordError("Something went wrong."); }
+    } catch (error) { 
+      console.error("Recovery generation error:", error);
+      setPasswordError(error.message || "Something went wrong."); 
+    }
     finally { setLoading(false); }
   };
 
@@ -143,13 +156,13 @@ export default function SettingsScreen() {
               autoFocus
             />
             {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
-            <TouchableOpacity 
-              style={[styles.modalBtn, { backgroundColor: theme.colors.primary }]}
-              onPress={showChangePassword ? handleChangePassword : handlePasswordConfirm}
-              disabled={loading}
-            >
-              {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.modalBtnText}>{showChangePassword ? "UPDATE" : "CONFIRM"}</Text>}
-            </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalBtn, { backgroundColor: theme.colors.primary }]}
+                onPress={showChangePassword ? handleChangePassword : handlePasswordConfirm}
+                disabled={loading}
+              >
+                {loading ? <ActivityIndicator color="#000" /> : <Text style={styles.modalBtnText}>{showChangePassword ? "UPDATE" : "CONFIRM"}</Text>}
+              </TouchableOpacity>
             <TouchableOpacity onPress={() => { setShowPasswordModal(false); setShowChangePassword(false); }} style={styles.closeBtn}>
               <Text style={{ color: theme.colors.textSecondary, fontWeight: '700' }}>CANCEL</Text>
             </TouchableOpacity>
@@ -199,7 +212,7 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: 18, fontWeight: 'bold', textAlign: 'center' },
   modalInput: { borderRadius: 10, padding: 15, fontSize: 16, borderWidth: 1 },
   modalBtn: { padding: 15, borderRadius: 10, alignItems: 'center' },
-  modalBtnText: { color: '#FFF', fontWeight: 'bold' },
+  modalBtnText: { color: '#000', fontWeight: 'bold' },
   closeBtn: { alignItems: 'center', padding: 10 },
   errorText: { color: '#ef4444', fontSize: 12, textAlign: 'center' },
 });
