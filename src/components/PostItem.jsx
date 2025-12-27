@@ -92,10 +92,27 @@ import { useRouter, useLocalSearchParams, usePathname } from "expo-router";
     }, [isExpanded, item.id]);
 
 
-  useEffect(() => {
-    checkIfSaved();
-    fetchShareCount();
-  }, [item.id, user?.id]);
+    useEffect(() => {
+      checkIfSaved();
+      fetchShareCount();
+
+      // Realtime subscription for shares
+      const sharesSub = supabase
+        .channel(`post_shares_${item.id}`)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'rshares',
+          filter: `post_id=eq.${item.id}`
+        }, () => {
+          fetchShareCount();
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(sharesSub);
+      };
+    }, [item.id, user?.id]);
 
   const checkIfSaved = async () => {
     if (!user?.id) return;
@@ -502,17 +519,15 @@ import { useRouter, useLocalSearchParams, usePathname } from "expo-router";
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={() => onShare(item)}
-            style={styles.actionButton}
-          >
-            <ShareIcon size={20} color="rgba(255,255,255,0.4)" />
-            {shareCount > 0 && (
+            <TouchableOpacity
+              onPress={() => onShare(item)}
+              style={styles.actionButton}
+            >
+              <ShareIcon size={20} color="rgba(255,255,255,0.4)" />
               <Text style={[styles.actionCount, { color: "rgba(255,255,255,0.4)" }]}>
-                {shareCount}
+                {shareCount || 0}
               </Text>
-            )}
-          </TouchableOpacity>
+            </TouchableOpacity>
 
           {(user?.id === item.user_id || user?.is_admin || user?.is_moderator) && (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
