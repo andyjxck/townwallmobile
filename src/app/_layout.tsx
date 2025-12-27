@@ -12,7 +12,7 @@ import { Toaster } from "sonner-native";
 import { requestTrackingPermissionsAsync } from "expo-tracking-transparency";
 import Purchases from "react-native-purchases";
 import Constants from "expo-constants";
-import { ErrorBoundaryWrapper } from "./__create/SharedErrorBoundary";
+import { ErrorBoundaryWrapper } from "../../__create/SharedErrorBoundary";
 
 const isExpoGo = Constants.appOwnership === "expo";
 
@@ -121,7 +121,15 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
 
   useEffect(() => {
-    initiate();
+    const init = async () => {
+      await initiate();
+      try {
+        await initUser();
+      } catch (e) {
+        console.error("Failed to init user:", e);
+      }
+    };
+    init();
     
     if (Platform.OS !== 'web') {
       (async () => {
