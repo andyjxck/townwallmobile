@@ -11,6 +11,7 @@ import {
   Share,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
 } from "react-native";
 import {
   Heart,
@@ -40,9 +41,11 @@ import { TextInput } from "react-native-gesture-handler";
 import RenderHtml from 'react-native-render-html';
 import { useWindowDimensions } from 'react-native';
 import PollComponent from "./PollComponent";
+import { useRouter } from "expo-router";
 
   export default function PostItem({ item, deviceId, onReaction, onComment, onDelete, onMute, onShare, onEdit, user }) {
     const { width } = useWindowDimensions();
+    const router = useRouter();
     const [revealed, setRevealed] = useState(false);
     const [showFullImage, setShowFullImage] = useState(false);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -51,6 +54,11 @@ import PollComponent from "./PollComponent";
     const [loadingComments, setLoadingComments] = useState(false);
     const [isSaved, setIsSaved] = useState(false);
     const [isExpanded, setIsExpanded] = useState(false);
+    const [showReactorsList, setShowReactorsList] = useState(false);
+    const [reactorsListType, setReactorsListType] = useState(null);
+    const [reactorsList, setReactorsList] = useState([]);
+    const [loadingReactors, setLoadingReactors] = useState(false);
+    const [shareCount, setShareCount] = useState(0);
     const flatListRef = useRef(null);
 
   const isVideo = item.media_type === 'video' || (item.image_url && (item.image_url.endsWith('.mp4') || item.image_url.endsWith('.mov')));
@@ -84,6 +92,7 @@ import PollComponent from "./PollComponent";
 
   useEffect(() => {
     checkIfSaved();
+    fetchShareCount();
   }, [item.id, user?.id]);
 
   const checkIfSaved = async () => {
@@ -95,6 +104,38 @@ import PollComponent from "./PollComponent";
       .eq('post_id', item.id)
       .maybeSingle();
     setIsSaved(!!data);
+  };
+
+  const fetchShareCount = async () => {
+    const { count } = await supabase
+      .from('rshares')
+      .select('*', { count: 'exact', head: true })
+      .eq('post_id', item.id);
+    setShareCount(count || 0);
+  };
+
+  const fetchReactorsList = async (type) => {
+    setLoadingReactors(true);
+    setReactorsListType(type);
+    setShowReactorsList(true);
+    try {
+      const { data } = await supabase
+        .from('rreactions')
+        .select('user_id, rusers!rreactions_user_id_fkey(id, username, emoji_icon, avatar_url)')
+        .eq('post_id', item.id)
+        .eq('reaction_type', type);
+      setReactorsList(data?.map(r => r.rusers).filter(Boolean) || []);
+    } catch (error) {
+      console.error("Error fetching reactors:", error);
+    } finally {
+      setLoadingReactors(false);
+    }
+  };
+
+  const navigateToProfile = (userId) => {
+    if (!userId) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push(`/profile?userId=${userId}`);
   };
 
   const handleSave = async () => {
@@ -244,45 +285,57 @@ import PollComponent from "./PollComponent";
             Reported as misleading by the community. Tap to reveal.
           </Text>
         </TouchableOpacity>
-      ) : (
-        <View>
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            <View style={{ flex: 1 }}>
-              <View style={[styles.postHeader, { gap: 8 }]}>
-                {!item.is_anonymous && (item.user?.avatar_url || item.user?.emoji_icon) ? (
-                  item.user?.avatar_url ? (
-                    <Image 
-                      source={{ uri: item.user.avatar_url }} 
-                      style={{ width: 24, height: 24, borderRadius: 12 }} 
-                    />
-                  ) : (
-                    <Text style={{ fontSize: 16 }}>{item.user.emoji_icon}</Text>
-                  )
-                ) : (
-                  <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' }}>
-                    <User size={14} color="rgba(255,255,255,0.4)" />
+        ) : (
+          <View>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <View style={{ flex: 1 }}>
+                <View style={[styles.postHeader, { gap: 8 }]}>
+                  <TouchableOpacity 
+                    onPress={() => !item.is_anonymous && item.user_id && navigateToProfile(item.user_id)}
+                    disabled={item.is_anonymous || !item.user_id}
+                    activeOpacity={0.7}
+                  >
+                    {!item.is_anonymous && (item.user?.avatar_url || item.user?.emoji_icon) ? (
+                      item.user?.avatar_url ? (
+                        <Image 
+                          source={{ uri: item.user.avatar_url }} 
+                          style={{ width: 24, height: 24, borderRadius: 12 }} 
+                        />
+                      ) : (
+                        <Text style={{ fontSize: 16 }}>{item.user.emoji_icon}</Text>
+                      )
+                    ) : (
+                      <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' }}>
+                        <User size={14} color="rgba(255,255,255,0.4)" />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                  
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <TouchableOpacity 
+                        onPress={() => !item.is_anonymous && item.user_id && navigateToProfile(item.user_id)}
+                        disabled={item.is_anonymous || !item.user_id}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.zoneText, { color: '#FFFFFF' }]}>
+                          {!item.is_anonymous && item.user?.username ? item.user.username : "Anonymous"}
+                        </Text>
+                      </TouchableOpacity>
+                      <Text style={[styles.timeText, { color: 'rgba(255, 255, 255, 0.3)' }]}>
+                        · {item.zone?.name}
+                      </Text>
+                      <Text style={[styles.timeText, { color: 'rgba(255, 255, 255, 0.3)' }]}>
+                        · {timeAgo}
+                      </Text>
+                    </View>
+                    {item.tag?.name && (
+                      <Text style={[styles.tagText, { color: 'rgba(255, 255, 255, 0.3)', marginTop: 1 }]}>
+                        #{item.tag.name.replace(/\s+/g, '')}
+                      </Text>
+                    )}
                   </View>
-                )}
-                
-                <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={[styles.zoneText, { color: '#FFFFFF' }]}>
-                      {!item.is_anonymous && item.user?.username ? item.user.username : "Anonymous"}
-                    </Text>
-                    <Text style={[styles.timeText, { color: 'rgba(255, 255, 255, 0.3)' }]}>
-                      · {item.zone?.name}
-                    </Text>
-                    <Text style={[styles.timeText, { color: 'rgba(255, 255, 255, 0.3)' }]}>
-                      · {timeAgo}
-                    </Text>
-                  </View>
-                  {item.tag?.name && (
-                    <Text style={[styles.tagText, { color: 'rgba(255, 255, 255, 0.3)', marginTop: 1 }]}>
-                      #{item.tag.name.replace(/\s+/g, '')}
-                    </Text>
-                  )}
                 </View>
-              </View>
 
               <TouchableOpacity 
                 onPress={() => setIsExpanded(!isExpanded)} 
@@ -378,89 +431,100 @@ import PollComponent from "./PollComponent";
         </View>
       )}
 
-      <View style={styles.actionRow}>
-        <TouchableOpacity
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            onReaction(item.id, "helpful", userReactions.helpful);
-          }}
-          style={styles.actionButton}
-        >
-          <Heart
-            size={20}
-            color={userReactions.helpful ? "#F43F5E" : "rgba(255,255,255,0.4)"}
-            fill={userReactions.helpful ? "#F43F5E" : "transparent"}
-          />
-          <Text style={[styles.actionCount, { color: userReactions.helpful ? "#F43F5E" : "rgba(255,255,255,0.4)" }]}>
-            {helpfulCount || 0}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            onReaction(item.id, "seen", userReactions.seen);
-          }}
-          style={styles.actionButton}
-        >
-          <Star
-            size={20}
-            color={userReactions.seen ? "#FBBF24" : "rgba(255,255,255,0.4)"}
-            fill={userReactions.seen ? "#FBBF24" : "transparent"}
-          />
-          <Text style={[styles.actionCount, { color: userReactions.seen ? "#FBBF24" : "rgba(255,255,255,0.4)" }]}>
-            {seenCount || 0}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            onReaction(item.id, "fake", userReactions.fake);
-          }}
-          style={styles.actionButton}
-        >
-          <Flag
-            size={20}
-            color={userReactions.fake ? "#EF4444" : "rgba(255,255,255,0.4)"}
-            fill={userReactions.fake ? "#EF4444" : "transparent"}
-          />
-          <Text style={[styles.actionCount, { color: userReactions.fake ? "#EF4444" : "rgba(255,255,255,0.4)" }]}>
-            REPORT
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={() => onShare(item)}
-          style={styles.actionButton}
-        >
-          <ShareIcon size={20} color="rgba(255,255,255,0.4)" />
-        </TouchableOpacity>
-
-        {(user?.id === item.user_id || user?.is_admin || user?.is_moderator) && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <View style={styles.actionRow}>
+          <View style={styles.actionButton}>
             <TouchableOpacity
               onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                onEdit(item);
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                onReaction(item.id, "helpful", userReactions.helpful);
               }}
-              style={styles.actionButton}
             >
-              <Pencil size={20} color="rgba(255, 255, 255, 0.4)" />
+              <Heart
+                size={20}
+                color={userReactions.helpful ? "#F43F5E" : "rgba(255,255,255,0.4)"}
+                fill={userReactions.helpful ? "#F43F5E" : "transparent"}
+              />
             </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                onDelete(item.id);
-              }}
-              style={styles.actionButton}
-            >
-              <Trash2 size={20} color="rgba(239, 68, 68, 0.4)" />
+            <TouchableOpacity onPress={() => helpfulCount > 0 && fetchReactorsList("helpful")}>
+              <Text style={[styles.actionCount, { color: userReactions.helpful ? "#F43F5E" : "rgba(255,255,255,0.4)" }]}>
+                {helpfulCount || 0}
+              </Text>
             </TouchableOpacity>
           </View>
-        )}
-      </View>
+
+          <View style={styles.actionButton}>
+            <TouchableOpacity
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                onReaction(item.id, "seen", userReactions.seen);
+              }}
+            >
+              <Star
+                size={20}
+                color={userReactions.seen ? "#FBBF24" : "rgba(255,255,255,0.4)"}
+                fill={userReactions.seen ? "#FBBF24" : "transparent"}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => seenCount > 0 && fetchReactorsList("seen")}>
+              <Text style={[styles.actionCount, { color: userReactions.seen ? "#FBBF24" : "rgba(255,255,255,0.4)" }]}>
+                {seenCount || 0}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              onReaction(item.id, "fake", userReactions.fake);
+            }}
+            style={styles.actionButton}
+          >
+            <Flag
+              size={20}
+              color={userReactions.fake ? "#EF4444" : "rgba(255,255,255,0.4)"}
+              fill={userReactions.fake ? "#EF4444" : "transparent"}
+            />
+            <Text style={[styles.actionCount, { color: userReactions.fake ? "#EF4444" : "rgba(255,255,255,0.4)" }]}>
+              REPORT
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => onShare(item)}
+            style={styles.actionButton}
+          >
+            <ShareIcon size={20} color="rgba(255,255,255,0.4)" />
+            {shareCount > 0 && (
+              <Text style={[styles.actionCount, { color: "rgba(255,255,255,0.4)" }]}>
+                {shareCount}
+              </Text>
+            )}
+          </TouchableOpacity>
+
+          {(user?.id === item.user_id || user?.is_admin || user?.is_moderator) && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <TouchableOpacity
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  onEdit(item);
+                }}
+                style={styles.actionButton}
+              >
+                <Pencil size={20} color="rgba(255, 255, 255, 0.4)" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  onDelete(item.id);
+                }}
+                style={styles.actionButton}
+              >
+                <Trash2 size={20} color="rgba(239, 68, 68, 0.4)" />
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
 
       {isExpanded && (
         <View style={styles.expandedContent}>
@@ -569,12 +633,53 @@ import PollComponent from "./PollComponent";
               style={styles.fullImage}
               contentFit="contain"
             />
-          )}
-        </View>
-      </Modal>
-    </View>
-  );
-}
+            )}
+          </View>
+        </Modal>
+
+        <Modal visible={showReactorsList} transparent animationType="slide">
+          <View style={styles.reactorsModalOverlay}>
+            <View style={styles.reactorsModalContent}>
+              <View style={styles.reactorsHeader}>
+                <Text style={styles.reactorsTitle}>
+                  {reactorsListType === 'helpful' ? '❤️ LIKES' : '⭐ SUPERLIKES'}
+                </Text>
+                <TouchableOpacity onPress={() => setShowReactorsList(false)}>
+                  <X color="#FFF" size={24} />
+                </TouchableOpacity>
+              </View>
+              
+              {loadingReactors ? (
+                <ActivityIndicator color="#FFF" style={{ marginVertical: 30 }} />
+              ) : reactorsList.length === 0 ? (
+                <Text style={styles.noReactors}>No users found.</Text>
+              ) : (
+                <ScrollView style={{ maxHeight: 400 }}>
+                  {reactorsList.map((reactor, idx) => (
+                    <TouchableOpacity 
+                      key={idx} 
+                      style={styles.reactorItem}
+                      onPress={() => {
+                        setShowReactorsList(false);
+                        navigateToProfile(reactor.id);
+                      }}
+                    >
+                      {reactor.avatar_url ? (
+                        <Image source={{ uri: reactor.avatar_url }} style={styles.reactorAvatar} />
+                      ) : (
+                        <Text style={{ fontSize: 24 }}>{reactor.emoji_icon || "👤"}</Text>
+                      )}
+                      <Text style={styles.reactorUsername}>@{reactor.username}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
+          </View>
+        </Modal>
+      </View>
+    );
+  }
 
 const styles = StyleSheet.create({
   postContainer: {
@@ -732,6 +837,57 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
+  },
+  reactorsModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    justifyContent: 'flex-end',
+  },
+  reactorsModalContent: {
+    backgroundColor: '#0F172A',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
+    maxHeight: '70%',
+  },
+  reactorsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
+  },
+  reactorsTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  noReactors: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 14,
+    textAlign: 'center',
+    paddingVertical: 30,
+  },
+  reactorItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  reactorAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+  },
+  reactorUsername: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
 

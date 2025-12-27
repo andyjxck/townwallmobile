@@ -172,77 +172,81 @@ export default function HelpContact() {
   };
 
       const handleSend = async () => {
-        if (!inputText.trim() || !currentUser) return;
-        
-        // If there's a resolved status, purge before sending new
-        if (messages.some(m => m.status === 'resolved')) {
-          await purgeMessages();
-        }
-  
-        const text = inputText.trim();
-        setInputText('');
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          if (!inputText.trim() || !currentUser) return;
+          
+          // If there's a resolved or overtaken status, purge before sending new (restart fresh)
+          const shouldPurge = messages.some(m => m.status === 'resolved' || m.status === 'overtaken');
+          if (shouldPurge) {
+            await purgeMessages();
+          }
+    
+          const text = inputText.trim();
+          setInputText('');
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-    // Optimistic update
-    const tempId = Date.now();
-    const tempMsg = {
-      id: tempId,
-      sender_id: currentUser.id,
-      content: text,
-      is_from_admin: false,
-      created_at: new Date().toISOString(),
-      status: 'open'
-    };
-    setMessages(prev => [...prev, tempMsg]);
-
-    try {
-      const { data: realMsg, error } = await supabase
-        .from('rhelp_messages')
-        .insert({
-          sender_id: currentUser.id,
-          content: text,
-          is_from_admin: false
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      // Update optimistic message with real one
-      if (realMsg) {
-        setMessages(prev => prev.map(m => m.id === tempId ? realMsg : m));
-      }
-
-      // AI Assistant Response
-      const isOvertaken = messages.some(m => m.status === 'overtaken');
-      if (isOvertaken) {
-        console.log("Chat overtaken by agent. AI suppressed.");
-        return;
-      }
-
-      const history = messages.slice(-5).map(m => ({
-            role: m.is_from_admin ? 'assistant' : 'user',
-            content: m.content
-          }));
-
-          const aiResponse = await getAIAssistantResponse(text, history);
-
-          await supabase
-            .from('rhelp_messages')
-            .insert({
-              receiver_id: currentUser.id,
-              content: aiResponse,
-              is_from_admin: true
-            });
-  
-        } catch (error) {
-          console.error("Error in handleSend:", error);
-          setInputText(text); // Restore text on error
-          // Remove optimistic message on error
-          setMessages(prev => prev.filter(m => m.id !== tempId));
-          Alert.alert("Error", "Message could not be sent.");
-        }
+      // Optimistic update
+      const tempId = Date.now();
+      const tempMsg = {
+        id: tempId,
+        sender_id: currentUser.id,
+        content: text,
+        is_from_admin: false,
+        created_at: new Date().toISOString(),
+        status: 'open'
       };
+      setMessages(prev => [...prev, tempMsg]);
+
+      try {
+        const { data: realMsg, error } = await supabase
+          .from('rhelp_messages')
+          .insert({
+            sender_id: currentUser.id,
+            content: text,
+            is_from_admin: false
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        // Update optimistic message with real one
+        if (realMsg) {
+          setMessages(prev => prev.map(m => m.id === tempId ? realMsg : m));
+        }
+
+        // AI Assistant Response - only skip if chat was overtaken AND we didn't purge
+        // If we purged, it's a fresh start so AI should respond
+        if (!shouldPurge) {
+          const isOvertaken = messages.some(m => m.status === 'overtaken');
+          if (isOvertaken) {
+            console.log("Chat overtaken by agent. AI suppressed.");
+            return;
+          }
+        }
+
+        const history = shouldPurge ? [] : messages.slice(-5).map(m => ({
+              role: m.is_from_admin ? 'assistant' : 'user',
+              content: m.content
+            }));
+
+            const aiResponse = await getAIAssistantResponse(text, history);
+
+            await supabase
+              .from('rhelp_messages')
+              .insert({
+                receiver_id: currentUser.id,
+                content: aiResponse,
+                is_from_admin: true
+              });
+    
+          } catch (error) {
+            console.error("Error in handleSend:", error);
+            setInputText(text); // Restore text on error
+            // Remove optimistic message on error
+            setMessages(prev => prev.filter(m => m.id !== tempId));
+            Alert.alert("Error", "Message could not be sent.");
+          }
+        };
 
   return (
     <View style={styles.container}>

@@ -11,7 +11,7 @@ import {
   FlatList,
   Dimensions,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { supabase } from "@/utils/supabase";
 import { getStoredUser, logoutUser, initUser } from "@/utils/user";
 import { getDeviceId } from "@/utils/deviceId";
@@ -56,8 +56,11 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
 
 export default function Profile() {
   const router = useRouter();
+  const { userId } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
   const [user, setUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [isOwnProfile, setIsOwnProfile] = useState(true);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ posts: 0, reactions: 0, joined: "" });
   const [replies, setReplies] = useState([]);
@@ -69,7 +72,7 @@ export default function Profile() {
   const [savedPosts, setSavedPosts] = useState([]);
   const [friendsPosts, setFriendsPosts] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
-  const [activeTab, setActiveTab] = useState("posts"); // posts, media, replies, saved, friends
+  const [activeTab, setActiveTab] = useState("posts");
   const [deviceId, setDeviceId] = useState(null);
   const [editingBio, setEditingBio] = useState(false);
   const [bioText, setBioText] = useState("");
@@ -121,27 +124,43 @@ export default function Profile() {
     return () => {
       if (sub) supabase.removeChannel(sub);
     };
-  }, []);
+  }, [userId]);
 
   const loadData = async () => {
     setLoading(true);
     try {
-      let userData = await getStoredUser();
+      const storedUser = await getStoredUser();
+      setCurrentUser(storedUser);
       
-      if (userData?.id) {
+      let profileUserId = userId ? parseInt(userId) : storedUser?.id;
+      const viewingOwnProfile = !userId || (storedUser?.id && parseInt(userId) === storedUser.id);
+      setIsOwnProfile(viewingOwnProfile);
+      
+      let userData;
+      
+      if (viewingOwnProfile && storedUser?.id) {
         const { data: freshUser, error } = await supabase
           .from('rusers')
           .select('*')
-          .eq('id', userData.id)
+          .eq('id', storedUser.id)
           .single();
         
         if (freshUser && !error) {
           userData = freshUser;
           await AsyncStorage.setItem("@redditch_user_data", JSON.stringify(freshUser));
+        } else {
+          userData = storedUser;
         }
+      } else if (profileUserId) {
+        const { data: otherUser } = await supabase
+          .from('rusers')
+          .select('*')
+          .eq('id', profileUserId)
+          .single();
+        userData = otherUser;
       }
 
-      if (!userData) {
+      if (!userData && viewingOwnProfile) {
         userData = await initUser();
       }
       
@@ -149,7 +168,6 @@ export default function Profile() {
       setBioText(userData?.bio || "");
 
       if (userData) {
-        // Fetch stats
         const { count: postCount } = await supabase
           .from('rposts')
           .select('*', { count: 'exact', head: true })
@@ -166,45 +184,44 @@ export default function Profile() {
           joined: new Date(userData.created_at).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
         });
 
-        // Fetch Saved Posts
-        const { data: savedData } = await supabase
-          .from('rsaved_posts')
-          .select(`
-            post:post_id (
-              id, 
-              title, 
-              text, 
-              created_at, 
-              user_id, 
-              zone_id, 
-              tag_id, 
-              image_url, 
-              image_urls, 
-              media_type,
-              is_anonymous, 
-              moderation_status,
-              is_deleted,
-              user:rusers!user_id (username, emoji_icon, avatar_url),
-              zone:rzones!zone_id (name),
-                tag:rtags!tag_id (name),
-                poll_id,
-                reactions:rreactions (reaction_type, device_id)
-              )
-            `)
-          .eq('user_id', userData.id);
-        
-        setSavedPosts(savedData?.map(s => s.post).filter(p => p && !p.is_deleted) || []);
+        if (viewingOwnProfile) {
+          const { data: savedData } = await supabase
+            .from('rsaved_posts')
+            .select(`
+              post:post_id (
+                id, 
+                title, 
+                text, 
+                created_at, 
+                user_id, 
+                zone_id, 
+                tag_id, 
+                image_url, 
+                image_urls, 
+                media_type,
+                is_anonymous, 
+                moderation_status,
+                is_deleted,
+                user:rusers!user_id (username, emoji_icon, avatar_url),
+                zone:rzones!zone_id (name),
+                  tag:rtags!tag_id (name),
+                  poll_id,
+                  reactions:rreactions (reaction_type, device_id)
+                )
+              `)
+            .eq('user_id', userData.id);
+          
+          setSavedPosts(savedData?.map(s => s.post).filter(p => p && !p.is_deleted) || []);
 
-        // Fetch Pending Requests
-        const { data: requestsData } = await supabase
-          .from('friends')
-          .select('id, user_id, rusers!friends_user_id_fkey(id, username, emoji_icon, avatar_url)')
-          .eq('friend_id', userData.id)
-          .eq('status', 'pending');
-        
-        setPendingRequests(requestsData?.map(r => ({ ...r.rusers, requestId: r.id })) || []);
+          const { data: requestsData } = await supabase
+            .from('friends')
+            .select('id, user_id, rusers!friends_user_id_fkey(id, username, emoji_icon, avatar_url)')
+            .eq('friend_id', userData.id)
+            .eq('status', 'pending');
+          
+          setPendingRequests(requestsData?.map(r => ({ ...r.rusers, requestId: r.id })) || []);
+        }
 
-        // Fetch Friends
         const { data: friendData } = await supabase
           .from('friends')
           .select('friend_id, rusers!friends_friend_id_fkey(id, username, emoji_icon, avatar_url)')
@@ -213,9 +230,8 @@ export default function Profile() {
         
         const friendsList = friendData?.map(f => f.rusers) || [];
         setFriends(friendsList);
-        const friendIds = friendsList.map(f => f.id);
+        const friendIds = viewingOwnProfile ? friendsList.map(f => f.id) : [];
 
-        // Fetch user's own posts AND friends' posts
         const { data: feedPosts } = await supabase
           .from('rposts')
           .select(`
@@ -238,33 +254,34 @@ export default function Profile() {
               poll_id,
               reactions:rreactions (reaction_type, device_id)
             `)
-          .in('user_id', [userData.id, ...friendIds])
+          .in('user_id', viewingOwnProfile ? [userData.id, ...friendIds] : [userData.id])
           .eq('is_deleted', false)
           .order('created_at', { ascending: false });
         
         setUserPosts(feedPosts || []);
 
-        // Fetch replies to user's posts
-        const { data: userPostIds } = await supabase
-          .from('rposts')
-          .select('id')
-          .eq('user_id', userData.id);
-        
-        if (userPostIds && userPostIds.length > 0) {
-          const postIds = userPostIds.map(p => p.id);
-          const { data: replyData } = await supabase
-            .from('rcomments')
-            .select(`
-              *,
-              user:rusers!user_id (username, emoji_icon, avatar_url),
-              post:rposts!post_id (title)
-            `)
-            .in('post_id', postIds)
-            .neq('user_id', userData.id)
-            .order('created_at', { ascending: false })
-            .limit(10);
+        if (viewingOwnProfile) {
+          const { data: userPostIds } = await supabase
+            .from('rposts')
+            .select('id')
+            .eq('user_id', userData.id);
           
-          setReplies(replyData || []);
+          if (userPostIds && userPostIds.length > 0) {
+            const postIds = userPostIds.map(p => p.id);
+            const { data: replyData } = await supabase
+              .from('rcomments')
+              .select(`
+                *,
+                user:rusers!user_id (username, emoji_icon, avatar_url),
+                post:rposts!post_id (title)
+              `)
+              .in('post_id', postIds)
+              .neq('user_id', userData.id)
+              .order('created_at', { ascending: false })
+              .limit(10);
+            
+            setReplies(replyData || []);
+          }
         }
       }
     } catch (error) {
@@ -560,115 +577,140 @@ export default function Profile() {
     <View style={styles.container}>
       <LinearGradient colors={['#0F172A', '#000', '#000']} style={StyleSheet.absoluteFill} />
       
-      <ScrollView showsVerticalScrollIndicator={false} stickyHeaderIndices={[2]}>
-        {/* Cover Photo */}
-        <View style={styles.coverContainer}>
-          {user?.cover_url ? (
-            <Image source={{ uri: user.cover_url }} style={styles.coverImage} />
-          ) : (
-            <LinearGradient colors={['#1E293B', '#0F172A']} style={styles.coverPlaceholder} />
-          )}
-          <TouchableOpacity style={styles.editCoverButton} onPress={handlePickCover}>
-            <Camera size={16} color="#000" />
-          </TouchableOpacity>
-          {uploadingCover && <ActivityIndicator style={styles.coverLoader} color="#FFF" />}
-          
-          <TouchableOpacity onPress={() => router.back()} style={[styles.headerIcon, { left: 20, top: insets.top + 10 }]}>
-            <ChevronLeft color="#FFF" size={24} />
-          </TouchableOpacity>
-            <TouchableOpacity onPress={() => setShowChangePassword(true)} style={[styles.headerIcon, { right: 70, top: insets.top + 10 }]}>
-              <Lock color="#FFF" size={20} />
+        <ScrollView showsVerticalScrollIndicator={false} stickyHeaderIndices={[2]}>
+          {/* Cover Photo */}
+          <View style={styles.coverContainer}>
+            {user?.cover_url ? (
+              <Image source={{ uri: user.cover_url }} style={styles.coverImage} />
+            ) : (
+              <LinearGradient colors={['#1E293B', '#0F172A']} style={styles.coverPlaceholder} />
+            )}
+            {isOwnProfile && (
+              <TouchableOpacity style={styles.editCoverButton} onPress={handlePickCover}>
+                <Camera size={16} color="#000" />
+              </TouchableOpacity>
+            )}
+            {uploadingCover && <ActivityIndicator style={styles.coverLoader} color="#FFF" />}
+            
+            <TouchableOpacity onPress={() => router.back()} style={[styles.headerIcon, { left: 20, top: insets.top + 10 }]}>
+              <ChevronLeft color="#FFF" size={24} />
             </TouchableOpacity>
-            <TouchableOpacity onPress={handleLogout} style={[styles.headerIcon, { right: 20, top: insets.top + 10 }]}>
-              <LogOut color="#EF4444" size={20} />
-            </TouchableOpacity>
-        </View>
+            {isOwnProfile && (
+              <>
+                <TouchableOpacity onPress={() => setShowChangePassword(true)} style={[styles.headerIcon, { right: 70, top: insets.top + 10 }]}>
+                  <Lock color="#FFF" size={20} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleLogout} style={[styles.headerIcon, { right: 20, top: insets.top + 10 }]}>
+                  <LogOut color="#EF4444" size={20} />
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
 
-        {/* Profile Info Overlay */}
-        <View style={styles.profileHeader}>
-          <View style={styles.avatarWrapper}>
-            <TouchableOpacity style={styles.mainAvatarContainer} onPress={() => setShowEmojiPicker(true)}>
-              {user?.avatar_url ? (
-                <Image source={{ uri: user.avatar_url }} style={styles.mainAvatar} />
+          {/* Profile Info Overlay */}
+          <View style={styles.profileHeader}>
+            <View style={styles.avatarWrapper}>
+              {isOwnProfile ? (
+                <TouchableOpacity style={styles.mainAvatarContainer} onPress={() => setShowEmojiPicker(true)}>
+                  {user?.avatar_url ? (
+                    <Image source={{ uri: user.avatar_url }} style={styles.mainAvatar} />
+                  ) : (
+                    <Text style={styles.mainEmojiAvatar}>{user?.emoji_icon || "👤"}</Text>
+                  )}
+                  <View style={styles.avatarEditBadge}>
+                    <Camera size={12} color="#000" />
+                  </View>
+                </TouchableOpacity>
               ) : (
-                <Text style={styles.mainEmojiAvatar}>{user?.emoji_icon || "👤"}</Text>
-              )}
-              <View style={styles.avatarEditBadge}>
-                <Camera size={12} color="#000" />
-              </View>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.nameSection}>
-            <Text style={styles.mainUsername}>@{user?.username}</Text>
-            <View style={styles.badgeRow}>
-              <Text style={styles.userStatusBadge}>{user?.supabase_uid ? "PRO" : "GUEST"}</Text>
-              {user?.is_admin && (
-                <TouchableOpacity onPress={() => router.push("/admin")} style={styles.adminBadge}>
-                  <Shield size={10} color="#000" />
-                  <Text style={styles.adminBadgeText}>MOD</Text>
-                </TouchableOpacity>
+                <View style={styles.mainAvatarContainer}>
+                  {user?.avatar_url ? (
+                    <Image source={{ uri: user.avatar_url }} style={styles.mainAvatar} />
+                  ) : (
+                    <Text style={styles.mainEmojiAvatar}>{user?.emoji_icon || "👤"}</Text>
+                  )}
+                </View>
               )}
             </View>
-          </View>
 
-          {editingBio ? (
-            <View style={styles.bioEditContainer}>
-              <TextInput
-                style={styles.bioInput}
-                value={bioText}
-                onChangeText={setBioText}
-                placeholder="Write a bio..."
-                placeholderTextColor="rgba(255,255,255,0.3)"
-                multiline
-                maxLength={160}
-                autoFocus
-              />
-              <View style={styles.bioEditActions}>
-                <TouchableOpacity onPress={() => setEditingBio(false)} style={styles.bioActionBtn}>
-                  <XIcon size={16} color="#EF4444" />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={handleUpdateBio} style={[styles.bioActionBtn, { backgroundColor: '#FFF' }]}>
-                  <Check size={16} color="#000" />
-                </TouchableOpacity>
+            <View style={styles.nameSection}>
+              <Text style={styles.mainUsername}>@{user?.username}</Text>
+              <View style={styles.badgeRow}>
+                <Text style={styles.userStatusBadge}>{user?.supabase_uid ? "PRO" : "GUEST"}</Text>
+                {user?.is_admin && (
+                  <View style={styles.adminBadge}>
+                    <Shield size={10} color="#000" />
+                    <Text style={styles.adminBadgeText}>MOD</Text>
+                  </View>
+                )}
               </View>
             </View>
-          ) : (
-            <TouchableOpacity style={styles.bioContainer} onPress={() => setEditingBio(true)}>
-              <Text style={styles.bioText} numberOfLines={3}>
-                {user?.bio || "Tap to add a bio..."}
-              </Text>
-            </TouchableOpacity>
-          )}
 
-          <View style={styles.mainStatsRow}>
-            <View style={styles.mainStatBox}>
-              <Text style={styles.mainStatVal}>{stats.posts}</Text>
-              <Text style={styles.mainStatLab}>POSTS</Text>
-            </View>
-            <View style={styles.divider} />
-            <View style={styles.mainStatBox}>
-              <Text style={styles.mainStatVal}>{friends.length}</Text>
-              <Text style={styles.mainStatLab}>FRIENDS</Text>
-            </View>
-            <View style={styles.divider} />
-            <View style={styles.mainStatBox}>
-              <Text style={styles.mainStatVal}>{stats.reactions}</Text>
-              <Text style={styles.mainStatLab}>KARMA</Text>
+            {isOwnProfile && editingBio ? (
+              <View style={styles.bioEditContainer}>
+                <TextInput
+                  style={styles.bioInput}
+                  value={bioText}
+                  onChangeText={setBioText}
+                  placeholder="Write a bio..."
+                  placeholderTextColor="rgba(255,255,255,0.3)"
+                  multiline
+                  maxLength={160}
+                  autoFocus
+                />
+                <View style={styles.bioEditActions}>
+                  <TouchableOpacity onPress={() => setEditingBio(false)} style={styles.bioActionBtn}>
+                    <XIcon size={16} color="#EF4444" />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={handleUpdateBio} style={[styles.bioActionBtn, { backgroundColor: '#FFF' }]}>
+                    <Check size={16} color="#000" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : isOwnProfile ? (
+              <TouchableOpacity style={styles.bioContainer} onPress={() => setEditingBio(true)}>
+                <Text style={styles.bioText} numberOfLines={3}>
+                  {user?.bio || "Tap to add a bio..."}
+                </Text>
+              </TouchableOpacity>
+            ) : user?.bio ? (
+              <View style={styles.bioContainer}>
+                <Text style={styles.bioText} numberOfLines={3}>
+                  {user.bio}
+                </Text>
+              </View>
+            ) : null}
+
+            <View style={styles.mainStatsRow}>
+              <View style={styles.mainStatBox}>
+                <Text style={styles.mainStatVal}>{stats.posts}</Text>
+                <Text style={styles.mainStatLab}>POSTS</Text>
+              </View>
+              <View style={styles.divider} />
+              <View style={styles.mainStatBox}>
+                <Text style={styles.mainStatVal}>{friends.length}</Text>
+                <Text style={styles.mainStatLab}>FRIENDS</Text>
+              </View>
+              <View style={styles.divider} />
+              <View style={styles.mainStatBox}>
+                <Text style={styles.mainStatVal}>{stats.reactions}</Text>
+                <Text style={styles.mainStatLab}>KARMA</Text>
+              </View>
             </View>
           </View>
-        </View>
 
-        {/* Sticky Tabs */}
+          {/* Sticky Tabs */}
         <View style={styles.stickyTabContainer}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsScroll}>
-            {[
+            {(isOwnProfile ? [
               { id: 'posts', label: 'Feed' },
               { id: 'media', label: 'Media' },
               { id: 'replies', label: 'Replies' },
               { id: 'saved', label: 'Saved' },
               { id: 'friends', label: 'Friends' }
-            ].map(tab => (
+            ] : [
+              { id: 'posts', label: 'Posts' },
+              { id: 'media', label: 'Media' },
+            ]).map(tab => (
               <TouchableOpacity 
                 key={tab.id}
                 style={[styles.tabItem, activeTab === tab.id && styles.activeTabItem]}

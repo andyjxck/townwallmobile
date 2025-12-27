@@ -5,16 +5,29 @@ import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
 import { ShareCard } from './ShareCard';
 import { toast } from 'sonner-native';
+import { supabase } from '../utils/supabase';
+import { getStoredUser } from '../utils/user';
 
 export const ShareManager = forwardRef((props, ref) => {
   const [sharingPost, setSharingPost] = useState(null);
   const viewRef = useRef();
 
+  const trackShare = async (postId) => {
+    try {
+      const user = await getStoredUser();
+      await supabase.from('rshares').insert({
+        post_id: postId,
+        user_id: user?.id || null
+      });
+    } catch (error) {
+      console.error("Failed to track share:", error);
+    }
+  };
+
   useImperativeHandle(ref, () => ({
     share: async (post) => {
       setSharingPost(post);
       
-      // Give it a moment to render
       toast.info("Generating shareable card...");
       
         setTimeout(async () => {
@@ -36,6 +49,7 @@ export const ShareManager = forwardRef((props, ref) => {
               dialogTitle: `Share "${post.title}"`,
               UTI: 'public.png',
             });
+            await trackShare(post.id);
           } else {
             toast.error("Sharing is not available on this device");
           }
@@ -45,7 +59,7 @@ export const ShareManager = forwardRef((props, ref) => {
         } finally {
           setSharingPost(null);
         }
-      }, 500); // 500ms should be enough for images to load and render
+      }, 500);
     }
   }));
 
