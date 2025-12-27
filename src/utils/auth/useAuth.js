@@ -16,14 +16,22 @@ export const useAuth = () => {
   const { isReady, auth, setAuth } = useAuthStore();
   const { isOpen, close, open } = useAuthModal();
 
-  const initiate = useCallback(() => {
-    SecureStore.getItemAsync(authKey).then((auth) => {
-      useAuthStore.setState({
-        auth: auth ? JSON.parse(auth) : null,
-        isReady: true,
-      });
-    });
-  }, []);
+    const initiate = useCallback(() => {
+      SecureStore.getItemAsync(authKey)
+        .then((auth) => {
+          useAuthStore.setState({
+            auth: auth ? JSON.parse(auth) : null,
+            isReady: true,
+          });
+        })
+        .catch((error) => {
+          console.error("Error retrieving auth state:", error);
+          useAuthStore.setState({
+            auth: null,
+            isReady: true,
+          });
+        });
+    }, []);
 
   useEffect(() => {}, []);
 

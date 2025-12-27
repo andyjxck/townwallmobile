@@ -51,9 +51,19 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (isReady) {
-      SplashScreen.hideAsync();
+      SplashScreen.hideAsync().catch((e) => {
+        console.warn("Error hiding splash screen:", e);
+      });
     }
   }, [isReady]);
+
+  // Safety fallback to hide splash screen after 5 seconds
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      SplashScreen.hideAsync().catch(() => {});
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, []);
 
   if (!isReady) {
     return null;
