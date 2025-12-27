@@ -1,20 +1,25 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { View, Text, Platform } from 'react-native';
+import Constants from 'expo-constants';
 
 let NativeAdView, CallToActionView, HeadlineView, IconView, StarRatingView, TaglineView, AdvertiserView, ImageView;
 
-try {
-  const ads = require('react-native-google-mobile-ads');
-  NativeAdView = ads.default;
-  CallToActionView = ads.CallToActionView;
-  HeadlineView = ads.HeadlineView;
-  IconView = ads.IconView;
-  StarRatingView = ads.StarRatingView;
-  TaglineView = ads.TaglineView;
-  AdvertiserView = ads.AdvertiserView;
-  ImageView = ads.ImageView;
-} catch (e) {
-  // Module not found or failed to load (e.g. in Expo Go)
+const isExpoGo = Constants.appOwnership === 'expo';
+
+if (!isExpoGo) {
+  try {
+    const ads = require('react-native-google-mobile-ads');
+    NativeAdView = ads.default;
+    CallToActionView = ads.CallToActionView;
+    HeadlineView = ads.HeadlineView;
+    IconView = ads.IconView;
+    StarRatingView = ads.StarRatingView;
+    TaglineView = ads.TaglineView;
+    AdvertiserView = ads.AdvertiserView;
+    ImageView = ads.ImageView;
+  } catch (e) {
+    // Module not found or failed to load
+  }
 }
 
 const adUnitId = __DEV__ 

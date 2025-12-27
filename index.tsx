@@ -17,16 +17,24 @@ import { AppRegistry, LogBox } from 'react-native';
 import { DeviceErrorBoundaryWrapper } from './__create/DeviceErrorBoundary';
 
 
-let WrapperComponentProvider: any = ({ children }: { children: ReactNode }) => children;
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+
+let WrapperComponentProvider: any = ({ children }: { children: ReactNode }) => (
+  <SafeAreaProvider>
+    {children}
+  </SafeAreaProvider>
+);
 
 if (__DEV__) {
   LogBox.ignoreAllLogs();
   LogBox.uninstall();
   WrapperComponentProvider = ({ children }: { children: ReactNode }) => {
     return (
-      <DeviceErrorBoundaryWrapper>
-        {children}
-      </DeviceErrorBoundaryWrapper>
+      <SafeAreaProvider>
+        <DeviceErrorBoundaryWrapper>
+          {children}
+        </DeviceErrorBoundaryWrapper>
+      </SafeAreaProvider>
     );
   };
 }

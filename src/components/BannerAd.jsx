@@ -1,15 +1,20 @@
 import React from 'react';
 import { View, Platform } from 'react-native';
+import Constants from 'expo-constants';
 
 let RNBannerAd, BannerAdSize, TestIds;
 
-try {
-  const ads = require('react-native-google-mobile-ads');
-  RNBannerAd = ads.BannerAd;
-  BannerAdSize = ads.BannerAdSize;
-  TestIds = ads.TestIds;
-} catch (e) {
-  // Module not found
+const isExpoGo = Constants.appOwnership === 'expo';
+
+if (!isExpoGo) {
+  try {
+    const ads = require('react-native-google-mobile-ads');
+    RNBannerAd = ads.BannerAd;
+    BannerAdSize = ads.BannerAdSize;
+    TestIds = ads.TestIds;
+  } catch (e) {
+    // Module not found
+  }
 }
 
 const adUnitId = __DEV__ 
@@ -20,7 +25,7 @@ const adUnitId = __DEV__
     });
 
 export function BannerAd() {
-  if (!RNBannerAd) {
+  if (!RNBannerAd || !BannerAdSize) {
     return null;
   }
 

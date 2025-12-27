@@ -5,9 +5,11 @@ import { requestTrackingPermissionsAsync } from 'expo-tracking-transparency';
 import { ErrorBoundaryWrapper } from './__create/SharedErrorBoundary';
 import { Toaster } from 'sonner-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import Constants from 'expo-constants';
 import Purchases from 'react-native-purchases';
 import './global.css';
+
+const isExpoGo = Constants.appOwnership === 'expo';
 
 // Initialize RevenueCat as early as possible
 const initRevenueCat = async () => {
@@ -51,15 +53,13 @@ const GlobalErrorReporter = () => {
 
 const Wrapper = memo(() => {
   return (
-    <SafeAreaProvider>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <ErrorBoundaryWrapper>
-          <App />
-          <GlobalErrorReporter />
-          <Toaster />
-        </ErrorBoundaryWrapper>
-      </GestureHandlerRootView>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ErrorBoundaryWrapper>
+        <App />
+        <GlobalErrorReporter />
+        <Toaster />
+      </ErrorBoundaryWrapper>
+    </GestureHandlerRootView>
   );
 });
 
@@ -74,18 +74,22 @@ const CreateApp = () => {
           console.log('Tracking permission granted');
         }
         
-        // Dynamically require to avoid startup crash if module is missing
-        try {
-          const ads = require('react-native-google-mobile-ads');
-          if (ads) {
-            const mobileAds = ads.default || ads;
-            if (mobileAds && typeof mobileAds === 'function') {
-              await mobileAds().initialize();
-              console.log('AdMob initialized');
+        // Only attempt AdMob init if not in Expo Go
+        if (!isExpoGo) {
+          try {
+            const ads = require('react-native-google-mobile-ads');
+            if (ads) {
+              const mobileAds = ads.default || ads;
+              if (mobileAds && typeof mobileAds === 'function') {
+                await mobileAds().initialize();
+                console.log('AdMob initialized');
+              }
             }
+          } catch (e) {
+            console.log('AdMob module failed to load, skipping');
           }
-        } catch (e) {
-          console.log('AdMob module not found, skipping initialization');
+        } else {
+          console.log('Expo Go detected, skipping AdMob initialization');
         }
       } catch (error) {
         console.warn('Initialization skipped:', error.message);
