@@ -5,6 +5,7 @@ import { requestTrackingPermissionsAsync } from 'expo-tracking-transparency';
 import { ErrorBoundaryWrapper } from './__create/SharedErrorBoundary';
 import { Toaster } from 'sonner-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Purchases from 'react-native-purchases';
 import './global.css';
 
@@ -50,13 +51,15 @@ const GlobalErrorReporter = () => {
 
 const Wrapper = memo(() => {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <ErrorBoundaryWrapper>
-        <App />
-        <GlobalErrorReporter />
-        <Toaster />
-      </ErrorBoundaryWrapper>
-    </GestureHandlerRootView>
+    <SafeAreaProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <ErrorBoundaryWrapper>
+          <App />
+          <GlobalErrorReporter />
+          <Toaster />
+        </ErrorBoundaryWrapper>
+      </GestureHandlerRootView>
+    </SafeAreaProvider>
   );
 });
 
@@ -72,16 +75,20 @@ const CreateApp = () => {
         }
         
         // Dynamically require to avoid startup crash if module is missing
-        const ads = require('react-native-google-mobile-ads');
-        if (ads) {
-          const mobileAds = ads.default || ads;
-          if (mobileAds && typeof mobileAds === 'function') {
-            await mobileAds().initialize();
-            console.log('AdMob initialized');
+        try {
+          const ads = require('react-native-google-mobile-ads');
+          if (ads) {
+            const mobileAds = ads.default || ads;
+            if (mobileAds && typeof mobileAds === 'function') {
+              await mobileAds().initialize();
+              console.log('AdMob initialized');
+            }
           }
+        } catch (e) {
+          console.log('AdMob module not found, skipping initialization');
         }
       } catch (error) {
-        console.warn('AdMob initialization skipped:', error.message);
+        console.warn('Initialization skipped:', error.message);
       }
     })();
   }, []);

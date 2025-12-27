@@ -1,14 +1,21 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { View, Text, Platform } from 'react-native';
-import NativeAdView, {
-  CallToActionView,
-  HeadlineView,
-  IconView,
-  StarRatingView,
-  TaglineView,
-  AdvertiserView,
-  ImageView,
-} from 'react-native-google-mobile-ads';
+
+let NativeAdView, CallToActionView, HeadlineView, IconView, StarRatingView, TaglineView, AdvertiserView, ImageView;
+
+try {
+  const ads = require('react-native-google-mobile-ads');
+  NativeAdView = ads.default;
+  CallToActionView = ads.CallToActionView;
+  HeadlineView = ads.HeadlineView;
+  IconView = ads.IconView;
+  StarRatingView = ads.StarRatingView;
+  TaglineView = ads.TaglineView;
+  AdvertiserView = ads.AdvertiserView;
+  ImageView = ads.ImageView;
+} catch (e) {
+  // Module not found or failed to load (e.g. in Expo Go)
+}
 
 const adUnitId = __DEV__ 
   ? 'ca-app-pub-3940256099942544/2247696110' // Test ID for Native
@@ -19,15 +26,23 @@ const adUnitId = __DEV__
 
 export function NativeAd() {
   const nativeAdRef = useRef(null);
+  const [isAdLoaded, setIsAdLoaded] = useState(false);
 
   useEffect(() => {
-    nativeAdRef.current?.loadAd();
+    if (NativeAdView) {
+      nativeAdRef.current?.loadAd();
+    }
   }, []);
+
+  if (!NativeAdView) {
+    return null;
+  }
 
   return (
     <NativeAdView
       ref={nativeAdRef}
       adUnitID={adUnitId}
+      onAdLoaded={() => setIsAdLoaded(true)}
       style={{
         width: '100%',
         alignSelf: 'center',
@@ -37,6 +52,7 @@ export function NativeAd() {
         marginVertical: 8,
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.05)',
+        minHeight: isAdLoaded ? 250 : 0,
       }}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
