@@ -52,11 +52,11 @@ export default function PrivacyPolicy() {
             While we choose partners with high security standards, we are not responsible for the privacy practices or security of these third-party entities.
           </Section>
 
-          <Section title="5. Data Security & "Recovery Codes">
+          <Section title="5. Data Security & 'Recovery Codes'">
             Passwords are cryptographically hashed using standard protocols. We cannot recover forgotten passwords. It is your exclusive responsibility to manage your credentials and secure your Recovery Codes. Loss of these credentials may result in permanent loss of access to your account and associated data.
           </Section>
 
-          <Section title="6. Service Provision "As-Is">
+          <Section title="6. Service Provision 'As-Is'">
             "The Service is provided on an "AS IS" and "AS AVAILABLE" basis. We make no warranties, express or implied, regarding the reliability, availability, or accuracy of the Service. We reserve the right to modify, suspend, or terminate any aspect of the Service at any time without prior notice or liability.
           </Section>
 
