@@ -17,13 +17,10 @@ import {
   ChevronLeft, 
   Camera, 
   LogOut, 
-  MessageSquare, 
   User as UserIcon,
   Shield,
   UserPlus,
-  Users,
   Trash2,
-  Heart,
   Image as ImageIcon,
   Check,
   X as XIcon,
@@ -38,19 +35,18 @@ import { decode } from "base64-arraybuffer";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { TextInput } from "react-native-gesture-handler";
 import { Image } from "expo-image";
-import { LinearGradient } from "expo-linear-gradient";
 import PostItem from "../components/PostItem";
 import { ShareManager } from "../components/ShareManager";
-import { useTheme } from "../utils/theme";
+import { theme } from "../utils/theme";
 
 const { width } = Dimensions.get('window');
 const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", "🐵", "🦄", "🐲", "🤖", "👻", "👾", "👽", "💩"];
 
 export default function Profile() {
   const router = useRouter();
-  const { userId } = useLocalSearchParams();
+  const params = useLocalSearchParams();
+  const userId = params.userId;
   const insets = useSafeAreaInsets();
-  const { colors, spacing, borderRadius, typography, isDark } = useTheme();
   
   const [user, setUser] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
@@ -69,7 +65,6 @@ export default function Profile() {
   const [deviceId, setDeviceId] = useState(null);
   const [editingBio, setEditingBio] = useState(false);
   const [bioText, setBioText] = useState("");
-  const [uploadingCover, setUploadingCover] = useState(false);
   const shareRef = useRef();
 
   useEffect(() => {
@@ -187,23 +182,6 @@ export default function Profile() {
     }
   };
 
-  const handlePickCover = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [16, 9], quality: 0.7 });
-    if (!result.canceled) {
-      setUploadingCover(true);
-      try {
-        const image = result.assets[0];
-        const fileName = `${user.id}_cover_${Date.now()}.jpg`;
-        const base64 = await FileSystem.readAsStringAsync(image.uri, { encoding: "base64" });
-        await supabase.storage.from('covers').upload(fileName, decode(base64), { contentType: 'image/jpeg', upsert: true });
-        const { data: { publicUrl } } = supabase.storage.from('covers').getPublicUrl(fileName);
-        await supabase.from('rusers').update({ cover_url: publicUrl }).eq('id', user.id);
-        loadData();
-      } catch (error) { Alert.alert("Error", "Failed to upload cover photo"); }
-      finally { setUploadingCover(false); }
-    }
-  };
-
   const handleUpdateBio = async () => {
     if (bioText.length > 160) { Alert.alert("Error", "Bio too long"); return; }
     setEditingBio(false);
@@ -242,197 +220,185 @@ export default function Profile() {
     } catch (error) { console.error(error); }
   };
 
-  const renderMediaGrid = () => {
-    const mediaPosts = userPosts.filter(p => p.image_url || p.image_urls?.length > 0);
-    return (
-      <View style={styles.mediaGrid}>
-        {mediaPosts.length > 0 ? (
-          mediaPosts.map((post) => (
-            <TouchableOpacity key={post.id} style={[styles.mediaItem, { backgroundColor: colors.surfaceHover }]} onPress={() => router.push(`/?postId=${post.id}`)}>
-              <Image source={{ uri: post.image_url || post.image_urls?.[0] }} style={styles.mediaThumb} contentFit="cover" />
-              {post.media_type === 'video' && <View style={styles.mediaTypeBadge}><Camera size={12} color="#FFF" /></View>}
-            </TouchableOpacity>
-          ))
-        ) : (
-          <View style={styles.emptyContainer}>
-            <ImageIcon size={40} color={colors.textTertiary} />
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No media shared yet.</Text>
-          </View>
-        )}
-      </View>
-    );
+  const handleAddFriend = async () => {
+    if (!friendUsername) return;
+    setAddingFriend(true);
+    try {
+      const { data: friendUser, error: findError } = await supabase.from('rusers').select('id').eq('username', friendUsername).single();
+      if (findError || !friendUser) throw new Error("User not found");
+      if (friendUser.id === user.id) throw new Error("You can't add yourself");
+      
+      const { data: existing } = await supabase.from('friends').select('*').match({ user_id: user.id, friend_id: friendUser.id }).single();
+      if (existing) throw new Error("Friend request already sent or accepted");
+
+      await supabase.from('friends').insert({ user_id: user.id, friend_id: friendUser.id, status: 'pending' });
+      Alert.alert("Success", "Friend request sent!");
+      setFriendUsername("");
+    } catch (error) { Alert.alert("Error", error.message); }
+    finally { setAddingFriend(false); }
+  };
+
+  const handleAcceptFriend = async (requestId, friendId) => {
+    try {
+      await supabase.from('friends').update({ status: 'accepted' }).eq('id', requestId);
+      await supabase.from('friends').insert({ user_id: user.id, friend_id: friendId, status: 'accepted' });
+      loadData();
+    } catch (error) { Alert.alert("Error", "Failed to accept request"); }
+  };
+
+  const handleRejectFriend = async (requestId) => {
+    try {
+      await supabase.from('friends').delete().eq('id', requestId);
+      loadData();
+    } catch (error) { Alert.alert("Error", "Failed to reject request"); }
   };
 
   if (loading && !user) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
-        <ActivityIndicator color={colors.primary} />
+      <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
+        <ActivityIndicator color={theme.colors.primary} />
       </View>
     );
   }
 
-  const tabs = isOwnProfile ? [
-    { id: 'posts', label: 'Feed' },
-    { id: 'media', label: 'Media' },
-    { id: 'replies', label: 'Replies' },
-    { id: 'saved', label: 'Saved' },
-    { id: 'friends', label: 'Friends' }
-  ] : [
-    { id: 'posts', label: 'Posts' },
-    { id: 'media', label: 'Media' },
-  ];
-
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Cover Section */}
-        <View style={styles.coverContainer}>
-          {user?.cover_url ? (
-            <Image source={{ uri: user.cover_url }} style={styles.coverImage} />
-          ) : (
-            <LinearGradient colors={[colors.primary, colors.background]} style={styles.coverPlaceholder} />
-          )}
-          
-          <TouchableOpacity onPress={() => router.back()} style={[styles.headerIcon, { left: 20, top: insets.top + 10, backgroundColor: colors.overlay }]}>
-            <ChevronLeft color="#FFF" size={24} />
-          </TouchableOpacity>
-
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.headerIcon}>
+          <ChevronLeft color={theme.colors.text} size={28} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Profile</Text>
+        <View style={{ flexDirection: 'row', gap: 10 }}>
           {isOwnProfile && (
-            <View style={{ position: 'absolute', right: 20, top: insets.top + 10, flexDirection: 'row', gap: 10 }}>
-              <TouchableOpacity onPress={() => router.push("/settings")} style={[styles.headerIcon, { backgroundColor: colors.overlay }]}>
-                <SettingsIcon color="#FFF" size={20} />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={handleLogout} style={[styles.headerIcon, { backgroundColor: 'rgba(239, 68, 68, 0.5)' }]}>
-                <LogOut color="#FFF" size={20} />
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {isOwnProfile && (
-            <TouchableOpacity style={[styles.editCoverButton, { backgroundColor: colors.surface }]} onPress={handlePickCover}>
-              <Camera size={16} color={colors.text} />
+            <TouchableOpacity onPress={() => router.push("/settings")} style={styles.headerIcon}>
+              <SettingsIcon color={theme.colors.text} size={24} />
             </TouchableOpacity>
           )}
-          {uploadingCover && <ActivityIndicator style={styles.coverLoader} color="#FFF" />}
+          {isOwnProfile && (
+            <TouchableOpacity onPress={handleLogout} style={styles.headerIcon}>
+              <LogOut color={theme.colors.error} size={24} />
+            </TouchableOpacity>
+          )}
+          {!isOwnProfile && <View style={{ width: 40 }} />}
         </View>
+      </View>
 
-        {/* Profile Stats & Info */}
-        <View style={styles.profileContent}>
-          <View style={styles.headerRow}>
-            <View style={[styles.avatarWrapper, { borderColor: colors.background, backgroundColor: colors.surface }]}>
-              {isOwnProfile ? (
-                <TouchableOpacity onPress={() => setShowEmojiPicker(true)} style={styles.avatarTouch}>
-                  {user?.avatar_url ? <Image source={{ uri: user.avatar_url }} style={styles.avatar} /> : <Text style={styles.emojiAvatar}>{user?.emoji_icon || "👤"}</Text>}
-                  <View style={[styles.avatarEditBadge, { backgroundColor: colors.primary }]}>
-                    <Camera size={10} color="#FFF" />
-                  </View>
-                </TouchableOpacity>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <View style={styles.profileInfo}>
+          <View style={styles.avatarSection}>
+            <TouchableOpacity 
+              onPress={() => isOwnProfile && setShowEmojiPicker(true)} 
+              disabled={!isOwnProfile}
+              style={[styles.avatarContainer, { backgroundColor: theme.colors.surface }]}
+            >
+              {user?.avatar_url ? (
+                <Image source={{ uri: user.avatar_url }} style={styles.avatar} />
               ) : (
-                <View style={styles.avatarTouch}>
-                  {user?.avatar_url ? <Image source={{ uri: user.avatar_url }} style={styles.avatar} /> : <Text style={styles.emojiAvatar}>{user?.emoji_icon || "👤"}</Text>}
+                <Text style={styles.avatarEmoji}>{user?.emoji_icon || "👤"}</Text>
+              )}
+              {isOwnProfile && (
+                <View style={[styles.editBadge, { backgroundColor: theme.colors.primary }]}>
+                  <Camera size={12} color="#FFF" />
                 </View>
               )}
-            </View>
+            </TouchableOpacity>
             
-            <View style={styles.statsRow}>
-              <View style={styles.statItem}>
-                <Text style={[styles.statValue, { color: colors.text }]}>{stats.posts}</Text>
-                <Text style={[styles.statLabel, { color: colors.textSecondary }]}>POSTS</Text>
-              </View>
-              <View style={styles.statItem}>
-                <Text style={[styles.statValue, { color: colors.text }]}>{friends.length}</Text>
-                <Text style={[styles.statLabel, { color: colors.textSecondary }]}>FRIENDS</Text>
-              </View>
-              <View style={styles.statItem}>
-                <Text style={[styles.statValue, { color: colors.text }]}>{stats.reactions}</Text>
-                <Text style={[styles.statLabel, { color: colors.textSecondary }]}>KARMA</Text>
-              </View>
+            <View style={styles.nameSection}>
+              <Text style={[styles.username, { color: theme.colors.text }]}>@{user?.username}</Text>
+              {user?.is_admin && <View style={styles.adminBadge}><Shield size={12} color="#FFF" /><Text style={styles.adminText}>MOD</Text></View>}
             </View>
-          </View>
 
-          <View style={styles.userInfo}>
-            <View style={styles.usernameRow}>
-              <Text style={[styles.username, { color: colors.text, ...typography.h3 }]}>@{user?.username}</Text>
-              {user?.is_admin && (
-                <View style={[styles.badge, { backgroundColor: colors.warning + '33' }]}>
-                  <Shield size={12} color={colors.warning} />
-                  <Text style={[styles.badgeText, { color: colors.warning }]}>MOD</Text>
-                </View>
-              )}
-            </View>
-            
             {editingBio ? (
-              <View style={[styles.bioEdit, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <View style={styles.bioEditContainer}>
                 <TextInput
-                  style={[styles.bioInput, { color: colors.text }]}
+                  style={[styles.bioInput, { color: theme.colors.text, borderColor: theme.colors.border }]}
                   value={bioText}
                   onChangeText={setBioText}
                   multiline
                   maxLength={160}
-                  autoFocus
+                  placeholder="Tell us about yourself..."
                 />
-                <View style={styles.bioActions}>
-                  <TouchableOpacity onPress={() => setEditingBio(false)}><XIcon size={20} color={colors.danger} /></TouchableOpacity>
-                  <TouchableOpacity onPress={handleUpdateBio}><Check size={20} color={colors.success} /></TouchableOpacity>
+                <View style={styles.bioButtons}>
+                  <TouchableOpacity onPress={() => setEditingBio(false)} style={styles.bioCancel}><Text style={styles.bioCancelText}>Cancel</Text></TouchableOpacity>
+                  <TouchableOpacity onPress={handleUpdateBio} style={[styles.bioSave, { backgroundColor: theme.colors.primary }]}><Text style={styles.bioSaveText}>Save</Text></TouchableOpacity>
                 </View>
               </View>
             ) : (
               <TouchableOpacity onPress={() => isOwnProfile && setEditingBio(true)} disabled={!isOwnProfile}>
-                <Text style={[styles.bio, { color: colors.textSecondary }]}>
-                  {user?.bio || (isOwnProfile ? "Add a bio..." : "")}
+                <Text style={[styles.bio, { color: theme.colors.textSecondary }]}>
+                  {user?.bio || (isOwnProfile ? "Tap to add a bio..." : "")}
                 </Text>
               </TouchableOpacity>
             )}
           </View>
 
-          {/* Tabs */}
-          <View style={[styles.tabBar, { borderBottomColor: colors.border }]}>
-            {tabs.map(tab => (
-              <TouchableOpacity 
-                key={tab.id} 
-                style={[styles.tab, activeTab === tab.id && { borderBottomColor: colors.primary }]}
-                onPress={() => setActiveTab(tab.id)}
-              >
-                <Text style={[styles.tabText, { color: activeTab === tab.id ? colors.primary : colors.textTertiary }]}>
-                  {tab.label.toUpperCase()}
-                </Text>
-              </TouchableOpacity>
-            ))}
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}><Text style={[styles.statValue, { color: theme.colors.text }]}>{stats.posts}</Text><Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Posts</Text></View>
+            <View style={styles.statItem}><Text style={[styles.statValue, { color: theme.colors.text }]}>{stats.reactions}</Text><Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Karma</Text></View>
+            <View style={styles.statItem}><Text style={[styles.statValue, { color: theme.colors.text }]}>{stats.joined}</Text><Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Joined</Text></View>
           </View>
 
-          {/* Tab Content */}
+          <View style={styles.tabBar}>
+            <TouchableOpacity onPress={() => setActiveTab("posts")} style={[styles.tab, activeTab === "posts" && { borderBottomColor: theme.colors.primary }]}><Text style={[styles.tabText, { color: activeTab === "posts" ? theme.colors.primary : theme.colors.textSecondary }]}>FEED</Text></TouchableOpacity>
+            {isOwnProfile && <TouchableOpacity onPress={() => setActiveTab("saved")} style={[styles.tab, activeTab === "saved" && { borderBottomColor: theme.colors.primary }]}><Text style={[styles.tabText, { color: activeTab === "saved" ? theme.colors.primary : theme.colors.textSecondary }]}>SAVED</Text></TouchableOpacity>}
+            {isOwnProfile && <TouchableOpacity onPress={() => setActiveTab("friends")} style={[styles.tab, activeTab === "friends" && { borderBottomColor: theme.colors.primary }]}><Text style={[styles.tabText, { color: activeTab === "friends" ? theme.colors.primary : theme.colors.textSecondary }]}>FRIENDS</Text></TouchableOpacity>}
+          </View>
+
           <View style={styles.tabContent}>
-            {activeTab === 'posts' && userPosts.map(post => <PostItem key={post.id} item={post} deviceId={deviceId} onReaction={handleReaction} user={currentUser} onComment={loadData} />)}
-            {activeTab === 'media' && renderMediaGrid()}
-            {activeTab === 'replies' && replies.map(r => (
-              <View key={r.id} style={[styles.replyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <Text style={[styles.replyText, { color: colors.textSecondary }]}>{r.text}</Text>
-                <TouchableOpacity onPress={() => router.push(`/?postId=${r.post_id}`)}>
-                  <Text style={[styles.replyLink, { color: colors.primary }]}>on "{r.post?.title}"</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
-            {activeTab === 'saved' && savedPosts.map(post => <PostItem key={post.id} item={post} deviceId={deviceId} onReaction={handleReaction} user={currentUser} onComment={loadData} />)}
-            {activeTab === 'friends' && (
-              <View style={styles.friendsTab}>
-                <View style={[styles.searchBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                  <Search size={18} color={colors.textTertiary} />
+            {activeTab === "posts" && (
+              userPosts.length > 0 ? (
+                userPosts.map(post => <PostItem key={post.id} item={post} deviceId={deviceId} onReaction={handleReaction} user={currentUser} onComment={loadData} />)
+              ) : (
+                <View style={styles.emptyContainer}><Text style={styles.emptyText}>No posts yet</Text></View>
+              )
+            )}
+            {activeTab === "saved" && (
+              savedPosts.length > 0 ? (
+                savedPosts.map(post => <PostItem key={post.id} item={post} deviceId={deviceId} onReaction={handleReaction} user={currentUser} onComment={loadData} />)
+              ) : (
+                <View style={styles.emptyContainer}><Text style={styles.emptyText}>No saved posts</Text></View>
+              )
+            )}
+            {activeTab === "friends" && (
+              <View style={styles.friendsContainer}>
+                <View style={styles.addFriendSection}>
                   <TextInput
-                    style={[styles.searchInput, { color: colors.text }]}
-                    placeholder="Find friends..."
-                    placeholderTextColor={colors.textTertiary}
+                    style={[styles.friendInput, { color: theme.colors.text, borderColor: theme.colors.border }]}
+                    placeholder="Add by username..."
                     value={friendUsername}
                     onChangeText={setFriendUsername}
                     autoCapitalize="none"
                   />
-                  <TouchableOpacity onPress={handleAddFriend} disabled={addingFriend}>
-                    <UserPlus size={20} color={colors.primary} />
+                  <TouchableOpacity 
+                    onPress={handleAddFriend} 
+                    disabled={addingFriend}
+                    style={[styles.addBtn, { backgroundColor: theme.colors.primary }]}
+                  >
+                    <UserPlus color="#FFF" size={20} />
                   </TouchableOpacity>
                 </View>
+
+                {pendingRequests.length > 0 && (
+                  <View style={styles.requestsSection}>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Pending Requests</Text>
+                    {pendingRequests.map(r => (
+                      <View key={r.id} style={styles.requestItem}>
+                        <Text style={{ fontSize: 24 }}>{r.emoji_icon || "👤"}</Text>
+                        <Text style={[styles.requestName, { color: theme.colors.text }]}>@{r.username}</Text>
+                        <View style={styles.requestBtns}>
+                          <TouchableOpacity onPress={() => handleAcceptFriend(r.requestId, r.id)} style={[styles.acceptBtn, { backgroundColor: theme.colors.success }]}><Check color="#FFF" size={16} /></TouchableOpacity>
+                          <TouchableOpacity onPress={() => handleRejectFriend(r.requestId)} style={[styles.rejectBtn, { backgroundColor: theme.colors.error }]}><XIcon color="#FFF" size={16} /></TouchableOpacity>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                <Text style={[styles.sectionTitle, { color: theme.colors.text, marginTop: 20 }]}>Friends ({friends.length})</Text>
                 {friends.map(f => (
                   <TouchableOpacity key={f.id} style={styles.friendItem} onPress={() => router.push(`/profile?userId=${f.id}`)}>
                     <Text style={{ fontSize: 24 }}>{f.emoji_icon || "👤"}</Text>
-                    <Text style={[styles.friendName, { color: colors.text }]}>@{f.username}</Text>
+                    <Text style={[styles.friendName, { color: theme.colors.text }]}>@{f.username}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -441,25 +407,19 @@ export default function Profile() {
         </View>
       </ScrollView>
 
-      {/* Emoji Picker Modal */}
       {showEmojiPicker && (
-        <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
-          <View style={[styles.modalContent, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[styles.modalTitle, { color: colors.text, ...typography.h3 }]}>Choose Avatar</Text>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.colors.background }]}>
+            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Choose Icon</Text>
             <View style={styles.emojiGrid}>
               {EMOJIS.map(emoji => (
-                <TouchableOpacity key={emoji} onPress={() => handleSelectEmoji(emoji)} style={[styles.emojiBtn, { backgroundColor: colors.background }]}>
-                  <Text style={styles.emojiTxt}>{emoji}</Text>
+                <TouchableOpacity key={emoji} onPress={() => handleSelectEmoji(emoji)} style={styles.emojiItem}>
+                  <Text style={styles.emojiText}>{emoji}</Text>
                 </TouchableOpacity>
               ))}
             </View>
-            <TouchableOpacity style={[styles.uploadBtn, { backgroundColor: colors.primary }]} onPress={handlePickAvatar}>
-              <Camera size={18} color="#FFF" />
-              <Text style={styles.uploadBtnText}>UPLOAD PHOTO</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.closeBtn} onPress={() => setShowEmojiPicker(false)}>
-              <Text style={[styles.closeBtnText, { color: colors.textSecondary }]}>CANCEL</Text>
-            </TouchableOpacity>
+            <TouchableOpacity onPress={handlePickAvatar} style={[styles.photoBtn, { backgroundColor: theme.colors.surface }]}><Camera size={20} color={theme.colors.text} /><Text style={[styles.photoBtnText, { color: theme.colors.text }]}>Upload Photo</Text></TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowEmojiPicker(false)} style={styles.closeBtn}><Text style={styles.closeBtnText}>Cancel</Text></TouchableOpacity>
           </View>
         </View>
       )}
@@ -472,58 +432,57 @@ export default function Profile() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  coverContainer: { height: 200, width: '100%', position: 'relative' },
-  coverImage: { width: '100%', height: '100%' },
-  coverPlaceholder: { width: '100%', height: '100%' },
-  headerIcon: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
-  editCoverButton: { position: 'absolute', right: 16, bottom: 16, width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
-  coverLoader: { position: 'absolute', right: 60, bottom: 20 },
-  profileContent: { flex: 1, marginTop: -40, paddingHorizontal: 16 },
-  headerRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 16 },
-  avatarWrapper: { width: 90, height: 90, borderRadius: 45, borderWidth: 4, overflow: 'hidden' },
-  avatarTouch: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' },
-  avatar: { width: '100%', height: '100%' },
-  emojiAvatar: { fontSize: 48 },
-  avatarEditBadge: { position: 'absolute', bottom: 4, right: 4, width: 20, height: 20, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
-  statsRow: { flexDirection: 'row', gap: 20, marginBottom: 8, paddingRight: 8 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 16 },
+  headerIcon: { padding: 8 },
+  headerTitle: { fontSize: 20, fontWeight: 'bold' },
+  profileInfo: { paddingHorizontal: 16, paddingTop: 20 },
+  avatarSection: { alignItems: 'center', marginBottom: 24 },
+  avatarContainer: { width: 100, height: 100, borderRadius: 50, justifyContent: 'center', alignItems: 'center', marginBottom: 16, position: 'relative' },
+  avatar: { width: 100, height: 100, borderRadius: 50 },
+  avatarEmoji: { fontSize: 60 },
+  editBadge: { position: 'absolute', bottom: 0, right: 0, width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: '#FFF' },
+  nameSection: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  username: { fontSize: 24, fontWeight: 'bold' },
+  adminBadge: { backgroundColor: '#6366f1', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  adminText: { color: '#FFF', fontSize: 10, fontWeight: 'bold' },
+  bio: { fontSize: 16, textAlign: 'center', paddingHorizontal: 20 },
+  bioEditContainer: { width: '100%', gap: 10 },
+  bioInput: { borderWidth: 1, borderRadius: 10, padding: 12, fontSize: 16, minHeight: 80, textAlignVertical: 'top' },
+  bioButtons: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10 },
+  bioCancel: { padding: 10 },
+  bioCancelText: { color: '#ef4444' },
+  bioSave: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 },
+  bioSaveText: { color: '#FFF', fontWeight: 'bold' },
+  statsRow: { flexDirection: 'row', justifyContent: 'space-around', paddingVertical: 20, borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#f1f5f9', marginBottom: 20 },
   statItem: { alignItems: 'center' },
-  statValue: { fontSize: 18, fontWeight: '800' },
-  statLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
-  userInfo: { marginBottom: 24 },
-  usernameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
-  username: { fontWeight: '800' },
-  badge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
-  badgeText: { fontSize: 10, fontWeight: '800' },
-  bio: { fontSize: 15, lineHeight: 20 },
-  bioEdit: { borderWidth: 1, borderRadius: 12, padding: 12, gap: 12 },
-  bioInput: { fontSize: 15, minHeight: 60, textAlignVertical: 'top' },
-  bioActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 16 },
-  tabBar: { flexDirection: 'row', borderBottomWidth: 1, marginBottom: 16 },
-  tab: { paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  tabText: { fontSize: 12, fontWeight: '800', letterSpacing: 1 },
-  tabContent: { flex: 1 },
-  mediaGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
-  mediaItem: { width: (width - 40) / 3, height: (width - 40) / 3, borderRadius: 12, overflow: 'hidden' },
-  mediaThumb: { width: '100%', height: '100%' },
-  mediaTypeBadge: { position: 'absolute', right: 4, top: 4, backgroundColor: 'rgba(0,0,0,0.5)', padding: 4, borderRadius: 4 },
-  replyCard: { padding: 16, borderRadius: 16, borderWidth: 1, marginBottom: 12 },
-  replyText: { fontSize: 14, lineHeight: 20, marginBottom: 8 },
-  replyLink: { fontSize: 12, fontWeight: '700' },
-  friendsTab: { gap: 16 },
-  searchBox: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 16, borderWidth: 1 },
-  searchInput: { flex: 1, fontSize: 15 },
-  friendItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 },
-  friendName: { fontSize: 16, fontWeight: '700' },
-  modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  modalContent: { width: '85%', borderRadius: 24, padding: 24, borderWidth: 1 },
-  modalTitle: { textAlign: 'center', marginBottom: 24 },
-  emojiGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 12, marginBottom: 24 },
-  emojiBtn: { width: 50, height: 50, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  emojiTxt: { fontSize: 24 },
-  uploadBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 16, borderRadius: 16, marginBottom: 16 },
-  uploadBtnText: { color: '#FFF', fontSize: 14, fontWeight: '800', letterSpacing: 1 },
-  closeBtn: { alignItems: 'center' },
-  closeBtnText: { fontSize: 14, fontWeight: '700' },
-  emptyContainer: { alignItems: 'center', paddingVertical: 48, gap: 12 },
-  emptyText: { fontSize: 14, fontWeight: '600' },
+  statValue: { fontSize: 18, fontWeight: 'bold' },
+  statLabel: { fontSize: 12 },
+  tabBar: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#f1f5f9', marginBottom: 10 },
+  tab: { flex: 1, paddingVertical: 15, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  tabText: { fontWeight: 'bold', fontSize: 13 },
+  tabContent: { flex: 1, paddingBottom: 40 },
+  emptyContainer: { padding: 40, alignItems: 'center' },
+  emptyText: { color: '#94a3b8' },
+  friendsContainer: { padding: 10 },
+  addFriendSection: { flexDirection: 'row', gap: 10, marginBottom: 20 },
+  friendInput: { flex: 1, borderWidth: 1, borderRadius: 10, padding: 12 },
+  addBtn: { width: 50, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  sectionTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 15 },
+  requestItem: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
+  requestName: { flex: 1, fontWeight: 'bold' },
+  requestBtns: { flexDirection: 'row', gap: 8 },
+  acceptBtn: { padding: 8, borderRadius: 8 },
+  rejectBtn: { padding: 8, borderRadius: 8 },
+  friendItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
+  friendName: { fontWeight: 'bold' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { width: '80%', padding: 20, borderRadius: 20 },
+  modalTitle: { fontSize: 18, fontWeight: 'bold', textAlign: 'center', marginBottom: 20 },
+  emojiGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 15, marginBottom: 20 },
+  emojiItem: { padding: 5 },
+  emojiText: { fontSize: 32 },
+  photoBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, padding: 15, borderRadius: 10, marginBottom: 10 },
+  photoBtnText: { fontWeight: 'bold' },
+  closeBtn: { padding: 15, alignItems: 'center' },
+  closeBtnText: { color: '#ef4444', fontWeight: 'bold' },
 });

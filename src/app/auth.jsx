@@ -15,17 +15,16 @@ import { supabase } from "../utils/supabase";
 import { useAuthStore } from "../utils/auth";
 import { getDeviceId } from "../utils/deviceId";
 import { initUser } from "../utils/user";
-import { ChevronLeft, User, Lock } from "lucide-react-native";
+import { ChevronLeft } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import bcrypt from 'bcryptjs';
 import { generateRecoveryCodes, storeRecoveryCodes } from "../utils/recoveryCode";
 import { RecoveryCodesDisplay } from "../components/RecoveryCodesDisplay";
-import { useTheme } from "../utils/theme";
+import { theme } from "../utils/theme";
 
 export default function Auth() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const { colors, spacing, borderRadius, typography } = useTheme();
   
   const [isLogin, setIsLogin] = useState(params.mode === "login");
   const [loading, setLoading] = useState(false);
@@ -147,9 +146,9 @@ export default function Auth() {
 
   if (showRecoveryCodes) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { borderBottomColor: colors.border }]}>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Recovery Codes</Text>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Recovery Codes</Text>
         </View>
         <RecoveryCodesDisplay 
           codes={recoveryCodes}
@@ -162,96 +161,74 @@ export default function Auth() {
   return (
     <KeyboardAvoidingView 
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={[styles.container, { backgroundColor: colors.background }]}
+      style={styles.container}
     >
       <View style={styles.header}>
         <TouchableOpacity 
           onPress={() => router.back()}
-          style={[styles.backButton, { backgroundColor: colors.surface }]}
+          style={styles.backButton}
         >
-          <ChevronLeft color={colors.text} size={24} />
+          <ChevronLeft color={theme.colors.text} size={28} />
         </TouchableOpacity>
-        <View style={{ flex: 1 }} />
+        <Text style={styles.headerTitle}>{isLogin ? "Sign In" : "Sign Up"}</Text>
+        <View style={{ width: 40 }} />
       </View>
 
-      <View style={styles.content}>
-        <View style={styles.titleContainer}>
-          <Text style={[styles.title, { color: colors.text, ...typography.h1 }]}>
-            {isLogin ? "Welcome Back" : "Create Account"}
-          </Text>
-          <Text style={[styles.description, { color: colors.textSecondary }]}>
-            {isLogin 
-              ? "Sign in to join the community." 
-              : "Choose a username and password. No personal data required."}
-          </Text>
-        </View>
+      <View style={styles.form}>
+        <Text style={styles.title}>{isLogin ? "Welcome Back" : "Join TownWall"}</Text>
+        <Text style={styles.subtitle}>
+          {isLogin 
+            ? "Enter your credentials to continue" 
+            : "Create an account to start posting and interacting"}
+        </Text>
 
-        <View style={styles.form}>
-          <View style={styles.inputGroup}>
-            <View style={styles.inputWrapper}>
-              <User size={20} color={colors.textTertiary} style={styles.inputIcon} />
-              <TextInput
-                style={[styles.input, { color: colors.text, backgroundColor: colors.surface, borderColor: colors.border }]}
-                placeholder="Username"
-                placeholderTextColor={colors.textTertiary}
-                value={username}
-                onChangeText={setUsername}
-                autoCapitalize="none"
-              />
-            </View>
-          </View>
+        <TextInput
+          style={styles.input}
+          placeholder="Username"
+          value={username}
+          onChangeText={setUsername}
+          autoCapitalize="none"
+        />
 
-          <View style={styles.inputGroup}>
-            <View style={styles.inputWrapper}>
-              <Lock size={20} color={colors.textTertiary} style={styles.inputIcon} />
-              <TextInput
-                style={[styles.input, { color: colors.text, backgroundColor: colors.surface, borderColor: colors.border }]}
-                placeholder="Password"
-                placeholderTextColor={colors.textTertiary}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-              />
-            </View>
-          </View>
+        <TextInput
+          style={styles.input}
+          placeholder="Password"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+        />
 
-          <TouchableOpacity 
-            style={[styles.button, { backgroundColor: colors.primary, borderRadius: borderRadius.xl }]} 
-            onPress={handleAuth}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text style={[styles.buttonText, { ...typography.button }]}>
-                {isLogin ? "SIGN IN" : "CREATE ACCOUNT"}
-              </Text>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={styles.toggle} 
-            onPress={() => setIsLogin(!isLogin)}
-          >
-            <Text style={[styles.toggleText, { color: colors.textSecondary }]}>
-              {isLogin ? "New here? " : "Joined already? "}
-              <Text style={{ color: colors.primary, fontWeight: '700' }}>
-                {isLogin ? "Sign up" : "Sign in"}
-              </Text>
+        <TouchableOpacity 
+          style={styles.button} 
+          onPress={handleAuth}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Text style={styles.buttonText}>
+              {isLogin ? "Sign In" : "Create Account"}
             </Text>
-          </TouchableOpacity>
-
-          {isLogin && (
-            <TouchableOpacity 
-              style={styles.forgotPassword} 
-              onPress={() => router.push("/forgot-password")}
-            >
-              <Text style={[styles.forgotPasswordText, { color: colors.primary }]}>
-                Forgotten your password?
-              </Text>
-            </TouchableOpacity>
           )}
-        </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.toggle} 
+          onPress={() => setIsLogin(!isLogin)}
+        >
+          <Text style={styles.toggleText}>
+            {isLogin ? "Don't have an account? Sign Up" : "Already have an account? Sign In"}
+          </Text>
+        </TouchableOpacity>
+
+        {isLogin && (
+          <TouchableOpacity 
+            style={styles.forgotPassword} 
+            onPress={() => router.push("/forgot-password")}
+          >
+            <Text style={styles.forgotPasswordText}>Forgotten your password?</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </KeyboardAvoidingView>
   );
@@ -260,90 +237,75 @@ export default function Auth() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: theme.colors.background,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     paddingTop: 60,
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingBottom: 20,
   },
   backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
+    padding: 5,
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: "700",
-    textAlign: 'center',
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 32,
-    paddingTop: 20,
-  },
-  titleContainer: {
-    marginBottom: 40,
-  },
-  title: {
-    marginBottom: 12,
-  },
-  description: {
-    fontSize: 16,
-    lineHeight: 24,
+    fontWeight: "600",
+    color: theme.colors.text,
   },
   form: {
-    gap: 16,
+    flex: 1,
+    padding: 20,
+    justifyContent: "center",
   },
-  inputGroup: {
-    gap: 8,
+  title: {
+    fontSize: 28,
+    fontWeight: "bold",
+    marginBottom: 10,
+    color: theme.colors.text,
   },
-  inputWrapper: {
-    position: 'relative',
-    justifyContent: 'center',
-  },
-  inputIcon: {
-    position: 'absolute',
-    left: 16,
-    zIndex: 10,
+  subtitle: {
+    fontSize: 16,
+    color: theme.colors.textSecondary,
+    marginBottom: 30,
   },
   input: {
-    borderRadius: 16,
-    padding: 16,
-    paddingLeft: 48,
+    backgroundColor: theme.colors.surface,
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 15,
     fontSize: 16,
     borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   button: {
-    padding: 20,
+    backgroundColor: theme.colors.primary,
+    padding: 15,
+    borderRadius: 10,
     alignItems: "center",
-    marginTop: 12,
-    shadowColor: "#6366F1",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 8,
+    marginTop: 10,
   },
   buttonText: {
     color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "600",
   },
   toggle: {
-    marginTop: 24,
+    marginTop: 20,
     alignItems: "center",
   },
   toggleText: {
-    fontSize: 15,
+    color: theme.colors.primary,
+    fontSize: 16,
   },
   forgotPassword: {
-    marginTop: 16,
+    marginTop: 15,
     alignItems: "center",
   },
   forgotPasswordText: {
+    color: theme.colors.secondary,
     fontSize: 14,
-    fontWeight: "600",
   },
 });
