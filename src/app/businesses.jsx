@@ -14,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import MapView, { Marker, Callout } from 'react-native-maps';
 import { BannerAd } from '@/components/BannerAd';
+import { NativeAd } from '@/components/NativeAd';
 
 export default function LocalBusinesses() {
   const insets = useSafeAreaInsets();
