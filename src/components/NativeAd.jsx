@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { View, Text, Platform } from 'react-native';
+import { View, Text, Platform, StyleSheet } from 'react-native';
 import Constants from 'expo-constants';
 
 let NativeAdView, CallToActionView, HeadlineView, IconView, StarRatingView, TaglineView, AdvertiserView, ImageView;
@@ -18,12 +18,11 @@ if (!isExpoGo) {
     AdvertiserView = ads.AdvertiserView;
     ImageView = ads.ImageView;
   } catch (e) {
-    // Module not found or failed to load
   }
 }
 
 const adUnitId = __DEV__ 
-  ? 'ca-app-pub-3940256099942544/2247696110' // Test ID for Native
+  ? 'ca-app-pub-3940256099942544/2247696110'
   : Platform.select({
       ios: 'ca-app-pub-1505977777207758/1638367758', 
       android: 'ca-app-pub-1505977777207758/6195707754',
@@ -40,7 +39,16 @@ export function NativeAd() {
   }, []);
 
   if (!NativeAdView) {
-    return null;
+    return (
+      <View style={styles.placeholder}>
+        <View style={styles.placeholderIcon} />
+        <View style={styles.placeholderContent}>
+          <View style={styles.placeholderLine} />
+          <View style={[styles.placeholderLine, { width: '60%' }]} />
+        </View>
+        <Text style={styles.placeholderText}>AD</Text>
+      </View>
+    );
   }
 
   return (
@@ -84,3 +92,41 @@ export function NativeAd() {
     </NativeAdView>
   );
 }
+
+const styles = StyleSheet.create({
+  placeholder: {
+    marginVertical: 8,
+    marginHorizontal: 15,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderStyle: 'dashed',
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  placeholderIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  placeholderContent: {
+    flex: 1,
+    gap: 6,
+  },
+  placeholderLine: {
+    height: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 6,
+    width: '80%',
+  },
+  placeholderText: {
+    color: 'rgba(255,255,255,0.2)',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+});

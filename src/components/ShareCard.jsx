@@ -10,13 +10,13 @@ export const ShareCard = ({ post }) => {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={['#ffffff', '#f8fafc']}
+        colors={['#111111', '#000000']}
         style={styles.card}
       >
         <View style={styles.header}>
           <Text style={styles.appTitle}>TOWNWALL</Text>
           <View style={styles.tag}>
-            <Text style={styles.tagText}>Featured Post</Text>
+            <Text style={styles.tagText}>{post.zone?.name || "Featured"}</Text>
           </View>
         </View>
 
@@ -26,17 +26,17 @@ export const ShareCard = ({ post }) => {
           </Text>
           
           <Text style={styles.body} numberOfLines={5}>
-            {post.content?.substring(0, 200) || "Check out this new update on TownWall!"}
+            {post.text?.replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').substring(0, 200) || "Check out this update on TownWall!"}
           </Text>
 
           <View style={styles.footer}>
             <View style={styles.userInfo}>
               <View style={styles.avatarPlaceholder}>
-                <Text style={styles.avatarLetter}>
-                  {(post.username || 'U')[0].toUpperCase()}
+                <Text style={styles.avatarEmoji}>
+                  {post.is_anonymous ? "👤" : (post.user?.emoji_icon || "👤")}
                 </Text>
               </View>
-              <Text style={styles.username}>@{post.username || 'user'}</Text>
+              <Text style={styles.username}>@{post.is_anonymous ? "Anonymous" : (post.user?.username || 'user')}</Text>
             </View>
             <Text style={styles.date}>
               {new Date(post.created_at || Date.now()).toLocaleDateString()}
@@ -56,7 +56,7 @@ const styles = StyleSheet.create({
   container: {
     width: width * 0.9,
     padding: 2,
-    backgroundColor: '#e2e8f0',
+    backgroundColor: '#222',
     borderRadius: 24,
     overflow: 'hidden',
   },
@@ -76,10 +76,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '900',
     letterSpacing: 2,
-    color: '#1e293b',
+    color: '#FFFFFF',
   },
   tag: {
-    backgroundColor: '#3b82f6',
+    backgroundColor: 'rgba(255,255,255,0.1)',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
@@ -96,13 +96,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#0f172a',
+    color: '#FFFFFF',
     lineHeight: 34,
     marginBottom: 12,
   },
   body: {
     fontSize: 16,
-    color: '#475569',
+    color: 'rgba(255,255,255,0.7)',
     lineHeight: 22,
     marginBottom: 20,
   },
@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
     marginTop: 'auto',
     paddingTop: 20,
     borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
+    borderTopColor: 'rgba(255,255,255,0.1)',
   },
   userInfo: {
     flexDirection: 'row',
@@ -123,24 +123,22 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#cbd5e1',
+    backgroundColor: 'rgba(255,255,255,0.1)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,
   },
-  avatarLetter: {
-    color: '#64748b',
-    fontSize: 14,
-    fontWeight: '700',
+  avatarEmoji: {
+    fontSize: 18,
   },
   username: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#334155',
+    color: 'rgba(255,255,255,0.8)',
   },
   date: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: 'rgba(255,255,255,0.4)',
     fontWeight: '500',
   },
   branding: {
@@ -149,7 +147,7 @@ const styles = StyleSheet.create({
   },
   url: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: 'rgba(255,255,255,0.3)',
     letterSpacing: 1,
     fontWeight: '600',
   },

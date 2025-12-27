@@ -35,7 +35,7 @@ import PollComponent from "./PollComponent";
 import { useRouter, useLocalSearchParams, usePathname } from "expo-router";
 import { theme } from "../utils/theme";
 
-export default function PostItem({ item, deviceId, onReaction, onComment, onDelete, onShare, onEdit, user }) {
+export default function PostItem({ item, deviceId, onReaction, onComment, onDelete, onShare, onEdit, user, onFilterZone, onFilterTag }) {
   const { width } = useWindowDimensions();
   const router = useRouter();
   
@@ -146,12 +146,26 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
                 )}
               </TouchableOpacity>
               <View style={styles.headerInfo}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Text style={styles.username}>@{item.is_anonymous ? "Anonymous" : item.user?.username}</Text>
-                  {!item.is_anonymous && isOnline(item.user?.last_seen) && <View style={styles.onlineDot} />}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={styles.username}>@{item.is_anonymous ? "Anonymous" : item.user?.username}</Text>
+                    {!item.is_anonymous && isOnline(item.user?.last_seen) && <View style={styles.onlineDot} />}
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                    <TouchableOpacity onPress={() => onFilterZone?.(item.zone_id)}>
+                      <Text style={styles.metaLink}>{item.zone?.name}</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.metaText}>•</Text>
+                    {item.tag?.name && (
+                      <>
+                        <TouchableOpacity onPress={() => onFilterTag?.(item.tag_id)}>
+                          <Text style={styles.metaLink}>{item.tag?.name}</Text>
+                        </TouchableOpacity>
+                        <Text style={styles.metaText}>•</Text>
+                      </>
+                    )}
+                    <Text style={styles.metaText}>{timeAgo}</Text>
+                  </View>
                 </View>
-                <Text style={styles.metaText}>{item.zone?.name} • {timeAgo}</Text>
-              </View>
               {(user?.id === item.user_id || user?.is_admin) && (
                 <TouchableOpacity onPress={() => onEdit?.(item)}><Pencil size={18} color={theme.colors.textSecondary} /></TouchableOpacity>
               )}
@@ -281,6 +295,7 @@ const styles = StyleSheet.create({
   username: { fontWeight: '700', fontSize: 15, color: '#FFF' },
   onlineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#10B981' },
   metaText: { fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 2 },
+  metaLink: { fontSize: 12, color: 'rgba(255,255,255,0.7)', fontWeight: '600' },
   body: { marginBottom: 12 },
   title: { fontSize: 17, fontWeight: '700', marginBottom: 6, color: '#FFF' },
   bodyText: { fontSize: 15, color: 'rgba(255,255,255,0.8)', lineHeight: 22 },

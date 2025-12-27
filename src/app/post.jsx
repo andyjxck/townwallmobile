@@ -167,33 +167,36 @@ export default function PostScreen() {
         <TouchableOpacity onPress={handlePost} disabled={loading}><Text style={[styles.postBtn, { color: theme.colors.primary }]}>Post</Text></TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.form}>
-        <View style={styles.options}>
-          <TouchableOpacity onPress={() => setStep('zone')} style={styles.option}><Text style={styles.optionLabel}>Zone: </Text><Text style={styles.optionValue}>{selectedZone?.name || "Select"}</Text></TouchableOpacity>
-          <TouchableOpacity onPress={() => setStep('tag')} style={styles.option}><Text style={styles.optionLabel}>Tag: </Text><Text style={styles.optionValue}>{selectedTag?.name || "Select"}</Text></TouchableOpacity>
-        </View>
-
-        <TextInput placeholder="Title" value={title} onChangeText={setTitle} style={styles.titleInput} />
-          <RichTextEditor value={text} onChange={setText} placeholder="What's happening?" onPollPress={() => setStep('poll')} />
-
-          <View style={styles.anonRow}>
-            <Text style={styles.anonLabel}>Post Anonymously</Text>
+        <View style={styles.form}>
+          <View style={styles.topOptions}>
+            <TouchableOpacity onPress={() => setStep('zone')} style={styles.option}>
+              <Text style={styles.optionLabel}>Zone: </Text>
+              <Text style={styles.optionValue}>{selectedZone?.name || "Select"}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setStep('tag')} style={styles.option}>
+              <Text style={styles.optionLabel}>Tag: </Text>
+              <Text style={styles.optionValue}>{selectedTag?.name || "Select"}</Text>
+            </TouchableOpacity>
             <TouchableOpacity 
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 setIsAnonymous(!isAnonymous);
               }}
-              style={[styles.toggle, isAnonymous && styles.toggleActive]}
+              style={[styles.anonOption, isAnonymous && styles.anonOptionActive]}
             >
-              <View style={[styles.toggleDot, isAnonymous && styles.toggleDotActive]} />
+              <Shield size={14} color={isAnonymous ? "#FFF" : "#666"} />
+              <Text style={[styles.anonOptionText, isAnonymous && styles.anonOptionTextActive]}>Anon</Text>
             </TouchableOpacity>
           </View>
 
-          <View style={styles.mediaSection}>
-          {media.map((m, i) => <Image key={i} source={{ uri: m.uri }} style={styles.mediaThumb} />)}
-          <TouchableOpacity onPress={pickMedia} style={styles.addMedia}><Plus size={24} color="#666" /></TouchableOpacity>
+          <TextInput placeholder="Title" value={title} onChangeText={setTitle} style={styles.titleInput} />
+            <RichTextEditor value={text} onChange={setText} placeholder="What's happening?" onPollPress={() => setStep('poll')} />
+
+            <View style={styles.mediaSection}>
+            {media.map((m, i) => <Image key={i} source={{ uri: m.uri }} style={styles.mediaThumb} />)}
+            <TouchableOpacity onPress={pickMedia} style={styles.addMedia}><Plus size={24} color="#666" /></TouchableOpacity>
+          </View>
         </View>
-      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -203,21 +206,19 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 15, borderBottomWidth: 1, borderBottomColor: '#EEE' },
   headerTitle: { fontSize: 18, fontWeight: 'bold' },
   postBtn: { fontSize: 16, fontWeight: 'bold' },
-  form: { padding: 20 },
-  options: { flexDirection: 'row', gap: 15, marginBottom: 20 },
+  form: { padding: 20, flex: 1 },
+  topOptions: { flexDirection: 'row', gap: 10, marginBottom: 20, flexWrap: 'wrap' },
   option: { flexDirection: 'row', backgroundColor: '#F5F5F5', padding: 8, borderRadius: 8 },
   optionLabel: { color: '#666' },
   optionValue: { fontWeight: 'bold' },
+  anonOption: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#F5F5F5', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
+  anonOptionActive: { backgroundColor: theme.colors.primary },
+  anonOptionText: { fontSize: 13, fontWeight: '600', color: '#666' },
+  anonOptionTextActive: { color: '#FFF' },
   titleInput: { fontSize: 24, fontWeight: 'bold', marginBottom: 15 },
   mediaSection: { flexDirection: 'row', gap: 10, flexWrap: 'wrap', marginTop: 20 },
   mediaThumb: { width: 80, height: 80, borderRadius: 8 },
   addMedia: { width: 80, height: 80, borderRadius: 8, backgroundColor: '#F5F5F5', justifyContent: 'center', alignItems: 'center', borderStyle: 'dashed', borderWidth: 1, borderColor: '#CCC' },
-  anonRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 15, borderTopWidth: 1, borderTopColor: '#EEE', marginTop: 20 },
-  anonLabel: { fontSize: 16, fontWeight: '600', color: '#333' },
-  toggle: { width: 50, height: 30, borderRadius: 15, backgroundColor: '#E2E8F0', padding: 2, justifyContent: 'center' },
-  toggleActive: { backgroundColor: theme.colors.primary },
-  toggleDot: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#FFF' },
-  toggleDotActive: { alignSelf: 'flex-end' },
   overlayHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, borderBottomWidth: 1, borderBottomColor: '#EEE' },
   overlayTitle: { fontSize: 18, fontWeight: 'bold' },
   item: { padding: 20, borderBottomWidth: 1, borderBottomColor: '#EEE' },

@@ -297,10 +297,10 @@ export default function Profile() {
                 <Text style={styles.avatarEmoji}>{user?.emoji_icon || "👤"}</Text>
               )}
               {isOwnProfile && (
-                <View style={[styles.editBadge, { backgroundColor: theme.colors.primary }]}>
-                  <Camera size={12} color="#FFF" />
-                </View>
-              )}
+                  <View style={[styles.editBadge, { backgroundColor: '#000' }]}>
+                    <ImageIcon size={12} color="#FFF" />
+                  </View>
+                )}
             </TouchableOpacity>
             
               <View style={styles.nameSection}>
@@ -375,12 +375,12 @@ export default function Profile() {
                     autoCapitalize="none"
                   />
                   <TouchableOpacity 
-                    onPress={handleAddFriend} 
-                    disabled={addingFriend}
-                    style={[styles.addBtn, { backgroundColor: theme.colors.primary }]}
-                  >
-                    <UserPlus color="#FFF" size={20} />
-                  </TouchableOpacity>
+                      onPress={handleAddFriend} 
+                      disabled={addingFriend}
+                      style={[styles.addBtn, { backgroundColor: '#000' }]}
+                    >
+                      <UserPlus color="#FFF" size={20} />
+                    </TouchableOpacity>
                 </View>
 
                 {pendingRequests.length > 0 && (

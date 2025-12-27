@@ -146,9 +146,8 @@ export default function UniversalFeed() {
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <Image source={require("../../assets/images/icon.png")} style={{ width: 32, height: 32 }} contentFit="contain" />
-          <Text style={[styles.logo, { color: theme.colors.text }]}>TownWall</Text>
-        </View>
+            <Image source={require("../../assets/images/icon.png")} style={{ width: 32, height: 32 }} contentFit="contain" />
+          </View>
         <View style={styles.headerActions}>
           <TouchableOpacity onPress={() => setShowNotifications(true)} style={styles.headerIcon}>
             <Bell color={theme.colors.text} size={24} />
@@ -160,10 +159,28 @@ export default function UniversalFeed() {
         </View>
       </View>
 
+      <View style={styles.filterBar}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+          {['newest', 'oldest'].map(s => (
+            <TouchableOpacity key={s} onPress={() => setSortBy(s)} style={[styles.filterPill, sortBy === s && styles.filterPillActive]}>
+              <Text style={[styles.filterPillText, sortBy === s && styles.filterPillTextActive]}>{s}</Text>
+            </TouchableOpacity>
+          ))}
+          <View style={styles.filterDivider} />
+          <TouchableOpacity onPress={() => setSelectedZone(null)} style={[styles.filterPill, !selectedZone && styles.filterPillActive]}>
+            <Text style={[styles.filterPillText, !selectedZone && styles.filterPillTextActive]}>All</Text>
+          </TouchableOpacity>
+          {zones.map(z => (
+            <TouchableOpacity key={z.id} onPress={() => setSelectedZone(z.id)} style={[styles.filterPill, selectedZone === z.id && styles.filterPillActive]}>
+              <Text style={[styles.filterPillText, selectedZone === z.id && styles.filterPillTextActive]}>{z.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
       {showMenu && (
         <View style={[styles.menu, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
           <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/profile"); }} style={styles.menuItem}><User size={20} color={theme.colors.text} /><Text style={styles.menuText}>Profile</Text></TouchableOpacity>
-          <TouchableOpacity onPress={() => { setShowMenu(false); setShowFilterSort(true); }} style={styles.menuItem}><ListFilter size={20} color={theme.colors.text} /><Text style={styles.menuText}>Filters</Text></TouchableOpacity>
           <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/talent"); }} style={styles.menuItem}><Star size={20} color={theme.colors.text} /><Text style={styles.menuText}>Local Talent</Text></TouchableOpacity>
           <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/businesses"); }} style={styles.menuItem}><Briefcase size={20} color={theme.colors.text} /><Text style={styles.menuText}>Local Business</Text></TouchableOpacity>
           <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/polls"); }} style={styles.menuItem}><Vote size={20} color={theme.colors.text} /><Text style={styles.menuText}>Polls & Features</Text></TouchableOpacity>
@@ -172,24 +189,34 @@ export default function UniversalFeed() {
         </View>
       )}
 
-      <FlatList
-        data={posts}
-        renderItem={({ item, index }) => (
-          <View>
-            {index === 0 && <BannerAd />}
-            <PostItem item={item} deviceId={deviceId} onReaction={handleReaction} user={user} onComment={() => fetchPosts(true)} onShare={(p) => shareRef.current?.share(p)} onEdit={(p) => router.push(`/post?id=${p.id}`)} />
-            {(index + 1) % 5 === 0 && <NativeAd />}
-          </View>
-        )}
+        <FlatList
+          data={posts}
+          renderItem={({ item, index }) => (
+            <View>
+              {index === 0 && <BannerAd />}
+              <PostItem 
+                item={item} 
+                deviceId={deviceId} 
+                onReaction={handleReaction} 
+                user={user} 
+                onComment={() => fetchPosts(true)} 
+                onShare={(p) => shareRef.current?.share(p)} 
+                onEdit={(p) => router.push(`/post?id=${p.id}`)}
+                onFilterZone={(zoneId) => setSelectedZone(zoneId)}
+                onFilterTag={() => {}}
+              />
+              {(index + 1) % 5 === 0 && <NativeAd />}
+            </View>
+          )}
         keyExtractor={item => item.id.toString()}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         contentContainerStyle={{ paddingBottom: 100 }}
         ListEmptyComponent={loading ? <ActivityIndicator style={{ marginTop: 20 }} /> : <View style={styles.empty}><Text style={styles.emptyText}>No posts found</Text></View>}
       />
 
-      <TouchableOpacity onPress={() => router.push("/post")} style={[styles.fab, { backgroundColor: theme.colors.primary }]}>
-        <Plus color="#FFF" size={30} />
-      </TouchableOpacity>
+        <TouchableOpacity onPress={() => router.push("/post")} style={[styles.fab, { backgroundColor: theme.colors.primary }]}>
+          <Plus color="#000" size={30} />
+        </TouchableOpacity>
 
       <Modal visible={showFilterSort} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
@@ -226,6 +253,13 @@ const styles = StyleSheet.create({
   headerActions: { flexDirection: 'row', gap: 15 },
   headerIcon: { position: 'relative' },
   badge: { position: 'absolute', top: -2, right: -2, width: 10, height: 10, borderRadius: 5, borderWidth: 2, borderColor: '#FFF' },
+  filterBar: { paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
+  filterScroll: { paddingHorizontal: 15, gap: 8 },
+  filterPill: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.08)' },
+  filterPillActive: { backgroundColor: theme.colors.primary },
+  filterPillText: { fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.5)', textTransform: 'capitalize' },
+  filterPillTextActive: { color: '#000' },
+  filterDivider: { width: 1, height: 20, backgroundColor: 'rgba(255,255,255,0.1)', marginHorizontal: 4 },
   menu: { position: 'absolute', top: 100, right: 20, width: 180, borderRadius: 10, padding: 10, zIndex: 100, borderWidth: 1, elevation: 5 },
   menuItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 },
   menuText: { fontSize: 16, color: theme.colors.text },

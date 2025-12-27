@@ -203,23 +203,27 @@ export default function RootLayout() {
             <GlobalErrorReporter />
             <Toaster />
             <Stack
-              screenOptions={{
-                headerShown: false,
-                animation: "slide_from_right",
-              }}
-            >
-                <Stack.Screen name="index" />
-                <Stack.Screen name="auth" />
-                <Stack.Screen name="onboarding/welcome" />
-                <Stack.Screen name="onboarding/zones" />
-                <Stack.Screen
-                  name="post"
-                  options={{
-                    presentation: "modal",
-                    animation: "slide_from_bottom",
-                  }}
-                />
-            </Stack>
+                screenOptions={{
+                  headerShown: false,
+                  animation: "slide_from_right",
+                }}
+              >
+                  <Stack.Screen name="index" />
+                  <Stack.Screen name="auth" />
+                  <Stack.Screen name="help" />
+                  <Stack.Screen name="profile" />
+                  <Stack.Screen name="settings" />
+                  <Stack.Screen name="admin" />
+                  <Stack.Screen name="onboarding/welcome" />
+                  <Stack.Screen name="onboarding/zones" />
+                  <Stack.Screen
+                    name="post"
+                    options={{
+                      presentation: "modal",
+                      animation: "slide_from_bottom",
+                    }}
+                  />
+              </Stack>
           </SafeAreaProvider>
         </ErrorBoundaryWrapper>
       </GestureHandlerRootView>

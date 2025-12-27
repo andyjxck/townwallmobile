@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Platform } from 'react-native';
+import { View, Platform, Text, StyleSheet } from 'react-native';
 import Constants from 'expo-constants';
 
 let RNBannerAd, BannerAdSize, TestIds;
@@ -13,7 +13,6 @@ if (!isExpoGo) {
     BannerAdSize = ads.BannerAdSize;
     TestIds = ads.TestIds;
   } catch (e) {
-    // Module not found
   }
 }
 
@@ -26,7 +25,11 @@ const adUnitId = __DEV__
 
 export function BannerAd() {
   if (!RNBannerAd || !BannerAdSize) {
-    return null;
+    return (
+      <View style={styles.placeholder}>
+        <Text style={styles.placeholderText}>AD SPACE</Text>
+      </View>
+    );
   }
 
   return (
@@ -41,3 +44,24 @@ export function BannerAd() {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  placeholder: {
+    height: 60,
+    marginVertical: 10,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: 15,
+  },
+  placeholderText: {
+    color: 'rgba(255,255,255,0.2)',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 2,
+  },
+});

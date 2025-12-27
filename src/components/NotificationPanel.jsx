@@ -12,6 +12,7 @@ import { X, Bell, CheckCircle, MessageSquare, Shield, Info } from 'lucide-react-
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetchNotifications, markAsRead } from '@/utils/notifications';
 import { getStoredUser } from '@/utils/user';
+import { supabase } from '@/utils/supabase';
 import * as Haptics from 'expo-haptics';
 
 export default function NotificationPanel({ visible, onClose }) {
