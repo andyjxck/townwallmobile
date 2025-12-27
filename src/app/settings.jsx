@@ -49,12 +49,18 @@ export default function SettingsScreen() {
   const [hasPasswordLocal, setHasPasswordLocal] = useState(!!auth?.password);
   const [passwordError, setPasswordError] = useState("");
 
-  const loadingMessages = [
-    "Generating your secure recovery codes...",
-    "I know this can take a while.. I promise it's working!",
-    "Almost there... securing your account...",
-    "Encryption in progress...",
-  ];
+    const loadingMessages = [
+      "Generating your secure recovery codes...",
+      "I know this can take a while.. I promise it's working!",
+      "Almost there... securing your account...",
+      "Encryption in progress...",
+      "Hashing codes for maximum safety...",
+      "One-time use, lifetime security...",
+      "Double checking the locks...",
+      "Your account's safety is our priority...",
+      "Wrapping things up for you...",
+      "Finalizing your vault...",
+    ];
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
 
   useEffect(() => {
