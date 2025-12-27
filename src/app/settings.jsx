@@ -60,7 +60,14 @@ export default function SettingsScreen() {
 
   const handleOpenRecoveryStatus = () => {
     if (!auth?.password) {
-      Alert.alert("Not Available", "Recovery codes are only available for accounts with a password.");
+      Alert.alert(
+        "Password Required", 
+        "To use recovery codes, you first need to set a password for your account. This helps keep your account secure!",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Set Password", onPress: () => { setShowChangePassword(true); setPasswordError(""); } }
+        ]
+      );
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -120,12 +127,17 @@ export default function SettingsScreen() {
     try {
       const salt = bcrypt.genSaltSync(10);
       const hashedPassword = bcrypt.hashSync(newPassword, salt);
-      await supabase.from('rusers').update({ password: hashedPassword }).eq('id', auth.id);
-      Alert.alert("Success", "Password changed.");
+      const { data, error } = await supabase.from('rusers').update({ password: hashedPassword }).eq('id', auth.id).select().single();
+      if (error) throw error;
+      
+      // Update global store so UI re-renders correctly
+      useAuthStore.getState().setAuth(data);
+      
+      Alert.alert("Success", "Password updated successfully.");
       setShowChangePassword(false);
       setNewPassword("");
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (error) { setPasswordError("Failed to change password."); }
+    } catch (error) { setPasswordError("Failed to update password."); }
     finally { setLoading(false); }
   };
 
@@ -152,17 +164,11 @@ export default function SettingsScreen() {
       </View>
 
         <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}>
-            <View style={styles.section}>
-              <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>SECURITY</Text>
-              {auth?.password ? (
-                <>
-                  <SettingsItem icon={<Key size={20} color={theme.colors.textSecondary} />} title="Change Password" onPress={() => { setShowChangePassword(true); setPasswordError(""); }} />
-                  <SettingsItem icon={<Shield size={20} color={theme.colors.textSecondary} />} title="Recovery Codes" onPress={handleOpenRecoveryStatus} />
-                </>
-              ) : (
-                <SettingsItem icon={<Key size={20} color={theme.colors.textSecondary} />} title="Set Account Password" onPress={() => { setShowChangePassword(true); setPasswordError(""); }} />
-              )}
-            </View>
+              <View style={styles.section}>
+                <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>SECURITY</Text>
+                <SettingsItem icon={<Key size={20} color={theme.colors.textSecondary} />} title={auth?.password ? "Change Password" : "Set Account Password"} onPress={() => { setShowChangePassword(true); setPasswordError(""); }} />
+                <SettingsItem icon={<Shield size={20} color={theme.colors.textSecondary} />} title="Recovery Codes" onPress={handleOpenRecoveryStatus} />
+              </View>
 
           <View style={styles.section}>
             <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>LEGAL</Text>
