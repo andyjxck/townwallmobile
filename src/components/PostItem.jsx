@@ -161,7 +161,7 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
               )}
             </View>
 
-            <TouchableOpacity onPress={() => router.push(`/post?id=${item.id}&view=true`)} style={styles.body}>
+            <TouchableOpacity onPress={() => setIsExpanded(!isExpanded)} style={styles.body}>
               {item.title && <Text style={styles.title}>{item.title}</Text>}
               <Text style={styles.bodyText} numberOfLines={isExpanded ? undefined : 4}>
                 {item.text?.replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ')}

@@ -59,6 +59,12 @@ export default function PostScreen() {
     try {
       const { data } = await supabase.from('rposts').select('*').eq('id', postId).single();
       if (data) {
+        const storedUser = await getStoredUser();
+        if (data.user_id !== storedUser?.id && !storedUser?.is_admin) {
+          Alert.alert("Permission Denied", "You cannot edit someone else's post.");
+          router.replace("/");
+          return;
+        }
         setTitle(data.title || "");
         setText(data.text || "");
         setIsAnonymous(data.is_anonymous);
