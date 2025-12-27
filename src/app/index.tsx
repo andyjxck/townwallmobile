@@ -9,17 +9,21 @@ export default function Index() {
   const [isComplete, setIsComplete] = useState<boolean | null>(null);
   const [error, setError] = useState<boolean>(false);
 
-  useEffect(() => {
-    let mounted = true;
-    const setup = async () => {
-      try {
-        console.log("[Index] Starting setup...");
-        await initUser();
-        const complete = await isOnboardingComplete();
-        if (mounted) {
-          setIsComplete(complete);
-        }
-      } catch (err) {
+    useEffect(() => {
+      let mounted = true;
+      const setup = async () => {
+        if (isComplete !== null) return; // Prevent double execution
+        
+        try {
+          console.log("[Index] Starting setup...");
+          // If we already have a user in the store, we might not need to initUser again
+          // but initUser handles anonymous creation too.
+          await initUser();
+          const complete = await isOnboardingComplete();
+          if (mounted) {
+            setIsComplete(complete);
+          }
+        } catch (err) {
         console.error("[Index] Error in setup:", err);
         if (mounted) {
           setError(true);

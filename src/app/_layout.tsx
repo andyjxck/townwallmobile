@@ -8,6 +8,13 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useColorScheme, Platform } from "react-native";
+import { Toaster } from "sonner-native";
+import { requestTrackingPermissionsAsync } from "expo-tracking-transparency";
+import Purchases from "react-native-purchases";
+import Constants from "expo-constants";
+import { ErrorBoundaryWrapper } from "./__create/SharedErrorBoundary";
+
+const isExpoGo = Constants.appOwnership === "expo";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -20,12 +27,36 @@ const queryClient = new QueryClient({
   },
 });
 
+const GlobalErrorReporter = () => {
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined") {
+      return;
+    }
+    const errorHandler = (event: ErrorEvent) => {
+      if (typeof event.preventDefault === "function") event.preventDefault();
+      console.error(event.error);
+    };
+    const unhandledRejectionHandler = (event: PromiseRejectionEvent) => {
+      if (typeof event.preventDefault === "function") event.preventDefault();
+      console.error("Unhandled promise rejection:", event.reason);
+    };
+    window.addEventListener("error", errorHandler);
+    window.addEventListener("unhandledrejection", unhandledRejectionHandler);
+    return () => {
+      window.removeEventListener("error", errorHandler);
+      window.removeEventListener("unhandledrejection", unhandledRejectionHandler);
+    };
+  }, []);
+  return null;
+};
+
 const healthyResponse = {
   type: 'sandbox:mobile:healthcheck:response',
   healthy: true,
 };
 
 function SandboxHandler() {
+// ... existing SandboxHandler code ...
   const pathname = usePathname();
   const router = useRouter();
 
@@ -69,12 +100,56 @@ function SandboxHandler() {
   return null;
 }
 
+const initRevenueCat = async () => {
+  if (Platform.OS === 'web') return;
+  try {
+    const apiKey = process.env.EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY;
+    if (apiKey) {
+      Purchases.setLogLevel(Purchases.LOG_LEVEL.DEBUG);
+      await Purchases.configure({ apiKey });
+      console.log('RevenueCat initialized');
+    }
+  } catch (error) {
+    console.warn('RevenueCat initialization skipped:', error.message);
+  }
+};
+
+initRevenueCat();
+
 export default function RootLayout() {
   const { initiate, isReady, auth } = useAuth();
   const colorScheme = useColorScheme();
 
   useEffect(() => {
     initiate();
+    
+    if (Platform.OS !== 'web') {
+      (async () => {
+        try {
+          const { status } = await requestTrackingPermissionsAsync();
+          if (status === 'granted') {
+            console.log('Tracking permission granted');
+          }
+          
+          if (!isExpoGo) {
+            try {
+              const ads = require('react-native-google-mobile-ads');
+              if (ads) {
+                const mobileAds = ads.default || ads;
+                if (mobileAds && typeof mobileAds === 'function') {
+                  await mobileAds().initialize();
+                  console.log('AdMob initialized');
+                }
+              }
+            } catch (e) {
+              console.log('AdMob module failed to load, skipping');
+            }
+          }
+        } catch (error) {
+          console.warn('Initialization error:', error.message);
+        }
+      })();
+    }
   }, [initiate]);
 
   useEffect(() => {
@@ -91,7 +166,7 @@ export default function RootLayout() {
       };
       
       updateLastSeen();
-      const interval = setInterval(updateLastSeen, 1000 * 60 * 5); // every 5 mins
+      const interval = setInterval(updateLastSeen, 1000 * 60 * 5);
       return () => clearInterval(interval);
     }
   }, [isReady, auth]);
@@ -99,9 +174,7 @@ export default function RootLayout() {
   useEffect(() => {
     if (isReady) {
       const timer = setTimeout(() => {
-        SplashScreen.hideAsync().catch((e) => {
-          console.warn("Error hiding splash screen:", e);
-        });
+        SplashScreen.hideAsync().catch(() => {});
       }, 100);
       return () => clearTimeout(timer);
     }
@@ -114,26 +187,30 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <SafeAreaProvider>
-          <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
-          <SandboxHandler />
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              animation: "slide_from_right",
-            }}
-          >
-            <Stack.Screen name="index" />
-            <Stack.Screen name="onboarding/welcome" />
-            <Stack.Screen
-              name="post"
-              options={{
-                presentation: "modal",
-                animation: "slide_from_bottom",
+        <ErrorBoundaryWrapper>
+          <SafeAreaProvider>
+            <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
+            <SandboxHandler />
+            <GlobalErrorReporter />
+            <Toaster />
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                animation: "slide_from_right",
               }}
-            />
-          </Stack>
-        </SafeAreaProvider>
+            >
+              <Stack.Screen name="index" />
+              <Stack.Screen name="onboarding/welcome" />
+              <Stack.Screen
+                name="post"
+                options={{
+                  presentation: "modal",
+                  animation: "slide_from_bottom",
+                }}
+              />
+            </Stack>
+          </SafeAreaProvider>
+        </ErrorBoundaryWrapper>
       </GestureHandlerRootView>
     </QueryClientProvider>
   );
