@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { useCallback, useEffect, useMemo } from 'react';
 import { create } from 'zustand';
-import { Modal, View } from 'react-native';
+import { Modal, View, Platform } from 'react-native';
 import { useAuthModal, useAuthStore, authKey } from './store';
 
 
@@ -17,6 +17,20 @@ export const useAuth = () => {
   const { isOpen, close, open } = useAuthModal();
 
     const initiate = useCallback(() => {
+      if (Platform.OS === 'web') {
+        // Fallback for web since SecureStore is not natively supported
+        try {
+          const auth = localStorage.getItem(authKey);
+          useAuthStore.setState({
+            auth: auth ? JSON.parse(auth) : null,
+            isReady: true,
+          });
+        } catch (e) {
+          useAuthStore.setState({ auth: null, isReady: true });
+        }
+        return;
+      }
+
       SecureStore.getItemAsync(authKey)
         .then((auth) => {
           useAuthStore.setState({
