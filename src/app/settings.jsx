@@ -29,9 +29,12 @@ export default function SettingsScreen() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showRecoveryCodes, setShowRecoveryCodes] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
   const [newRecoveryCodes, setNewRecoveryCodes] = useState([]);
   const [regeneratingCodes, setRegeneratingCodes] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
   const [passwordError, setPasswordError] = useState("");
 
   const toggleNotifications = () => {
@@ -100,6 +103,36 @@ export default function SettingsScreen() {
       setPasswordError("Something went wrong. Please try again.");
     } finally {
       setRegeneratingCodes(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (newPassword.length < 6) {
+      setPasswordError("Password must be at least 6 characters.");
+      return;
+    }
+    setChangingPassword(true);
+    setPasswordError("");
+    try {
+      const salt = bcrypt.genSaltSync(10);
+      const hashedPassword = bcrypt.hashSync(newPassword, salt);
+      
+      const { error } = await supabase
+        .from('rusers')
+        .update({ password: hashedPassword })
+        .eq('id', auth.id);
+      
+      if (error) throw error;
+      
+      Alert.alert("Success", "Password changed successfully.");
+      setShowChangePassword(false);
+      setNewPassword("");
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error) {
+      console.error(error);
+      setPasswordError("Failed to change password.");
+    } finally {
+      setChangingPassword(false);
     }
   };
 
@@ -173,17 +206,27 @@ export default function SettingsScreen() {
                 <Text style={styles.infoText}>Tell your friends about us!</Text>
               </View>
 
-            {auth?.password && (
-              <View style={styles.section}>
-                <Text style={styles.sectionLabel}>SECURITY</Text>
-                <SettingsItem 
-                  icon={<Key size={20} color="rgba(255,255,255,0.4)" />}
-                  title="Regenerate Recovery Codes"
-                  onPress={handleRegenerateRecoveryCodes}
-                />
-                <Text style={styles.infoText}>Generate new codes if you've lost yours or used them all.</Text>
-              </View>
-            )}
+              {auth?.password && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionLabel}>SECURITY</Text>
+                  <SettingsItem 
+                    icon={<Key size={20} color="rgba(255,255,255,0.4)" />}
+                    title="Change Password"
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setShowChangePassword(true);
+                      setNewPassword("");
+                      setPasswordError("");
+                    }}
+                  />
+                  <SettingsItem 
+                    icon={<Shield size={20} color="rgba(255,255,255,0.4)" />}
+                    title="Regenerate Recovery Codes"
+                    onPress={handleRegenerateRecoveryCodes}
+                  />
+                  <Text style={styles.infoText}>Manage your account access and recovery options.</Text>
+                </View>
+              )}
 
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>LEGAL & ABOUT</Text>
@@ -257,14 +300,58 @@ export default function SettingsScreen() {
                 )}
               </TouchableOpacity>
             </View>
-          </View>
-        </Modal>
+            </View>
+          </Modal>
 
-        <Modal
-          visible={showRecoveryCodes}
-          animationType="slide"
-          transparent={false}
-        >
+          <Modal
+            visible={showChangePassword}
+            animationType="slide"
+            transparent={true}
+            onRequestClose={() => setShowChangePassword(false)}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Change Password</Text>
+                  <TouchableOpacity onPress={() => setShowChangePassword(false)}>
+                    <X size={24} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.modalDescription}>
+                  Enter a new password for your account. It must be at least 6 characters.
+                </Text>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="New password"
+                  placeholderTextColor="rgba(255,255,255,0.3)"
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  secureTextEntry
+                  autoFocus
+                />
+                {passwordError ? (
+                  <Text style={styles.errorText}>{passwordError}</Text>
+                ) : null}
+                <TouchableOpacity 
+                  style={styles.modalButton}
+                  onPress={handleChangePassword}
+                  disabled={changingPassword}
+                >
+                  {changingPassword ? (
+                    <ActivityIndicator color="#000000" />
+                  ) : (
+                    <Text style={styles.modalButtonText}>UPDATE PASSWORD</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
+
+          <Modal
+            visible={showRecoveryCodes}
+            animationType="slide"
+            transparent={false}
+          >
           <View style={[styles.container, { backgroundColor: '#000000' }]}>
             <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
               <View style={{ width: 28 }} />

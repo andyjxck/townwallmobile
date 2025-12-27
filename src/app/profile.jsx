@@ -31,11 +31,11 @@ import {
   Share as ShareIcon,
   Edit2,
   Image as ImageIcon,
-  Check,
-  X as XIcon,
-  Lock,
-  Key
-} from "lucide-react-native";
+    Check,
+    X as XIcon,
+    Settings,
+    Key
+  } from "lucide-react-native";
 import bcrypt from "bcryptjs";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
@@ -75,12 +75,9 @@ export default function Profile() {
   const [activeTab, setActiveTab] = useState("posts");
   const [deviceId, setDeviceId] = useState(null);
   const [editingBio, setEditingBio] = useState(false);
-  const [bioText, setBioText] = useState("");
-  const [uploadingCover, setUploadingCover] = useState(false);
-  const [showChangePassword, setShowChangePassword] = useState(false);
-  const [newPassword, setNewPassword] = useState("");
-  const [changingPassword, setChangingPassword] = useState(false);
-  const shareRef = useRef();
+    const [bioText, setBioText] = useState("");
+    const [uploadingCover, setUploadingCover] = useState(false);
+    const shareRef = useRef();
 
   useEffect(() => {
     getDeviceId().then(setDeviceId);
@@ -508,34 +505,6 @@ export default function Profile() {
 
   const handleShare = async (post) => shareRef.current?.share(post);
 
-  const handleChangePassword = async () => {
-    if (newPassword.length < 6) {
-      Alert.alert("Error", "Password must be at least 6 characters.");
-      return;
-    }
-    setChangingPassword(true);
-    try {
-      const salt = bcrypt.genSaltSync(10);
-      const hashedPassword = bcrypt.hashSync(newPassword, salt);
-      
-      const { error } = await supabase
-        .from('rusers')
-        .update({ password: hashedPassword })
-        .eq('id', user.id);
-      
-      if (error) throw error;
-      
-      Alert.alert("Success", "Password changed successfully.");
-      setShowChangePassword(false);
-      setNewPassword("");
-    } catch (error) {
-      console.error(error);
-      Alert.alert("Error", "Failed to change password.");
-    } finally {
-      setChangingPassword(false);
-    }
-  };
-
   const renderMediaGrid = () => {
     const mediaPosts = userPosts.filter(p => p.image_url || p.image_urls?.length > 0);
     return (
@@ -597,8 +566,8 @@ export default function Profile() {
             </TouchableOpacity>
             {isOwnProfile && (
               <>
-                <TouchableOpacity onPress={() => setShowChangePassword(true)} style={[styles.headerIcon, { right: 70, top: insets.top + 10 }]}>
-                  <Lock color="#FFF" size={20} />
+                <TouchableOpacity onPress={() => router.push("/settings")} style={[styles.headerIcon, { right: 70, top: insets.top + 10 }]}>
+                  <Settings color="#FFF" size={20} />
                 </TouchableOpacity>
                 <TouchableOpacity onPress={handleLogout} style={[styles.headerIcon, { right: 20, top: insets.top + 10 }]}>
                   <LogOut color="#EF4444" size={20} />
@@ -876,51 +845,11 @@ export default function Profile() {
         </View>
       )}
 
-      {showChangePassword && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Key size={30} color="#FFF" style={{ marginBottom: 15 }} />
-            <Text style={styles.modalTitle}>Change Password</Text>
-            
-            <TextInput
-              style={[styles.fInput, { width: '100%', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, paddingHorizontal: 15, marginBottom: 20 }]}
-              placeholder="New Password"
-              placeholderTextColor="rgba(255,255,255,0.3)"
-              secureTextEntry
-              value={newPassword}
-              onChangeText={setNewPassword}
-            />
+      </View>
+    );
+  }
 
-            <TouchableOpacity 
-              style={[styles.uploadBtn, { opacity: changingPassword ? 0.7 : 1 }]} 
-              onPress={handleChangePassword}
-              disabled={changingPassword}
-            >
-              {changingPassword ? <ActivityIndicator size="small" color="#000" /> : (
-                <>
-                  <Check size={18} color="#000" />
-                  <Text style={styles.uploadBtnText}>UPDATE PASSWORD</Text>
-                </>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.modalClose} 
-              onPress={() => {
-                setShowChangePassword(false);
-                setNewPassword("");
-              }}
-            >
-              <Text style={styles.modalCloseText}>CANCEL</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-    </View>
-  );
-}
-
-function getTimeAgo(date) {
+  function getTimeAgo(date) {
   const seconds = Math.floor((new Date() - date) / 1000);
   if (seconds < 60) return "NOW";
   if (seconds < 3600) return `${Math.floor(seconds / 60)}M`;
