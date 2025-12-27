@@ -47,6 +47,7 @@ export default function SettingsScreen() {
   const [recoveryStatus, setRecoveryStatus] = useState([]);
   const [loading, setLoading] = useState(false);
   const [hasPasswordLocal, setHasPasswordLocal] = useState(!!auth?.password);
+  const [passwordError, setPasswordError] = useState("");
 
   useEffect(() => {
     setHasPasswordLocal(!!auth?.password);
