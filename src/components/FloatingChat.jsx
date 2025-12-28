@@ -12,9 +12,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Keyboard
+  Keyboard,
+  Switch
 } from 'react-native';
-import { MessageCircle, X, Send, ChevronLeft, MoreHorizontal, User } from 'lucide-react-native';
+import { MessageCircle, X, Send, ChevronLeft, MoreHorizontal, User, Check, CheckCheck, Settings } from 'lucide-react-native';
 import { supabase } from '../utils/supabase';
 import { getStoredUser } from '../utils/user';
 import { theme } from '../utils/theme';
@@ -23,10 +24,12 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
+import { useRouter } from 'expo-router';
 
 const { width, height } = Dimensions.get('window');
 
 export default function FloatingChat() {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [activeChat, setActiveChat] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -34,8 +37,11 @@ export default function FloatingChat() {
   const [user, setUser] = useState(null);
   const [chats, setChats] = useState([]);
   const [showChatList, setShowChatList] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
+  const [onlineUsers, setOnlineUsers] = useState({});
+  const [readReceiptsEnabled, setReadReceiptsEnabled] = useState(true);
   
   const pan = useRef(new Animated.ValueXY({ x: width - 80, y: height - 210 })).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -52,7 +58,6 @@ export default function FloatingChat() {
       onPanResponderRelease: () => {
         pan.flattenOffset();
         const toX = pan.x._value > width / 2 ? width - 80 : 20;
-        // Keep within vertical bounds
         const toY = Math.min(Math.max(pan.y._value, 60), height - 120);
         
         Animated.spring(pan, {
@@ -83,17 +88,42 @@ export default function FloatingChat() {
   useEffect(() => {
     loadUserAndChats();
     
+    let presenceChannel;
+
+    const setupPresence = async (currentUser) => {
+      presenceChannel = supabase.channel('online-users');
+      
+      presenceChannel
+        .on('presence', { event: 'sync' }, () => {
+          const state = presenceChannel.presenceState();
+          const online = {};
+          Object.values(state).forEach(presences => {
+            presences.forEach(p => {
+              online[p.user_id] = true;
+            });
+          });
+          setOnlineUsers(online);
+        })
+        .subscribe(async (status) => {
+          if (status === 'SUBSCRIBED') {
+            await presenceChannel.track({ user_id: currentUser.id });
+          }
+        });
+    };
+
     const chatSub = supabase
       .channel('public:rmessages_realtime')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'rmessages' }, async (payload) => {
         if (activeChat && payload.new.chat_id === activeChat.id) {
           setMessages(prev => [...prev, payload.new]);
           setTimeout(() => flatListRef.current?.scrollToEnd(), 100);
+          
+          if (isOpen && !showChatList && payload.new.sender_id !== user?.id) {
+            markAsRead(payload.new.id);
+          }
         }
         
-        // Show bubble if a message is received (not sent by current user)
         if (user && payload.new.sender_id !== user.id) {
-          // Check if this chat belongs to the current user
           const { data: chatData } = await supabase
             .from('rchats')
             .select('user1_id, user2_id')
@@ -108,10 +138,35 @@ export default function FloatingChat() {
         
         loadUserAndChats();
       })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rmessages' }, (payload) => {
+        setMessages(prev => prev.map(msg => msg.id === payload.new.id ? payload.new : msg));
+      })
       .subscribe();
 
-    return () => { supabase.removeChannel(chatSub); };
-  }, [activeChat]);
+    getStoredUser().then(u => {
+      if (u) {
+        setUser(u);
+        setReadReceiptsEnabled(u.read_receipts_enabled !== false);
+        setupPresence(u);
+      }
+    });
+
+    return () => { 
+      supabase.removeChannel(chatSub); 
+      if (presenceChannel) supabase.removeChannel(presenceChannel);
+    };
+  }, [activeChat, isOpen, showChatList]);
+
+  const markAsRead = async (messageId) => {
+    if (!readReceiptsEnabled) return;
+    await supabase.from('rmessages').update({ is_read: true }).eq('id', messageId);
+  };
+
+  const toggleReadReceipts = async (value) => {
+    setReadReceiptsEnabled(value);
+    await supabase.from('rusers').update({ read_receipts_enabled: value }).eq('id', user.id);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
 
   const loadUserAndChats = async () => {
     const storedUser = await getStoredUser();
@@ -137,47 +192,51 @@ export default function FloatingChat() {
     setMessages(data || []);
     setLoading(false);
     setTimeout(() => flatListRef.current?.scrollToEnd(), 100);
+
+    const unreadFromOthers = data?.filter(m => !m.is_read && m.sender_id !== user?.id) || [];
+    if (unreadFromOthers.length > 0 && readReceiptsEnabled) {
+      await supabase.from('rmessages').update({ is_read: true }).eq('chat_id', chatId).neq('sender_id', user.id);
+    }
   };
 
-    const handleSendMessage = async () => {
-      if (!inputText.trim() || !activeChat) return;
-      const text = inputText.trim();
-      setInputText('');
-      
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  const handleSendMessage = async () => {
+    if (!inputText.trim() || !activeChat) return;
+    const text = inputText.trim();
+    setInputText('');
+    
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-      const { data } = await supabase
-        .from('rmessages')
-        .insert({
-          chat_id: activeChat.id,
-          sender_id: user.id,
-          text
-        }).select().single();
+    const { data } = await supabase
+      .from('rmessages')
+      .insert({
+        chat_id: activeChat.id,
+        sender_id: user.id,
+        text
+      }).select().single();
 
-      if (data) {
-        await supabase.from('rchats').update({
-          last_message: text,
-          last_message_at: new Date().toISOString()
-        }).eq('id', activeChat.id);
+    if (data) {
+      await supabase.from('rchats').update({
+        last_message: text,
+        last_message_at: new Date().toISOString()
+      }).eq('id', activeChat.id);
 
-        // Send notification to the other user
-        const otherUser = getOtherUser(activeChat);
-        if (otherUser) {
-          await sendNotification({
-            userId: otherUser.id,
-            title: `@${user.username} sent you a message`,
-            message: text,
-            type: 'help_chat'
-          });
-        }
+      const otherUser = getOtherUser(activeChat);
+      if (otherUser) {
+        await sendNotification({
+          userId: otherUser.id,
+          title: `@${user.username} sent you a message`,
+          message: text,
+          type: 'help_chat'
+        });
       }
-    };
+    }
+  };
 
-    const handleKeyPress = ({ nativeEvent }) => {
-      if (nativeEvent.key === 'Enter' && !nativeEvent.shiftKey) {
-        handleSendMessage();
-      }
-    };
+  const handleKeyPress = ({ nativeEvent }) => {
+    if (nativeEvent.key === 'Enter' && !nativeEvent.shiftKey) {
+      handleSendMessage();
+    }
+  };
 
   const selectChat = (chat) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -212,13 +271,10 @@ export default function FloatingChat() {
         >
           <View style={styles.bubbleContainer}>
             <TouchableOpacity onPress={toggleChat} activeOpacity={0.8}>
-              <LinearGradient
-                colors={[theme.colors.primary, '#4ADE80']}
-                style={styles.bubble}
-              >
-                <MessageCircle color="#000" size={28} />
+              <BlurView intensity={80} tint="light" style={styles.bubble}>
+                <MessageCircle color={theme.colors.primary} size={28} />
                 {chats.some(c => c.unread_count > 0) && <View style={styles.unreadBadge} />}
-              </LinearGradient>
+              </BlurView>
             </TouchableOpacity>
             
             <TouchableOpacity 
@@ -246,25 +302,54 @@ export default function FloatingChat() {
           
           <Animated.View style={[styles.chatWindow, { transform: [{ translateY: slideAnim }] }]}>
             <View style={styles.chatHeader}>
-              {showChatList ? (
-                <Text style={styles.headerTitle}>Messages</Text>
+              {showSettings ? (
+                <View style={styles.headerNav}>
+                  <TouchableOpacity onPress={() => setShowSettings(false)} style={styles.iconBtn}>
+                    <ChevronLeft size={24} color="#FFF" />
+                  </TouchableOpacity>
+                  <Text style={styles.headerTitle}>Settings</Text>
+                </View>
+              ) : showChatList ? (
+                <View style={styles.headerNav}>
+                  <Text style={styles.headerTitle}>Messages</Text>
+                  <TouchableOpacity onPress={() => setShowSettings(true)} style={styles.iconBtn}>
+                    <Settings size={20} color="#FFF" />
+                  </TouchableOpacity>
+                </View>
               ) : (
                 <View style={styles.headerNav}>
                   <TouchableOpacity onPress={() => setShowChatList(true)} style={styles.iconBtn}>
                     <ChevronLeft size={24} color="#FFF" />
                   </TouchableOpacity>
-                  <View style={styles.headerUserInfo}>
-                    {getOtherUser(activeChat)?.avatar_url ? (
-                      <Image source={{ uri: getOtherUser(activeChat).avatar_url }} style={styles.headerAvatar} />
-                    ) : (
-                      <View style={styles.headerEmojiBg}>
-                        <Text style={styles.headerEmoji}>{getOtherUser(activeChat)?.emoji_icon || "👤"}</Text>
-                      </View>
-                    )}
-                    <Text style={styles.headerTitle}>
-                      @{getOtherUser(activeChat)?.username}
-                    </Text>
-                  </View>
+                  <TouchableOpacity 
+                    style={styles.headerUserInfo}
+                    onPress={() => {
+                      const other = getOtherUser(activeChat);
+                      if (other) {
+                        setIsOpen(false);
+                        router.push(`/profile?username=${other.username}`);
+                      }
+                    }}
+                  >
+                    <View style={styles.avatarWrapper}>
+                      {getOtherUser(activeChat)?.avatar_url ? (
+                        <Image source={{ uri: getOtherUser(activeChat).avatar_url }} style={styles.headerAvatar} />
+                      ) : (
+                        <View style={styles.headerEmojiBg}>
+                          <Text style={styles.headerEmoji}>{getOtherUser(activeChat)?.emoji_icon || "👤"}</Text>
+                        </View>
+                      )}
+                      {onlineUsers[getOtherUser(activeChat)?.id] && <View style={styles.headerStatusDot} />}
+                    </View>
+                    <View>
+                      <Text style={styles.headerTitle}>
+                        @{getOtherUser(activeChat)?.username}
+                      </Text>
+                      <Text style={styles.onlineStatusText}>
+                        {onlineUsers[getOtherUser(activeChat)?.id] ? 'Online' : 'Offline'}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
                 </View>
               )}
               <TouchableOpacity onPress={() => setIsOpen(false)} style={styles.iconBtn}>
@@ -272,12 +357,27 @@ export default function FloatingChat() {
               </TouchableOpacity>
             </View>
 
-            {showChatList ? (
+            {showSettings ? (
+              <View style={styles.settingsContent}>
+                <View style={styles.settingRow}>
+                  <View>
+                    <Text style={styles.settingLabel}>Read Receipts</Text>
+                    <Text style={styles.settingDesc}>Allow others to see when you've read their messages</Text>
+                  </View>
+                  <Switch 
+                    value={readReceiptsEnabled}
+                    onValueChange={toggleReadReceipts}
+                    trackColor={{ false: '#334155', true: theme.colors.primary }}
+                  />
+                </View>
+              </View>
+            ) : showChatList ? (
               <FlatList
                 data={chats}
                 keyExtractor={item => item.id}
                 renderItem={({ item }) => {
                   const otherUser = getOtherUser(item);
+                  const isOnline = onlineUsers[otherUser?.id];
                   return (
                     <TouchableOpacity onPress={() => selectChat(item)} style={styles.chatListItem}>
                       <View style={styles.avatarWrapper}>
@@ -288,7 +388,7 @@ export default function FloatingChat() {
                             <Text style={styles.listEmoji}>{otherUser?.emoji_icon || "👤"}</Text>
                           </View>
                         )}
-                        <View style={styles.statusDot} />
+                        {isOnline && <View style={styles.statusDot} />}
                       </View>
                       <View style={styles.chatInfo}>
                         <View style={styles.chatInfoTop}>
@@ -335,12 +435,23 @@ export default function FloatingChat() {
                         ]}>
                           {item.text}
                         </Text>
-                        <Text style={[
-                          styles.msgTime,
-                          { color: item.sender_id === user?.id ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.4)' }
-                        ]}>
-                          {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </Text>
+                        <View style={styles.msgFooter}>
+                          <Text style={[
+                            styles.msgTime,
+                            { color: item.sender_id === user?.id ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.4)' }
+                          ]}>
+                            {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </Text>
+                          {item.sender_id === user?.id && (
+                            <View style={styles.readStatus}>
+                              {item.is_read ? (
+                                <CheckCheck size={14} color="rgba(0,0,0,0.5)" />
+                              ) : (
+                                <Check size={14} color="rgba(0,0,0,0.5)" />
+                              )}
+                            </View>
+                          )}
+                        </View>
                       </View>
                     )}
                     style={styles.messagesList}
@@ -392,48 +503,49 @@ const styles = StyleSheet.create({
     bottom: 0,
     zIndex: 9999,
   },
-    bubbleWrapper: {
-      width: 60,
-      height: 60,
-      elevation: 10,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.4,
-      shadowRadius: 8,
-    },
-    bubbleContainer: {
-      position: 'relative',
-      width: 60,
-      height: 60,
-    },
-    bubble: {
-      width: 60,
-      height: 60,
-      borderRadius: 30,
-      justifyContent: 'center',
-      alignItems: 'center',
-      borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.2)',
-    },
-    closeBubbleBtn: {
-      position: 'absolute',
-      top: -4,
-      right: -4,
-      width: 22,
-      height: 22,
-      borderRadius: 11,
-      backgroundColor: '#FFF',
-      justifyContent: 'center',
-      alignItems: 'center',
-      borderWidth: 2,
-      borderColor: '#000',
-      elevation: 5,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.2,
-      shadowRadius: 2,
-    },
-    unreadBadge: {
+  bubbleWrapper: {
+    width: 60,
+    height: 60,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+  },
+  bubbleContainer: {
+    position: 'relative',
+    width: 60,
+    height: 60,
+  },
+  bubble: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    overflow: 'hidden',
+  },
+  closeBubbleBtn: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#FFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#000',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+  },
+  unreadBadge: {
     position: 'absolute',
     top: -2,
     right: -2,
@@ -446,70 +558,99 @@ const styles = StyleSheet.create({
   },
   chatOverlay: {
     flex: 1,
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    paddingBottom: 40,
+    backgroundColor: 'rgba(0,0,0,0.4)',
   },
   chatWindow: {
-    width: width * 0.92,
-    height: height * 0.65,
-    backgroundColor: '#1E293B',
-    borderRadius: 32,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    elevation: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
+    flex: 1,
+    backgroundColor: '#0F172A',
+    width: width,
+    height: height,
   },
   chatHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
-    paddingTop: 20,
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.06)',
-    backgroundColor: 'rgba(15, 23, 42, 0.8)',
+    backgroundColor: '#0F172A',
   },
   headerNav: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
   },
   headerUserInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
   },
   headerAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
   headerEmojiBg: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: 'rgba(255,255,255,0.1)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerEmoji: {
-    fontSize: 18,
+    fontSize: 22,
   },
   headerTitle: {
     color: '#FFF',
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '800',
     letterSpacing: -0.5,
   },
+  onlineStatusText: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.5)',
+    marginTop: -2,
+  },
+  headerStatusDot: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#10B981',
+    borderWidth: 2,
+    borderColor: '#0F172A',
+  },
   iconBtn: {
-    padding: 6,
+    padding: 8,
     borderRadius: 12,
     backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  settingsContent: {
+    padding: 20,
+  },
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    padding: 16,
+    borderRadius: 16,
+  },
+  settingLabel: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  settingDesc: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 13,
+    maxWidth: width * 0.6,
   },
   chatListItem: {
     flexDirection: 'row',
@@ -546,7 +687,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: '#10B981',
     borderWidth: 2,
-    borderColor: '#1E293B',
+    borderColor: '#0F172A',
   },
   chatInfo: {
     marginLeft: 16,
@@ -597,15 +738,25 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontWeight: '500',
   },
+  msgFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 4,
+    marginTop: 4,
+  },
   msgTime: {
     fontSize: 10,
-    alignSelf: 'flex-end',
-    marginTop: 4,
+  },
+  readStatus: {
+    marginLeft: 2,
   },
   inputContainer: {
     padding: 16,
-    paddingTop: 8,
-    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+    paddingBottom: Platform.OS === 'ios' ? 40 : 16,
+    backgroundColor: '#0F172A',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.06)',
   },
   inputWrapper: {
     flexDirection: 'row',
