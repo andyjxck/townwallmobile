@@ -57,10 +57,9 @@ export const useAuth = () => {
   }, [open]);
 
   const signOut = useCallback(async () => {
-    await SecureStore.deleteItemAsync(authKey);
     setAuth(null);
     close();
-  }, [close]);
+  }, [close, setAuth]);
 
   return {
     isReady,
