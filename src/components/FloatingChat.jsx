@@ -18,7 +18,7 @@ import {
   ScrollView,
   Alert
 } from 'react-native';
-import { MessageCircle, X, Send, ChevronLeft, MoreHorizontal, User, Users, Check, CheckCheck, Settings, Plus, UserPlus, Mic, MicOff, Video, Phone as PhoneIcon, PhoneOff as PhoneOffIcon, PhoneIncoming, PhoneOutgoing, Phone } from 'lucide-react-native';
+import { MessageCircle, X, Send, ChevronLeft, MoreHorizontal, User, Users, Check, CheckCheck, Settings, Plus, UserPlus, Mic, MicOff, Phone as PhoneIcon, PhoneOff as PhoneOffIcon, PhoneIncoming, PhoneOutgoing, Phone } from 'lucide-react-native';
 import { supabase } from '../utils/supabase';
 import { getStoredUser } from '../utils/user';
 import { theme } from '../utils/theme';
@@ -750,20 +750,13 @@ export default function FloatingChat() {
                       <Text style={styles.callBtnLabel}>{isMuted ? 'Unmute' : 'Mute'}</Text>
                     </TouchableOpacity>
                     
-                    <TouchableOpacity onPress={endCall} style={[styles.callBtn, styles.callBtnEnd]}>
-                      <View style={[styles.iconCircle, { backgroundColor: '#EF4444' }]}>
-                        <PhoneOffIcon size={28} color="#FFF" />
-                      </View>
-                      <Text style={styles.callBtnLabel}>End</Text>
-                    </TouchableOpacity>
-                    
-                    <TouchableOpacity style={styles.callBtn}>
-                      <View style={styles.iconCircle}>
-                        <Video size={24} color="rgba(255,255,255,0.4)" />
-                      </View>
-                      <Text style={[styles.callBtnLabel, { color: 'rgba(255,255,255,0.4)' }]}>Video</Text>
-                    </TouchableOpacity>
-                  </View>
+                      <TouchableOpacity onPress={endCall} style={[styles.callBtn, styles.callBtnEnd]}>
+                        <View style={[styles.iconCircle, { backgroundColor: '#EF4444' }]}>
+                          <PhoneOffIcon size={28} color="#FFF" />
+                        </View>
+                        <Text style={styles.callBtnLabel}>End</Text>
+                      </TouchableOpacity>
+                    </View>
                 )}
               </View>
             </View>
