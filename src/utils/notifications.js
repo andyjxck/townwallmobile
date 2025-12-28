@@ -97,6 +97,22 @@ export async function sendPushNotification(expoPushToken, title, body, data = {}
 
 export const sendNotification = async ({ userId, title, message, type, link }) => {
   try {
+    // Prevent double notifications by checking for identical ones in the last 10 seconds
+    const tenSecondsAgo = new Date(Date.now() - 10000).toISOString();
+    const { data: existing } = await supabase
+      .from('rnotifications')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('title', title)
+      .eq('message', message)
+      .gt('created_at', tenSecondsAgo)
+      .limit(1);
+
+    if (existing && existing.length > 0) {
+      console.log('Skipping duplicate notification');
+      return { success: true, skipped: true };
+    }
+
     const { data: newNotification, error } = await supabase
       .from('rnotifications')
       .insert({
