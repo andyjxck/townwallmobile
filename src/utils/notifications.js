@@ -3,11 +3,12 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
+import { isOnline } from './user';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
+    shouldShowAlert: false,
+    shouldPlaySound: false,
     shouldSetBadge: true,
   }),
 });
@@ -112,11 +113,12 @@ export const sendNotification = async ({ userId, title, message, type, link }) =
 
     const { data: userData } = await supabase
       .from('rusers')
-      .select('push_token')
+      .select('push_token, last_seen')
       .eq('id', userId)
       .single();
 
-    if (userData?.push_token) {
+    // Only send push if user has a token AND is not currently online
+    if (userData?.push_token && !isOnline(userData.last_seen)) {
       await sendPushNotification(userData.push_token, title, message, { type, link });
     }
 

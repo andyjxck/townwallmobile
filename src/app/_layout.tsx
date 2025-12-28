@@ -8,7 +8,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { useColorScheme, Platform } from "react-native";
+import { useColorScheme, Platform, AppState } from "react-native";
 import { Toaster } from "sonner-native";
 import { requestTrackingPermissionsAsync } from "expo-tracking-transparency";
 import Purchases from "react-native-purchases";
@@ -209,8 +209,18 @@ export default function RootLayout() {
       };
       
       updateLastSeen();
+
+      const subscription = AppState.addEventListener('change', nextAppState => {
+        if (nextAppState === 'active') {
+          updateLastSeen();
+        }
+      });
+
       const interval = setInterval(updateLastSeen, 1000 * 60 * 5);
-      return () => clearInterval(interval);
+      return () => {
+        subscription.remove();
+        clearInterval(interval);
+      };
     }
   }, [isReady, auth]);
 
