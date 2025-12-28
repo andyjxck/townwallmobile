@@ -241,45 +241,76 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
 
             {isExpanded && (
               <View style={styles.commentsSection}>
-                {loadingComments ? <ActivityIndicator size="small" /> : comments.map(c => (
-                  <View key={c.id} style={styles.comment}>
-                    <Text style={styles.commentUser}>
-                      {c.is_anonymous ? `@${c.nickname || "Anonymous"}` : `@${c.user?.username}`}
-                    </Text>
-                    <Text style={styles.commentText}>{c.text}</Text>
+                {loadingComments ? (
+                  <ActivityIndicator size="small" color={theme.colors.primary} style={{ marginVertical: 20 }} />
+                ) : (
+                  <View style={styles.commentList}>
+                    {comments.map(c => (
+                      <View key={c.id} style={styles.commentRow}>
+                        <View style={styles.commentAvatarContainer}>
+                          {c.is_anonymous ? (
+                            <View style={[styles.miniAvatar, { backgroundColor: 'rgba(255,255,255,0.05)' }]}>
+                              <User size={12} color={theme.colors.textSecondary} />
+                            </View>
+                          ) : (
+                            c.user?.avatar_url ? (
+                              <Image source={{ uri: c.user.avatar_url }} style={styles.miniAvatar} />
+                            ) : (
+                              <Text style={styles.miniEmojiAvatar}>{c.user?.emoji_icon || "👤"}</Text>
+                            )
+                          )}
+                        </View>
+                        <View style={styles.commentContent}>
+                          <View style={styles.commentBubble}>
+                            <Text style={styles.commentUser}>
+                              {c.is_anonymous ? (c.nickname || "Anonymous") : c.user?.username}
+                            </Text>
+                            <Text style={styles.commentText}>{c.text}</Text>
+                          </View>
+                          <Text style={styles.commentTime}>{getTimeAgo(new Date(c.created_at))}</Text>
+                        </View>
+                      </View>
+                    ))}
                   </View>
-                ))}
+                )}
                 
                 <View style={styles.inputRow}>
-                    <View style={{ flex: 1 }}>
-                      <TextInput 
-                        style={styles.input} 
-                        placeholder="Comment..." 
-                        value={commentText} 
-                        onChangeText={setCommentText} 
-                      />
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 10 }}>
-                        <TouchableOpacity 
-                          onPress={() => {
-                            setIsAnonComment(!isAnonComment);
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                          }} 
-                          style={[
-                            styles.anonToggleBtn,
-                            isAnonComment && styles.anonToggleBtnActive
-                          ]}
-                        >
-                          <User size={16} color={isAnonComment ? "#000" : theme.colors.textSecondary} />
-                        </TouchableOpacity>
-                        
-                        {isAnonComment && (
-                          <Text style={styles.anonLabel}>
-                            Commenting as {userNickname ? `@${userNickname}` : "Anonymous"}
-                          </Text>
-                        )}
-                      </View>
+                  <View style={styles.inputWrapper}>
+                    <TextInput 
+                      style={styles.input} 
+                      placeholder="Write a comment..." 
+                      placeholderTextColor="rgba(255,255,255,0.3)"
+                      value={commentText} 
+                      onChangeText={setCommentText}
+                      multiline
+                    />
+                    <View style={styles.inputActions}>
+                      <TouchableOpacity 
+                        onPress={() => {
+                          setIsAnonComment(!isAnonComment);
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        }} 
+                        style={[
+                          styles.anonToggleBtn,
+                          isAnonComment && styles.anonToggleBtnActive
+                        ]}
+                      >
+                        <User size={14} color={isAnonComment ? "#000" : "rgba(255,255,255,0.5)"} />
+                      </TouchableOpacity>
+                      {isAnonComment && (
+                        <Text style={styles.anonLabel}>
+                          {userNickname || "Anon"}
+                        </Text>
+                      )}
                     </View>
-                  <TouchableOpacity onPress={handleSendComment} style={styles.sendBtn}><Send size={18} color="#FFF" /></TouchableOpacity>
+                  </View>
+                  <TouchableOpacity 
+                    onPress={handleSendComment} 
+                    style={[styles.sendBtn, !commentText.trim() && { opacity: 0.5 }]}
+                    disabled={!commentText.trim()}
+                  >
+                    <Send size={18} color="#000" />
+                  </TouchableOpacity>
                 </View>
               </View>
             )}
@@ -387,6 +418,97 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: theme.colors.primary,
     fontWeight: '600',
+  },
+  commentsSection: { 
+    marginTop: 15, 
+    borderTopWidth: 1, 
+    borderTopColor: 'rgba(255,255,255,0.05)', 
+    paddingTop: 15 
+  },
+  commentList: {
+    marginBottom: 15,
+  },
+  commentRow: {
+    flexDirection: 'row',
+    marginBottom: 12,
+    gap: 10,
+  },
+  commentAvatarContainer: {
+    paddingTop: 4,
+  },
+  miniAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  miniEmojiAvatar: {
+    fontSize: 18,
+  },
+  commentContent: {
+    flex: 1,
+  },
+  commentBubble: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    padding: 10,
+    borderRadius: 15,
+    borderTopLeftRadius: 2,
+  },
+  commentUser: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: theme.colors.primary,
+    marginBottom: 2,
+  },
+  commentText: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.9)',
+    lineHeight: 18,
+  },
+  commentTime: {
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.3)',
+    marginTop: 4,
+    marginLeft: 4,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'flex-end',
+  },
+  inputWrapper: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 20,
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  input: {
+    color: '#FFF',
+    fontSize: 14,
+    maxHeight: 100,
+    paddingTop: Platform.OS === 'ios' ? 4 : 0,
+  },
+  inputActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.05)',
+    paddingTop: 6,
+  },
+  sendBtn: {
+    backgroundColor: theme.colors.primary,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 2,
   },
 });
 
