@@ -19,7 +19,7 @@ import { MessageCircle, X, Send, ChevronLeft, MoreHorizontal, User, Check, Check
 import { supabase } from '../utils/supabase';
 import { getStoredUser } from '../utils/user';
 import { theme } from '../utils/theme';
-import { sendNotification } from '../utils/notifications';
+import { sendNotification, sendMessageNotification } from '../utils/notifications';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -89,6 +89,8 @@ export default function FloatingChat() {
     loadUserAndChats();
     
     let presenceChannel;
+    let chatSub;
+    let currentUserId = null;
 
     const setupPresence = async (currentUser) => {
       presenceChannel = supabase.channel('online-users');
@@ -111,51 +113,60 @@ export default function FloatingChat() {
         });
     };
 
-    const chatSub = supabase
-      .channel('public:rmessages_realtime')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'rmessages' }, async (payload) => {
-        if (activeChat && payload.new.chat_id === activeChat.id) {
-          setMessages(prev => [...prev, payload.new]);
-          setTimeout(() => flatListRef.current?.scrollToEnd(), 100);
+    const setupChatSubscription = async () => {
+      const storedUser = await getStoredUser();
+      if (!storedUser) return;
+      
+      currentUserId = storedUser.id;
+      setUser(storedUser);
+      setReadReceiptsEnabled(storedUser.read_receipts_enabled !== false);
+      setupPresence(storedUser);
+
+      chatSub = supabase
+        .channel(`chat_messages_${storedUser.id}_${Date.now()}`)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'rmessages' }, async (payload) => {
+          const newMessage = payload.new;
           
-          if (isOpen && !showChatList && payload.new.sender_id !== user?.id) {
-            markAsRead(payload.new.id);
-          }
-        }
-        
-        if (user && payload.new.sender_id !== user.id) {
           const { data: chatData } = await supabase
             .from('rchats')
             .select('user1_id, user2_id')
-            .eq('id', payload.new.chat_id)
+            .eq('id', newMessage.chat_id)
             .single();
-            
-          if (chatData && (chatData.user1_id === user.id || chatData.user2_id === user.id)) {
+          
+          if (!chatData) return;
+          
+          const isMyChat = chatData.user1_id === currentUserId || chatData.user2_id === currentUserId;
+          if (!isMyChat) return;
+          
+          setMessages(prev => {
+            if (prev.some(m => m.id === newMessage.id)) return prev;
+            return [...prev, newMessage];
+          });
+          
+          setTimeout(() => flatListRef.current?.scrollToEnd(), 100);
+          
+          if (newMessage.sender_id !== currentUserId) {
             setIsVisible(true);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            loadUserAndChats();
           }
-        }
-        
-        loadUserAndChats();
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rmessages' }, (payload) => {
-        setMessages(prev => prev.map(msg => msg.id === payload.new.id ? payload.new : msg));
-      })
-      .subscribe();
+        })
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rmessages' }, (payload) => {
+          setMessages(prev => prev.map(msg => msg.id === payload.new.id ? payload.new : msg));
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'rchats' }, () => {
+          loadUserAndChats();
+        })
+        .subscribe();
+    };
 
-    getStoredUser().then(u => {
-      if (u) {
-        setUser(u);
-        setReadReceiptsEnabled(u.read_receipts_enabled !== false);
-        setupPresence(u);
-      }
-    });
+    setupChatSubscription();
 
     return () => { 
-      supabase.removeChannel(chatSub); 
+      if (chatSub) supabase.removeChannel(chatSub); 
       if (presenceChannel) supabase.removeChannel(presenceChannel);
     };
-  }, [activeChat, isOpen, showChatList]);
+  }, []);
 
   const markAsRead = async (messageId) => {
     if (!readReceiptsEnabled) return;
@@ -182,7 +193,14 @@ export default function FloatingChat() {
     setChats(data || []);
   };
 
+  useEffect(() => {
+    if (activeChat?.id) {
+      loadMessages(activeChat.id);
+    }
+  }, [activeChat?.id]);
+
   const loadMessages = async (chatId) => {
+    if (!chatId) return;
     setLoading(true);
     const { data } = await supabase
       .from('rmessages')
@@ -193,9 +211,10 @@ export default function FloatingChat() {
     setLoading(false);
     setTimeout(() => flatListRef.current?.scrollToEnd(), 100);
 
-    const unreadFromOthers = data?.filter(m => !m.is_read && m.sender_id !== user?.id) || [];
+    const storedUser = await getStoredUser();
+    const unreadFromOthers = data?.filter(m => !m.is_read && m.sender_id !== storedUser?.id) || [];
     if (unreadFromOthers.length > 0 && readReceiptsEnabled) {
-      await supabase.from('rmessages').update({ is_read: true }).eq('chat_id', chatId).neq('sender_id', user.id);
+      await supabase.from('rmessages').update({ is_read: true }).eq('chat_id', chatId).neq('sender_id', storedUser?.id);
     }
   };
 
@@ -222,11 +241,11 @@ export default function FloatingChat() {
 
       const otherUser = getOtherUser(activeChat);
       if (otherUser) {
-        await sendNotification({
-          userId: otherUser.id,
-          title: `@${user.username} sent you a message`,
-          message: text,
-          type: 'help_chat'
+        await sendMessageNotification({
+          senderId: user.id,
+          receiverId: otherUser.id,
+          senderUsername: user.username,
+          messageText: text
         });
       }
     }
@@ -242,7 +261,6 @@ export default function FloatingChat() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setActiveChat(chat);
     setShowChatList(false);
-    loadMessages(chat.id);
   };
 
   const toggleChat = () => {

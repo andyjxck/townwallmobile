@@ -7,8 +7,8 @@ import { isOnline } from './user';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: false,
-    shouldPlaySound: false,
+    shouldShowAlert: true,
+    shouldPlaySound: true,
     shouldSetBadge: true,
   }),
 });
@@ -42,7 +42,7 @@ export async function registerForPushNotificationsAsync(userId) {
     const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
     
     if (!projectId) {
-      console.log('Project ID not found for push notifications');
+      console.log('Project ID not found for push notifications. Please configure EAS project ID.');
       return null;
     }
 
@@ -61,7 +61,7 @@ export async function registerForPushNotificationsAsync(userId) {
         name: 'default',
         importance: Notifications.AndroidImportance.MAX,
         vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#FF231F7C',
+        lightColor: '#22C55E',
       });
     }
   } catch (error) {
@@ -72,16 +72,19 @@ export async function registerForPushNotificationsAsync(userId) {
 }
 
 export async function sendPushNotification(expoPushToken, title, body, data = {}) {
+  if (!expoPushToken) return;
+  
   const message = {
     to: expoPushToken,
     sound: 'default',
     title,
     body,
     data,
+    priority: 'high',
   };
 
   try {
-    await fetch('https://exp.host/--/api/v2/push/send', {
+    const response = await fetch('https://exp.host/--/api/v2/push/send', {
       method: 'POST',
       headers: {
         Accept: 'application/json',
@@ -90,6 +93,11 @@ export async function sendPushNotification(expoPushToken, title, body, data = {}
       },
       body: JSON.stringify(message),
     });
+    
+    const result = await response.json();
+    if (result.data?.status === 'error') {
+      console.error('Push notification error:', result.data.message);
+    }
   } catch (error) {
     console.error('Error sending push notification:', error);
   }
@@ -97,7 +105,6 @@ export async function sendPushNotification(expoPushToken, title, body, data = {}
 
 export const sendNotification = async ({ userId, title, message, type, link }) => {
   try {
-    // Prevent double notifications by checking for identical ones in the last 10 seconds
     const tenSecondsAgo = new Date(Date.now() - 10000).toISOString();
     const { data: existing } = await supabase
       .from('rnotifications')
@@ -127,15 +134,17 @@ export const sendNotification = async ({ userId, title, message, type, link }) =
 
     if (error) throw error;
 
-    // Send push notification if user is offline
     const { data: userData } = await supabase
       .from('rusers')
       .select('push_token, last_seen')
       .eq('id', userId)
       .single();
 
-    if (userData?.push_token && !isOnline(userData.last_seen)) {
-      await sendPushNotification(userData.push_token, title, message, { type, link });
+    if (userData?.push_token) {
+      const userIsOffline = !isOnline(userData.last_seen);
+      if (userIsOffline) {
+        await sendPushNotification(userData.push_token, title, message, { type, link });
+      }
     }
 
     return { success: true, data: newNotification };
@@ -143,6 +152,84 @@ export const sendNotification = async ({ userId, title, message, type, link }) =
     console.error('Error sending notification:', error);
     return { success: false, error };
   }
+};
+
+export const sendMessageNotification = async ({ senderId, receiverId, senderUsername, messageText }) => {
+  return sendNotification({
+    userId: receiverId,
+    title: `New message from @${senderUsername}`,
+    message: messageText.length > 50 ? messageText.substring(0, 50) + '...' : messageText,
+    type: 'message',
+    link: `/chat`
+  });
+};
+
+export const sendReactionNotification = async ({ reactorUsername, reactorId, postOwnerId, postTitle, reactionType }) => {
+  if (reactorId === postOwnerId) return { success: true, skipped: true };
+  
+  const reactionLabel = reactionType === 'helpful' ? 'liked' : reactionType === 'superlike' ? 'superliked' : 'reacted to';
+  
+  return sendNotification({
+    userId: postOwnerId,
+    title: `New ${reactionType === 'superlike' ? 'Superlike' : 'Like'}!`,
+    message: `@${reactorUsername} ${reactionLabel} your post: "${postTitle || 'Untitled'}"`,
+    type: 'reaction',
+    link: `/post`
+  });
+};
+
+export const sendFriendRequestNotification = async ({ senderId, senderUsername, receiverId }) => {
+  return sendNotification({
+    userId: receiverId,
+    title: 'New Friend Request!',
+    message: `@${senderUsername} wants to be your friend`,
+    type: 'friend_request',
+    link: `/profile`
+  });
+};
+
+export const sendFriendAcceptedNotification = async ({ acceptorId, acceptorUsername, requesterId }) => {
+  return sendNotification({
+    userId: requesterId,
+    title: 'Friend Request Accepted!',
+    message: `@${acceptorUsername} accepted your friend request`,
+    type: 'friend_accepted',
+    link: `/profile?userId=${acceptorId}`
+  });
+};
+
+export const sendShareNotification = async ({ sharerUsername, sharerId, postOwnerId, postTitle }) => {
+  if (sharerId === postOwnerId) return { success: true, skipped: true };
+  
+  return sendNotification({
+    userId: postOwnerId,
+    title: 'Your Post Was Shared!',
+    message: `@${sharerUsername} shared your post: "${postTitle || 'Untitled'}"`,
+    type: 'share',
+    link: `/post`
+  });
+};
+
+export const sendCommentNotification = async ({ commenterUsername, commenterId, postOwnerId, postTitle, commentText }) => {
+  if (commenterId === postOwnerId) return { success: true, skipped: true };
+  
+  return sendNotification({
+    userId: postOwnerId,
+    title: 'New Comment!',
+    message: `@${commenterUsername} commented: "${commentText.length > 30 ? commentText.substring(0, 30) + '...' : commentText}"`,
+    type: 'comment',
+    link: `/post`
+  });
+};
+
+export const sendHelpMessageNotification = async ({ senderId, senderUsername, receiverId, isFromAdmin, messageContent }) => {
+  return sendNotification({
+    userId: receiverId,
+    title: isFromAdmin ? 'Support Response' : `Help message from @${senderUsername}`,
+    message: messageContent.length > 50 ? messageContent.substring(0, 50) + '...' : messageContent,
+    type: 'help_message',
+    link: `/help`
+  });
 };
 
 export const fetchNotifications = async (userId) => {

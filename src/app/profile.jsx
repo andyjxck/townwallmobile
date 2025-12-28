@@ -15,21 +15,21 @@ import { supabase } from "../utils/supabase";
 import { getStoredUser, logoutUser, initUser, isOnline } from "../utils/user";
 import { getDeviceId } from "../utils/deviceId";
 import { 
-  ChevronLeft, 
-  Camera, 
-  LogOut, 
-  User as UserIcon,
-  Shield,
-  UserPlus,
-  Trash2,
-  Image as ImageIcon,
-  Check,
-  X as XIcon,
-  Settings as SettingsIcon,
-  Search,
-  Pencil,
-  MessageCircle,
-} from "lucide-react-native";
+    ChevronLeft, 
+    Camera, 
+    LogOut, 
+    User as UserIcon,
+    Shield,
+    UserPlus,
+    Trash2,
+    Image as ImageIcon,
+    Check,
+    X as XIcon,
+    Settings as SettingsIcon,
+    Search,
+    Pencil,
+    MessageCircle,
+  } from "lucide-react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
@@ -41,6 +41,7 @@ import { Image } from "expo-image";
 import PostItem from "../components/PostItem";
 import { ShareManager } from "../components/ShareManager";
 import { theme } from "../utils/theme";
+import { sendFriendRequestNotification, sendFriendAcceptedNotification } from "../utils/notifications";
 
 const { width } = Dimensions.get('window');
 const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", "🐵", "🦄", "🐲", "🤖", "👻", "👾", "👽", "💩"];
@@ -284,6 +285,13 @@ export default function Profile() {
       if (existing) throw new Error("Friend request already sent or accepted");
 
       await supabase.from('friends').insert({ user_id: user.id, friend_id: friendUser.id, status: 'pending' });
+      
+      await sendFriendRequestNotification({
+        senderId: user.id,
+        senderUsername: user.username,
+        receiverId: friendUser.id
+      });
+      
       Alert.alert("Success", "Friend request sent!");
       setFriendUsername("");
     } catch (error) { Alert.alert("Error", error.message); }
@@ -294,6 +302,13 @@ export default function Profile() {
     try {
       await supabase.from('friends').update({ status: 'accepted' }).eq('id', requestId);
       await supabase.from('friends').insert({ user_id: user.id, friend_id: friendId, status: 'accepted' });
+      
+      await sendFriendAcceptedNotification({
+        acceptorId: user.id,
+        acceptorUsername: user.username,
+        requesterId: friendId
+      });
+      
       loadData();
     } catch (error) { Alert.alert("Error", "Failed to accept request"); }
   };
