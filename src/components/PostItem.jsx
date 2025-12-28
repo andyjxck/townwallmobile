@@ -184,7 +184,7 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
                     <Text style={styles.metaText}>{timeAgo}</Text>
                   </View>
                 </View>
-              {(user?.id === item.user_id || user?.is_admin) && (
+              {user?.id === item.user_id && (
                 <TouchableOpacity onPress={() => onEdit?.(item)}><Pencil size={18} color={theme.colors.textSecondary} /></TouchableOpacity>
               )}
             </View>
