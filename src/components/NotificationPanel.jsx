@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { X, Bell, CheckCircle, MessageSquare, Shield, Info } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { fetchNotifications, markAsRead } from '@/utils/notifications';
+import { fetchNotifications, markAsRead, markAllAsRead } from '@/utils/notifications';
 import { getStoredUser } from '@/utils/user';
 import { supabase } from '@/utils/supabase';
 import * as Haptics from 'expo-haptics';
@@ -19,8 +19,9 @@ export default function NotificationPanel({ visible, onClose }) {
   const insets = useSafeAreaInsets();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const wasVisible = useRef(visible);
 
-    useEffect(() => {
+  useEffect(() => {
     let sub;
     if (visible) {
       loadNotifications();
@@ -47,8 +48,13 @@ export default function NotificationPanel({ visible, onClose }) {
       };
       
       setupSubscription();
+    } else if (wasVisible.current && !visible) {
+      // Panel was just closed
+      handleMarkAllAsRead();
     }
     
+    wasVisible.current = visible;
+
     return () => {
       if (sub) supabase.removeChannel(sub);
     };
@@ -62,6 +68,14 @@ export default function NotificationPanel({ visible, onClose }) {
       setNotifications(data);
     }
     setLoading(false);
+  };
+
+  const handleMarkAllAsRead = async () => {
+    const user = await getStoredUser();
+    if (user) {
+      await markAllAsRead(user.id);
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+    }
   };
 
   const handleMarkAsRead = async (id) => {

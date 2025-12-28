@@ -35,6 +35,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Haptics from "expo-haptics";
 import { decode } from "base64-arraybuffer";
+import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Image } from "expo-image";
 import PostItem from "../components/PostItem";
@@ -466,14 +467,25 @@ export default function Profile() {
                 <View style={styles.statItem}><Text style={[styles.statValue, { color: theme.colors.text }]}>{friends.length}</Text><Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Friends</Text></View>
               </View>
 
-              {!isOwnProfile && (
-                <View style={styles.actionRow}>
-                  <TouchableOpacity onPress={handleMessageUser} style={[styles.messageBtn, { backgroundColor: theme.colors.primary }]}>
-                    <MessageCircle size={20} color="#000" />
-                    <Text style={styles.messageBtnText}>Message</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
+                {!isOwnProfile && (
+                  <View style={styles.actionRow}>
+                    <TouchableOpacity 
+                      onPress={handleMessageUser} 
+                      style={styles.messageBtn}
+                    >
+                      <LinearGradient
+                        colors={[theme.colors.primary, '#4ADE80']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.messageBtnGradient}
+                      >
+                        <MessageCircle size={20} color="#000" />
+                        <Text style={styles.messageBtnText}>Message</Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
 
             <View style={styles.tabBar}>
               <TouchableOpacity onPress={() => setActiveTab("posts")} style={[styles.tab, activeTab === "posts" && { borderBottomColor: theme.colors.primary }]}><Text style={[styles.tabText, { color: activeTab === "posts" ? theme.colors.primary : theme.colors.textSecondary }]}>FEED</Text></TouchableOpacity>
@@ -632,6 +644,16 @@ const styles = StyleSheet.create({
     friendName: { fontWeight: 'bold' },
     footer: { paddingVertical: 30, alignItems: 'center' },
     footerText: { fontSize: 12, fontWeight: '600' },
+    actionRow: { paddingVertical: 10, alignItems: 'center', width: '100%', paddingHorizontal: 20 },
+    messageBtn: { width: '100%', borderRadius: 25, overflow: 'hidden' },
+    messageBtnGradient: { 
+      flexDirection: 'row', 
+      alignItems: 'center', 
+      justifyContent: 'center', 
+      paddingVertical: 12,
+      gap: 10 
+    },
+    messageBtnText: { fontWeight: 'bold', fontSize: 16, color: '#000' },
     modalOverlay: { 
       position: 'absolute', 
       top: 0, 
