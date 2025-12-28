@@ -3,6 +3,8 @@ import * as UserUtils from "../utils/user";
 import { supabase } from "@/utils/supabase";
 import { Stack, usePathname, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
+
+SplashScreen.preventAutoHideAsync().catch(() => {});
 import { useEffect, useRef, memo } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
