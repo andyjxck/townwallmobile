@@ -36,7 +36,7 @@ export default function FloatingChat() {
   const [showChatList, setShowChatList] = useState(false);
   const [loading, setLoading] = useState(false);
   
-  const pan = useRef(new Animated.ValueXY({ x: width - 80, y: height - 150 })).current;
+  const pan = useRef(new Animated.ValueXY({ x: width - 80, y: height - 210 })).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(height)).current;
   const flatListRef = useRef();
@@ -51,8 +51,11 @@ export default function FloatingChat() {
       onPanResponderRelease: () => {
         pan.flattenOffset();
         const toX = pan.x._value > width / 2 ? width - 80 : 20;
+        // Keep within vertical bounds
+        const toY = Math.min(Math.max(pan.y._value, 60), height - 120);
+        
         Animated.spring(pan, {
-          toValue: { x: toX, y: pan.y._value },
+          toValue: { x: toX, y: toY },
           useNativeDriver: false,
           tension: 80,
           friction: 10
@@ -95,8 +98,8 @@ export default function FloatingChat() {
 
   const loadUserAndChats = async () => {
     const storedUser = await getStoredUser();
-    if (!storedUser) return;
     setUser(storedUser);
+    if (!storedUser) return;
 
     const { data } = await supabase
       .from('rchats')
@@ -181,7 +184,7 @@ export default function FloatingChat() {
     return chat.user1_id === user.id ? chat.user2 : chat.user1;
   };
 
-  if (chats.length === 0 && !isOpen) return null;
+  if (!user && !isOpen) return null;
 
   return (
     <View style={styles.container} pointerEvents="box-none">
@@ -360,24 +363,24 @@ const styles = StyleSheet.create({
     bottom: 0,
     zIndex: 9999,
   },
-  bubbleWrapper: {
-    width: 64,
-    height: 64,
-    elevation: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-  },
-  bubble: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
+    bubbleWrapper: {
+      width: 60,
+      height: 60,
+      elevation: 10,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.4,
+      shadowRadius: 8,
+    },
+    bubble: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.2)',
+    },
   unreadBadge: {
     position: 'absolute',
     top: -2,
