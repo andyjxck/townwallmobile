@@ -21,7 +21,8 @@
       },
       "permissions": [
         "android.permission.RECORD_AUDIO",
-        "android.permission.MODIFY_AUDIO_SETTINGS"
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "com.google.android.gms.permission.AD_ID"
       ],
       "package": "com.andysocial.townwall"
     },
@@ -63,30 +64,30 @@
         }
       ],
       "expo-font",
-        "expo-secure-store",
-        "expo-web-browser",
-        [
-          "expo-notifications",
-          {
-            "icon": "./assets/images/icon.png",
-            "color": "#ffffff",
-            "sounds": []
-          }
-        ],
-        [
-          "react-native-google-mobile-ads",
-            {
-              "androidAppId": "ca-app-pub-1505977777207758~6195707754",
-              "iosAppId": "ca-app-pub-1505977777207758~6195707754"
-            }
-        ],
-        [
-          "expo-tracking-transparency",
-          {
-            "userTrackingUsageDescription": "This identifier will be used to deliver personalized ads to you."
-          }
-        ]
+      "expo-secure-store",
+      "expo-web-browser",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#ffffff",
+          "sounds": []
+        }
       ],
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-1505977777207758~6195707754",
+          "iosAppId": "ca-app-pub-1505977777207758~6195707754"
+        }
+      ],
+      [
+        "expo-tracking-transparency",
+        {
+          "userTrackingUsageDescription": "This identifier will be used to deliver personalized ads to you."
+        }
+      ]
+    ],
     "web": {
       "bundler": "metro",
       "favicon": "./assets/images/favicon.png"
@@ -98,12 +99,14 @@
     },
     "extra": {
       "router": {
-        "origin": false
+        "origin": false,
+        "sitemap": false
       },
       "eas": {
-        "projectId": "your-eas-project-id"
+        "projectId": "3d185e44-e9e3-4196-9dc9-a45a2fdff729"
       }
     },
-    "runtimeVersion": "1.0.0"
+    "runtimeVersion": "1.0.0",
+    "owner": "andyjxck"
   }
 }
