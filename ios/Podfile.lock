@@ -119,6 +119,8 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - ExpoNetwork (8.0.8):
+    - ExpoModulesCore
   - ExpoSecureStore (15.0.6):
     - ExpoModulesCore
   - ExpoSensors (15.0.6):
@@ -2423,6 +2425,7 @@ DEPENDENCIES:
   - ExpoLinking (from `../node_modules/expo-linking/ios`)
   - ExpoLocation (from `../node_modules/expo-location/ios`)
   - ExpoModulesCore (from `../node_modules/expo-modules-core`)
+  - ExpoNetwork (from `../node_modules/expo-network/ios`)
   - ExpoSecureStore (from `../node_modules/expo-secure-store/ios`)
   - ExpoSensors (from `../node_modules/expo-sensors/ios`)
   - ExpoSharing (from `../node_modules/expo-sharing/ios`)
@@ -2605,6 +2608,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo-location/ios"
   ExpoModulesCore:
     :path: "../node_modules/expo-modules-core"
+  ExpoNetwork:
+    :path: "../node_modules/expo-network/ios"
   ExpoSecureStore:
     :path: "../node_modules/expo-secure-store/ios"
   ExpoSensors:
@@ -2834,6 +2839,7 @@ SPEC CHECKSUMS:
   ExpoLinking: dadcc1205351c1108b7c5bab4b7891e744fc8c89
   ExpoLocation: 8ca995b4cda5e35f60c04cf8fbfde81e599520bf
   ExpoModulesCore: ecb96f70bf2a80d31e87ce0a2ac980563c0df6e5
+  ExpoNetwork: ee1fb67b0de59ab7f36794caf8242955dd8ae046
   ExpoSecureStore: 57327b9a484ad730cf823c82d092e0bf71e11512
   ExpoSensors: a04e0d47652b6c15c958e6d340f9af7d586bb3d9
   ExpoSharing: 0d983394ed4a80334bab5a0d5384f75710feb7e8
