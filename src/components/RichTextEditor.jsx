@@ -141,18 +141,19 @@ export function RichTextEditor({ value, onChange, placeholder, onPollPress, minH
             }}
             style={styles.subToolbar}
             flatContainerStyle={styles.flatStyle}
-            selectedIconTint="#007AFF"
-            iconTint="rgba(255,255,255,0.6)"
+            selectedIconTint="#FFF"
+            iconTint="rgba(255,255,255,0.4)"
           />
 
           {onPollPress && (
             <>
               <View style={styles.separator} />
               <TouchableOpacity 
-                style={styles.dropdownTrigger}
+                style={styles.pollBtn}
                 onPress={onPollPress}
               >
                 <BarChart2 size={18} color="rgba(255,255,255,0.6)" />
+                <Text style={styles.pollBtnText}>Add Poll</Text>
               </TouchableOpacity>
             </>
           )}
@@ -173,7 +174,7 @@ export function RichTextEditor({ value, onChange, placeholder, onPollPress, minH
               font-size: 18px; 
               line-height: 28px; 
               font-family: -apple-system, sans-serif;
-              padding: 15px;
+              padding: 0px;
               color: #FFFFFF;
             `,
           }}
@@ -190,27 +191,27 @@ const styles = StyleSheet.create({
     backgroundColor: '#000000',
   },
   toolbarContainer: {
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
-    backgroundColor: '#111111',
-    paddingVertical: 10,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 12,
+    paddingVertical: 6,
+    marginBottom: 10,
   },
   toolbarContent: {
     alignItems: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
   },
   subToolbar: {
     backgroundColor: 'transparent',
   },
   flatStyle: {
     paddingHorizontal: 0,
-    gap: 12,
+    gap: 8,
   },
   separator: {
     width: 1,
-    height: 20,
+    height: 16,
     backgroundColor: 'rgba(255,255,255,0.1)',
-    marginHorizontal: 12,
+    marginHorizontal: 8,
   },
   dropdownTrigger: {
     flexDirection: 'row',
@@ -223,6 +224,20 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '600',
+  },
+  pollBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 8,
+  },
+  pollBtnText: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 12,
+    fontWeight: '700',
   },
   modalOverlay: {
     flex: 1,
@@ -253,11 +268,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   editorWrapper: {
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 16,
-    marginVertical: 12,
-    overflow: 'hidden',
+    marginVertical: 10,
     backgroundColor: '#000000',
   },
   richEditor: {
