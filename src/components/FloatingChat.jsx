@@ -5,9 +5,9 @@ import {
   TouchableOpacity, 
   StyleSheet, 
   Animated, 
-  PanResponder, 
   Dimensions, 
   TextInput, 
+
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -18,7 +18,7 @@ import {
   ScrollView,
   Alert
 } from 'react-native';
-import { MessageCircle, X, Send, ChevronLeft, MoreHorizontal, User, Users, Check, CheckCheck, Settings, Plus, UserPlus, Mic, MicOff, Video, Phone as PhoneIcon, PhoneOff as PhoneOffIcon, PhoneIncoming, PhoneOutgoing } from 'lucide-react-native';
+import { MessageCircle, X, Send, ChevronLeft, MoreHorizontal, User, Users, Check, CheckCheck, Settings, Plus, UserPlus, Mic, MicOff, Video, Phone as PhoneIcon, PhoneOff as PhoneOffIcon, PhoneIncoming, PhoneOutgoing, Phone } from 'lucide-react-native';
 import { supabase } from '../utils/supabase';
 import { getStoredUser } from '../utils/user';
 import { theme } from '../utils/theme';
@@ -48,6 +48,7 @@ export default function FloatingChat() {
   useEffect(() => {
     activeChatRef.current = activeChat;
   }, [activeChat]);
+
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [user, setUser] = useState(null);
@@ -73,10 +74,10 @@ export default function FloatingChat() {
   const callTimerRef = useRef(null);
   const soundObjects = useRef({});
   
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const pan = useRef(new Animated.ValueXY({ x: width - 80, y: height - 210 })).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(height)).current;
+    const pulseAnim = useRef(new Animated.Value(1)).current;
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const slideAnim = useRef(new Animated.Value(height)).current;
+
   const flatListRef = useRef();
 
   useEffect(() => {
@@ -123,28 +124,6 @@ export default function FloatingChat() {
       console.log('Error stopping sound:', error);
     }
   };
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        pan.setOffset({ x: pan.x._value, y: pan.y._value });
-      },
-      onPanResponderMove: Animated.event([null, { dx: pan.x, dy: pan.y }], { useNativeDriver: false }),
-      onPanResponderRelease: () => {
-        pan.flattenOffset();
-        const toX = pan.x._value > width / 2 ? width - 80 : 20;
-        const toY = Math.min(Math.max(pan.y._value, 60), height - 120);
-        
-        Animated.spring(pan, {
-          toValue: { x: toX, y: toY },
-          useNativeDriver: false,
-          tension: 80,
-          friction: 10
-        }).start();
-      },
-    })
-  ).current;
 
   useEffect(() => {
     if (isOpen) {
@@ -679,20 +658,15 @@ export default function FloatingChat() {
 
   return (
     <View style={styles.container} pointerEvents="box-none">
-      {!isOpen && isVisible && (
-        <Animated.View
-          {...panResponder.panHandlers}
-          style={[pan.getLayout(), styles.bubbleWrapper]}
-        >
+      {!isOpen && isVisible && hasUnread && (
+        <View style={styles.fixedBubbleContainer}>
           <View style={styles.bubbleContainer}>
             <TouchableOpacity onPress={toggleChat} activeOpacity={0.8}>
-              <View style={[styles.bubble, hasUnread && styles.bubbleUnread]}>
-                <MessageCircle color={hasUnread ? '#FFF' : theme.colors.primary} size={28} />
-                {hasUnread && (
-                  <View style={styles.bubbleBadge}>
-                    <Text style={styles.bubbleBadgeText}>{totalUnreadCount > 99 ? '99+' : totalUnreadCount}</Text>
-                  </View>
-                )}
+              <View style={[styles.bubble, styles.bubbleUnread]}>
+                <MessageCircle color="#FFF" size={28} />
+                <View style={styles.bubbleBadge}>
+                  <Text style={styles.bubbleBadgeText}>{totalUnreadCount > 99 ? '99+' : totalUnreadCount}</Text>
+                </View>
               </View>
             </TouchableOpacity>
             
@@ -706,7 +680,7 @@ export default function FloatingChat() {
               <X size={14} color="#000" />
             </TouchableOpacity>
           </View>
-        </Animated.View>
+        </View>
       )}
 
       {activeCall && (
@@ -1152,9 +1126,11 @@ const styles = StyleSheet.create({
     bottom: 0,
     zIndex: 9999,
   },
-  bubbleWrapper: {
-    width: 60,
-    height: 60,
+  fixedBubbleContainer: {
+    position: 'absolute',
+    bottom: 40,
+    left: 20,
+    zIndex: 9999,
     elevation: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
