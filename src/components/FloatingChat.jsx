@@ -18,7 +18,7 @@ import {
   ScrollView,
   Alert
 } from 'react-native';
-import { MessageCircle, X, Send, ChevronLeft, MoreHorizontal, User, Check, CheckCheck, Settings, Plus, UserPlus, Mic, MicOff, Video, Phone as PhoneIcon, PhoneOff as PhoneOffIcon, PhoneIncoming, PhoneOutgoing } from 'lucide-react-native';
+import { MessageCircle, X, Send, ChevronLeft, MoreHorizontal, User, Users, Check, CheckCheck, Settings, Plus, UserPlus, Mic, MicOff, Video, Phone as PhoneIcon, PhoneOff as PhoneOffIcon, PhoneIncoming, PhoneOutgoing } from 'lucide-react-native';
 import { supabase } from '../utils/supabase';
 import { getStoredUser } from '../utils/user';
 import { theme } from '../utils/theme';
