@@ -23,6 +23,7 @@ import { supabase } from '../utils/supabase';
 import { getStoredUser } from '../utils/user';
 import { theme } from '../utils/theme';
 import { sendNotification, sendMessageNotification } from '../utils/notifications';
+import { useChatStore } from '../utils/auth';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -41,7 +42,7 @@ const { width, height } = Dimensions.get('window');
 
 export default function FloatingChat() {
   const router = useRouter();
-  const [isOpen, setIsOpen] = useState(false);
+  const { isOpen, open: setOpen, close: setClose, toggle: toggleChatGlobal } = useChatStore();
   const [activeChat, setActiveChat] = useState(null);
   const activeChatRef = useRef(null);
 
@@ -476,9 +477,9 @@ export default function FloatingChat() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (!isOpen) {
       setShowChatList(true);
-      setIsOpen(true);
+      setOpen();
     } else {
-      setIsOpen(false);
+      setClose();
     }
   };
 
@@ -848,7 +849,7 @@ export default function FloatingChat() {
           <TouchableOpacity 
             style={StyleSheet.absoluteFill} 
             activeOpacity={1} 
-            onPress={() => setIsOpen(false)}
+            onPress={() => setClose()}
           >
             <BlurView intensity={20} style={StyleSheet.absoluteFill} tint="dark" />
           </TouchableOpacity>
@@ -892,45 +893,45 @@ export default function FloatingChat() {
                   ) : (
                     <TouchableOpacity 
                       style={styles.headerUserInfo}
-                      onPress={() => {
-                        const other = getOtherUser(activeChat);
-                        if (other) {
-                          setIsOpen(false);
-                          router.push(`/profile?username=${other.username}`);
-                        }
-                      }}
-                    >
-                      <View style={styles.avatarWrapper}>
-                        {getOtherUser(activeChat)?.avatar_url ? (
-                          <Image source={{ uri: getOtherUser(activeChat).avatar_url }} style={styles.headerAvatar} />
-                        ) : (
-                          <View style={styles.headerEmojiBg}>
-                            <Text style={styles.headerEmoji}>{getOtherUser(activeChat)?.emoji_icon || "👤"}</Text>
-                          </View>
-                        )}
-                        {onlineUsers[getOtherUser(activeChat)?.id] && <View style={styles.headerStatusDot} />}
-                      </View>
-                      <View>
-                        <Text style={styles.headerTitle}>
-                          @{getOtherUser(activeChat)?.username}
-                        </Text>
-                        <Text style={styles.onlineStatusText}>
-                          {onlineUsers[getOtherUser(activeChat)?.id] ? 'Online' : 'Offline'}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  )}
-                  {activeChat && (activeChat.status === 'accepted' || activeChat.is_group) && (
-                    <TouchableOpacity onPress={() => startCall(activeChat.is_group)} style={styles.iconBtn}>
-                      <Phone size={20} color="#FFF" />
-                    </TouchableOpacity>
-                  )}
-                </View>
-              )}
-              <TouchableOpacity onPress={() => setIsOpen(false)} style={styles.iconBtn}>
-                <X size={24} color="#FFF" />
-              </TouchableOpacity>
-            </View>
+                        onPress={() => {
+                          const other = getOtherUser(activeChat);
+                          if (other) {
+                            setClose();
+                            router.push(`/profile?username=${other.username}`);
+                          }
+                        }}
+                      >
+                        <View style={styles.avatarWrapper}>
+                          {getOtherUser(activeChat)?.avatar_url ? (
+                            <Image source={{ uri: getOtherUser(activeChat).avatar_url }} style={styles.headerAvatar} />
+                          ) : (
+                            <View style={styles.headerEmojiBg}>
+                              <Text style={styles.headerEmoji}>{getOtherUser(activeChat)?.emoji_icon || "👤"}</Text>
+                            </View>
+                          )}
+                          {onlineUsers[getOtherUser(activeChat)?.id] && <View style={styles.headerStatusDot} />}
+                        </View>
+                        <View>
+                          <Text style={styles.headerTitle}>
+                            @{getOtherUser(activeChat)?.username}
+                          </Text>
+                          <Text style={styles.onlineStatusText}>
+                            {onlineUsers[getOtherUser(activeChat)?.id] ? 'Online' : 'Offline'}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    )}
+                    {activeChat && (activeChat.status === 'accepted' || activeChat.is_group) && (
+                      <TouchableOpacity onPress={() => startCall(activeChat.is_group)} style={styles.iconBtn}>
+                        <Phone size={20} color="#FFF" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+                <TouchableOpacity onPress={() => setClose()} style={styles.iconBtn}>
+                  <X size={24} color="#FFF" />
+                </TouchableOpacity>
+              </View>
 
             {showSettings ? (
               <View style={styles.settingsContent}>

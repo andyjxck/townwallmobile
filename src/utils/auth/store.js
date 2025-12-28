@@ -37,3 +37,13 @@ export const useAuthModal = create((set) => ({
   open: (options) => set({ isOpen: true, mode: options?.mode || 'signup' }),
   close: () => set({ isOpen: false }),
 }));
+
+/**
+ * This store manages the state of the chat visibility.
+ */
+export const useChatStore = create((set) => ({
+  isOpen: false,
+  open: () => set({ isOpen: true }),
+  close: () => set({ isOpen: false }),
+  toggle: () => set((state) => ({ isOpen: !state.isOpen })),
+}));

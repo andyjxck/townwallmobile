@@ -31,6 +31,7 @@ import {
     Vote,
     WifiOff,
     CloudUpload,
+    MessageCircle,
 } from "lucide-react-native";
 import { Image } from "expo-image";
 import { getDeviceId } from "../utils/deviceId";
@@ -38,7 +39,7 @@ import { supabase } from "../utils/supabase";
 import * as Haptics from "expo-haptics";
 import { theme } from "../utils/theme";
 import { getStoredUser } from "../utils/user";
-import { useAuthStore } from "../utils/auth";
+import { useAuthStore, useChatStore } from "../utils/auth";
 import NotificationPanel from "./NotificationPanel";
 import { ShareManager } from "./ShareManager";
 import { BannerAd } from "@/components/BannerAd";
@@ -224,10 +225,11 @@ export default function UniversalFeed() {
         </View>
       </View>
 
-      {showMenu && (
-          <View style={[styles.menu, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-            <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/profile"); }} style={styles.menuItem}><User size={20} color={theme.colors.text} /><Text style={styles.menuText}>Profile</Text></TouchableOpacity>
-            <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/talent"); }} style={styles.menuItem}><Star size={20} color={theme.colors.text} /><Text style={styles.menuText}>Local Talent</Text></TouchableOpacity>
+        {showMenu && (
+            <View style={[styles.menu, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+              <TouchableOpacity onPress={() => { setShowMenu(false); useChatStore.getState().open(); }} style={styles.menuItem}><MessageCircle size={20} color={theme.colors.text} /><Text style={styles.menuText}>Chat</Text></TouchableOpacity>
+              <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/profile"); }} style={styles.menuItem}><User size={20} color={theme.colors.text} /><Text style={styles.menuText}>Profile</Text></TouchableOpacity>
+              <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/talent"); }} style={styles.menuItem}><Star size={20} color={theme.colors.text} /><Text style={styles.menuText}>Local Talent</Text></TouchableOpacity>
             <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/businesses"); }} style={styles.menuItem}><Briefcase size={20} color={theme.colors.text} /><Text style={styles.menuText}>Local Business</Text></TouchableOpacity>
             <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/polls"); }} style={styles.menuItem}><Vote size={20} color={theme.colors.text} /><Text style={styles.menuText}>Polls & Features</Text></TouchableOpacity>
             {isModerator && <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/admin"); }} style={styles.menuItem}><Shield size={20} color={theme.colors.error} /><Text style={styles.menuText}>Admin</Text></TouchableOpacity>}
