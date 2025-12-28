@@ -29,6 +29,8 @@ import {
     Star,
     Briefcase,
     Vote,
+    WifiOff,
+    CloudUpload,
 } from "lucide-react-native";
 import { Image } from "expo-image";
 import { getDeviceId } from "../utils/deviceId";
@@ -42,6 +44,7 @@ import { ShareManager } from "./ShareManager";
 import { BannerAd } from "@/components/BannerAd";
 import PostItem from "./PostItem";
 import { subscribeToUnreadCount, sendNotification } from "../utils/notifications";
+import { offlineStorage, syncService, subscribeToNetworkChanges, checkNetworkStatus } from "../utils/offline";
 
 export default function UniversalFeed() {
   const insets = useSafeAreaInsets();
@@ -62,13 +65,35 @@ export default function UniversalFeed() {
   const [showNotifications, setShowNotifications] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
     const shareRef = useRef();
+  const [isOnline, setIsOnline] = useState(true);
+  const [pendingPosts, setPendingPosts] = useState([]);
+  const [syncing, setSyncing] = useState(false);
   
-  const postsWithAds = posts;
+  const postsWithAds = useMemo(() => {
+    const offlinePosts = pendingPosts.map(p => ({
+      ...p,
+      isPending: true,
+      user: null,
+      zone: null,
+      tag: null,
+      reactions: [],
+    }));
+    return [...offlinePosts, ...posts];
+  }, [posts, pendingPosts]);
 
     useEffect(() => {
     getDeviceId().then(setDeviceId);
     fetchZones();
     checkModerator();
+    loadPendingPosts();
+    checkNetworkStatus().then(setIsOnline);
+
+    const unsubscribeNetwork = subscribeToNetworkChanges(async (online) => {
+      setIsOnline(online);
+      if (online) {
+        await syncPendingPosts();
+      }
+    });
 
     const postsSub = supabase
       .channel('public:rposts')
@@ -76,8 +101,31 @@ export default function UniversalFeed() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rreactions' }, () => fetchPosts(true))
       .subscribe();
 
-    return () => { supabase.removeChannel(postsSub); };
+    return () => { 
+      supabase.removeChannel(postsSub); 
+      unsubscribeNetwork();
+    };
   }, [selectedZone, sortBy]);
+
+  const loadPendingPosts = async () => {
+    const pending = await offlineStorage.getPendingPosts();
+    setPendingPosts(pending);
+  };
+
+  const syncPendingPosts = async () => {
+    const pending = await offlineStorage.getPendingPosts();
+    if (pending.length === 0) return;
+    
+    setSyncing(true);
+    const { synced, failed } = await syncService.syncPendingPosts();
+    setSyncing(false);
+    
+    if (synced > 0) {
+      await loadPendingPosts();
+      await fetchPosts(true);
+      Alert.alert("Synced", `${synced} post(s) uploaded successfully.`);
+    }
+  };
 
   useEffect(() => {
     if (!user?.id) return;
@@ -148,7 +196,12 @@ export default function UniversalFeed() {
     } catch (e) { console.error(e); }
   };
 
-  const onRefresh = useCallback(() => { setRefreshing(true); fetchPosts(true); }, [selectedZone, sortBy]);
+  const onRefresh = useCallback(() => { 
+    setRefreshing(true); 
+    loadPendingPosts();
+    if (isOnline) syncPendingPosts();
+    fetchPosts(true); 
+  }, [selectedZone, sortBy, isOnline]);
   useEffect(() => { fetchPosts(); }, [selectedZone, sortBy]);
 
   return (
@@ -172,15 +225,35 @@ export default function UniversalFeed() {
       </View>
 
       {showMenu && (
-        <View style={[styles.menu, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-          <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/profile"); }} style={styles.menuItem}><User size={20} color={theme.colors.text} /><Text style={styles.menuText}>Profile</Text></TouchableOpacity>
-          <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/talent"); }} style={styles.menuItem}><Star size={20} color={theme.colors.text} /><Text style={styles.menuText}>Local Talent</Text></TouchableOpacity>
-          <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/businesses"); }} style={styles.menuItem}><Briefcase size={20} color={theme.colors.text} /><Text style={styles.menuText}>Local Business</Text></TouchableOpacity>
-          <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/polls"); }} style={styles.menuItem}><Vote size={20} color={theme.colors.text} /><Text style={styles.menuText}>Polls & Features</Text></TouchableOpacity>
-          {isModerator && <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/admin"); }} style={styles.menuItem}><Shield size={20} color={theme.colors.error} /><Text style={styles.menuText}>Admin</Text></TouchableOpacity>}
-          <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/help"); }} style={styles.menuItem}><HelpCircle size={20} color={theme.colors.text} /><Text style={styles.menuText}>Help</Text></TouchableOpacity>
-        </View>
-      )}
+          <View style={[styles.menu, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+            <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/profile"); }} style={styles.menuItem}><User size={20} color={theme.colors.text} /><Text style={styles.menuText}>Profile</Text></TouchableOpacity>
+            <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/talent"); }} style={styles.menuItem}><Star size={20} color={theme.colors.text} /><Text style={styles.menuText}>Local Talent</Text></TouchableOpacity>
+            <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/businesses"); }} style={styles.menuItem}><Briefcase size={20} color={theme.colors.text} /><Text style={styles.menuText}>Local Business</Text></TouchableOpacity>
+            <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/polls"); }} style={styles.menuItem}><Vote size={20} color={theme.colors.text} /><Text style={styles.menuText}>Polls & Features</Text></TouchableOpacity>
+            {isModerator && <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/admin"); }} style={styles.menuItem}><Shield size={20} color={theme.colors.error} /><Text style={styles.menuText}>Admin</Text></TouchableOpacity>}
+            <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/help"); }} style={styles.menuItem}><HelpCircle size={20} color={theme.colors.text} /><Text style={styles.menuText}>Help</Text></TouchableOpacity>
+          </View>
+        )}
+
+        {!isOnline && (
+          <View style={styles.offlineBanner}>
+            <WifiOff size={14} color="#92400E" />
+            <Text style={styles.offlineBannerText}>You're offline</Text>
+          </View>
+        )}
+
+        {pendingPosts.length > 0 && isOnline && (
+          <TouchableOpacity onPress={syncPendingPosts} disabled={syncing} style={styles.syncBanner}>
+            {syncing ? (
+              <ActivityIndicator size="small" color="#1E40AF" />
+            ) : (
+              <CloudUpload size={14} color="#1E40AF" />
+            )}
+            <Text style={styles.syncBannerText}>
+              {syncing ? 'Syncing...' : `${pendingPosts.length} pending post(s) - Tap to sync`}
+            </Text>
+          </TouchableOpacity>
+        )}
 
         <FlatList
           data={postsWithAds}
@@ -247,6 +320,10 @@ const styles = StyleSheet.create({
   headerActions: { flexDirection: 'row', gap: 15 },
   headerIcon: { position: 'relative' },
   badge: { position: 'absolute', top: -2, right: -2, width: 10, height: 10, borderRadius: 5, borderWidth: 2, borderColor: '#FFF' },
+  offlineBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FEF3C7', padding: 10, paddingHorizontal: 20 },
+  offlineBannerText: { fontSize: 13, color: '#92400E' },
+  syncBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#DBEAFE', padding: 10, paddingHorizontal: 20 },
+  syncBannerText: { fontSize: 13, color: '#1E40AF' },
   filterBar: { paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
   filterScroll: { paddingHorizontal: 15, gap: 8 },
   filterPill: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.08)' },

@@ -21,6 +21,7 @@ import {
   Pencil,
   Play,
   MessageCircle,
+  CloudOff,
 } from "lucide-react-native";
 import { supabase } from "../utils/supabase";
 import { moderateContent } from "../utils/ai";
@@ -141,6 +142,12 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
 
   return (
     <View style={styles.container}>
+      {item.isPending && (
+        <View style={styles.pendingBanner}>
+          <CloudOff size={14} color="#92400E" />
+          <Text style={styles.pendingText}>Pending - Will sync when online</Text>
+        </View>
+      )}
       {shouldBlur && !revealed ? (
         <TouchableOpacity onPress={() => setRevealed(true)} style={styles.blurBanner}>
           <AlertTriangle size={18} color={theme.colors.error} />
@@ -328,6 +335,8 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
 
 const styles = StyleSheet.create({
   container: { marginBottom: 20, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)', paddingBottom: 20 },
+  pendingBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FEF3C7', padding: 8, marginHorizontal: 15, marginBottom: 10, borderRadius: 8 },
+  pendingText: { fontSize: 12, color: '#92400E' },
   card: { paddingHorizontal: 15 },
   header: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   avatar: { width: 40, height: 40, borderRadius: 20 },

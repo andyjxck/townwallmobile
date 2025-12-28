@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { X, ChevronRight, Image as ImageIcon, Shield, BarChart2, Plus, ChevronLeft } from "lucide-react-native";
+import { X, ChevronRight, Image as ImageIcon, Shield, BarChart2, Plus, ChevronLeft, WifiOff } from "lucide-react-native";
 import { getStoredUser } from "../utils/user";
 import { getDeviceId } from "../utils/deviceId";
 import { supabase } from "../utils/supabase";
@@ -23,6 +23,7 @@ import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
 import { theme } from "../utils/theme";
 import { RichTextEditor } from "../components/RichTextEditor";
+import { offlineStorage, checkNetworkStatus } from "../utils/offline";
 
 export default function PostScreen() {
   const insets = useSafeAreaInsets();
@@ -46,8 +47,10 @@ export default function PostScreen() {
   const [pollQuestion, setPollQuestion] = useState("");
   const [pollOptions, setPollOptions] = useState(["", ""]);
   const [hasPoll, setHasPoll] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
 
   useEffect(() => {
+    checkNetworkStatus().then(setIsOnline);
     getDeviceId().then(setDeviceId);
     getStoredUser().then(setUser);
     fetchData();
@@ -95,11 +98,39 @@ export default function PostScreen() {
       return;
     }
     setLoading(true);
+    
+    const online = await checkNetworkStatus();
+    
     try {
-      const moderation = await moderateContent(`${title}\n${text}`);
-      if (moderation.status === 'rejected') {
-        Alert.alert("Rejected", moderation.reason);
-        setLoading(false); return;
+      let moderation = { status: 'approved' };
+      if (online) {
+        moderation = await moderateContent(`${title}\n${text}`);
+        if (moderation.status === 'rejected') {
+          Alert.alert("Rejected", moderation.reason);
+          setLoading(false); return;
+        }
+      }
+
+      const postData = {
+        title: title.trim(),
+        text: text.trim(),
+        zone_id: selectedZone?.id,
+        tag_id: selectedTag?.id,
+        device_id: deviceId,
+        user_id: user?.id,
+        is_anonymous: isAnonymous,
+        moderation_status: moderation.status,
+        localMedia: media,
+      };
+
+      if (!online) {
+        await offlineStorage.savePendingPost(postData);
+        Alert.alert(
+          "Saved Offline",
+          "Your post has been saved and will be uploaded when you're back online.",
+          [{ text: "OK", onPress: () => router.replace("/") }]
+        );
+        return;
       }
 
       let createdPollId = null;
@@ -119,7 +150,7 @@ export default function PostScreen() {
         imageUrls.push(supabase.storage.from('posts').getPublicUrl(fileName).data.publicUrl);
       }
 
-      const postData = {
+      const dbPostData = {
         title: title.trim(),
         text: text.trim(),
         zone_id: selectedZone?.id,
@@ -133,8 +164,8 @@ export default function PostScreen() {
         moderation_status: moderation.status,
       };
 
-      if (postId) await supabase.from('rposts').update(postData).eq('id', postId);
-      else await supabase.from('rposts').insert(postData);
+      if (postId) await supabase.from('rposts').update(dbPostData).eq('id', postId);
+      else await supabase.from('rposts').insert(dbPostData);
 
       router.replace("/");
     } catch (error) { Alert.alert("Error", "Failed to post"); }
@@ -163,9 +194,19 @@ export default function PostScreen() {
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <TouchableOpacity onPress={() => router.back()}><X size={24} color="#000" /></TouchableOpacity>
-        <Text style={styles.headerTitle}>{postId ? "Edit Post" : "New Post"}</Text>
-        <TouchableOpacity onPress={handlePost} disabled={loading}><Text style={[styles.postBtn, { color: theme.colors.primary }]}>Post</Text></TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Text style={styles.headerTitle}>{postId ? "Edit Post" : "New Post"}</Text>
+          {!isOnline && <WifiOff size={16} color="#F59E0B" />}
+        </View>
+        <TouchableOpacity onPress={handlePost} disabled={loading}><Text style={[styles.postBtn, { color: theme.colors.primary }]}>{isOnline ? "Post" : "Save"}</Text></TouchableOpacity>
       </View>
+
+      {!isOnline && (
+        <View style={styles.offlineBanner}>
+          <WifiOff size={14} color="#92400E" />
+          <Text style={styles.offlineBannerText}>You're offline. Posts will sync when connected.</Text>
+        </View>
+      )}
 
         <View style={styles.form}>
           <View style={styles.topOptions}>
@@ -206,6 +247,8 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 15, borderBottomWidth: 1, borderBottomColor: '#EEE' },
   headerTitle: { fontSize: 18, fontWeight: 'bold' },
   postBtn: { fontSize: 16, fontWeight: 'bold' },
+  offlineBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FEF3C7', padding: 10, paddingHorizontal: 20 },
+  offlineBannerText: { fontSize: 13, color: '#92400E' },
   form: { padding: 20, flex: 1 },
   topOptions: { flexDirection: 'row', gap: 10, marginBottom: 20, flexWrap: 'wrap' },
   option: { flexDirection: 'row', backgroundColor: '#F5F5F5', padding: 8, borderRadius: 8 },
