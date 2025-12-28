@@ -267,7 +267,22 @@ export default function Profile() {
       if (currentlyReacted) {
         await supabase.from('rreactions').delete().match({ post_id: postId, reaction_type: reactionType, device_id: deviceId });
       } else {
-        await supabase.from('rreactions').insert({ post_id: postId, reaction_type: reactionType, device_id: deviceId });
+        const { data: reactionData } = await supabase.from('rreactions').insert({ 
+          post_id: postId, 
+          reaction_type: reactionType, 
+          device_id: deviceId,
+          user_id: currentUser?.id 
+        }).select('*, post:rposts(user_id, title)').single();
+
+        if (reactionData?.post?.user_id && reactionData.post.user_id !== currentUser?.id) {
+          await sendNotification({
+            userId: reactionData.post.user_id,
+            title: `New ${reactionType === 'helpful' ? 'Like' : 'Superlike'}!`,
+            message: `@${currentUser?.username || 'Someone'} ${reactionType === 'helpful' ? 'liked' : 'superliked'} your post: "${reactionData.post.title || 'Untitled'}"`,
+            type: 'reaction',
+            link: `/post?id=${postId}`
+          });
+        }
       }
       loadData();
     } catch (error) { console.error(error); }
