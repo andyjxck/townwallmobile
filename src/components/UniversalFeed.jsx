@@ -229,12 +229,26 @@ export default function UniversalFeed() {
   }, [selectedZone, sortBy, isOnline]);
   useEffect(() => { fetchPosts(); }, [selectedZone, sortBy]);
 
+    const [logoClicks, setLogoClicks] = useState(0);
+
+    const handleLogoClick = () => {
+        const newClicks = logoClicks + 1;
+        setLogoClicks(newClicks);
+        if (newClicks >= 15) {
+            setLogoClicks(0);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            router.push("/secret-hippie");
+        } else if (newClicks > 5) {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        }
+    };
+
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <TouchableOpacity onPress={handleLogoClick} activeOpacity={0.7} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <Image source={require("../../assets/images/icon.png")} style={{ width: 32, height: 32 }} contentFit="contain" />
-          </View>
+          </TouchableOpacity>
         <View style={styles.headerActions}>
           <TouchableOpacity onPress={() => setShowFilterSort(true)} style={styles.headerIcon}>
             <ListFilter color={theme.colors.text} size={24} />

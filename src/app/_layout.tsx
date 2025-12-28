@@ -124,6 +124,28 @@ const initRevenueCat = async () => {
 
 initRevenueCat();
 
+import { ThemeProvider, useTheme } from "@/utils/ThemeContext";
+
+import HippieBackground from "@/components/HippieBackground";
+
+function ThemeWrapper({ children }) {
+  const { isHippie } = useTheme();
+  const colorScheme = useColorScheme();
+  
+  const content = (
+    <SafeAreaProvider style={{ flex: 1 }}>
+      <StatusBar style={isHippie ? "light" : (colorScheme === "dark" ? "light" : "dark")} />
+      {children}
+    </SafeAreaProvider>
+  );
+
+  if (isHippie) {
+    return <HippieBackground>{content}</HippieBackground>;
+  }
+
+  return content;
+}
+
 export default function RootLayout() {
   const { initiate, isReady, auth } = useAuth();
   const colorScheme = useColorScheme();
@@ -241,39 +263,42 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <ErrorBoundaryWrapper>
-          <SafeAreaProvider>
-            <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
-            <SandboxHandler />
-            <GlobalErrorReporter />
-              <Toaster />
-              <Stack
-                  screenOptions={{
-                    headerShown: false,
-                    animation: "slide_from_right",
-                  }}
-                >
-                    <Stack.Screen name="index" />
-                    <Stack.Screen name="auth" />
-                    <Stack.Screen name="help" />
-                    <Stack.Screen name="profile" />
-                    <Stack.Screen name="settings" />
-                    <Stack.Screen name="admin" />
-                    <Stack.Screen name="onboarding/welcome" />
-                    <Stack.Screen name="onboarding/zones" />
-                    <Stack.Screen
-                      name="post"
-                      options={{
-                        presentation: "modal",
-                        animation: "slide_from_bottom",
+      <ThemeProvider>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <ErrorBoundaryWrapper>
+            <ThemeWrapper>
+                <SandboxHandler />
+                <GlobalErrorReporter />
+                  <Toaster />
+                  <Stack
+                      screenOptions={{
+                        headerShown: false,
+                        animation: "slide_from_right",
                       }}
-                    />
-                </Stack>
-              <FloatingChat />
-            </SafeAreaProvider>
-        </ErrorBoundaryWrapper>
-      </GestureHandlerRootView>
+                    >
+                        <Stack.Screen name="index" />
+                        <Stack.Screen name="auth" />
+                        <Stack.Screen name="help" />
+                        <Stack.Screen name="profile" />
+                        <Stack.Screen name="settings" />
+                        <Stack.Screen name="admin" />
+                        <Stack.Screen name="onboarding/welcome" />
+                        <Stack.Screen name="onboarding/zones" />
+                        <Stack.Screen
+                          name="post"
+                          options={{
+                            presentation: "modal",
+                            animation: "slide_from_bottom",
+                          }}
+                        />
+                        <Stack.Screen name="secret-hippie" options={{ presentation: 'modal' }} />
+                    </Stack>
+                  <FloatingChat />
+              </ThemeWrapper>
+          </ErrorBoundaryWrapper>
+        </GestureHandlerRootView>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }
+
