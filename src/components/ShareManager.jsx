@@ -7,7 +7,7 @@ import { ShareCard } from './ShareCard';
 import { toast } from 'sonner-native';
 import { supabase } from '../utils/supabase';
 import { getStoredUser } from '../utils/user';
-import { sendNotification } from '../utils/notifications';
+import { sendNotification, sendShareNotification } from '../utils/notifications';
 
 export const ShareManager = forwardRef((props, ref) => {
   const [sharingPost, setSharingPost] = useState(null);

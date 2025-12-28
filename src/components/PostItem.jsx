@@ -25,7 +25,7 @@ import {
 } from "lucide-react-native";
 import { supabase } from "../utils/supabase";
 import { moderateContent } from "../utils/ai";
-import { sendNotification } from "../utils/notifications";
+import { sendNotification, sendCommentNotification } from "../utils/notifications";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { useVideoPlayer, VideoView } from 'expo-video';
