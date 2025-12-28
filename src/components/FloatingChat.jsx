@@ -35,6 +35,7 @@ export default function FloatingChat() {
   const [chats, setChats] = useState([]);
   const [showChatList, setShowChatList] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isVisible, setIsVisible] = useState(true);
   
   const pan = useRef(new Animated.ValueXY({ x: width - 80, y: height - 210 })).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -84,11 +85,27 @@ export default function FloatingChat() {
     
     const chatSub = supabase
       .channel('public:rmessages_realtime')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'rmessages' }, (payload) => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'rmessages' }, async (payload) => {
         if (activeChat && payload.new.chat_id === activeChat.id) {
           setMessages(prev => [...prev, payload.new]);
           setTimeout(() => flatListRef.current?.scrollToEnd(), 100);
         }
+        
+        // Show bubble if a message is received (not sent by current user)
+        if (user && payload.new.sender_id !== user.id) {
+          // Check if this chat belongs to the current user
+          const { data: chatData } = await supabase
+            .from('rchats')
+            .select('user1_id, user2_id')
+            .eq('id', payload.new.chat_id)
+            .single();
+            
+          if (chatData && (chatData.user1_id === user.id || chatData.user2_id === user.id)) {
+            setIsVisible(true);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          }
+        }
+        
         loadUserAndChats();
       })
       .subscribe();
@@ -184,24 +201,36 @@ export default function FloatingChat() {
     return chat.user1_id === user.id ? chat.user2 : chat.user1;
   };
 
-  if (!user && !isOpen) return null;
+  if (!user || (!isVisible && !isOpen)) return null;
 
   return (
     <View style={styles.container} pointerEvents="box-none">
-      {!isOpen && (
+      {!isOpen && isVisible && (
         <Animated.View
           {...panResponder.panHandlers}
           style={[pan.getLayout(), styles.bubbleWrapper]}
         >
-          <TouchableOpacity onPress={toggleChat} activeOpacity={0.8}>
-            <LinearGradient
-              colors={[theme.colors.primary, '#4ADE80']}
-              style={styles.bubble}
+          <View style={styles.bubbleContainer}>
+            <TouchableOpacity onPress={toggleChat} activeOpacity={0.8}>
+              <LinearGradient
+                colors={[theme.colors.primary, '#4ADE80']}
+                style={styles.bubble}
+              >
+                <MessageCircle color="#000" size={28} />
+                {chats.some(c => c.unread_count > 0) && <View style={styles.unreadBadge} />}
+              </LinearGradient>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setIsVisible(false);
+              }} 
+              style={styles.closeBubbleBtn}
             >
-              <MessageCircle color="#000" size={28} />
-              {chats.some(c => c.unread_count > 0) && <View style={styles.unreadBadge} />}
-            </LinearGradient>
-          </TouchableOpacity>
+              <X size={14} color="#000" />
+            </TouchableOpacity>
+          </View>
         </Animated.View>
       )}
 
@@ -372,6 +401,11 @@ const styles = StyleSheet.create({
       shadowOpacity: 0.4,
       shadowRadius: 8,
     },
+    bubbleContainer: {
+      position: 'relative',
+      width: 60,
+      height: 60,
+    },
     bubble: {
       width: 60,
       height: 60,
@@ -381,7 +415,25 @@ const styles = StyleSheet.create({
       borderWidth: 1,
       borderColor: 'rgba(255,255,255,0.2)',
     },
-  unreadBadge: {
+    closeBubbleBtn: {
+      position: 'absolute',
+      top: -4,
+      right: -4,
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      backgroundColor: '#FFF',
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 2,
+      borderColor: '#000',
+      elevation: 5,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 2,
+    },
+    unreadBadge: {
     position: 'absolute',
     top: -2,
     right: -2,

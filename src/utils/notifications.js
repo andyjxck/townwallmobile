@@ -127,6 +127,17 @@ export const sendNotification = async ({ userId, title, message, type, link }) =
 
     if (error) throw error;
 
+    // Send push notification if user is offline
+    const { data: userData } = await supabase
+      .from('rusers')
+      .select('push_token, last_seen')
+      .eq('id', userId)
+      .single();
+
+    if (userData?.push_token && !isOnline(userData.last_seen)) {
+      await sendPushNotification(userData.push_token, title, message, { type, link });
+    }
+
     return { success: true, data: newNotification };
   } catch (error) {
     console.error('Error sending notification:', error);
