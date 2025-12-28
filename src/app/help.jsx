@@ -391,15 +391,16 @@ export default function HelpContact() {
           keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
         >
             <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, 20) }]}>
-              <TextInput
-                style={styles.input}
-                placeholder="Type a message..."
-                placeholderTextColor="rgba(255,255,255,0.3)"
-                value={inputText}
-                onChangeText={setInputText}
-                onKeyPress={handleKeyPress}
-                multiline
-              />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Type a message..."
+                  placeholderTextColor="rgba(255,255,255,0.3)"
+                  value={inputText}
+                  onChangeText={setInputText}
+                  onKeyPress={handleKeyPress}
+                  multiline
+                  blurOnSubmit={false}
+                />
             <TouchableOpacity 
               style={[styles.sendButton, !inputText.trim() && { opacity: 0.5 }]} 
               onPress={handleSend}

@@ -172,6 +172,7 @@ export default function PostScreen() {
     finally { setLoading(false); }
   };
 
+  if (step === 'zone' || step === 'tag') {
     return (
       <View style={[styles.container, { paddingTop: insets.top, backgroundColor: theme.colors.background }]}>
         <View style={[styles.overlayHeader, { borderBottomColor: theme.colors.border }]}>

@@ -318,15 +318,16 @@ export default function FloatingChat() {
                 )}
                 <View style={styles.inputContainer}>
                   <View style={styles.inputWrapper}>
-                      <TextInput
-                        style={styles.input}
-                        placeholder="Type a message..."
-                        value={inputText}
-                        onChangeText={setInputText}
-                        onKeyPress={handleKeyPress}
-                        placeholderTextColor="rgba(255,255,255,0.3)"
-                        multiline
-                      />
+                        <TextInput
+                          style={styles.input}
+                          placeholder="Type a message..."
+                          value={inputText}
+                          onChangeText={setInputText}
+                          onKeyPress={handleKeyPress}
+                          placeholderTextColor="rgba(255,255,255,0.3)"
+                          multiline
+                          blurOnSubmit={false}
+                        />
                     <TouchableOpacity 
                       onPress={handleSendMessage} 
                       style={[styles.sendBtn, !inputText.trim() && { opacity: 0.5 }]}
