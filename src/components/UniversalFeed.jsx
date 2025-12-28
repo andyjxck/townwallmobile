@@ -42,6 +42,7 @@ import { ShareManager } from "./ShareManager";
 import { BannerAd } from "@/components/BannerAd";
 import { NativeAd } from "@/components/NativeAd";
 import PostItem from "./PostItem";
+import { subscribeToUnreadCount, sendNotification } from "../utils/notifications";
 
 export default function UniversalFeed() {
   const insets = useSafeAreaInsets();
@@ -90,7 +91,6 @@ export default function UniversalFeed() {
     getDeviceId().then(setDeviceId);
     fetchZones();
     checkModerator();
-    loadUnreadCount();
 
     const postsSub = supabase
       .channel('public:rposts')
@@ -100,6 +100,14 @@ export default function UniversalFeed() {
 
     return () => { supabase.removeChannel(postsSub); };
   }, [selectedZone, sortBy]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const unsubscribe = subscribeToUnreadCount(user.id, (count) => {
+      setUnreadCount(count);
+    });
+    return () => unsubscribe();
+  }, [user?.id]);
 
   const loadUnreadCount = async () => {
     const user = await getStoredUser();
@@ -148,9 +156,9 @@ export default function UniversalFeed() {
           user_id: user?.id 
         }).select('*, post:rposts(user_id, title)').single();
 
-        if (reactionData?.post?.user_id) {
-          await supabase.from('rnotifications').insert({
-            user_id: reactionData.post.user_id,
+        if (reactionData?.post?.user_id && reactionData.post.user_id !== user?.id) {
+          await sendNotification({
+            userId: reactionData.post.user_id,
             title: `New ${type === 'helpful' ? 'Like' : 'Superlike'}!`,
             message: `@${user?.username || 'Someone'} ${type === 'helpful' ? 'liked' : 'superliked'} your post: "${reactionData.post.title || 'Untitled'}"`,
             type: 'reaction',

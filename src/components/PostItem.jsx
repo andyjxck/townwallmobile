@@ -24,6 +24,7 @@ import {
 } from "lucide-react-native";
 import { supabase } from "../utils/supabase";
 import { moderateContent } from "../utils/ai";
+import { sendNotification } from "../utils/notifications";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -107,15 +108,15 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
           nickname: isAnonComment ? userNickname : null
         }).select(`*, user:rusers (username, emoji_icon, avatar_url, nickname)`).single();
 
-      if (item.user_id) {
-        await supabase.from('rnotifications').insert({
-          user_id: item.user_id,
-          title: `New Comment!`,
-          message: `@${storedUser?.username || 'Someone'} commented on your post: "${item.title || 'Untitled'}"`,
-          type: 'comment',
-          link: `/post?id=${item.id}`
-        });
-      }
+      if (item.user_id && item.user_id !== storedUser?.id) {
+          await sendNotification({
+            userId: item.user_id,
+            title: `New Comment!`,
+            message: `@${storedUser?.username || 'Someone'} commented on your post: "${item.title || 'Untitled'}"`,
+            type: 'comment',
+            link: `/post?id=${item.id}`
+          });
+        }
 
       setComments([...comments, commentData]);
       setCommentText("");

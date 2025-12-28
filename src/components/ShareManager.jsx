@@ -7,6 +7,7 @@ import { ShareCard } from './ShareCard';
 import { toast } from 'sonner-native';
 import { supabase } from '../utils/supabase';
 import { getStoredUser } from '../utils/user';
+import { sendNotification } from '../utils/notifications';
 
 export const ShareManager = forwardRef((props, ref) => {
   const [sharingPost, setSharingPost] = useState(null);
@@ -20,9 +21,9 @@ export const ShareManager = forwardRef((props, ref) => {
         user_id: user?.id || null
       });
 
-      if (post.user_id) {
-        await supabase.from('rnotifications').insert({
-          user_id: post.user_id,
+      if (post.user_id && post.user_id !== user?.id) {
+        await sendNotification({
+          userId: post.user_id,
           title: `Post Shared!`,
           message: `@${user?.username || 'Someone'} shared your post: "${post.title || 'Untitled'}"`,
           type: 'share',

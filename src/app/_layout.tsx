@@ -3,7 +3,7 @@ import * as UserUtils from "../utils/user";
 import { supabase } from "@/utils/supabase";
 import { Stack, usePathname, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import { useEffect, memo } from "react";
+import { useEffect, useRef, memo } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -14,6 +14,8 @@ import { requestTrackingPermissionsAsync } from "expo-tracking-transparency";
 import Purchases from "react-native-purchases";
 import Constants from "expo-constants";
 import { ErrorBoundaryWrapper } from "../../__create/SharedErrorBoundary";
+import * as Notifications from "expo-notifications";
+import { registerForPushNotificationsAsync } from "@/utils/notifications";
 
 import NotificationPanel from "@/components/NotificationPanel";
 import FloatingChat from "@/components/FloatingChat";
@@ -123,6 +125,9 @@ initRevenueCat();
 export default function RootLayout() {
   const { initiate, isReady, auth } = useAuth();
   const colorScheme = useColorScheme();
+  const router = useRouter();
+  const notificationListener = useRef<Notifications.EventSubscription>();
+  const responseListener = useRef<Notifications.EventSubscription>();
 
   useEffect(() => {
     const init = async () => {
@@ -163,6 +168,32 @@ export default function RootLayout() {
       })();
     }
   }, [initiate]);
+
+  useEffect(() => {
+    if (isReady && auth?.id && Platform.OS !== 'web') {
+      registerForPushNotificationsAsync(auth.id);
+
+      notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
+        console.log('Notification received:', notification);
+      });
+
+      responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+        const data = response.notification.request.content.data;
+        if (data?.link && typeof data.link === 'string') {
+          router.push(data.link as any);
+        }
+      });
+
+      return () => {
+        if (notificationListener.current) {
+          notificationListener.current.remove();
+        }
+        if (responseListener.current) {
+          responseListener.current.remove();
+        }
+      };
+    }
+  }, [isReady, auth]);
 
   useEffect(() => {
     if (isReady && auth?.id) {

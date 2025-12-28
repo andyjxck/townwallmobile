@@ -66,6 +66,14 @@
         "expo-secure-store",
         "expo-web-browser",
         [
+          "expo-notifications",
+          {
+            "icon": "./assets/images/icon.png",
+            "color": "#ffffff",
+            "sounds": []
+          }
+        ],
+        [
           "react-native-google-mobile-ads",
             {
               "androidAppId": "ca-app-pub-1505977777207758~6195707754",
