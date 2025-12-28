@@ -103,43 +103,51 @@ export async function sendPushNotification(expoPushToken, title, body, data = {}
   }
 }
 
-export const sendNotification = async ({ userId, title, message, type, link }) => {
-  try {
-    const tenSecondsAgo = new Date(Date.now() - 10000).toISOString();
-    const { data: existing } = await supabase
-      .from('rnotifications')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('title', title)
-      .eq('message', message)
-      .gt('created_at', tenSecondsAgo)
-      .limit(1);
-
-    if (existing && existing.length > 0) {
-      console.log('Skipping duplicate notification');
-      return { success: true, skipped: true };
+  export const sendNotification = async ({ userId, title, message, type, link }) => {
+    try {
+      // For reactions and shares, we want to be very strict to prevent spamming.
+      // We check if a notification with the same title and message already exists for this user.
+      const isStrictType = ['reaction', 'share'].includes(type);
+      const timeWindow = isStrictType ? null : new Date(Date.now() - 60000).toISOString(); // 1 minute window for others
+  
+      let query = supabase
+        .from('rnotifications')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('title', title)
+        .eq('message', message);
+  
+      if (timeWindow) {
+        query = query.gt('created_at', timeWindow);
+      }
+  
+      const { data: existing } = await query.limit(1);
+  
+      if (existing && existing.length > 0) {
+        console.log(`Skipping duplicate notification (type: ${type})`);
+        return { success: true, skipped: true };
+      }
+  
+      const { data: newNotification, error } = await supabase
+        .from('rnotifications')
+        .insert({
+          user_id: userId,
+          title,
+          message,
+          type,
+          link
+        })
+        .select('*')
+        .single();
+  
+      if (error) throw error;
+  
+      return { success: true, data: newNotification };
+    } catch (error) {
+      console.error('Error sending notification:', error);
+      return { success: false, error };
     }
-
-    const { data: newNotification, error } = await supabase
-      .from('rnotifications')
-      .insert({
-        user_id: userId,
-        title,
-        message,
-        type,
-        link
-      })
-      .select('*')
-      .single();
-
-    if (error) throw error;
-
-    return { success: true, data: newNotification };
-  } catch (error) {
-    console.error('Error sending notification:', error);
-    return { success: false, error };
-  }
-};
+  };
 
 export const sendMessageNotification = async ({ senderId, receiverId, senderUsername, messageText }) => {
   return sendNotification({
