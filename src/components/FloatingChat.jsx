@@ -18,7 +18,7 @@ import {
   ScrollView,
   Alert
 } from 'react-native';
-import { MessageCircle, X, Send, ChevronLeft, MoreHorizontal, User, Check, CheckCheck, Settings, Phone, PhoneOff, Users, Plus, UserPlus, Mic, MicOff, Video } from 'lucide-react-native';
+import { MessageCircle, X, Send, ChevronLeft, MoreHorizontal, User, Check, CheckCheck, Settings, Plus, UserPlus, Mic, MicOff, Video, Phone as PhoneIcon, PhoneOff as PhoneOffIcon, PhoneIncoming, PhoneOutgoing } from 'lucide-react-native';
 import { supabase } from '../utils/supabase';
 import { getStoredUser } from '../utils/user';
 import { theme } from '../utils/theme';
@@ -28,6 +28,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
+import { Audio } from 'expo-av';
+
+const SOUNDS = {
+  ringing: 'https://assets.mixkit.co/sfx/preview/mixkit-phone-ringing-bell-586.mp3',
+  connect: 'https://assets.mixkit.co/sfx/preview/mixkit-positive-interface-click-1112.mp3',
+  disconnect: 'https://assets.mixkit.co/sfx/preview/mixkit-modern-click-box-check-1120.mp3',
+  mute: 'https://assets.mixkit.co/sfx/preview/mixkit-interface-click-1126.mp3',
+};
 
 const { width, height } = Dimensions.get('window');
 
@@ -63,11 +71,58 @@ export default function FloatingChat() {
   const [isMuted, setIsMuted] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
   const callTimerRef = useRef(null);
+  const soundObjects = useRef({});
   
+  const pulseAnim = useRef(new Animated.Value(1)).current;
   const pan = useRef(new Animated.ValueXY({ x: width - 80, y: height - 210 })).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(height)).current;
   const flatListRef = useRef();
+
+  useEffect(() => {
+    if (activeCall?.status === 'ringing') {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, { toValue: 1.2, duration: 1000, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true })
+        ])
+      ).start();
+      playSound('ringing', true);
+    } else {
+      pulseAnim.setValue(1);
+      stopSound('ringing');
+      if (activeCall?.status === 'active') {
+        playSound('connect');
+      }
+    }
+  }, [activeCall?.status]);
+
+  const playSound = async (name, loop = false) => {
+    try {
+      if (soundObjects.current[name]) {
+        await soundObjects.current[name].unloadAsync();
+      }
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: SOUNDS[name] },
+        { shouldPlay: true, isLooping: loop }
+      );
+      soundObjects.current[name] = sound;
+    } catch (error) {
+      console.log('Error playing sound:', error);
+    }
+  };
+
+  const stopSound = async (name) => {
+    try {
+      if (soundObjects.current[name]) {
+        await soundObjects.current[name].stopAsync();
+        await soundObjects.current[name].unloadAsync();
+        soundObjects.current[name] = null;
+      }
+    } catch (error) {
+      console.log('Error stopping sound:', error);
+    }
+  };
 
   const panResponder = useRef(
     PanResponder.create({
@@ -514,6 +569,8 @@ export default function FloatingChat() {
       user_id: user.id
     });
     
+    stopSound('ringing');
+    playSound('connect');
     setActiveCall(prev => ({ ...prev, status: 'active' }));
     startCallTimer();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -527,6 +584,8 @@ export default function FloatingChat() {
       ended_at: new Date().toISOString()
     }).eq('id', activeCall.id);
     
+    stopSound('ringing');
+    playSound('disconnect');
     endCallUI();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
   };
@@ -543,12 +602,14 @@ export default function FloatingChat() {
       left_at: new Date().toISOString()
     }).eq('call_id', activeCall.id).eq('user_id', user.id);
     
+    playSound('disconnect');
     endCallUI();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   };
 
   const toggleMute = () => {
     setIsMuted(!isMuted);
+    playSound('mute');
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
@@ -651,45 +712,83 @@ export default function FloatingChat() {
       {activeCall && (
         <Modal visible={true} animationType="fade" transparent>
           <View style={styles.callOverlay}>
-            <BlurView intensity={90} style={StyleSheet.absoluteFill} tint="dark" />
+            <BlurView intensity={100} style={StyleSheet.absoluteFill} tint="dark" />
+            
+            {/* Background decorative elements */}
+            <View style={[styles.callBgCircle, { top: -100, left: -50, backgroundColor: theme.colors.primary + '20' }]} />
+            <View style={[styles.callBgCircle, { bottom: -100, right: -50, backgroundColor: '#4ADE8020' }]} />
+
             <View style={styles.callContent}>
-              <View style={styles.callAvatarLarge}>
+              <Animated.View style={[
+                styles.callAvatarLarge,
+                { transform: [{ scale: pulseAnim }] },
+                activeCall.status === 'ringing' && styles.callAvatarRinging
+              ]}>
                 {activeCall.chat?.is_group ? (
-                  <Text style={styles.callEmoji}>{activeCall.chat.group_icon || '👥'}</Text>
+                  <View style={styles.callEmojiBg}>
+                    <Text style={styles.callEmoji}>{activeCall.chat.group_icon || '👥'}</Text>
+                  </View>
                 ) : getOtherUser(activeCall.chat)?.avatar_url ? (
                   <Image source={{ uri: getOtherUser(activeCall.chat).avatar_url }} style={styles.callAvatarImg} />
                 ) : (
-                  <Text style={styles.callEmoji}>{getOtherUser(activeCall.chat)?.emoji_icon || '👤'}</Text>
+                  <View style={styles.callEmojiBg}>
+                    <Text style={styles.callEmoji}>{getOtherUser(activeCall.chat)?.emoji_icon || '👤'}</Text>
+                  </View>
                 )}
-              </View>
+              </Animated.View>
+
               <Text style={styles.callName}>
                 {activeCall.chat?.is_group ? activeCall.chat.group_name : `@${getOtherUser(activeCall.chat)?.username}`}
               </Text>
-              <Text style={styles.callStatus}>
-                {activeCall.status === 'ringing' 
-                  ? (activeCall.isOutgoing ? 'Calling...' : 'Incoming call')
-                  : formatCallDuration(callDuration)}
-              </Text>
               
+              <View style={styles.callStatusContainer}>
+                {activeCall.status === 'ringing' ? (
+                  <Text style={styles.callStatusText}>
+                    {activeCall.isOutgoing ? 'Calling...' : 'Incoming call'}
+                  </Text>
+                ) : (
+                  <View style={styles.callDurationContainer}>
+                    <View style={styles.activeDot} />
+                    <Text style={styles.callDurationText}>{formatCallDuration(callDuration)}</Text>
+                  </View>
+                )}
+              </View>
+
               <View style={styles.callActions}>
                 {activeCall.status === 'ringing' && !activeCall.isOutgoing ? (
-                  <>
+                  <View style={styles.incomingActions}>
                     <TouchableOpacity onPress={declineCall} style={[styles.callBtn, styles.callBtnDecline]}>
-                      <PhoneOff size={28} color="#FFF" />
+                      <PhoneOffIcon size={32} color="#FFF" />
+                      <Text style={styles.callBtnLabel}>Decline</Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={answerCall} style={[styles.callBtn, styles.callBtnAnswer]}>
-                      <Phone size={28} color="#FFF" />
+                      <PhoneIcon size={32} color="#FFF" />
+                      <Text style={styles.callBtnLabel}>Answer</Text>
                     </TouchableOpacity>
-                  </>
+                  </View>
                 ) : (
-                  <>
+                  <View style={styles.activeActions}>
                     <TouchableOpacity onPress={toggleMute} style={[styles.callBtn, isMuted && styles.callBtnMuted]}>
-                      {isMuted ? <MicOff size={24} color="#FFF" /> : <Mic size={24} color="#FFF" />}
+                      <View style={styles.iconCircle}>
+                        {isMuted ? <MicOff size={24} color="#FFF" /> : <Mic size={24} color="#FFF" />}
+                      </View>
+                      <Text style={styles.callBtnLabel}>{isMuted ? 'Unmute' : 'Mute'}</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={endCall} style={[styles.callBtn, styles.callBtnDecline]}>
-                      <PhoneOff size={28} color="#FFF" />
+                    
+                    <TouchableOpacity onPress={endCall} style={[styles.callBtn, styles.callBtnEnd]}>
+                      <View style={[styles.iconCircle, { backgroundColor: '#EF4444' }]}>
+                        <PhoneOffIcon size={28} color="#FFF" />
+                      </View>
+                      <Text style={styles.callBtnLabel}>End</Text>
                     </TouchableOpacity>
-                  </>
+                    
+                    <TouchableOpacity style={styles.callBtn}>
+                      <View style={styles.iconCircle}>
+                        <Video size={24} color="rgba(255,255,255,0.4)" />
+                      </View>
+                      <Text style={[styles.callBtnLabel, { color: 'rgba(255,255,255,0.4)' }]}>Video</Text>
+                    </TouchableOpacity>
+                  </View>
                 )}
               </View>
             </View>
@@ -1434,59 +1533,156 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.85)',
+  },
+  callBgCircle: {
+    position: 'absolute',
+    width: 300,
+    height: 300,
+    borderRadius: 150,
   },
   callContent: {
     alignItems: 'center',
-    padding: 40,
+    width: '100%',
+    padding: 20,
   },
   callAvatarLarge: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: 'rgba(255,255,255,0.05)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 32,
+    borderWidth: 4,
+    borderColor: 'rgba(255,255,255,0.1)',
+    overflow: 'hidden',
+  },
+  callAvatarRinging: {
+    borderColor: theme.colors.primary,
+    shadowColor: theme.colors.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
   },
   callAvatarImg: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 140,
+    height: 140,
+  },
+  callEmojiBg: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)',
   },
   callEmoji: {
-    fontSize: 56,
+    fontSize: 64,
   },
   callName: {
     color: '#FFF',
-    fontSize: 24,
-    fontWeight: '800',
+    fontSize: 28,
+    fontWeight: '900',
     marginBottom: 8,
+    textAlign: 'center',
   },
-  callStatus: {
+  callStatusContainer: {
+    marginBottom: 60,
+    height: 30,
+    justifyContent: 'center',
+  },
+  callStatusText: {
     color: 'rgba(255,255,255,0.6)',
+    fontSize: 18,
+    fontWeight: '600',
+    letterSpacing: 1,
+  },
+  callDurationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  activeDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#10B981',
+  },
+  callDurationText: {
+    color: '#FFF',
     fontSize: 16,
-    marginBottom: 48,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
   },
   callActions: {
+    width: '100%',
+    paddingHorizontal: 20,
+  },
+  incomingActions: {
     flexDirection: 'row',
-    gap: 32,
+    justifyContent: 'space-around',
+    width: '100%',
+  },
+  activeActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    paddingHorizontal: 10,
   },
   callBtn: {
+    alignItems: 'center',
+    gap: 12,
+  },
+  iconCircle: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(255,255,255,0.15)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  callBtnDecline: {
-    backgroundColor: '#EF4444',
-  },
   callBtnAnswer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: '#10B981',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+  },
+  callBtnDecline: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#EF4444',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+  },
+  callBtnEnd: {
+    alignItems: 'center',
+    gap: 12,
   },
   callBtnMuted: {
-    backgroundColor: 'rgba(239,68,68,0.3)',
+    opacity: 0.8,
+  },
+  callBtnLabel: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '700',
+    marginTop: 4,
   },
   modalOverlay: {
     flex: 1,
