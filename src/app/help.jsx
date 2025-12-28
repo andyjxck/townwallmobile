@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/utils/supabase';
 import { getStoredUser } from '@/utils/user';
 import { getAIAssistantResponse } from '@/utils/ai';
+import { sendNotification } from '@/utils/notifications';
 import * as Haptics from 'expo-haptics';
 
 import { LinearGradient } from "expo-linear-gradient";
@@ -234,6 +235,14 @@ export default function HelpContact() {
               content: aiResponse,
               is_from_admin: true
             });
+          
+          // Notify user of assistant response
+          await sendNotification({
+            userId: currentUser.id,
+            title: 'Town Wall Assistant',
+            message: aiResponse,
+            type: 'help_chat'
+          });
   
         } catch (error) {
           console.error("Error in handleSend:", error);
@@ -243,6 +252,12 @@ export default function HelpContact() {
           Alert.alert("Error", "Message could not be sent.");
         }
       };
+
+  const handleKeyPress = ({ nativeEvent }) => {
+    if (nativeEvent.key === 'Enter' && !nativeEvent.shiftKey) {
+      handleSend();
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -375,15 +390,16 @@ export default function HelpContact() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
           keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
         >
-          <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, 20) }]}>
-            <TextInput
-              style={styles.input}
-              placeholder="Type a message..."
-              placeholderTextColor="rgba(255,255,255,0.3)"
-              value={inputText}
-              onChangeText={setInputText}
-              multiline
-            />
+            <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+              <TextInput
+                style={styles.input}
+                placeholder="Type a message..."
+                placeholderTextColor="rgba(255,255,255,0.3)"
+                value={inputText}
+                onChangeText={setInputText}
+                onKeyPress={handleKeyPress}
+                multiline
+              />
             <TouchableOpacity 
               style={[styles.sendButton, !inputText.trim() && { opacity: 0.5 }]} 
               onPress={handleSend}

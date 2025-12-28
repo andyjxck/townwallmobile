@@ -18,6 +18,7 @@ import { MessageCircle, X, Send, ChevronLeft, MoreHorizontal, User } from 'lucid
 import { supabase } from '../utils/supabase';
 import { getStoredUser } from '../utils/user';
 import { theme } from '../utils/theme';
+import { sendNotification } from '../utils/notifications';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -118,28 +119,45 @@ export default function FloatingChat() {
     setTimeout(() => flatListRef.current?.scrollToEnd(), 100);
   };
 
-  const handleSendMessage = async () => {
-    if (!inputText.trim() || !activeChat) return;
-    const text = inputText.trim();
-    setInputText('');
-    
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const handleSendMessage = async () => {
+      if (!inputText.trim() || !activeChat) return;
+      const text = inputText.trim();
+      setInputText('');
+      
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-    const { data } = await supabase
-      .from('rmessages')
-      .insert({
-        chat_id: activeChat.id,
-        sender_id: user.id,
-        text
-      }).select().single();
+      const { data } = await supabase
+        .from('rmessages')
+        .insert({
+          chat_id: activeChat.id,
+          sender_id: user.id,
+          text
+        }).select().single();
 
-    if (data) {
-      await supabase.from('rchats').update({
-        last_message: text,
-        last_message_at: new Date().toISOString()
-      }).eq('id', activeChat.id);
-    }
-  };
+      if (data) {
+        await supabase.from('rchats').update({
+          last_message: text,
+          last_message_at: new Date().toISOString()
+        }).eq('id', activeChat.id);
+
+        // Send notification to the other user
+        const otherUser = getOtherUser(activeChat);
+        if (otherUser) {
+          await sendNotification({
+            userId: otherUser.id,
+            title: `@${user.username} sent you a message`,
+            message: text,
+            type: 'help_chat'
+          });
+        }
+      }
+    };
+
+    const handleKeyPress = ({ nativeEvent }) => {
+      if (nativeEvent.key === 'Enter' && !nativeEvent.shiftKey) {
+        handleSendMessage();
+      }
+    };
 
   const selectChat = (chat) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -300,14 +318,15 @@ export default function FloatingChat() {
                 )}
                 <View style={styles.inputContainer}>
                   <View style={styles.inputWrapper}>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Type a message..."
-                      value={inputText}
-                      onChangeText={setInputText}
-                      placeholderTextColor="rgba(255,255,255,0.3)"
-                      multiline
-                    />
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Type a message..."
+                        value={inputText}
+                        onChangeText={setInputText}
+                        onKeyPress={handleKeyPress}
+                        placeholderTextColor="rgba(255,255,255,0.3)"
+                        multiline
+                      />
                     <TouchableOpacity 
                       onPress={handleSendMessage} 
                       style={[styles.sendBtn, !inputText.trim() && { opacity: 0.5 }]}
