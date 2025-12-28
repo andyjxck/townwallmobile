@@ -14,7 +14,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import MapView, { Marker, Callout } from 'react-native-maps';
 import { BannerAd } from '@/components/BannerAd';
-import { NativeAd } from '@/components/NativeAd';
 
 export default function LocalBusinesses() {
   const insets = useSafeAreaInsets();
@@ -308,38 +307,9 @@ export default function LocalBusinesses() {
     b.description?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const displayBusinesses = useMemo(() => {
-    if (!filteredBusinesses || filteredBusinesses.length === 0) return [];
-    
-    const interleaved = [];
-    let itemsSinceLastAd = 0;
-    let nextAdThreshold = Math.floor(Math.random() * (11 - 5 + 1)) + 5;
-    
-    const firstAdIndex = 1; // Show first ad after 2 items
-
-    filteredBusinesses.forEach((b, index) => {
-      interleaved.push({ ...b, _isBusiness: true });
-      itemsSinceLastAd++;
-      
-      if (index === firstAdIndex || itemsSinceLastAd >= nextAdThreshold) {
-        interleaved.push({ _isAd: true, id: `ad-${b.id || index}` });
-        itemsSinceLastAd = 0;
-        nextAdThreshold = Math.floor(Math.random() * (11 - 5 + 1)) + 5;
-      }
-    });
-    
-    return interleaved;
-  }, [filteredBusinesses]);
+  const displayBusinesses = filteredBusinesses;
 
   const renderItem = ({ item }) => {
-    if (item._isAd) {
-      return (
-        <View style={{ width: width - 24, marginHorizontal: 6, marginVertical: 6 }}>
-          <NativeAd />
-        </View>
-      );
-    }
-
     return (
       <TouchableOpacity
         activeOpacity={0.9}

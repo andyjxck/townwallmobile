@@ -11,7 +11,6 @@ import { supabase } from '@/utils/supabase';
 import { decode } from 'base64-arraybuffer';
 import * as ImagePicker from 'expo-image-picker';
 import { getStoredUser } from '@/utils/user';
-import { NativeAd } from '@/components/NativeAd';
 import { BannerAd } from '@/components/BannerAd';
 
 export default function LocalTalent() {
@@ -221,38 +220,9 @@ export default function LocalTalent() {
     return matchesSearch && matchesCategory;
   });
 
-  const displayTalents = useMemo(() => {
-    if (!filteredTalents || filteredTalents.length === 0) return [];
-    
-    const interleaved = [];
-    let itemsSinceLastAd = 0;
-    let nextAdThreshold = Math.floor(Math.random() * (11 - 5 + 1)) + 5;
-    
-    const firstAdIndex = 1; // Show first ad after 2 items
-
-    filteredTalents.forEach((t, index) => {
-      interleaved.push({ ...t, _isTalent: true });
-      itemsSinceLastAd++;
-      
-      if (index === firstAdIndex || itemsSinceLastAd >= nextAdThreshold) {
-        interleaved.push({ _isAd: true, id: `ad-${t.id || index}` });
-        itemsSinceLastAd = 0;
-        nextAdThreshold = Math.floor(Math.random() * (11 - 5 + 1)) + 5;
-      }
-    });
-    
-    return interleaved;
-  }, [filteredTalents]);
+  const displayTalents = filteredTalents;
 
   const renderTalentCard = ({ item }) => {
-    if (item._isAd) {
-      return (
-        <View style={{ width: width - 24, marginHorizontal: 6, marginVertical: 6 }}>
-          <NativeAd />
-        </View>
-      );
-    }
-
     return (
       <TouchableOpacity 
         activeOpacity={0.9}

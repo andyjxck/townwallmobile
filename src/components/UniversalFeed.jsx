@@ -40,7 +40,6 @@ import { useAuthStore } from "../utils/auth";
 import NotificationPanel from "./NotificationPanel";
 import { ShareManager } from "./ShareManager";
 import { BannerAd } from "@/components/BannerAd";
-import { NativeAd } from "@/components/NativeAd";
 import PostItem from "./PostItem";
 import { subscribeToUnreadCount, sendNotification } from "../utils/notifications";
 
@@ -64,28 +63,7 @@ export default function UniversalFeed() {
     const [unreadCount, setUnreadCount] = useState(0);
     const shareRef = useRef();
   
-    const postsWithAds = useMemo(() => {
-      if (!posts || posts.length === 0) return [];
-      
-      const interleaved = [];
-      let postsSinceLastAd = 0;
-      let nextAdThreshold = Math.floor(Math.random() * (11 - 5 + 1)) + 5;
-      
-      const firstAdIndex = 1; // Show first ad after 2 posts
-  
-      posts.forEach((post, index) => {
-        interleaved.push(post);
-        postsSinceLastAd++;
-        
-        if (index === firstAdIndex || postsSinceLastAd >= nextAdThreshold) {
-          interleaved.push({ isAd: true, id: `ad-${post.id}` });
-          postsSinceLastAd = 0;
-          nextAdThreshold = Math.floor(Math.random() * (11 - 5 + 1)) + 5;
-        }
-      });
-      
-      return interleaved;
-    }, [posts]);
+  const postsWithAds = posts;
 
     useEffect(() => {
     getDeviceId().then(setDeviceId);
@@ -206,26 +184,24 @@ export default function UniversalFeed() {
 
         <FlatList
           data={postsWithAds}
-          renderItem={({ item, index }) => {
-            if (item.isAd) return <NativeAd />;
-            
-            return (
-              <View>
-                {index === 0 && <BannerAd />}
-                <PostItem 
-                  item={item} 
-                  deviceId={deviceId} 
-                  onReaction={handleReaction} 
-                  user={user} 
-                  onComment={() => fetchPosts(true)} 
-                  onShare={(p) => shareRef.current?.share(p)} 
-                  onEdit={(p) => router.push(`/post?id=${p.id}`)}
-                  onFilterZone={(zoneId) => setSelectedZone(zoneId)}
-                  onFilterTag={() => {}}
-                />
-              </View>
-            );
-          }}
+            renderItem={({ item, index }) => {
+              return (
+                <View>
+                  {index === 0 && <BannerAd />}
+                  <PostItem 
+                    item={item} 
+                    deviceId={deviceId} 
+                    onReaction={handleReaction} 
+                    user={user} 
+                    onComment={() => fetchPosts(true)} 
+                    onShare={(p) => shareRef.current?.share(p)} 
+                    onEdit={(p) => router.push(`/post?id=${p.id}`)}
+                    onFilterZone={(zoneId) => setSelectedZone(zoneId)}
+                    onFilterTag={() => {}}
+                  />
+                </View>
+              );
+            }}
           keyExtractor={item => item.id.toString()}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           contentContainerStyle={{ paddingBottom: 100 }}
