@@ -110,12 +110,12 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
         }).select(`*, user:rusers (username, emoji_icon, avatar_url, nickname)`).single();
 
       if (item.user_id && item.user_id !== storedUser?.id) {
-          await sendNotification({
-            userId: item.user_id,
-            title: `New Comment!`,
-            message: `@${storedUser?.username || 'Someone'} commented on your post: "${item.title || 'Untitled'}"`,
-            type: 'comment',
-            link: `/post?id=${item.id}`
+          await sendCommentNotification({
+            commenterUsername: storedUser?.username || 'Someone',
+            commenterId: storedUser?.id,
+            postOwnerId: item.user_id,
+            postTitle: item.title,
+            commentText: commentText.trim()
           });
         }
 

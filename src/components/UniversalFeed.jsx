@@ -182,15 +182,15 @@ export default function UniversalFeed() {
           user_id: user?.id 
         }).select('*, post:rposts(user_id, title)').single();
 
-        if (reactionData?.post?.user_id && reactionData.post.user_id !== user?.id) {
-          await sendNotification({
-            userId: reactionData.post.user_id,
-            title: `New ${type === 'helpful' ? 'Like' : 'Superlike'}!`,
-            message: `@${user?.username || 'Someone'} ${type === 'helpful' ? 'liked' : 'superliked'} your post: "${reactionData.post.title || 'Untitled'}"`,
-            type: 'reaction',
-            link: `/post?id=${postId}`
-          });
-        }
+          if (reactionData?.post?.user_id && reactionData.post.user_id !== user?.id) {
+            await sendReactionNotification({
+              reactorUsername: user?.username || 'Someone',
+              reactorId: user?.id,
+              postOwnerId: reactionData.post.user_id,
+              postTitle: reactionData.post.title,
+              reactionType: type
+            });
+          }
       }
       fetchPosts(true);
     } catch (e) { console.error(e); }

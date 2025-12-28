@@ -22,12 +22,11 @@ export const ShareManager = forwardRef((props, ref) => {
       });
 
       if (post.user_id && post.user_id !== user?.id) {
-        await sendNotification({
-          userId: post.user_id,
-          title: `Post Shared!`,
-          message: `@${user?.username || 'Someone'} shared your post: "${post.title || 'Untitled'}"`,
-          type: 'share',
-          link: `/post?id=${post.id}`
+        await sendShareNotification({
+          sharerUsername: user?.username || 'Someone',
+          sharerId: user?.id,
+          postOwnerId: post.user_id,
+          postTitle: post.title
         });
       }
     } catch (error) {

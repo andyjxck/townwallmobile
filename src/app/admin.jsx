@@ -317,14 +317,14 @@ export default function ModerationAdmin() {
       });
       if (error) throw error;
       
-      // Notify the user
-      await sendNotification({
-        userId: userId,
-        title: 'Support Response',
-        message: replyText.trim(),
-        type: 'help_chat',
-        link: '/help'
-      });
+        // Notify the user
+        await sendHelpMessageNotification({
+          senderId: admin.id,
+          senderUsername: 'Admin',
+          receiverId: userId,
+          isFromAdmin: true,
+          messageContent: replyText.trim()
+        });
       
       setReplyText('');
     setExpandedChatId(null);

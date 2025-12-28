@@ -226,23 +226,24 @@ export default function HelpContact() {
             content: m.content
           }));
 
-          const aiResponse = await getAIAssistantResponse(text, history);
+            const aiResponse = await getAIAssistantResponse(text, history);
 
-          await supabase
-            .from('rhelp_messages')
-            .insert({
-              receiver_id: currentUser.id,
-              content: aiResponse,
-              is_from_admin: true
+            await supabase
+              .from('rhelp_messages')
+              .insert({
+                receiver_id: currentUser.id,
+                content: aiResponse,
+                is_from_admin: true
+              });
+            
+            // Notify user of assistant response
+            await sendHelpMessageNotification({
+              senderId: 'assistant',
+              senderUsername: 'Town Wall Assistant',
+              receiverId: currentUser.id,
+              isFromAdmin: true,
+              messageContent: aiResponse
             });
-          
-          // Notify user of assistant response
-          await sendNotification({
-            userId: currentUser.id,
-            title: 'Town Wall Assistant',
-            message: aiResponse,
-            type: 'help_chat'
-          });
   
         } catch (error) {
           console.error("Error in handleSend:", error);
