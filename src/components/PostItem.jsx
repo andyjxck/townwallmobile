@@ -251,34 +251,34 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
                 ))}
                 
                 <View style={styles.inputRow}>
-                  <View style={{ flex: 1 }}>
-                    <TextInput 
-                      style={styles.input} 
-                      placeholder="Comment..." 
-                      value={commentText} 
-                      onChangeText={setCommentText} 
-                    />
-                    <TouchableOpacity 
-                      onPress={() => setIsAnonComment(!isAnonComment)} 
-                      style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 }}
-                    >
-                      <View style={{ 
-                        width: 16, 
-                        height: 16, 
-                        borderRadius: 4, 
-                        borderWidth: 1, 
-                        borderColor: theme.colors.textSecondary,
-                        backgroundColor: isAnonComment ? theme.colors.primary : 'transparent',
-                        justifyContent: 'center',
-                        alignItems: 'center'
-                      }}>
-                        {isAnonComment && <X size={12} color="#000" />}
+                    <View style={{ flex: 1 }}>
+                      <TextInput 
+                        style={styles.input} 
+                        placeholder="Comment..." 
+                        value={commentText} 
+                        onChangeText={setCommentText} 
+                      />
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 10 }}>
+                        <TouchableOpacity 
+                          onPress={() => {
+                            setIsAnonComment(!isAnonComment);
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          }} 
+                          style={[
+                            styles.anonToggleBtn,
+                            isAnonComment && styles.anonToggleBtnActive
+                          ]}
+                        >
+                          <User size={16} color={isAnonComment ? "#000" : theme.colors.textSecondary} />
+                        </TouchableOpacity>
+                        
+                        {isAnonComment && (
+                          <Text style={styles.anonLabel}>
+                            Commenting as {userNickname ? `@${userNickname}` : "Anonymous"}
+                          </Text>
+                        )}
                       </View>
-                      <Text style={{ fontSize: 12, color: theme.colors.textSecondary }}>
-                        Comment as {userNickname ? `@${userNickname}` : "Anonymous"}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
+                    </View>
                   <TouchableOpacity onPress={handleSendComment} style={styles.sendBtn}><Send size={18} color="#FFF" /></TouchableOpacity>
                 </View>
               </View>
@@ -369,6 +369,25 @@ const styles = StyleSheet.create({
   userEmoji: { fontSize: 28 },
   userName: { fontSize: 15, color: '#FFF', fontWeight: '600' },
   emptyText: { color: 'rgba(255,255,255,0.5)', textAlign: 'center', marginTop: 20 },
+  anonToggleBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  anonToggleBtnActive: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+  },
+  anonLabel: {
+    fontSize: 12,
+    color: theme.colors.primary,
+    fontWeight: '600',
+  },
 });
 
 function getTimeAgo(date) {

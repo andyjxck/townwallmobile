@@ -35,6 +35,11 @@ export default function FloatingChat() {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [activeChat, setActiveChat] = useState(null);
+  const activeChatRef = useRef(null);
+
+  useEffect(() => {
+    activeChatRef.current = activeChat;
+  }, [activeChat]);
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [user, setUser] = useState(null);
@@ -178,6 +183,10 @@ export default function FloatingChat() {
             setIsVisible(true);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             loadUserAndChats();
+
+            if (activeChatRef.current?.id === newMessage.chat_id) {
+              markAllAsRead(newMessage.chat_id);
+            }
           }
         })
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rmessages' }, (payload) => {
@@ -618,6 +627,11 @@ export default function FloatingChat() {
             <TouchableOpacity onPress={toggleChat} activeOpacity={0.8}>
               <View style={[styles.bubble, hasUnread && styles.bubbleUnread]}>
                 <MessageCircle color={hasUnread ? '#FFF' : theme.colors.primary} size={28} />
+                {hasUnread && (
+                  <View style={styles.bubbleBadge}>
+                    <Text style={styles.bubbleBadgeText}>{totalUnreadCount > 99 ? '99+' : totalUnreadCount}</Text>
+                  </View>
+                )}
               </View>
             </TouchableOpacity>
             
@@ -993,18 +1007,19 @@ export default function FloatingChat() {
                 {(!activeChat || activeChat.status === 'accepted' || activeChat.initiated_by === user?.id || activeChat.is_group) && (
                   <View style={styles.inputContainer}>
                     <View style={styles.inputWrapper}>
-                          <TextInput
-                            style={styles.input}
-                            placeholder={activeChat?.status === 'pending' && !activeChat?.is_group ? "Waiting for approval..." : "Type a message..."}
-                            value={inputText}
-                            onChangeText={setInputText}
-                            onSubmitEditing={handleSendMessage}
-                            placeholderTextColor="rgba(255,255,255,0.3)"
-                            multiline
-                            blurOnSubmit={false}
-                            returnKeyType="send"
-                            editable={activeChat?.status === 'accepted' || activeChat?.initiated_by === user?.id || activeChat?.is_group}
-                          />
+                            <TextInput
+                              style={styles.input}
+                              placeholder={activeChat?.status === 'pending' && !activeChat?.is_group ? "Waiting for approval..." : "Type a message..."}
+                              value={inputText}
+                              onChangeText={setInputText}
+                              onKeyPress={handleKeyPress}
+                              onSubmitEditing={handleSendMessage}
+                              placeholderTextColor="rgba(255,255,255,0.3)"
+                              multiline
+                              blurOnSubmit={false}
+                              returnKeyType="send"
+                              editable={activeChat?.status === 'accepted' || activeChat?.initiated_by === user?.id || activeChat?.is_group}
+                            />
                       <TouchableOpacity 
                         onPress={handleSendMessage} 
                         style={[styles.sendBtn, (!inputText.trim() || (activeChat?.status === 'pending' && activeChat?.initiated_by === user?.id && !activeChat?.is_group)) && { opacity: 0.5 }]}
@@ -1063,10 +1078,28 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: 'rgba(255,255,255,0.9)',
   },
-  bubbleUnread: {
-    backgroundColor: '#EF4444',
-    borderColor: '#EF4444',
-  },
+    bubbleUnread: {
+      backgroundColor: '#EF4444',
+      borderColor: '#EF4444',
+    },
+    bubbleBadge: {
+      position: 'absolute',
+      top: 0,
+      right: 0,
+      backgroundColor: '#FFF',
+      borderRadius: 10,
+      minWidth: 20,
+      height: 20,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 2,
+      borderColor: '#EF4444',
+    },
+    bubbleBadgeText: {
+      color: '#EF4444',
+      fontSize: 10,
+      fontWeight: 'bold',
+    },
   closeBubbleBtn: {
     position: 'absolute',
     top: -4,
