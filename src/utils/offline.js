@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import NetInfo from '@react-native-community/netinfo';
+import * as Network from 'expo-network';
+import { AppState } from 'react-native';
 import { supabase } from './supabase';
 
 const OFFLINE_POSTS_KEY = '@offline_posts';
@@ -126,7 +127,7 @@ export const syncService = {
 
 export async function checkNetworkStatus() {
   try {
-    const state = await NetInfo.fetch();
+    const state = await Network.getNetworkStateAsync();
     return state.isConnected && state.isInternetReachable;
   } catch (e) {
     return false;
@@ -134,7 +135,19 @@ export async function checkNetworkStatus() {
 }
 
 export function subscribeToNetworkChanges(callback) {
-  return NetInfo.addEventListener(state => {
-    callback(state.isConnected && state.isInternetReachable);
-  });
+  const handler = async (nextAppState) => {
+    if (nextAppState === 'active') {
+      const isConnected = await checkNetworkStatus();
+      callback(isConnected);
+    }
+  };
+
+  const subscription = AppState.addEventListener('change', handler);
+
+  // Since expo-network doesn't have a listener, we also do a one-time check
+  checkNetworkStatus().then(callback);
+
+  return () => {
+    subscription.remove();
+  };
 }
