@@ -160,13 +160,37 @@ export default function UniversalFeed() {
   const fetchPosts = async (isRefreshing = false) => {
     if (!isRefreshing) setLoading(true);
     try {
-      let query = supabase.from("rposts").select(`id, title, text, created_at, user_id, zone_id, tag_id, image_url, image_urls, is_anonymous, moderation_status, is_deleted, user:rusers (username, emoji_icon, avatar_url), zone:rzones (name), tag:rtags (name), poll_id, reactions:rreactions (reaction_type, device_id)`).eq("is_deleted", false).eq("moderation_status", "approved");
+      let query = supabase.from("rposts").select(`id, title, text, created_at, user_id, zone_id, tag_id, image_url, image_urls, is_anonymous, moderation_status, is_deleted, is_blurred, blur_reason, comments_disabled, user:rusers (username, emoji_icon, avatar_url, last_seen), zone:rzones (name), tag:rtags (name), poll_id, reactions:rreactions (reaction_type, device_id)`).eq("is_deleted", false).eq("moderation_status", "approved");
       if (selectedZone) query = query.eq("zone_id", selectedZone);
       query = query.order("created_at", { ascending: sortBy === 'oldest' });
       const { data } = await query.limit(50);
       setPosts(data || []);
     } catch (err) { console.error(err); }
     finally { setLoading(false); setRefreshing(false); }
+  };
+
+  const handleModAction = async (postId, action, reason = null) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      if (action === 'delete') {
+        await supabase.from('rposts').update({ is_deleted: true }).eq('id', postId);
+        Alert.alert("Success", "Post deleted");
+      } else if (action === 'toggle_comments') {
+        const post = posts.find(p => p.id === postId);
+        await supabase.from('rposts').update({ comments_disabled: !post?.comments_disabled }).eq('id', postId);
+        Alert.alert("Success", post?.comments_disabled ? "Comments enabled" : "Comments disabled");
+      } else if (action === 'blur') {
+        await supabase.from('rposts').update({ is_blurred: true, blur_reason: reason }).eq('id', postId);
+        Alert.alert("Success", "Post blurred");
+      } else if (action === 'unblur') {
+        await supabase.from('rposts').update({ is_blurred: false, blur_reason: null }).eq('id', postId);
+        Alert.alert("Success", "Blur removed");
+      }
+      fetchPosts(true);
+    } catch (e) { 
+      console.error(e); 
+      Alert.alert("Error", "Failed to perform action");
+    }
   };
 
   const handleReaction = async (postId, type, currentlyReacted) => {
@@ -267,12 +291,13 @@ export default function UniversalFeed() {
                     item={item} 
                     deviceId={deviceId} 
                     onReaction={handleReaction} 
-                    user={user} 
+                    user={{ ...user, is_admin: isModerator, is_moderator: isModerator }} 
                     onComment={() => fetchPosts(true)} 
                     onShare={(p) => shareRef.current?.share(p)} 
                     onEdit={(p) => router.push(`/post?id=${p.id}`)}
                     onFilterZone={(zoneId) => setSelectedZone(zoneId)}
                     onFilterTag={() => {}}
+                    onModAction={handleModAction}
                   />
                 </View>
               );

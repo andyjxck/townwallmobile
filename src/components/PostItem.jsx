@@ -22,6 +22,10 @@ import {
   Play,
   MessageCircle,
   CloudOff,
+  MoreVertical,
+  Trash2,
+  MessageSquareOff,
+  EyeOff,
 } from "lucide-react-native";
 import { supabase } from "../utils/supabase";
 import { moderateContent } from "../utils/ai";
@@ -37,11 +41,12 @@ import PollComponent from "./PollComponent";
 import { useRouter, useLocalSearchParams, usePathname } from "expo-router";
 import { theme } from "../utils/theme";
 
-export default function PostItem({ item, deviceId, onReaction, onComment, onDelete, onShare, onEdit, user, onFilterZone, onFilterTag }) {
+export default function PostItem({ item, deviceId, onReaction, onComment, onDelete, onShare, onEdit, user, onFilterZone, onFilterTag, onModAction }) {
   const { width } = useWindowDimensions();
   const router = useRouter();
   
   const [revealed, setRevealed] = useState(false);
+  const [blurRevealed, setBlurRevealed] = useState(false);
   const [showFullImage, setShowFullImage] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [commentText, setCommentText] = useState("");
@@ -50,6 +55,9 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
   const [isExpanded, setIsExpanded] = useState(false);
   const [isAnonComment, setIsAnonComment] = useState(false);
   const [userNickname, setUserNickname] = useState("");
+  const [showModMenu, setShowModMenu] = useState(false);
+  const [showBlurModal, setShowBlurModal] = useState(false);
+  const [blurReasonInput, setBlurReasonInput] = useState("");
 
   const [loadingLikers, setLoadingLikers] = useState(false);
   const [likers, setLikers] = useState([]);
@@ -139,6 +147,22 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
 
   const shouldBlur = fakeCount > 5 && fakeCount > helpfulCount;
   const timeAgo = getTimeAgo(new Date(item.created_at));
+  const isModOrAdmin = user?.is_admin || user?.is_moderator;
+  const isBlurredByMod = item.is_blurred && item.blur_reason;
+
+  const handleModAction = async (action, reason = null) => {
+    setShowModMenu(false);
+    if (onModAction) {
+      await onModAction(item.id, action, reason);
+    }
+  };
+
+  const handleBlurPost = () => {
+    if (!blurReasonInput.trim()) return;
+    handleModAction('blur', blurReasonInput.trim());
+    setShowBlurModal(false);
+    setBlurReasonInput("");
+  };
 
   return (
     <View style={styles.container}>
@@ -153,41 +177,53 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
           <AlertTriangle size={18} color={theme.colors.error} />
           <Text style={[styles.blurText, { color: theme.colors.error }]}>Reported Content. Tap to reveal.</Text>
         </TouchableOpacity>
+      ) : isBlurredByMod && !blurRevealed ? (
+        <TouchableOpacity onPress={() => setBlurRevealed(true)} style={styles.modBlurBanner}>
+          <EyeOff size={18} color="#FFF" />
+          <Text style={styles.modBlurText}>Post has been blurred for: {item.blur_reason} - Tap To Reveal</Text>
+        </TouchableOpacity>
       ) : (
         <View style={styles.card}>
-            <View style={styles.header}>
-              <TouchableOpacity onPress={() => !item.is_anonymous && router.push(`/profile?userId=${item.user_id}`)} disabled={item.is_anonymous}>
-                {item.user?.avatar_url ? (
-                  <Image source={{ uri: item.user.avatar_url }} style={styles.avatar} />
-                ) : (
-                  <Text style={styles.emojiAvatar}>{item.user?.emoji_icon || "👤"}</Text>
+            {!isBlurredByMod && (
+              <View style={styles.header}>
+                <TouchableOpacity onPress={() => !item.is_anonymous && router.push(`/profile?userId=${item.user_id}`)} disabled={item.is_anonymous}>
+                  {item.user?.avatar_url ? (
+                    <Image source={{ uri: item.user.avatar_url }} style={styles.avatar} />
+                  ) : (
+                    <Text style={styles.emojiAvatar}>{item.user?.emoji_icon || "👤"}</Text>
+                  )}
+                </TouchableOpacity>
+                <View style={styles.headerInfo}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={styles.username}>@{item.is_anonymous ? "Anonymous" : item.user?.username}</Text>
+                      {!item.is_anonymous && isOnline(item.user?.last_seen) && <View style={styles.onlineDot} />}
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                      <TouchableOpacity onPress={() => onFilterZone?.(item.zone_id)}>
+                        <Text style={styles.metaLink}>{item.zone?.name}</Text>
+                      </TouchableOpacity>
+                      <Text style={styles.metaText}>•</Text>
+                      {item.tag?.name && (
+                        <>
+                          <TouchableOpacity onPress={() => onFilterTag?.(item.tag_id)}>
+                            <Text style={styles.metaLink}>{item.tag?.name}</Text>
+                          </TouchableOpacity>
+                          <Text style={styles.metaText}>•</Text>
+                        </>
+                      )}
+                      <Text style={styles.metaText}>{timeAgo}</Text>
+                    </View>
+                  </View>
+                {user?.id === item.user_id && (
+                  <TouchableOpacity onPress={() => onEdit?.(item)}><Pencil size={18} color={theme.colors.textSecondary} /></TouchableOpacity>
                 )}
-              </TouchableOpacity>
-              <View style={styles.headerInfo}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Text style={styles.username}>@{item.is_anonymous ? "Anonymous" : item.user?.username}</Text>
-                    {!item.is_anonymous && isOnline(item.user?.last_seen) && <View style={styles.onlineDot} />}
-                  </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-                    <TouchableOpacity onPress={() => onFilterZone?.(item.zone_id)}>
-                      <Text style={styles.metaLink}>{item.zone?.name}</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.metaText}>•</Text>
-                    {item.tag?.name && (
-                      <>
-                        <TouchableOpacity onPress={() => onFilterTag?.(item.tag_id)}>
-                          <Text style={styles.metaLink}>{item.tag?.name}</Text>
-                        </TouchableOpacity>
-                        <Text style={styles.metaText}>•</Text>
-                      </>
-                    )}
-                    <Text style={styles.metaText}>{timeAgo}</Text>
-                  </View>
-                </View>
-              {user?.id === item.user_id && (
-                <TouchableOpacity onPress={() => onEdit?.(item)}><Pencil size={18} color={theme.colors.textSecondary} /></TouchableOpacity>
-              )}
-            </View>
+                {isModOrAdmin && (
+                  <TouchableOpacity onPress={() => setShowModMenu(true)} style={{ marginLeft: 8 }}>
+                    <MoreVertical size={18} color={theme.colors.textSecondary} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
 
             <TouchableOpacity onPress={() => setIsExpanded(!isExpanded)} style={styles.body}>
               {item.title && <Text style={styles.title}>{item.title}</Text>}
@@ -207,39 +243,41 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
               </TouchableOpacity>
             )}
 
-            <View style={styles.footer}>
-              <View style={styles.actions}>
-                <TouchableOpacity 
-                  onPress={() => onReaction(item.id, "helpful", userReactions.helpful)} 
-                  style={styles.actionBtn}
-                >
-                  <Heart size={20} color={userReactions.helpful ? theme.colors.error : theme.colors.textSecondary} fill={userReactions.helpful ? theme.colors.error : "transparent"} />
-                  <TouchableOpacity onPress={() => { fetchLikers('helpful'); setShowLikersModal(true); }}>
-                    <Text style={styles.actionText}>{helpfulCount}</Text>
+            {!isBlurredByMod && (
+              <View style={styles.footer}>
+                <View style={styles.actions}>
+                  <TouchableOpacity 
+                    onPress={() => onReaction(item.id, "helpful", userReactions.helpful)} 
+                    style={styles.actionBtn}
+                  >
+                    <Heart size={20} color={userReactions.helpful ? theme.colors.error : theme.colors.textSecondary} fill={userReactions.helpful ? theme.colors.error : "transparent"} />
+                    <TouchableOpacity onPress={() => { fetchLikers('helpful'); setShowLikersModal(true); }}>
+                      <Text style={styles.actionText}>{helpfulCount}</Text>
+                    </TouchableOpacity>
                   </TouchableOpacity>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  onPress={() => onReaction(item.id, "superlike", userReactions.superlike)} 
-                  style={styles.actionBtn}
-                >
-                  <Star size={20} color={userReactions.superlike ? "#FBBF24" : theme.colors.textSecondary} fill={userReactions.superlike ? "#FBBF24" : "transparent"} />
-                  <TouchableOpacity onPress={() => { fetchLikers('superlike'); setShowSuperlikersModal(true); }}>
-                    <Text style={styles.actionText}>{superlikeCount}</Text>
+                  
+                  <TouchableOpacity 
+                    onPress={() => onReaction(item.id, "superlike", userReactions.superlike)} 
+                    style={styles.actionBtn}
+                  >
+                    <Star size={20} color={userReactions.superlike ? "#FBBF24" : theme.colors.textSecondary} fill={userReactions.superlike ? "#FBBF24" : "transparent"} />
+                    <TouchableOpacity onPress={() => { fetchLikers('superlike'); setShowSuperlikersModal(true); }}>
+                      <Text style={styles.actionText}>{superlikeCount}</Text>
+                    </TouchableOpacity>
                   </TouchableOpacity>
-                </TouchableOpacity>
 
-                <TouchableOpacity onPress={() => onShare(item)} style={styles.actionBtn}>
-                  <ShareIcon size={20} color={theme.colors.textSecondary} />
-                  <Text style={styles.actionText}>{item.share_count || 0}</Text>
+                  <TouchableOpacity onPress={() => onShare(item)} style={styles.actionBtn}>
+                    <ShareIcon size={20} color={theme.colors.textSecondary} />
+                    <Text style={styles.actionText}>{item.share_count || 0}</Text>
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity onPress={() => onReaction(item.id, "fake", userReactions.fake)}>
+                  <Flag size={18} color={userReactions.fake ? theme.colors.error : theme.colors.textSecondary} />
                 </TouchableOpacity>
               </View>
-              <TouchableOpacity onPress={() => onReaction(item.id, "fake", userReactions.fake)}>
-                <Flag size={18} color={userReactions.fake ? theme.colors.error : theme.colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
+            )}
 
-            {isExpanded && (
+            {isExpanded && !isBlurredByMod && !item.comments_disabled && (
               <View style={styles.commentsSection}>
                 {loadingComments ? (
                   <ActivityIndicator size="small" color={theme.colors.primary} style={{ marginVertical: 20 }} />
@@ -314,10 +352,17 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
                 </View>
               </View>
             )}
-        </View>
-      )}
+      </View>
+        )}
 
-      <Modal visible={showFullImage} transparent animationType="fade">
+        {isExpanded && item.comments_disabled && !isBlurredByMod && (
+          <View style={styles.commentsDisabledBanner}>
+            <MessageSquareOff size={16} color="rgba(255,255,255,0.5)" />
+            <Text style={styles.commentsDisabledText}>Comments are disabled on this post</Text>
+          </View>
+        )}
+
+        <Modal visible={showFullImage} transparent animationType="fade">
         <View style={styles.fullImageOverlay}>
           <TouchableOpacity style={styles.closeBtn} onPress={() => setShowFullImage(false)}><X color="#FFF" size={32} /></TouchableOpacity>
           {isVideo ? (
@@ -358,11 +403,76 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
               </View>
             )}
           </View>
-        </View>
-      </Modal>
-    </View>
-  );
-}
+          </View>
+        </Modal>
+
+        <Modal visible={showModMenu} transparent animationType="slide">
+          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowModMenu(false)}>
+            <View style={styles.modMenuContent}>
+              <Text style={styles.modMenuTitle}>Moderator Actions</Text>
+              
+              <TouchableOpacity style={styles.modMenuItem} onPress={() => { handleModAction('delete'); }}>
+                <Trash2 size={20} color={theme.colors.error} />
+                <Text style={[styles.modMenuText, { color: theme.colors.error }]}>Delete Post</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.modMenuItem} onPress={() => { handleModAction('toggle_comments'); }}>
+                <MessageSquareOff size={20} color={theme.colors.textSecondary} />
+                <Text style={styles.modMenuText}>{item.comments_disabled ? 'Enable Comments' : 'Disable Comments'}</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.modMenuItem} onPress={() => { setShowModMenu(false); setShowBlurModal(true); }}>
+                <EyeOff size={20} color="#FBBF24" />
+                <Text style={[styles.modMenuText, { color: '#FBBF24' }]}>Blur Post</Text>
+              </TouchableOpacity>
+
+              {item.is_blurred && (
+                <TouchableOpacity style={styles.modMenuItem} onPress={() => { handleModAction('unblur'); }}>
+                  <EyeOff size={20} color="#10B981" />
+                  <Text style={[styles.modMenuText, { color: '#10B981' }]}>Remove Blur</Text>
+                </TouchableOpacity>
+              )}
+              
+              <TouchableOpacity style={[styles.modMenuItem, styles.modMenuCancel]} onPress={() => setShowModMenu(false)}>
+                <Text style={styles.modMenuCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
+        <Modal visible={showBlurModal} transparent animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={styles.blurModalContent}>
+              <Text style={styles.modMenuTitle}>Blur Post</Text>
+              <Text style={styles.blurModalSubtitle}>Enter a reason that will be shown to users</Text>
+              
+              <TextInput
+                style={styles.blurReasonInput}
+                placeholder="Reason for blurring..."
+                placeholderTextColor="rgba(255,255,255,0.3)"
+                value={blurReasonInput}
+                onChangeText={setBlurReasonInput}
+                multiline
+              />
+              
+              <View style={styles.blurModalButtons}>
+                <TouchableOpacity style={styles.blurModalCancel} onPress={() => { setShowBlurModal(false); setBlurReasonInput(""); }}>
+                  <Text style={styles.blurModalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.blurModalConfirm, !blurReasonInput.trim() && { opacity: 0.5 }]} 
+                  onPress={handleBlurPost}
+                  disabled={!blurReasonInput.trim()}
+                >
+                  <Text style={styles.blurModalConfirmText}>Blur Post</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      </View>
+    );
+  }
 
 const styles = StyleSheet.create({
   container: { marginBottom: 20, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)', paddingBottom: 20 },
@@ -509,6 +619,124 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 2,
+  },
+  modBlurBanner: {
+    backgroundColor: '#DC2626',
+    padding: 20,
+    borderRadius: 12,
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
+    marginHorizontal: 15,
+  },
+  modBlurText: {
+    color: '#FFF',
+    fontWeight: '700',
+    fontSize: 14,
+    flex: 1,
+  },
+  commentsDisabledBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+    marginHorizontal: 15,
+    marginTop: 10,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 8,
+  },
+  commentsDisabledText: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 13,
+  },
+  modMenuContent: {
+    backgroundColor: '#1A1A1A',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    paddingBottom: 40,
+  },
+  modMenuTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFF',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  modMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  modMenuText: {
+    fontSize: 16,
+    color: '#FFF',
+    fontWeight: '500',
+  },
+  modMenuCancel: {
+    marginTop: 10,
+    borderBottomWidth: 0,
+    justifyContent: 'center',
+  },
+  modMenuCancelText: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.5)',
+    textAlign: 'center',
+    width: '100%',
+  },
+  blurModalContent: {
+    backgroundColor: '#1A1A1A',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    paddingBottom: 40,
+  },
+  blurModalSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.5)',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  blurReasonInput: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 12,
+    padding: 15,
+    color: '#FFF',
+    fontSize: 15,
+    minHeight: 80,
+    textAlignVertical: 'top',
+    marginBottom: 20,
+  },
+  blurModalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  blurModalCancel: {
+    flex: 1,
+    padding: 15,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    alignItems: 'center',
+  },
+  blurModalCancelText: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  blurModalConfirm: {
+    flex: 1,
+    padding: 15,
+    borderRadius: 12,
+    backgroundColor: '#DC2626',
+    alignItems: 'center',
+  },
+  blurModalConfirmText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 
