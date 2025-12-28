@@ -184,13 +184,41 @@ export default function FloatingChat() {
     setUser(storedUser);
     if (!storedUser) return;
 
-    const { data } = await supabase
+    const { data: chatsData } = await supabase
       .from('rchats')
       .select(`*, user1:rusers!user1_id(id, username, emoji_icon, avatar_url), user2:rusers!user2_id(id, username, emoji_icon, avatar_url)`)
       .or(`user1_id.eq.${storedUser.id},user2_id.eq.${storedUser.id}`)
       .order('last_message_at', { ascending: false });
     
-    setChats(data || []);
+    if (!chatsData) return;
+
+    // Filter out chats where the status is rejected AND the other user rejected it
+    // Actually, "IF CHAT = REJECTED, THE OTHER USER CAN NO LONGER SEE THEIR CHAT EITHER"
+    // So if status is rejected, NO ONE sees it? Or only the one who didn't reject?
+    // User said "THE OTHER USER CAN NO LONGER SEE THEIR CHAT EITHER", implying both.
+    const filteredChats = chatsData.filter(c => c.status !== 'rejected');
+
+    // Get unread counts for each chat
+    const chatsWithUnread = await Promise.all(filteredChats.map(async (chat) => {
+      const { count } = await supabase
+        .from('rmessages')
+        .select('*', { count: 'exact', head: true })
+        .eq('chat_id', chat.id)
+        .eq('is_read', false)
+        .neq('sender_id', storedUser.id);
+      return { ...chat, unread_count: count || 0 };
+    }));
+    
+    setChats(chatsWithUnread);
+  };
+
+  const handleStatusUpdate = async (chatId, newStatus) => {
+    try {
+      await supabase.from('rchats').update({ status: newStatus }).eq('id', chatId);
+      Haptics.notificationAsync(newStatus === 'accepted' ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Warning);
+      if (newStatus === 'rejected') setActiveChat(null);
+      loadUserAndChats();
+    } catch (error) { console.error(error); }
   };
 
   useEffect(() => {
@@ -394,433 +422,529 @@ export default function FloatingChat() {
                 data={chats}
                 keyExtractor={item => item.id}
                 renderItem={({ item }) => {
-                  const otherUser = getOtherUser(item);
-                  const isOnline = onlineUsers[otherUser?.id];
-                  return (
-                    <TouchableOpacity onPress={() => selectChat(item)} style={styles.chatListItem}>
-                      <View style={styles.avatarWrapper}>
-                        {otherUser?.avatar_url ? (
-                          <Image source={{ uri: otherUser.avatar_url }} style={styles.listAvatar} />
-                        ) : (
-                          <View style={styles.listEmojiBg}>
-                            <Text style={styles.listEmoji}>{otherUser?.emoji_icon || "👤"}</Text>
-                          </View>
-                        )}
-                        {isOnline && <View style={styles.statusDot} />}
-                      </View>
-                      <View style={styles.chatInfo}>
-                        <View style={styles.chatInfoTop}>
-                          <Text style={styles.chatName}>@{otherUser?.username}</Text>
-                          <Text style={styles.chatTime}>
-                            {item.last_message_at ? new Date(item.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-                          </Text>
-                        </View>
-                        <Text style={styles.chatLastMsg} numberOfLines={1}>{item.last_message}</Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                }}
-                ListEmptyComponent={
-                  <View style={styles.emptyState}>
-                    <MessageCircle size={48} color="rgba(255,255,255,0.1)" />
-                    <Text style={styles.emptyText}>No messages yet</Text>
-                  </View>
-                }
-              />
-            ) : (
-              <KeyboardAvoidingView 
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
-                style={{ flex: 1 }}
-                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-              >
-                {loading ? (
-                  <View style={styles.loadingContainer}>
-                    <ActivityIndicator color={theme.colors.primary} />
-                  </View>
-                ) : (
-                  <FlatList
-                    ref={flatListRef}
-                    data={messages}
-                    keyExtractor={item => item.id}
-                    renderItem={({ item }) => (
-                      <View style={[
-                        styles.messageBubble, 
-                        item.sender_id === user?.id ? styles.myMessage : styles.theirMessage
-                      ]}>
-                        <Text style={[
-                          styles.messageText, 
-                          { color: item.sender_id === user?.id ? '#000' : '#FFF' }
-                        ]}>
-                          {item.text}
-                        </Text>
-                        <View style={styles.msgFooter}>
-                          <Text style={[
-                            styles.msgTime,
-                            { color: item.sender_id === user?.id ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.4)' }
-                          ]}>
-                            {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </Text>
-                          {item.sender_id === user?.id && (
-                            <View style={styles.readStatus}>
-                              {item.is_read ? (
-                                <CheckCheck size={14} color="rgba(0,0,0,0.5)" />
-                              ) : (
-                                <Check size={14} color="rgba(0,0,0,0.5)" />
-                              )}
+    const otherUser = getOtherUser(item);
+                    const isOnline = onlineUsers[otherUser?.id];
+                    return (
+                      <TouchableOpacity onPress={() => selectChat(item)} style={styles.chatListItem}>
+                        <View style={styles.avatarWrapper}>
+                          {otherUser?.avatar_url ? (
+                            <Image source={{ uri: otherUser.avatar_url }} style={styles.listAvatar} />
+                          ) : (
+                            <View style={styles.listEmojiBg}>
+                              <Text style={styles.listEmoji}>{otherUser?.emoji_icon || "👤"}</Text>
                             </View>
                           )}
+                          {isOnline && <View style={styles.statusDot} />}
+                        </View>
+                        <View style={styles.chatInfo}>
+                          <View style={styles.chatInfoTop}>
+                            <Text style={styles.chatName}>@{otherUser?.username}</Text>
+                            <Text style={styles.chatTime}>
+                              {item.last_message_at ? new Date(item.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                            </Text>
+                          </View>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <Text style={styles.chatLastMsg} numberOfLines={1}>{item.last_message}</Text>
+                            {item.unread_count > 0 && (
+                              <View style={styles.listUnreadBadge}>
+                                <Text style={styles.listUnreadText}>{item.unread_count}</Text>
+                              </View>
+                            )}
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  }}
+                  ListHeaderComponent={() => {
+                    const requests = chats.filter(c => c.status === 'pending');
+                    if (requests.length === 0) return null;
+                    return (
+                      <View style={styles.requestSection}>
+                        <Text style={styles.sectionHeader}>Message Requests ({requests.length})</Text>
+                      </View>
+                    );
+                  }}
+                  ListEmptyComponent={
+                    <View style={styles.emptyState}>
+                      <MessageCircle size={48} color="rgba(255,255,255,0.1)" />
+                      <Text style={styles.emptyText}>No messages yet</Text>
+                    </View>
+                  }
+                />
+              ) : (
+                <KeyboardAvoidingView 
+                  behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+                  style={{ flex: 1 }}
+                  keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+                >
+                  {loading ? (
+                    <View style={styles.loadingContainer}>
+                      <ActivityIndicator color={theme.colors.primary} />
+                    </View>
+                  ) : (
+                    <>
+                    <FlatList
+                      ref={flatListRef}
+                      data={messages}
+                      keyExtractor={item => item.id}
+                      renderItem={({ item }) => (
+                        <View style={[
+                          styles.messageBubble, 
+                          item.sender_id === user?.id ? styles.myMessage : styles.theirMessage
+                        ]}>
+                          <Text style={[
+                            styles.messageText, 
+                            { color: item.sender_id === user?.id ? '#000' : '#FFF' }
+                          ]}>
+                            {item.text}
+                          </Text>
+                          <View style={styles.msgFooter}>
+                            <Text style={[
+                              styles.msgTime,
+                              { color: item.sender_id === user?.id ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.4)' }
+                            ]}>
+                              {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </Text>
+                            {item.sender_id === user?.id && (
+                              <View style={styles.readStatus}>
+                                {item.is_read ? (
+                                  <CheckCheck size={14} color="rgba(0,0,0,0.5)" />
+                                ) : (
+                                  <Check size={14} color="rgba(0,0,0,0.5)" />
+                                )}
+                              </View>
+                            )}
+                          </View>
+                        </View>
+                      )}
+                      style={styles.messagesList}
+                      contentContainerStyle={{ padding: 16 }}
+                      onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
+                    />
+                    
+                    {activeChat?.status === 'pending' && activeChat.initiated_by !== user?.id && (
+                      <View style={styles.requestActions}>
+                        <Text style={styles.requestText}>Do you want to let @{getOtherUser(activeChat)?.username} message you?</Text>
+                        <View style={styles.requestButtons}>
+                          <TouchableOpacity 
+                            onPress={() => handleStatusUpdate(activeChat.id, 'rejected')} 
+                            style={[styles.requestBtn, { backgroundColor: 'rgba(239,68,68,0.1)' }]}
+                          >
+                            <Text style={[styles.requestBtnText, { color: '#EF4444' }]}>Deny</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity 
+                            onPress={() => handleStatusUpdate(activeChat.id, 'accepted')} 
+                            style={[styles.requestBtn, { backgroundColor: theme.colors.primary }]}
+                          >
+                            <Text style={[styles.requestBtnText, { color: '#000' }]}>Approve</Text>
+                          </TouchableOpacity>
                         </View>
                       </View>
                     )}
-                    style={styles.messagesList}
-                    contentContainerStyle={{ padding: 16 }}
-                    onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
-                  />
-                )}
-                <View style={styles.inputContainer}>
-                  <View style={styles.inputWrapper}>
-                        <TextInput
-                          style={styles.input}
-                          placeholder="Type a message..."
-                          value={inputText}
-                          onChangeText={setInputText}
-                          onKeyPress={handleKeyPress}
-                          placeholderTextColor="rgba(255,255,255,0.3)"
-                          multiline
-                          blurOnSubmit={false}
-                        />
-                    <TouchableOpacity 
-                      onPress={handleSendMessage} 
-                      style={[styles.sendBtn, !inputText.trim() && { opacity: 0.5 }]}
-                      disabled={!inputText.trim()}
-                    >
-                      <LinearGradient
-                        colors={[theme.colors.primary, '#4ADE80']}
-                        style={styles.sendIconBg}
-                      >
-                        <Send size={18} color="#000" />
-                      </LinearGradient>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </KeyboardAvoidingView>
-            )}
+                    </>
+                  )}
+                  {(!activeChat || activeChat.status === 'accepted' || activeChat.initiated_by === user?.id) && (
+                    <View style={styles.inputContainer}>
+                      <View style={styles.inputWrapper}>
+                            <TextInput
+                              style={styles.input}
+                              placeholder={activeChat?.status === 'pending' ? "Waiting for approval..." : "Type a message..."}
+                              value={inputText}
+                              onChangeText={setInputText}
+                              onKeyPress={handleKeyPress}
+                              placeholderTextColor="rgba(255,255,255,0.3)"
+                              multiline
+                              blurOnSubmit={false}
+                              editable={activeChat?.status === 'accepted' || activeChat?.initiated_by === user?.id}
+                            />
+                        <TouchableOpacity 
+                          onPress={handleSendMessage} 
+                          style={[styles.sendBtn, (!inputText.trim() || (activeChat?.status === 'pending' && activeChat?.initiated_by === user?.id)) && { opacity: 0.5 }]}
+                          disabled={!inputText.trim() || (activeChat?.status === 'pending' && activeChat?.initiated_by === user?.id)}
+                        >
+                          <LinearGradient
+                            colors={[theme.colors.primary, '#4ADE80']}
+                            style={styles.sendIconBg}
+                          >
+                            <Send size={18} color="#000" />
+                          </LinearGradient>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
+                </KeyboardAvoidingView>
+              )}
+            </Animated.View>
           </Animated.View>
-        </Animated.View>
-      )}
-    </View>
-  );
-}
+        )}
+      </View>
+    );
+  }
+  
+  const styles = StyleSheet.create({
+    container: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      zIndex: 9999,
+    },
+    bubbleWrapper: {
+      width: 60,
+      height: 60,
+      elevation: 10,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.4,
+      shadowRadius: 8,
+    },
+    bubbleContainer: {
+      position: 'relative',
+      width: 60,
+      height: 60,
+    },
+    bubble: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.2)',
+      overflow: 'hidden',
+    },
+    closeBubbleBtn: {
+      position: 'absolute',
+      top: -4,
+      right: -4,
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      backgroundColor: '#FFF',
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 2,
+      borderColor: '#000',
+      elevation: 5,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 2,
+    },
+    unreadBadge: {
+      position: 'absolute',
+      top: 0,
+      right: 0,
+      width: 16,
+      height: 16,
+      borderRadius: 8,
+      backgroundColor: '#EF4444',
+      borderWidth: 2,
+      borderColor: '#FFF',
+    },
+    chatOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.4)',
+    },
+    chatWindow: {
+      flex: 1,
+      backgroundColor: '#0F172A',
+      width: width,
+      height: height,
+    },
+    chatHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingTop: Platform.OS === 'ios' ? 60 : 40,
+      paddingBottom: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: 'rgba(255,255,255,0.06)',
+      backgroundColor: '#0F172A',
+    },
+    headerNav: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    headerUserInfo: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    headerAvatar: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+    },
+    headerEmojiBg: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: 'rgba(255,255,255,0.1)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    headerEmoji: {
+      fontSize: 22,
+    },
+    headerTitle: {
+      color: '#FFF',
+      fontSize: 18,
+      fontWeight: '800',
+      letterSpacing: -0.5,
+    },
+    onlineStatusText: {
+      fontSize: 12,
+      color: 'rgba(255,255,255,0.5)',
+      marginTop: -2,
+    },
+    headerStatusDot: {
+      position: 'absolute',
+      bottom: 0,
+      right: 0,
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      backgroundColor: '#10B981',
+      borderWidth: 2,
+      borderColor: '#0F172A',
+    },
+    iconBtn: {
+      padding: 8,
+      borderRadius: 12,
+      backgroundColor: 'rgba(255,255,255,0.05)',
+    },
+    settingsContent: {
+      padding: 20,
+    },
+    settingRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: 'rgba(255,255,255,0.05)',
+      padding: 16,
+      borderRadius: 16,
+    },
+    settingLabel: {
+      color: '#FFF',
+      fontSize: 16,
+      fontWeight: '700',
+      marginBottom: 4,
+    },
+    settingDesc: {
+      color: 'rgba(255,255,255,0.5)',
+      fontSize: 13,
+      maxWidth: width * 0.6,
+    },
+    chatListItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: 'rgba(255,255,255,0.03)',
+    },
+    avatarWrapper: {
+      position: 'relative',
+    },
+    listAvatar: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+    },
+    listEmojiBg: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      backgroundColor: 'rgba(255,255,255,0.05)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    listEmoji: {
+      fontSize: 28,
+    },
+    statusDot: {
+      position: 'absolute',
+      bottom: 2,
+      right: 2,
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      backgroundColor: '#10B981',
+      borderWidth: 2,
+      borderColor: '#0F172A',
+    },
+    chatInfo: {
+      marginLeft: 16,
+      flex: 1,
+    },
+    chatInfoTop: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 4,
+    },
+    chatName: {
+      color: '#FFF',
+      fontWeight: '700',
+      fontSize: 15,
+    },
+    chatTime: {
+      color: 'rgba(255,255,255,0.3)',
+      fontSize: 11,
+    },
+    chatLastMsg: {
+      color: 'rgba(255,255,255,0.5)',
+      fontSize: 13,
+      flex: 1,
+    },
+    listUnreadBadge: {
+      backgroundColor: theme.colors.primary,
+      borderRadius: 10,
+      minWidth: 20,
+      height: 20,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 6,
+    },
+    listUnreadText: {
+      color: '#000',
+      fontSize: 10,
+      fontWeight: 'bold',
+    },
+    sectionHeader: {
+      color: 'rgba(255,255,255,0.3)',
+      fontSize: 12,
+      fontWeight: 'bold',
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      backgroundColor: 'rgba(255,255,255,0.02)',
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+    },
+    messagesList: {
+      flex: 1,
+    },
+    messageBubble: {
+      padding: 12,
+      paddingHorizontal: 16,
+      borderRadius: 22,
+      marginBottom: 10,
+      maxWidth: '85%',
+      position: 'relative',
+    },
+    myMessage: {
+      alignSelf: 'flex-end',
+      backgroundColor: theme.colors.primary,
+      borderBottomRightRadius: 4,
+    },
+    theirMessage: {
+      alignSelf: 'flex-start',
+      backgroundColor: '#334155',
+      borderBottomLeftRadius: 4,
+    },
+    messageText: {
+      fontSize: 15,
+      lineHeight: 20,
+      fontWeight: '500',
+    },
+    msgFooter: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'flex-end',
+      gap: 4,
+      marginTop: 4,
+    },
+    msgTime: {
+      fontSize: 10,
+    },
+    readStatus: {
+      marginLeft: 2,
+    },
+    requestActions: {
+      padding: 20,
+      backgroundColor: 'rgba(255,255,255,0.05)',
+      borderTopWidth: 1,
+      borderTopColor: 'rgba(255,255,255,0.1)',
+      alignItems: 'center',
+    },
+    requestText: {
+      color: '#FFF',
+      textAlign: 'center',
+      marginBottom: 16,
+      fontSize: 14,
+      fontWeight: '500',
+    },
+    requestButtons: {
+      flexDirection: 'row',
+      gap: 12,
+      width: '100%',
+    },
+    requestBtn: {
+      flex: 1,
+      paddingVertical: 12,
+      borderRadius: 12,
+      alignItems: 'center',
+    },
+    requestBtnText: {
+      fontWeight: 'bold',
+      fontSize: 15,
+    },
+    inputContainer: {
+      padding: 16,
+      paddingBottom: Platform.OS === 'ios' ? 40 : 16,
+      backgroundColor: '#0F172A',
+      borderTopWidth: 1,
+      borderTopColor: 'rgba(255,255,255,0.06)',
+    },
+    inputWrapper: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      backgroundColor: 'rgba(255,255,255,0.05)',
+      borderRadius: 24,
+      paddingLeft: 16,
+      paddingRight: 6,
+      paddingVertical: 6,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.1)',
+    },
+    input: {
+      flex: 1,
+      color: '#FFF',
+      fontSize: 15,
+      minHeight: 40,
+      maxHeight: 100,
+      paddingTop: 10,
+      paddingBottom: 10,
+    },
+    sendBtn: {
+      padding: 4,
+    },
+    sendIconBg: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    emptyState: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingTop: 100,
+    },
+    emptyText: {
+      color: 'rgba(255,255,255,0.2)',
+      fontSize: 16,
+      fontWeight: '700',
+      marginTop: 12,
+    },
+  });
 
-const styles = StyleSheet.create({
-  container: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 9999,
-  },
-  bubbleWrapper: {
-    width: 60,
-    height: 60,
-    elevation: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-  },
-  bubbleContainer: {
-    position: 'relative',
-    width: 60,
-    height: 60,
-  },
-  bubble: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-    overflow: 'hidden',
-  },
-  closeBubbleBtn: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#FFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#000',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-  },
-  unreadBadge: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: '#EF4444',
-    borderWidth: 3,
-    borderColor: '#000',
-  },
-  chatOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-  },
-  chatWindow: {
-    flex: 1,
-    backgroundColor: '#0F172A',
-    width: width,
-    height: height,
-  },
-  chatHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.06)',
-    backgroundColor: '#0F172A',
-  },
-  headerNav: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  headerUserInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  headerAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-  },
-  headerEmojiBg: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerEmoji: {
-    fontSize: 22,
-  },
-  headerTitle: {
-    color: '#FFF',
-    fontSize: 18,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-  },
-  onlineStatusText: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.5)',
-    marginTop: -2,
-  },
-  headerStatusDot: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#10B981',
-    borderWidth: 2,
-    borderColor: '#0F172A',
-  },
-  iconBtn: {
-    padding: 8,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-  },
-  settingsContent: {
-    padding: 20,
-  },
-  settingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    padding: 16,
-    borderRadius: 16,
-  },
-  settingLabel: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  settingDesc: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 13,
-    maxWidth: width * 0.6,
-  },
-  chatListItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.03)',
-  },
-  avatarWrapper: {
-    position: 'relative',
-  },
-  listAvatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-  },
-  listEmojiBg: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  listEmoji: {
-    fontSize: 28,
-  },
-  statusDot: {
-    position: 'absolute',
-    bottom: 2,
-    right: 2,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#10B981',
-    borderWidth: 2,
-    borderColor: '#0F172A',
-  },
-  chatInfo: {
-    marginLeft: 16,
-    flex: 1,
-  },
-  chatInfoTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  chatName: {
-    color: '#FFF',
-    fontWeight: '700',
-    fontSize: 15,
-  },
-  chatTime: {
-    color: 'rgba(255,255,255,0.3)',
-    fontSize: 11,
-  },
-  chatLastMsg: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 13,
-  },
-  messagesList: {
-    flex: 1,
-  },
-  messageBubble: {
-    padding: 12,
-    paddingHorizontal: 16,
-    borderRadius: 22,
-    marginBottom: 10,
-    maxWidth: '85%',
-    position: 'relative',
-  },
-  myMessage: {
-    alignSelf: 'flex-end',
-    backgroundColor: theme.colors.primary,
-    borderBottomRightRadius: 4,
-  },
-  theirMessage: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#334155',
-    borderBottomLeftRadius: 4,
-  },
-  messageText: {
-    fontSize: 15,
-    lineHeight: 20,
-    fontWeight: '500',
-  },
-  msgFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 4,
-    marginTop: 4,
-  },
-  msgTime: {
-    fontSize: 10,
-  },
-  readStatus: {
-    marginLeft: 2,
-  },
-  inputContainer: {
-    padding: 16,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 16,
-    backgroundColor: '#0F172A',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.06)',
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 24,
-    paddingLeft: 16,
-    paddingRight: 6,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  input: {
-    flex: 1,
-    color: '#FFF',
-    fontSize: 15,
-    minHeight: 40,
-    maxHeight: 100,
-    paddingTop: 10,
-    paddingBottom: 10,
-  },
-  sendBtn: {
-    padding: 4,
-  },
-  sendIconBg: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingTop: 100,
-  },
-  emptyText: {
-    color: 'rgba(255,255,255,0.2)',
-    fontSize: 16,
-    fontWeight: '700',
-    marginTop: 12,
-  },
-});
