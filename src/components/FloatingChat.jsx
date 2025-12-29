@@ -113,8 +113,12 @@ export default function FloatingChat() {
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(height)).current;
 
-  const flatListRef = useRef();
-  const inputRef = useRef(null);
+    const flatListRef = useRef();
+    const inputRef = useRef(null);
+    const isSendingRef = useRef(false);
+    const chatSubRef = useRef(null);
+    const presenceSubRef = useRef(null);
+    const callSubRef = useRef(null);
 
   const fetchCallToken = async (roomName) => {
     try {
@@ -215,140 +219,151 @@ export default function FloatingChat() {
     }
   }, [isOpen]);
 
-  useEffect(() => {
-    loadUserAndChats();
-    
-    let presenceChannel;
-    let chatSub;
-    let callSub;
-    let currentUserId = null;
-
-    const setupPresence = async (currentUser) => {
-      presenceChannel = supabase.channel('online-users');
+    useEffect(() => {
+      loadUserAndChats();
       
-      presenceChannel
-        .on('presence', { event: 'sync' }, () => {
-          const state = presenceChannel.presenceState();
-          const online = {};
-          Object.values(state).forEach(presences => {
-            presences.forEach(p => {
-              online[p.user_id] = true;
+      let currentUserId = null;
+
+      const setupPresence = async (currentUser) => {
+        if (presenceSubRef.current) supabase.removeChannel(presenceSubRef.current);
+        const presenceChannel = supabase.channel('online-users');
+        presenceSubRef.current = presenceChannel;
+        
+        presenceChannel
+          .on('presence', { event: 'sync' }, () => {
+            const state = presenceChannel.presenceState();
+            const online = {};
+            Object.values(state).forEach(presences => {
+              presences.forEach(p => {
+                online[p.user_id] = true;
+              });
             });
-          });
-          setOnlineUsers(online);
-        })
-        .subscribe(async (status) => {
-          if (status === 'SUBSCRIBED') {
-            await presenceChannel.track({ user_id: currentUser.id });
-          }
-        });
-    };
-
-    const setupChatSubscription = async () => {
-      const storedUser = await getStoredUser();
-      if (!storedUser) return;
-      
-      currentUserId = storedUser.id;
-      setUser(storedUser);
-      setReadReceiptsEnabled(storedUser.read_receipts_enabled !== false);
-      setupPresence(storedUser);
-
-      chatSub = supabase
-        .channel(`chat_messages_${storedUser.id}_${Date.now()}`)
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'rmessages' }, async (payload) => {
-          const newMessage = payload.new;
-          
-          const { data: chatData } = await supabase
-            .from('rchats')
-            .select('user1_id, user2_id, is_group')
-            .eq('id', newMessage.chat_id)
-            .single();
-          
-          if (!chatData) return;
-          
-          let isMyChat = false;
-          if (chatData.is_group) {
-            const { data: memberData } = await supabase
-              .from('rchat_members')
-              .select('id')
-              .eq('chat_id', newMessage.chat_id)
-              .eq('user_id', currentUserId)
-              .single();
-            isMyChat = !!memberData;
-          } else {
-            isMyChat = chatData.user1_id === currentUserId || chatData.user2_id === currentUserId;
-          }
-          
-          if (!isMyChat) return;
-          
-          setMessages(prev => {
-            if (prev.some(m => m.id === newMessage.id)) return prev;
-            return [...prev, newMessage];
-          });
-          
-          setTimeout(() => flatListRef.current?.scrollToEnd(), 100);
-          
-          if (newMessage.sender_id !== currentUserId) {
-            setIsVisible(true);
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            loadUserAndChats();
-
-            if (activeChatRef.current?.id === newMessage.chat_id) {
-              markAllAsRead(newMessage.chat_id);
+            setOnlineUsers(online);
+          })
+          .subscribe(async (status) => {
+            if (status === 'SUBSCRIBED') {
+              await presenceChannel.track({ user_id: currentUser.id });
             }
-          }
-        })
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rmessages' }, (payload) => {
-          setMessages(prev => prev.map(msg => msg.id === payload.new.id ? payload.new : msg));
-        })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'rchats' }, () => {
-          loadUserAndChats();
-        })
-        .subscribe();
+          });
+      };
 
-      callSub = supabase
-        .channel(`calls_${storedUser.id}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'rcalls' }, async (payload) => {
-          if (payload.eventType === 'INSERT') {
-            const call = payload.new;
-            if (call.caller_id !== currentUserId && call.status === 'ringing') {
+      const setupChatSubscription = async () => {
+        const storedUser = await getStoredUser();
+        if (!storedUser) return;
+        
+        currentUserId = storedUser.id;
+        setUser(storedUser);
+        setReadReceiptsEnabled(storedUser.read_receipts_enabled !== false);
+        setupPresence(storedUser);
+
+        if (chatSubRef.current) supabase.removeChannel(chatSubRef.current);
+        const chatSub = supabase
+          .channel(`chat_messages_${storedUser.id}`) // Use a consistent channel name to prevent multiple channels
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'rmessages' }, async (payload) => {
+            const newMessage = payload.new;
+            
+            // Check if it's already in the list
+            setMessages(prev => {
+              if (prev.some(m => m.id === newMessage.id)) return prev;
+              
+              // Only add if it's for the active chat
+              if (activeChatRef.current?.id === newMessage.chat_id) {
+                setTimeout(() => flatListRef.current?.scrollToEnd(), 100);
+                return [...prev, newMessage];
+              }
+              return prev;
+            });
+
+            if (newMessage.sender_id !== currentUserId) {
+              // Notification/Update logic
               const { data: chatData } = await supabase
                 .from('rchats')
-                .select('*, user1:rusers!user1_id(*), user2:rusers!user2_id(*)')
-                .eq('id', call.chat_id)
+                .select('user1_id, user2_id, is_group')
+                .eq('id', newMessage.chat_id)
                 .single();
               
-              if (chatData) {
-                const isMyChat = chatData.user1_id === currentUserId || chatData.user2_id === currentUserId;
-                if (isMyChat) {
-                  setActiveCall({ ...call, chat: chatData });
-                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+              if (!chatData) return;
+              
+              let isMyChat = false;
+              if (chatData.is_group) {
+                const { data: memberData } = await supabase
+                  .from('rchat_members')
+                  .select('id')
+                  .eq('chat_id', newMessage.chat_id)
+                  .eq('user_id', currentUserId)
+                  .single();
+                isMyChat = !!memberData;
+              } else {
+                isMyChat = chatData.user1_id === currentUserId || chatData.user2_id === currentUserId;
+              }
+              
+              if (isMyChat) {
+                setIsVisible(true);
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                loadUserAndChats();
+
+                if (activeChatRef.current?.id === newMessage.chat_id) {
+                  markAllAsRead(newMessage.chat_id);
                 }
               }
             }
-          } else if (payload.eventType === 'UPDATE') {
-            if (payload.new.status === 'ended' || payload.new.status === 'declined') {
-              if (activeCall?.id === payload.new.id) {
-                endCallUI();
+          })
+          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rmessages' }, (payload) => {
+            setMessages(prev => prev.map(msg => msg.id === payload.new.id ? payload.new : msg));
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'rchats' }, () => {
+            loadUserAndChats();
+          })
+          .subscribe();
+        
+        chatSubRef.current = chatSub;
+
+        if (callSubRef.current) supabase.removeChannel(callSubRef.current);
+        const callSub = supabase
+          .channel(`calls_${storedUser.id}`)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'rcalls' }, async (payload) => {
+            if (payload.eventType === 'INSERT') {
+              const call = payload.new;
+              if (call.caller_id !== currentUserId && call.status === 'ringing') {
+                const { data: chatData } = await supabase
+                  .from('rchats')
+                  .select('*, user1:rusers!user1_id(*), user2:rusers!user2_id(*)')
+                  .eq('id', call.chat_id)
+                  .single();
+                
+                if (chatData) {
+                  const isMyChat = chatData.user1_id === currentUserId || chatData.user2_id === currentUserId;
+                  if (isMyChat) {
+                    setActiveCall({ ...call, chat: chatData });
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                  }
+                }
               }
-            } else if (payload.new.status === 'active' && activeCall?.id === payload.new.id) {
-              setActiveCall(prev => ({ ...prev, status: 'active' }));
-              startCallTimer();
+            } else if (payload.eventType === 'UPDATE') {
+              if (payload.new.status === 'ended' || payload.new.status === 'declined') {
+                if (activeCall?.id === payload.new.id) {
+                  endCallUI();
+                }
+              } else if (payload.new.status === 'active' && activeCall?.id === payload.new.id) {
+                setActiveCall(prev => ({ ...prev, status: 'active' }));
+                startCallTimer();
+              }
             }
-          }
-        })
-        .subscribe();
-    };
+          })
+          .subscribe();
+        
+        callSubRef.current = callSub;
+      };
 
-    setupChatSubscription();
+      setupChatSubscription();
 
-    return () => { 
-      if (chatSub) supabase.removeChannel(chatSub); 
-      if (presenceChannel) supabase.removeChannel(presenceChannel);
-      if (callSub) supabase.removeChannel(callSub);
-      if (callTimerRef.current) clearInterval(callTimerRef.current);
-    };
-  }, []);
+      return () => { 
+        if (chatSubRef.current) supabase.removeChannel(chatSubRef.current); 
+        if (presenceSubRef.current) supabase.removeChannel(presenceSubRef.current);
+        if (callSubRef.current) supabase.removeChannel(callSubRef.current);
+        if (callTimerRef.current) clearInterval(callTimerRef.current);
+      };
+    }, []);
 
   const startCallTimer = () => {
     setCallDuration(0);
@@ -489,58 +504,70 @@ export default function FloatingChat() {
     setTimeout(() => flatListRef.current?.scrollToEnd(), 100);
   };
 
-  const handleSendMessage = async () => {
-    if (!inputText.trim() || !activeChat) return;
-    const text = inputText.trim();
-    setInputText('');
-    inputRef.current?.clear();
-    
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const handleSendMessage = async () => {
+      if (!inputText.trim() || !activeChat || isSendingRef.current) return;
+      
+      const text = inputText.trim();
+      isSendingRef.current = true;
+      setInputText('');
+      inputRef.current?.clear();
+      
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-    const { data } = await supabase
-      .from('rmessages')
-      .insert({
-        chat_id: activeChat.id,
-        sender_id: user.id,
-        text
-      }).select().single();
+      try {
+        const { data, error } = await supabase
+          .from('rmessages')
+          .insert({
+            chat_id: activeChat.id,
+            sender_id: user.id,
+            text
+          }).select().single();
 
-    if (data) {
-      await supabase.from('rchats').update({
-        last_message: text,
-        last_message_at: new Date().toISOString()
-      }).eq('id', activeChat.id);
+        if (error) throw error;
 
-      if (activeChat.is_group) {
-        const otherMembers = groupMembers.filter(m => m.user_id !== user.id);
-        for (const member of otherMembers) {
-          await sendMessageNotification({
-            senderId: user.id,
-            receiverId: member.user_id,
-            senderUsername: user.username,
-            messageText: `[${activeChat.group_name}] ${text}`
-          });
+        if (data) {
+          await supabase.from('rchats').update({
+            last_message: text,
+            last_message_at: new Date().toISOString()
+          }).eq('id', activeChat.id);
+
+          if (activeChat.is_group) {
+            const otherMembers = groupMembers.filter(m => m.user_id !== user.id);
+            for (const member of otherMembers) {
+              await sendMessageNotification({
+                senderId: user.id,
+                receiverId: member.user_id,
+                senderUsername: user.username,
+                messageText: `[${activeChat.group_name}] ${text}`
+              });
+            }
+          } else {
+            const otherUser = getOtherUser(activeChat);
+            if (otherUser) {
+              await sendMessageNotification({
+                senderId: user.id,
+                receiverId: otherUser.id,
+                senderUsername: user.username,
+                messageText: text
+              });
+            }
+          }
         }
-      } else {
-        const otherUser = getOtherUser(activeChat);
-        if (otherUser) {
-          await sendMessageNotification({
-            senderId: user.id,
-            receiverId: otherUser.id,
-            senderUsername: user.username,
-            messageText: text
-          });
-        }
+      } catch (error) {
+        console.error('Error sending message:', error);
+        // On error, we might want to restore text, but usually it's better to just log
+      } finally {
+        isSendingRef.current = false;
       }
-    }
-  };
+    };
 
-  const handleKeyPress = (e) => {
-    if (e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
-      e.preventDefault?.();
-      handleSendMessage();
-    }
-  };
+    const handleKeyPress = (e) => {
+      // On web, prevent default to avoid double trigger with onSubmitEditing
+      if (Platform.OS === 'web' && e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
+        e.preventDefault();
+        handleSendMessage();
+      }
+    };
 
   const selectChat = (chat) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);

@@ -16,9 +16,11 @@ export default function HelpContact() {
   const { isHippie } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const flatListRef = useRef(null);
-  const inputRef = useRef(null);
-  const [messages, setMessages] = useState([]);
+    const flatListRef = useRef(null);
+    const inputRef = useRef(null);
+    const isSendingRef = useRef(false);
+    const subRef = useRef(null);
+    const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
@@ -49,64 +51,64 @@ export default function HelpContact() {
     
     initChat();
     
-      // Subscribe to new messages for this user
-      const subscription = supabase
-        .channel(`help_chat_${currentUser.id}`)
-        .on('postgres_changes', 
-          { 
-            event: 'INSERT', 
-            table: 'rhelp_messages'
-          }, 
-            payload => {
-              const newMsg = payload.new;
-              // Filter in JS to ensure privacy and fix "showing up in every chat" issue
-              if (Number(newMsg.sender_id) === Number(currentUser.id) || Number(newMsg.receiver_id) === Number(currentUser.id)) {
-                setMessages(prev => {
-                  // Already exists?
-                  if (prev.find(m => m.id === newMsg.id)) return prev;
-                  
-                  // Check for optimistic match to replace (match by content and sender)
-                  const optimisticIdx = prev.findIndex(m => 
-                    m.sender_id === newMsg.sender_id && 
-                    m.content === newMsg.content && 
-                    m.id > 1000000000000 // Date.now() timestamp
-                  );
+    // Subscribe to new messages for this user
+    if (subRef.current) supabase.removeChannel(subRef.current);
+    
+    const subscription = supabase
+      .channel(`help_chat_${currentUser.id}`)
+      .on('postgres_changes', 
+        { 
+          event: 'INSERT', 
+          table: 'rhelp_messages'
+        }, 
+        payload => {
+          const newMsg = payload.new;
+          if (Number(newMsg.sender_id) === Number(currentUser.id) || Number(newMsg.receiver_id) === Number(currentUser.id)) {
+            setMessages(prev => {
+              if (prev.some(m => m.id === newMsg.id)) return prev;
+              
+              const optimisticIdx = prev.findIndex(m => 
+                m.sender_id === newMsg.sender_id && 
+                m.content === newMsg.content && 
+                m.id > 1000000000000
+              );
 
-                  let newMessages;
-                  if (optimisticIdx !== -1) {
-                    newMessages = [...prev];
-                    newMessages[optimisticIdx] = newMsg;
-                  } else {
-                    newMessages = [...prev, newMsg];
-                  }
-                  
-                  if (Number(newMsg.receiver_id) === Number(currentUser.id)) {
-                    if (newMsg.status === 'resolved' || newMsg.content.includes("Please rate 1-5")) {
-                      setShowRating(true);
-                    }
-                  }
-                  return newMessages;
-                });
+              if (optimisticIdx !== -1) {
+                const newMessages = [...prev];
+                newMessages[optimisticIdx] = newMsg;
+                return newMessages;
+              } else {
+                return [...prev, newMsg];
+              }
+            });
+
+            if (Number(newMsg.receiver_id) === Number(currentUser.id)) {
+              if (newMsg.status === 'resolved' || newMsg.content.includes("Please rate 1-5")) {
+                setShowRating(true);
               }
             }
-        )
-        .on('postgres_changes',
-          {
-            event: 'UPDATE',
-            table: 'rhelp_messages'
-          },
-          payload => {
-            const newMsg = payload.new;
-            if (Number(newMsg.receiver_id) === Number(currentUser.id) && newMsg.status === 'resolved') {
-              setShowRating(true);
-              initChat();
-            }
           }
-        )
-        .subscribe();
+        }
+      )
+      .on('postgres_changes',
+        {
+          event: 'UPDATE',
+          table: 'rhelp_messages'
+        },
+        payload => {
+          const newMsg = payload.new;
+          if (Number(newMsg.receiver_id) === Number(currentUser.id) && newMsg.status === 'resolved') {
+            setShowRating(true);
+            initChat();
+          }
+        }
+      )
+      .subscribe();
+
+    subRef.current = subscription;
 
     return () => {
-      subscription.unsubscribe();
+      if (subRef.current) supabase.removeChannel(subRef.current);
     };
   }, [currentUser?.id]);
 
@@ -175,88 +177,92 @@ export default function HelpContact() {
     }
   };
 
-        const handleSend = async () => {
-          if (!inputText.trim() || !currentUser) return;
-          
-          // If there's a resolved status, purge before sending new
-          if (messages.some(m => m.status === 'resolved')) {
-            await purgeMessages();
-          }
-    
-          const text = inputText.trim();
-          setInputText('');
-          inputRef.current?.clear();
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
-    // Optimistic update
-    const tempId = Date.now();
-    const tempMsg = {
-      id: tempId,
-      sender_id: currentUser.id,
-      content: text,
-      is_from_admin: false,
-      created_at: new Date().toISOString(),
-      status: 'open'
-    };
-    setMessages(prev => [...prev, tempMsg]);
-
-    try {
-      const { data: realMsg, error } = await supabase
-        .from('rhelp_messages')
-        .insert({
-          sender_id: currentUser.id,
-          content: text,
-          is_from_admin: false
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      // Update optimistic message with real one
-      if (realMsg) {
-        setMessages(prev => prev.map(m => m.id === tempId ? realMsg : m));
-      }
-
-      // AI Assistant Response
-      const isOvertaken = messages.some(m => m.status === 'overtaken');
-      if (isOvertaken) {
-        console.log("Chat overtaken by agent. AI suppressed.");
-        return;
-      }
-
-      const history = messages.slice(-5).map(m => ({
-            role: m.is_from_admin ? 'assistant' : 'user',
-            content: m.content
-          }));
-
-            const aiResponse = await getAIAssistantResponse(text, history);
-
-            await supabase
-              .from('rhelp_messages')
-              .insert({
-                receiver_id: currentUser.id,
-                content: aiResponse,
-                is_from_admin: true
-              });
+          const handleSend = async () => {
+            if (!inputText.trim() || !currentUser || isSendingRef.current) return;
             
-            // Notify user of assistant response
-            await sendHelpMessageNotification({
-              senderId: 'assistant',
-              senderUsername: 'Town Wall Assistant',
-              receiverId: currentUser.id,
-              isFromAdmin: true,
-              messageContent: aiResponse
-            });
+            // If there's a resolved status, purge before sending new
+            if (messages.some(m => m.status === 'resolved')) {
+              await purgeMessages();
+            }
+      
+            const text = inputText.trim();
+            isSendingRef.current = true;
+            setInputText('');
+            inputRef.current?.clear();
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   
-        } catch (error) {
-          console.error("Error in handleSend:", error);
-          setInputText(text); // Restore text on error
-          // Remove optimistic message on error
-          setMessages(prev => prev.filter(m => m.id !== tempId));
-          Alert.alert("Error", "Message could not be sent.");
-        }
+      // Optimistic update
+      const tempId = Date.now();
+      const tempMsg = {
+        id: tempId,
+        sender_id: currentUser.id,
+        content: text,
+        is_from_admin: false,
+        created_at: new Date().toISOString(),
+        status: 'open'
       };
+      setMessages(prev => [...prev, tempMsg]);
+  
+      try {
+        const { data: realMsg, error } = await supabase
+          .from('rhelp_messages')
+          .insert({
+            sender_id: currentUser.id,
+            content: text,
+            is_from_admin: false
+          })
+          .select()
+          .single();
+  
+        if (error) throw error;
+  
+        // Update optimistic message with real one
+        if (realMsg) {
+          setMessages(prev => prev.map(m => m.id === tempId ? realMsg : m));
+        }
+  
+        // AI Assistant Response
+        const isOvertaken = messages.some(m => m.status === 'overtaken');
+        if (isOvertaken) {
+          console.log("Chat overtaken by agent. AI suppressed.");
+          return;
+        }
+  
+        const history = messages.slice(-5).map(m => ({
+              role: m.is_from_admin ? 'assistant' : 'user',
+              content: m.content
+            }));
+  
+              const aiResponse = await getAIAssistantResponse(text, history);
+  
+              await supabase
+                .from('rhelp_messages')
+                .insert({
+                  receiver_id: currentUser.id,
+                  content: aiResponse,
+                  is_from_admin: true
+                });
+              
+              // Notify user of assistant response
+              const { sendHelpMessageNotification } = require('@/utils/notifications');
+              await sendHelpMessageNotification({
+                senderId: 'assistant',
+                senderUsername: 'Town Wall Assistant',
+                receiverId: currentUser.id,
+                isFromAdmin: true,
+                messageContent: aiResponse
+              });
+    
+          } catch (error) {
+            console.error("Error in handleSend:", error);
+            setInputText(text); // Restore text on error
+            // Remove optimistic message on error
+            setMessages(prev => prev.filter(m => m.id !== tempId));
+            Alert.alert("Error", "Message could not be sent.");
+          } finally {
+            isSendingRef.current = false;
+          }
+        };
 
   const handleKeyPress = ({ nativeEvent }) => {
     if (nativeEvent.key === 'Enter' && !nativeEvent.shiftKey) {
