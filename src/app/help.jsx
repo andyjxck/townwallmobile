@@ -188,8 +188,14 @@ export default function HelpContact() {
             const text = inputText.trim();
             isSendingRef.current = true;
             setInputText('');
-            inputRef.current?.clear();
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            if (inputRef.current) {
+              inputRef.current.clear();
+              if (Platform.OS !== 'web') {
+                inputRef.current.setNativeProps({ text: '' });
+              }
+            }
+            
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   
       // Optimistic update
       const tempId = Date.now();

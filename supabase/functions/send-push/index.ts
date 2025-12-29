@@ -4,16 +4,25 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
 
 serve(async (req) => {
-  try {
-    const body = await req.json()
-    const record = body.record || body
-    
-    if (!record || !record.user_id) {
-      console.error('[send-push] Invalid payload: missing record or user_id', JSON.stringify(body))
-      return new Response(JSON.stringify({ error: 'Invalid payload' }), { status: 400 })
-    }
+    try {
+      const body = await req.json()
+      console.log('[send-push] Received payload:', JSON.stringify(body))
+      
+      // Handle different Supabase webhook formats or direct calls
+      const record = body?.record || body?.old_record || body
+      
+      if (!record || typeof record !== 'object') {
+        console.error('[send-push] Invalid payload: no record object found', JSON.stringify(body))
+        return new Response(JSON.stringify({ error: 'Invalid payload: no record' }), { status: 400 })
+      }
 
-    const { user_id, title, message, type, link } = record
+      const { user_id, title, message, type, link } = record
+      
+      if (!user_id) {
+        console.error('[send-push] Invalid payload: missing user_id in record', JSON.stringify(record))
+        return new Response(JSON.stringify({ error: 'Invalid payload: missing user_id' }), { status: 400 })
+      }
+
 
     // Initialize Supabase Client
     const supabase = createClient(

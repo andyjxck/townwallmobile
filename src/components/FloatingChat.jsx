@@ -505,18 +505,21 @@ export default function FloatingChat() {
   };
 
     const handleSendMessage = async () => {
-      const currentText = inputText.trim();
-      if (!currentText || !activeChat || isSendingRef.current) return;
+      const text = inputText.trim();
+      if (!text || !activeChat || isSendingRef.current) return;
       
+      // Clear immediately to prevent double-send and show responsiveness
       isSendingRef.current = true;
-      
+      setInputText('');
       if (inputRef.current) {
         inputRef.current.clear();
+        // Force clear for native
+        if (Platform.OS !== 'web') {
+          inputRef.current.setNativeProps({ text: '' });
+        }
       }
-      setInputText('');
       
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      const text = currentText;
 
       try {
         const { data, error } = await supabase
@@ -1216,10 +1219,12 @@ export default function FloatingChat() {
                               ref={inputRef}
                               style={styles.input}
                               placeholder={activeChat?.status === 'pending' && !activeChat?.is_group ? "Waiting for approval..." : "Type a message..."}
-                              value={inputText}
+                                value={inputText}
                                 onChangeText={setInputText}
                                 onKeyPress={handleKeyPress}
+                                onSubmitEditing={handleSendMessage}
                                 placeholderTextColor="rgba(255,255,255,0.3)"
+
 
                               multiline
                               blurOnSubmit={false}
