@@ -114,6 +114,7 @@ export default function FloatingChat() {
     const slideAnim = useRef(new Animated.Value(height)).current;
 
   const flatListRef = useRef();
+  const inputRef = useRef(null);
 
   const fetchCallToken = async (roomName) => {
     try {
@@ -492,6 +493,7 @@ export default function FloatingChat() {
     if (!inputText.trim() || !activeChat) return;
     const text = inputText.trim();
     setInputText('');
+    inputRef.current?.clear();
     
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
@@ -533,11 +535,10 @@ export default function FloatingChat() {
     }
   };
 
-  const handleKeyPress = ({ nativeEvent }) => {
-    if (nativeEvent.key === 'Enter' && !nativeEvent.shiftKey) {
-      nativeEvent.preventDefault?.();
+  const handleKeyPress = (e) => {
+    if (e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
+      e.preventDefault?.();
       handleSendMessage();
-      return true;
     }
   };
 
@@ -1180,6 +1181,7 @@ export default function FloatingChat() {
                   <View style={styles.inputContainer}>
                     <View style={styles.inputWrapper}>
                             <TextInput
+                              ref={inputRef}
                               style={styles.input}
                               placeholder={activeChat?.status === 'pending' && !activeChat?.is_group ? "Waiting for approval..." : "Type a message..."}
                               value={inputText}

@@ -17,6 +17,7 @@ export default function HelpContact() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const flatListRef = useRef(null);
+  const inputRef = useRef(null);
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(true);
@@ -174,17 +175,18 @@ export default function HelpContact() {
     }
   };
 
-      const handleSend = async () => {
-        if (!inputText.trim() || !currentUser) return;
-        
-        // If there's a resolved status, purge before sending new
-        if (messages.some(m => m.status === 'resolved')) {
-          await purgeMessages();
-        }
-  
-        const text = inputText.trim();
-        setInputText('');
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        const handleSend = async () => {
+          if (!inputText.trim() || !currentUser) return;
+          
+          // If there's a resolved status, purge before sending new
+          if (messages.some(m => m.status === 'resolved')) {
+            await purgeMessages();
+          }
+    
+          const text = inputText.trim();
+          setInputText('');
+          inputRef.current?.clear();
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     // Optimistic update
     const tempId = Date.now();
@@ -397,6 +399,7 @@ export default function HelpContact() {
         >
             <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, 20) }]}>
                 <TextInput
+                  ref={inputRef}
                   style={styles.input}
                   placeholder="Type a message..."
                   placeholderTextColor="rgba(255,255,255,0.3)"
