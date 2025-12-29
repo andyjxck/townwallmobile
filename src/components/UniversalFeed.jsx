@@ -40,6 +40,7 @@ import * as Haptics from "expo-haptics";
 import { theme } from "../utils/theme";
 import { getStoredUser } from "../utils/user";
 import { useAuthStore, useChatStore } from "../utils/auth";
+import { useTheme } from "../utils/ThemeContext";
 import NotificationPanel from "./NotificationPanel";
 import { ShareManager } from "./ShareManager";
 import { BannerAd } from "@/components/BannerAd";
@@ -50,6 +51,7 @@ import { offlineStorage, syncService, subscribeToNetworkChanges, checkNetworkSta
 export default function UniversalFeed() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { theme, isHippie } = useTheme();
   
   const [posts, setPosts] = useState([]);
   const [zones, setZones] = useState([]);

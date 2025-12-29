@@ -146,10 +146,12 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
 
   const shouldBlur = fakeCount > 5 && fakeCount > helpfulCount;
   const timeAgo = getTimeAgo(new Date(item.created_at));
-  const isModOrAdmin = user?.is_admin || user?.is_moderator;
-  const isBlurredByMod = item.is_blurred && item.blur_reason;
+    const isModOrAdmin = user?.is_admin || user?.is_moderator;
+    const isBlurredByMod = item.is_blurred && item.blur_reason;
+    const isCurrentlyBlurred = (shouldBlur && !revealed) || (isBlurredByMod && !blurRevealed);
 
-  const handleModAction = async (action, reason = null) => {
+    const handleModAction = async (action, reason = null) => {
+
     setShowModMenu(false);
     if (onModAction) {
       await onModAction(item.id, action, reason);
@@ -171,122 +173,151 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
           <Text style={styles.pendingText}>Pending - Will sync when online</Text>
         </View>
       )}
-      {shouldBlur && !revealed ? (
-        <TouchableOpacity onPress={() => setRevealed(true)} style={styles.blurBanner}>
-          <AlertTriangle size={18} color={theme.colors.error} />
-          <Text style={[styles.blurText, { color: theme.colors.error }]}>Reported Content. Tap to reveal.</Text>
-        </TouchableOpacity>
-      ) : isBlurredByMod && !blurRevealed ? (
-        <TouchableOpacity onPress={() => setBlurRevealed(true)} style={styles.modBlurBanner}>
-          <EyeOff size={18} color="#FFF" />
-          <Text style={styles.modBlurText}>Post has been blurred for: {item.blur_reason} - Tap To Reveal</Text>
-        </TouchableOpacity>
-      ) : (
-        <View style={styles.card}>
-            {!isBlurredByMod && (
-              <View style={styles.header}>
-                <TouchableOpacity onPress={() => !item.is_anonymous && router.push(`/profile?userId=${item.user_id}`)} disabled={item.is_anonymous}>
-                  {item.user?.avatar_url ? (
-                    <Image source={{ uri: item.user.avatar_url }} style={styles.avatar} />
-                  ) : (
-                    <Text style={styles.emojiAvatar}>{item.user?.emoji_icon || "👤"}</Text>
-                  )}
-                </TouchableOpacity>
-                <View style={styles.headerInfo}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Text style={styles.username}>@{item.is_anonymous ? "Anonymous" : item.user?.username}</Text>
-                      {!item.is_anonymous && isOnline(item.user?.last_seen) && <View style={styles.onlineDot} />}
-                    </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-                      <TouchableOpacity onPress={() => onFilterZone?.(item.zone_id)}>
-                        <Text style={styles.metaLink}>{item.zone?.name}</Text>
+      <View style={styles.card}>
+        <View style={styles.header}>
+          {isCurrentlyBlurred ? (
+            <View style={[styles.avatar, styles.redactedAvatar]}>
+              <User size={20} color="rgba(255,255,255,0.3)" />
+            </View>
+          ) : (
+            <TouchableOpacity onPress={() => !item.is_anonymous && router.push(`/profile?userId=${item.user_id}`)} disabled={item.is_anonymous}>
+              {item.user?.avatar_url ? (
+                <Image source={{ uri: item.user.avatar_url }} style={styles.avatar} />
+              ) : (
+                <Text style={styles.emojiAvatar}>{item.user?.emoji_icon || "👤"}</Text>
+              )}
+            </TouchableOpacity>
+          )}
+
+          <View style={styles.headerInfo}>
+            {isCurrentlyBlurred ? (
+              <View style={styles.redactedHeaderContainer}>
+                <View style={[styles.redactedBar, { width: 80, height: 14, marginBottom: 6 }]} />
+                <View style={{ flexDirection: 'row', gap: 4 }}>
+                  <View style={[styles.redactedBar, { width: 50, height: 10 }]} />
+                  <View style={[styles.redactedBar, { width: 40, height: 10 }]} />
+                </View>
+              </View>
+            ) : (
+              <>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={styles.username}>@{item.is_anonymous ? "Anonymous" : item.user?.username}</Text>
+                  {!item.is_anonymous && isOnline(item.user?.last_seen) && <View style={styles.onlineDot} />}
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                  <TouchableOpacity onPress={() => onFilterZone?.(item.zone_id)}>
+                    <Text style={styles.metaLink}>{item.zone?.name}</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.metaText}>•</Text>
+                  {item.tag?.name && (
+                    <>
+                      <TouchableOpacity onPress={() => onFilterTag?.(item.tag_id)}>
+                        <Text style={styles.metaLink}>{item.tag?.name}</Text>
                       </TouchableOpacity>
                       <Text style={styles.metaText}>•</Text>
-                      {item.tag?.name && (
-                        <>
-                          <TouchableOpacity onPress={() => onFilterTag?.(item.tag_id)}>
-                            <Text style={styles.metaLink}>{item.tag?.name}</Text>
-                          </TouchableOpacity>
-                          <Text style={styles.metaText}>•</Text>
-                        </>
-                      )}
-                      <Text style={styles.metaText}>{timeAgo}</Text>
-                    </View>
-                  </View>
-                {user?.id === item.user_id && (
-                  <TouchableOpacity onPress={() => onEdit?.(item)}><Pencil size={18} color={theme.colors.textSecondary} /></TouchableOpacity>
-                )}
-                {isModOrAdmin && (
-                  <TouchableOpacity onPress={() => setShowModMenu(true)} style={{ marginLeft: 8 }}>
-                    <MoreVertical size={18} color={theme.colors.textSecondary} />
-                  </TouchableOpacity>
-                )}
-              </View>
+                    </>
+                  )}
+                  <Text style={styles.metaText}>{timeAgo}</Text>
+                </View>
+              </>
             )}
+          </View>
 
-            <TouchableOpacity onPress={() => setIsExpanded(!isExpanded)} style={styles.body}>
+          {!isCurrentlyBlurred && user?.id === item.user_id && (
+            <TouchableOpacity onPress={() => onEdit?.(item)}><Pencil size={18} color={theme.colors.textSecondary} /></TouchableOpacity>
+          )}
+          {isModOrAdmin && (
+            <TouchableOpacity onPress={() => setShowModMenu(true)} style={{ marginLeft: 8 }}>
+              <MoreVertical size={18} color={theme.colors.textSecondary} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <TouchableOpacity 
+          onPress={() => isCurrentlyBlurred ? (shouldBlur ? setRevealed(true) : setBlurRevealed(true)) : setIsExpanded(!isExpanded)} 
+          style={styles.body}
+        >
+          {isCurrentlyBlurred ? (
+            <View style={styles.blurredContentWrapper}>
+              {isBlurredByMod ? (
+                <View style={styles.modBlurOverlay}>
+                  <EyeOff size={18} color="#FFF" />
+                  <Text style={styles.modBlurText}>Post blurred: {item.blur_reason}</Text>
+                  <Text style={styles.tapToRevealText}>Tap to reveal</Text>
+                </View>
+              ) : (
+                <View style={styles.communityBlurOverlay}>
+                  <AlertTriangle size={18} color={theme.colors.error} />
+                  <Text style={[styles.blurText, { color: theme.colors.error }]}>Reported Content</Text>
+                  <Text style={styles.tapToRevealText}>Tap to reveal</Text>
+                </View>
+              )}
+            </View>
+          ) : (
+            <>
               {item.title && <Text style={styles.title}>{item.title}</Text>}
               <Text style={styles.bodyText} numberOfLines={isExpanded ? undefined : 4}>
                 {item.text?.replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ')}
               </Text>
               {item.poll_id && <PollComponent pollId={item.poll_id} />}
-            </TouchableOpacity>
+            </>
+          )}
+        </TouchableOpacity>
 
-            {images.length > 0 && (
-              <TouchableOpacity onPress={() => setShowFullImage(true)} style={styles.mediaContainer}>
-                {isVideo ? (
+        {!isCurrentlyBlurred && images.length > 0 && (
+          <TouchableOpacity onPress={() => setShowFullImage(true)} style={styles.mediaContainer}>
+            {isVideo ? (
               <Video
-  source={{ uri: images[0] }}
-  style={styles.media}
-  resizeMode="cover"
-  shouldPlay={isExpanded}
-  isLooping
-  isMuted
-  useNativeControls={false}
-/>
-
-
-                ) : (
-                  <Image source={{ uri: images[0] }} style={styles.media} contentFit="cover" />
-                )}
-              </TouchableOpacity>
+                source={{ uri: images[0] }}
+                style={styles.media}
+                resizeMode="cover"
+                shouldPlay={isExpanded}
+                isLooping
+                isMuted
+                useNativeControls={false}
+              />
+            ) : (
+              <Image source={{ uri: images[0] }} style={styles.media} contentFit="cover" />
             )}
+          </TouchableOpacity>
+        )}
 
-            {!isBlurredByMod && (
-              <View style={styles.footer}>
-                <View style={styles.actions}>
-                  <TouchableOpacity 
-                    onPress={() => onReaction(item.id, "helpful", userReactions.helpful)} 
-                    style={styles.actionBtn}
-                  >
-                    <Heart size={20} color={userReactions.helpful ? theme.colors.error : theme.colors.textSecondary} fill={userReactions.helpful ? theme.colors.error : "transparent"} />
-                    <TouchableOpacity onPress={() => { fetchLikers('helpful'); setShowLikersModal(true); }}>
-                      <Text style={styles.actionText}>{helpfulCount}</Text>
-                    </TouchableOpacity>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity 
-                    onPress={() => onReaction(item.id, "superlike", userReactions.superlike)} 
-                    style={styles.actionBtn}
-                  >
-                    <Star size={20} color={userReactions.superlike ? "#FBBF24" : theme.colors.textSecondary} fill={userReactions.superlike ? "#FBBF24" : "transparent"} />
-                    <TouchableOpacity onPress={() => { fetchLikers('superlike'); setShowSuperlikersModal(true); }}>
-                      <Text style={styles.actionText}>{superlikeCount}</Text>
-                    </TouchableOpacity>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity onPress={() => onShare(item)} style={styles.actionBtn}>
-                    <ShareIcon size={20} color={theme.colors.textSecondary} />
-                    <Text style={styles.actionText}>{item.share_count || 0}</Text>
-                  </TouchableOpacity>
-                </View>
-                <TouchableOpacity onPress={() => onReaction(item.id, "fake", userReactions.fake)}>
-                  <Flag size={18} color={userReactions.fake ? theme.colors.error : theme.colors.textSecondary} />
+        {!isCurrentlyBlurred && (
+          <View style={styles.footer}>
+            <View style={styles.actions}>
+              <TouchableOpacity 
+                onPress={() => onReaction(item.id, "helpful", userReactions.helpful)} 
+                style={styles.actionBtn}
+              >
+                <Heart size={20} color={userReactions.helpful ? theme.colors.error : theme.colors.textSecondary} fill={userReactions.helpful ? theme.colors.error : "transparent"} />
+                <TouchableOpacity onPress={() => { fetchLikers('helpful'); setShowLikersModal(true); }}>
+                  <Text style={styles.actionText}>{helpfulCount}</Text>
                 </TouchableOpacity>
-              </View>
-            )}
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                onPress={() => onReaction(item.id, "superlike", userReactions.superlike)} 
+                style={styles.actionBtn}
+              >
+                <Star size={20} color={userReactions.superlike ? "#FBBF24" : theme.colors.textSecondary} fill={userReactions.superlike ? "#FBBF24" : "transparent"} />
+                <TouchableOpacity onPress={() => { fetchLikers('superlike'); setShowSuperlikersModal(true); }}>
+                  <Text style={styles.actionText}>{superlikeCount}</Text>
+                </TouchableOpacity>
+              </TouchableOpacity>
 
-            {isExpanded && !isBlurredByMod && !item.comments_disabled && (
+              <TouchableOpacity onPress={() => onShare(item)} style={styles.actionBtn}>
+                <ShareIcon size={20} color={theme.colors.textSecondary} />
+                <Text style={styles.actionText}>{item.share_count || 0}</Text>
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity onPress={() => onReaction(item.id, "fake", userReactions.fake)}>
+              <Flag size={18} color={userReactions.fake ? theme.colors.error : theme.colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {isExpanded && !isCurrentlyBlurred && !item.comments_disabled && (
+
               <View style={styles.commentsSection}>
                 {loadingComments ? (
                   <ActivityIndicator size="small" color={theme.colors.primary} style={{ marginVertical: 20 }} />
@@ -662,11 +693,46 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.03)',
     borderRadius: 8,
   },
-  commentsDisabledText: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 13,
-  },
-  modMenuContent: {
+    commentsDisabledText: {
+      color: 'rgba(255,255,255,0.5)',
+      fontSize: 13,
+    },
+    redactedAvatar: {
+      backgroundColor: 'rgba(255,255,255,0.05)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    redactedHeaderContainer: {
+      flex: 1,
+    },
+    redactedBar: {
+      backgroundColor: '#000',
+      borderRadius: 2,
+    },
+    blurredContentWrapper: {
+      minHeight: 80,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: 'rgba(0,0,0,0.2)',
+      borderRadius: 12,
+      padding: 20,
+    },
+    modBlurOverlay: {
+      alignItems: 'center',
+      gap: 8,
+    },
+    communityBlurOverlay: {
+      alignItems: 'center',
+      gap: 8,
+    },
+    tapToRevealText: {
+      fontSize: 12,
+      color: 'rgba(255,255,255,0.4)',
+      marginTop: 4,
+      fontWeight: '600',
+    },
+    modMenuContent: {
+
     backgroundColor: '#1A1A1A',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,

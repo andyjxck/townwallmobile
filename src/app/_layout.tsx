@@ -146,6 +146,37 @@ function ThemeWrapper({ children }) {
   return content;
 }
 
+function LayoutWithTheme() {
+  const { theme, isHippie } = useTheme();
+  
+  return (
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        animation: "slide_from_right",
+        contentStyle: { backgroundColor: isHippie ? 'transparent' : theme.colors.background }
+      }}
+    >
+        <Stack.Screen name="index" />
+        <Stack.Screen name="auth" />
+        <Stack.Screen name="help" />
+        <Stack.Screen name="profile" />
+        <Stack.Screen name="settings" />
+        <Stack.Screen name="admin" />
+        <Stack.Screen name="onboarding/welcome" />
+        <Stack.Screen name="onboarding/zones" />
+        <Stack.Screen
+          name="post"
+          options={{
+            presentation: "modal",
+            animation: "slide_from_bottom",
+          }}
+        />
+        <Stack.Screen name="secret-hippie" options={{ presentation: 'modal' }} />
+    </Stack>
+  );
+}
+
 export default function RootLayout() {
   const { initiate, isReady, auth } = useAuth();
   const colorScheme = useColorScheme();
@@ -270,29 +301,7 @@ export default function RootLayout() {
                 <SandboxHandler />
                 <GlobalErrorReporter />
                   <Toaster />
-                  <Stack
-                      screenOptions={{
-                        headerShown: false,
-                        animation: "slide_from_right",
-                      }}
-                    >
-                        <Stack.Screen name="index" />
-                        <Stack.Screen name="auth" />
-                        <Stack.Screen name="help" />
-                        <Stack.Screen name="profile" />
-                        <Stack.Screen name="settings" />
-                        <Stack.Screen name="admin" />
-                        <Stack.Screen name="onboarding/welcome" />
-                        <Stack.Screen name="onboarding/zones" />
-                        <Stack.Screen
-                          name="post"
-                          options={{
-                            presentation: "modal",
-                            animation: "slide_from_bottom",
-                          }}
-                        />
-                        <Stack.Screen name="secret-hippie" options={{ presentation: 'modal' }} />
-                    </Stack>
+                  <LayoutWithTheme />
                   <FloatingChat />
               </ThemeWrapper>
           </ErrorBoundaryWrapper>
