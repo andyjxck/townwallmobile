@@ -153,7 +153,8 @@ function LayoutWithTheme() {
     <Stack
       screenOptions={{
         headerShown: false,
-        animation: "slide_from_right",
+        animation: isHippie ? "fade" : "slide_from_right",
+        animationDuration: 200,
         contentStyle: { backgroundColor: isHippie ? 'transparent' : theme.colors.background }
       }}
     >

@@ -127,7 +127,7 @@ export default function NotificationPanel({ visible, onClose }) {
       transparent={true}
       onRequestClose={onClose}
     >
-    <View style={[styles.overlay, isHippie && { backgroundColor: 'rgba(15, 23, 42, 0.95)' }]}>
+    <View style={[styles.overlay, isHippie && { backgroundColor: '#0F172A' }]}>
       <View style={[styles.container, { paddingTop: insets.top + 20 }]}>
 
           <View style={styles.header}>

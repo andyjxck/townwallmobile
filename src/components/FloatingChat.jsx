@@ -847,7 +847,6 @@ export default function FloatingChat() {
             activeOpacity={1} 
             onPress={() => setClose()}
           >
-            <BlurView intensity={20} style={StyleSheet.absoluteFill} tint="dark" />
           </TouchableOpacity>
           
             <Animated.View style={[styles.chatWindow, { transform: [{ translateY: slideAnim }] }]}>
@@ -1193,7 +1192,7 @@ const styles = StyleSheet.create({
   },
   chatOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: '#0F172A',
   },
   chatWindow: {
     flex: 1,
