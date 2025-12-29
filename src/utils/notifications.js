@@ -7,8 +7,8 @@ import { isOnline } from './user';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
+    shouldShowAlert: false, // Don't show notifications when app is in foreground
+    shouldPlaySound: false,
     shouldSetBadge: true,
   }),
 });
@@ -72,14 +72,22 @@ export async function registerForPushNotificationsAsync(userId) {
           sound: 'message.mp3',
         });
 
-        await Notifications.setNotificationChannelAsync('calls', {
-          name: 'Calls',
-          importance: Notifications.AndroidImportance.MAX,
-          vibrationPattern: [0, 250, 250, 250],
-          lightColor: '#22C55E',
-          sound: 'ringtone.mp3',
-        });
-      }
+          await Notifications.setNotificationChannelAsync('calls', {
+            name: 'Calls',
+            importance: Notifications.AndroidImportance.MAX,
+            vibrationPattern: [0, 250, 250, 250],
+            lightColor: '#22C55E',
+            sound: 'ringtone.mp3',
+          });
+
+          await Notifications.setNotificationChannelAsync('alerts', {
+            name: 'Alerts',
+            importance: Notifications.AndroidImportance.MAX,
+            vibrationPattern: [0, 250, 250, 250],
+            lightColor: '#22C55E',
+            sound: 'alert.mp3',
+          });
+        }
   } catch (error) {
     console.error('Error registering for push notifications:', error);
   }
