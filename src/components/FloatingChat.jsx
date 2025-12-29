@@ -30,6 +30,7 @@ import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { Audio } from 'expo-av';
+import Constants from 'expo-constants';
 // LiveKit imports are handled dynamically to prevent crashes in environments without native modules
 let LiveKitRoom, useLocalParticipant, AudioSession;
 
