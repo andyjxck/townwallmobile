@@ -264,11 +264,15 @@ export default function HelpContact() {
           }
         };
 
-  const handleKeyPress = ({ nativeEvent }) => {
-    if (nativeEvent.key === 'Enter' && !nativeEvent.shiftKey) {
-      handleSend();
-    }
-  };
+    const handleKeyPress = (e) => {
+      if (e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
+        if (Platform.OS === 'web') {
+          e.preventDefault();
+        }
+        handleSend();
+      }
+    };
+
 
   return (
     <View style={[styles.container, isHippie && { backgroundColor: 'transparent' }]}>

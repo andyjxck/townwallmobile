@@ -5,7 +5,14 @@ const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
 
 serve(async (req) => {
   try {
-    const { record } = await req.json()
+    const body = await req.json()
+    const record = body.record || body
+    
+    if (!record || !record.user_id) {
+      console.error('[send-push] Invalid payload: missing record or user_id', JSON.stringify(body))
+      return new Response(JSON.stringify({ error: 'Invalid payload' }), { status: 400 })
+    }
+
     const { user_id, title, message, type, link } = record
 
     // Initialize Supabase Client

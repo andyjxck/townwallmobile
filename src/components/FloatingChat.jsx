@@ -511,7 +511,7 @@ export default function FloatingChat() {
       isSendingRef.current = true;
       
       if (inputRef.current) {
-        inputRef.current.setNativeProps({ text: '' });
+        inputRef.current.clear();
       }
       setInputText('');
       
@@ -566,9 +566,10 @@ export default function FloatingChat() {
     };
 
     const handleKeyPress = (e) => {
-      // On web, prevent default to avoid double trigger with onSubmitEditing
-      if (Platform.OS === 'web' && e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
-        e.preventDefault();
+      if (e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
+        if (Platform.OS === 'web') {
+          e.preventDefault();
+        }
         handleSendMessage();
       }
     };
@@ -1216,8 +1217,10 @@ export default function FloatingChat() {
                               style={styles.input}
                               placeholder={activeChat?.status === 'pending' && !activeChat?.is_group ? "Waiting for approval..." : "Type a message..."}
                               value={inputText}
-                              onChangeText={setInputText}
-                              placeholderTextColor="rgba(255,255,255,0.3)"
+                                onChangeText={setInputText}
+                                onKeyPress={handleKeyPress}
+                                placeholderTextColor="rgba(255,255,255,0.3)"
+
                               multiline
                               blurOnSubmit={false}
                               editable={activeChat?.status === 'accepted' || activeChat?.initiated_by === user?.id || activeChat?.is_group}
