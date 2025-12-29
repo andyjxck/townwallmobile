@@ -166,7 +166,7 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isCurrentlyBlurred && { paddingBottom: 10, marginBottom: 10 }]}>
       {item.isPending && (
         <View style={styles.pendingBanner}>
           <CloudOff size={14} color="#92400E" />
@@ -245,14 +245,14 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
               setIsExpanded(!isExpanded);
             }
           }} 
-          style={styles.body}
+          style={[styles.body, isCurrentlyBlurred && { marginBottom: 0 }]}
         >
           {isCurrentlyBlurred ? (
             <View style={styles.blurredContentWrapper}>
               {isBlurredByMod ? (
                 <View style={styles.modBlurOverlay}>
                   <EyeOff size={18} color="#FFF" />
-                  <Text style={styles.modBlurText}>Post blurred: {item.blur_reason}</Text>
+                  <Text style={styles.blurTextContent}>Post blurred: {item.blur_reason}</Text>
                   <Text style={styles.tapToRevealText}>Tap to reveal</Text>
                 </View>
               ) : (
@@ -327,85 +327,83 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
         )}
 
         {isExpanded && !isCurrentlyBlurred && !item.comments_disabled && (
-
-              <View style={styles.commentsSection}>
-                {loadingComments ? (
-                  <ActivityIndicator size="small" color={theme.colors.primary} style={{ marginVertical: 20 }} />
-                ) : (
-                  <View style={styles.commentList}>
-                    {comments.map(c => (
-                      <View key={c.id} style={styles.commentRow}>
-                        <View style={styles.commentAvatarContainer}>
-                          {c.is_anonymous ? (
-                            <View style={[styles.miniAvatar, { backgroundColor: 'rgba(255,255,255,0.05)' }]}>
-                              <User size={12} color={theme.colors.textSecondary} />
-                            </View>
-                          ) : (
-                            c.user?.avatar_url ? (
-                              <Image source={{ uri: c.user.avatar_url }} style={styles.miniAvatar} />
-                            ) : (
-                              <Text style={styles.miniEmojiAvatar}>{c.user?.emoji_icon || "👤"}</Text>
-                            )
-                          )}
+          <View style={styles.commentsSection}>
+            {loadingComments ? (
+              <ActivityIndicator size="small" color={theme.colors.primary} style={{ marginVertical: 20 }} />
+            ) : (
+              <View style={styles.commentList}>
+                {comments.map(c => (
+                  <View key={c.id} style={styles.commentRow}>
+                    <View style={styles.commentAvatarContainer}>
+                      {c.is_anonymous ? (
+                        <View style={[styles.miniAvatar, { backgroundColor: 'rgba(255,255,255,0.05)' }]}>
+                          <User size={12} color={theme.colors.textSecondary} />
                         </View>
-                        <View style={styles.commentContent}>
-                          <View style={styles.commentBubble}>
-                            <Text style={styles.commentUser}>
-                              {c.is_anonymous ? (c.nickname || "Anonymous") : c.user?.username}
-                            </Text>
-                            <Text style={styles.commentText}>{c.text}</Text>
-                          </View>
-                          <Text style={styles.commentTime}>{getTimeAgo(new Date(c.created_at))}</Text>
-                        </View>
-                      </View>
-                    ))}
-                  </View>
-                )}
-                
-                <View style={styles.inputRow}>
-                  <View style={styles.inputWrapper}>
-                    <TextInput 
-                      style={styles.input} 
-                      placeholder="Write a comment..." 
-                      placeholderTextColor="rgba(255,255,255,0.3)"
-                      value={commentText} 
-                      onChangeText={setCommentText}
-                      multiline
-                    />
-                    <View style={styles.inputActions}>
-                      <TouchableOpacity 
-                        onPress={() => {
-                          setIsAnonComment(!isAnonComment);
-                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        }} 
-                        style={[
-                          styles.anonToggleBtn,
-                          isAnonComment && styles.anonToggleBtnActive
-                        ]}
-                      >
-                        <User size={14} color={isAnonComment ? "#000" : "rgba(255,255,255,0.5)"} />
-                      </TouchableOpacity>
-                      {isAnonComment && (
-                        <Text style={styles.anonLabel}>
-                          {userNickname || "Anon"}
-                        </Text>
+                      ) : (
+                        c.user?.avatar_url ? (
+                          <Image source={{ uri: c.user.avatar_url }} style={styles.miniAvatar} />
+                        ) : (
+                          <Text style={styles.miniEmojiAvatar}>{c.user?.emoji_icon || "👤"}</Text>
+                        )
                       )}
                     </View>
+                    <View style={styles.commentContent}>
+                      <View style={styles.commentBubble}>
+                        <Text style={styles.commentUser}>
+                          {c.is_anonymous ? (c.nickname || "Anonymous") : c.user?.username}
+                        </Text>
+                        <Text style={styles.commentText}>{c.text}</Text>
+                      </View>
+                      <Text style={styles.commentTime}>{getTimeAgo(new Date(c.created_at))}</Text>
+                    </View>
                   </View>
-                  <TouchableOpacity 
-                    onPress={handleSendComment} 
-                    style={[styles.sendBtn, !commentText.trim() && { opacity: 0.5 }]}
-                    disabled={!commentText.trim()}
-                  >
-                    <Send size={18} color="#000" />
-                  </TouchableOpacity>
-                </View>
+                ))}
               </View>
             )}
-      </View>
+            
+            <View style={styles.inputRow}>
+              <View style={styles.inputWrapper}>
+                <TextInput 
+                  style={styles.input} 
+                  placeholder="Write a comment..." 
+                  placeholderTextColor="rgba(255,255,255,0.3)"
+                  value={commentText} 
+                  onChangeText={setCommentText}
+                  multiline
+                />
+                <View style={styles.inputActions}>
+                  <TouchableOpacity 
+                    onPress={() => {
+                      setIsAnonComment(!isAnonComment);
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    }} 
+                    style={[
+                      styles.anonToggleBtn,
+                      isAnonComment && styles.anonToggleBtnActive
+                    ]}
+                  >
+                    <User size={14} color={isAnonComment ? "#000" : "rgba(255,255,255,0.5)"} />
+                  </TouchableOpacity>
+                  {isAnonComment && (
+                    <Text style={styles.anonLabel}>
+                      {userNickname || "Anon"}
+                    </Text>
+                  )}
+                </View>
+              </View>
+              <TouchableOpacity 
+                onPress={handleSendComment} 
+                style={[styles.sendBtn, !commentText.trim() && { opacity: 0.5 }]}
+                disabled={!commentText.trim()}
+              >
+                <Send size={18} color="#000" />
+              </TouchableOpacity>
+            </View>
+          </View>
         )}
+      </View>
 
-        {isExpanded && item.comments_disabled && !isBlurredByMod && (
+      {isExpanded && item.comments_disabled && !isBlurredByMod && (
           <View style={styles.commentsDisabledBanner}>
             <MessageSquareOff size={16} color="rgba(255,255,255,0.5)" />
             <Text style={styles.commentsDisabledText}>Comments are disabled on this post</Text>
@@ -687,12 +685,18 @@ const styles = StyleSheet.create({
     gap: 12,
     marginHorizontal: 15,
   },
-  modBlurText: {
-    color: '#FFF',
-    fontWeight: '700',
-    fontSize: 14,
-    flex: 1,
-  },
+    modBlurText: {
+      color: '#FFF',
+      fontWeight: '700',
+      fontSize: 14,
+      flex: 1,
+    },
+    blurTextContent: {
+      color: '#FFF',
+      fontWeight: '700',
+      fontSize: 14,
+      textAlign: 'center',
+    },
   commentsDisabledBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -719,14 +723,13 @@ const styles = StyleSheet.create({
       backgroundColor: '#000',
       borderRadius: 2,
     },
-    blurredContentWrapper: {
-      minHeight: 80,
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: 'rgba(0,0,0,0.2)',
-      borderRadius: 12,
-      padding: 20,
-    },
+      blurredContentWrapper: {
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.2)',
+        borderRadius: 12,
+        padding: 15,
+      },
     modBlurOverlay: {
       alignItems: 'center',
       gap: 8,
