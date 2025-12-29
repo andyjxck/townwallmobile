@@ -328,27 +328,27 @@ export default function UniversalFeed() {
           <Plus color="#000" size={30} />
         </TouchableOpacity>
 
-      <Modal visible={showFilterSort} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: theme.colors.background }]}>
-            <Text style={styles.modalTitle}>Filters & Sorting</Text>
-            <Text style={styles.label}>Sort By</Text>
-            <View style={styles.row}>
-                {['newest', 'oldest'].map(s => (
-                  <TouchableOpacity key={s} onPress={() => setSortBy(s)} style={[styles.pill, sortBy === s && { backgroundColor: theme.colors.primary }]}><Text style={[styles.pillText, sortBy === s && { color: '#000' }]}>{s}</Text></TouchableOpacity>
-                ))}
-              </View>
-              <Text style={styles.label}>Zone</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.row}>
-                <TouchableOpacity onPress={() => setSelectedZone(null)} style={[styles.pill, !selectedZone && { backgroundColor: theme.colors.primary }]}><Text style={[styles.pillText, !selectedZone && { color: '#000' }]}>All</Text></TouchableOpacity>
-                {zones.map(z => (
-                  <TouchableOpacity key={z.id} onPress={() => setSelectedZone(z.id)} style={[styles.pill, selectedZone === z.id && { backgroundColor: theme.colors.primary }]}><Text style={[styles.pillText, selectedZone === z.id && { color: '#000' }]}>{z.name}</Text></TouchableOpacity>
-                ))}
-              </ScrollView>
-            <TouchableOpacity onPress={() => setShowFilterSort(false)} style={[styles.closeBtn, { backgroundColor: theme.colors.primary }]}><Text style={styles.closeBtnText}>Apply</Text></TouchableOpacity>
+        <Modal visible={showFilterSort} animationType="slide" transparent>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: isHippie ? '#1a1a1a' : theme.colors.background }]}>
+              <Text style={[styles.modalTitle, isHippie && { color: '#FFF' }]}>Filters & Sorting</Text>
+              <Text style={[styles.label, isHippie && { color: '#AAA' }]}>Sort By</Text>
+              <View style={styles.row}>
+                  {['newest', 'oldest'].map(s => (
+                    <TouchableOpacity key={s} onPress={() => setSortBy(s)} style={[styles.pill, isHippie && { backgroundColor: '#333' }, sortBy === s && { backgroundColor: theme.colors.primary }]}><Text style={[styles.pillText, (isHippie || sortBy === s) && { color: sortBy === s ? '#000' : '#FFF' }]}>{s}</Text></TouchableOpacity>
+                  ))}
+                </View>
+                <Text style={[styles.label, isHippie && { color: '#AAA' }]}>Zone</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.row}>
+                  <TouchableOpacity onPress={() => setSelectedZone(null)} style={[styles.pill, isHippie && { backgroundColor: '#333' }, !selectedZone && { backgroundColor: theme.colors.primary }]}><Text style={[styles.pillText, (isHippie || !selectedZone) && { color: !selectedZone ? '#000' : '#FFF' }]}>All</Text></TouchableOpacity>
+                  {zones.map(z => (
+                    <TouchableOpacity key={z.id} onPress={() => setSelectedZone(z.id)} style={[styles.pill, isHippie && { backgroundColor: '#333' }, selectedZone === z.id && { backgroundColor: theme.colors.primary }]}><Text style={[styles.pillText, (isHippie || selectedZone === z.id) && { color: selectedZone === z.id ? '#000' : '#FFF' }]}>{z.name}</Text></TouchableOpacity>
+                  ))}
+                </ScrollView>
+              <TouchableOpacity onPress={() => setShowFilterSort(false)} style={[styles.closeBtn, { backgroundColor: theme.colors.primary }]}><Text style={styles.closeBtnText}>Apply</Text></TouchableOpacity>
+            </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
 
       <NotificationPanel visible={showNotifications} onClose={() => setShowNotifications(false)} />
       <ShareManager ref={shareRef} />

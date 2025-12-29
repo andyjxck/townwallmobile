@@ -850,8 +850,8 @@ export default function FloatingChat() {
             <BlurView intensity={20} style={StyleSheet.absoluteFill} tint="dark" />
           </TouchableOpacity>
           
-            <Animated.View style={[styles.chatWindow, isHippie && { backgroundColor: 'transparent' }, { transform: [{ translateY: slideAnim }] }]}>
-              <View style={[styles.chatHeader, isHippie && { backgroundColor: 'transparent' }]}>
+            <Animated.View style={[styles.chatWindow, { transform: [{ translateY: slideAnim }] }]}>
+              <View style={styles.chatHeader}>
 
               {showSettings ? (
                 <View style={styles.headerNav}>
