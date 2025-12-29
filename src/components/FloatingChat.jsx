@@ -604,7 +604,7 @@ export default function FloatingChat() {
               userId: member.user_id,
               type: 'call',
               title: `${user.username} is calling`,
-              content: `Incoming ${isGroupCall ? 'group ' : ''}audio call from ${activeChat.group_name}`,
+              message: `Incoming ${isGroupCall ? 'group ' : ''}audio call from ${activeChat.group_name}`,
               senderId: user.id
             });
           }
@@ -616,7 +616,7 @@ export default function FloatingChat() {
             userId: otherUser.id,
             type: 'call',
             title: `${user.username} is calling`,
-            content: 'Incoming audio call',
+            message: 'Incoming audio call',
             senderId: user.id
           });
         }

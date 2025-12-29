@@ -14,7 +14,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Get user's push token and online status
+    // Get user's push token
     const { data: user, error: userError } = await supabase
       .from('rusers')
       .select('push_token, last_seen')
@@ -22,19 +22,23 @@ serve(async (req) => {
       .single()
 
     if (userError || !user?.push_token) {
+      console.log(`[send-push] Skipped for user ${user_id}: No push token found.`)
       return new Response(JSON.stringify({ skipped: true, reason: 'No token or user' }), { status: 200 })
     }
 
-    // Check if user is offline (inactive for > 1 minute)
+    // Optional: Online check. We've relaxed this to 5 seconds to allow for testing
+    // but still prevent spamming if the user is literally looking at the screen.
     const lastSeen = user.last_seen ? new Date(user.last_seen).getTime() : 0
     const now = new Date().getTime()
-    const isOnline = (now - lastSeen) < 60000
+    const isVeryOnline = (now - lastSeen) < 5000 // Only skip if active in last 5 seconds
 
-    if (isOnline) {
-      return new Response(JSON.stringify({ skipped: true, reason: 'User is online' }), { status: 200 })
+    if (isVeryOnline) {
+      console.log(`[send-push] Skipped for user ${user_id}: User is active (last seen ${now - lastSeen}ms ago).`)
+      return new Response(JSON.stringify({ skipped: true, reason: 'User is very online' }), { status: 200 })
     }
 
     // Send to Expo
+    console.log(`[send-push] Sending push to user ${user_id}: "${title}"`)
     const res = await fetch(EXPO_PUSH_URL, {
       method: 'POST',
       headers: {
@@ -42,8 +46,8 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         to: user.push_token,
-        title: title,
-        body: message,
+        title: title || 'New Notification',
+        body: message || 'You have a new update', // Expo requires a non-null body
         data: { type, link },
         sound: 'default',
         priority: 'high',
@@ -51,9 +55,11 @@ serve(async (req) => {
     })
 
     const result = await res.json()
+    console.log(`[send-push] Expo response:`, JSON.stringify(result))
     return new Response(JSON.stringify(result), { status: 200 })
 
   } catch (err) {
+    console.error(`[send-push] Error:`, err.message)
     return new Response(JSON.stringify({ error: err.message }), { status: 500 })
   }
 })
