@@ -146,11 +146,11 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
 
   const shouldBlur = fakeCount > 5 && fakeCount > helpfulCount;
   const timeAgo = getTimeAgo(new Date(item.created_at));
-    const isModOrAdmin = user?.is_admin || user?.is_moderator;
-    const isBlurredByMod = item.is_blurred && item.blur_reason;
-    const isRedactedMode = shouldBlur || isBlurredByMod;
-    const isRevealed = (shouldBlur && revealed) || (isBlurredByMod && blurRevealed);
-    const isCurrentlyBlurred = isRedactedMode && !isRevealed;
+    const isModOrAdmin = !!(user?.is_admin || user?.is_moderator);
+    const isBlurredByMod = !!(item.is_blurred && item.blur_reason);
+    const isRedactedMode = !!(shouldBlur || isBlurredByMod);
+    const isRevealed = !!((shouldBlur && revealed) || (isBlurredByMod && blurRevealed));
+    const isCurrentlyBlurred = !!(isRedactedMode && !isRevealed);
 
     const handleModAction = async (action, reason = null) => {
 
