@@ -47,20 +47,13 @@
           "resizeMode": "contain"
         }
       ],
-      "expo-audio",
+      "expo-av",
       [
         "expo-build-properties",
         {
           "ios": {
             "useFrameworks": "static"
           }
-        }
-      ],
-      [
-        "expo-video",
-        {
-          "supportsBackgroundPlayback": true,
-          "supportsPictureInPicture": true
         }
       ],
       "expo-font",

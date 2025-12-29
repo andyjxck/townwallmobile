@@ -32,7 +32,7 @@ import { moderateContent } from "../utils/ai";
 import { sendNotification, sendCommentNotification } from "../utils/notifications";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
-import { useVideoPlayer, VideoView } from 'expo-video';
+import { Video } from "expo-av";
 import { getStoredUser, isOnline } from "../utils/user";
 import { TextInput } from "react-native-gesture-handler";
 import RenderHtml from 'react-native-render-html';
@@ -82,7 +82,6 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
   };
 
   const isVideo = item.media_type === 'video' || (item.image_url && (item.image_url.endsWith('.mp4') || item.image_url.endsWith('.mov')));
-  const videoPlayer = useVideoPlayer(item.image_url, (player) => { player.loop = true; });
 
   useEffect(() => {
     if (isExpanded) fetchComments();
@@ -236,7 +235,17 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
             {images.length > 0 && (
               <TouchableOpacity onPress={() => setShowFullImage(true)} style={styles.mediaContainer}>
                 {isVideo ? (
-                  <VideoView player={videoPlayer} style={styles.media} contentFit="cover" nativeControls={false} />
+              <Video
+  source={{ uri: images[0] }}
+  style={styles.media}
+  resizeMode="cover"
+  shouldPlay={isExpanded}
+  isLooping
+  isMuted
+  useNativeControls={false}
+/>
+
+
                 ) : (
                   <Image source={{ uri: images[0] }} style={styles.media} contentFit="cover" />
                 )}
@@ -366,7 +375,15 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
         <View style={styles.fullImageOverlay}>
           <TouchableOpacity style={styles.closeBtn} onPress={() => setShowFullImage(false)}><X color="#FFF" size={32} /></TouchableOpacity>
           {isVideo ? (
-            <VideoView player={videoPlayer} style={styles.fullMedia} contentFit="contain" nativeControls />
+            <Video
+  source={{ uri: images[0] }}
+  style={styles.fullMedia}
+  resizeMode="contain"
+  shouldPlay
+  isLooping
+  useNativeControls
+/>
+
           ) : (
             <Image source={{ uri: images[0] }} style={styles.fullMedia} contentFit="contain" />
           )}
