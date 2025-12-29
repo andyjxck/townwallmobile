@@ -87,30 +87,40 @@ export default function Auth() {
     try {
       const deviceId = await getDeviceId();
 
-      if (isLogin) {
-        const { data: user, error } = await supabase
-          .from('rusers')
-          .select('*')
-          .ilike('username', trimmedUsername)
-          .single();
+        if (isLogin) {
+          const { data: user, error } = await supabase
+            .from('rusers')
+            .select('*')
+            .ilike('username', trimmedUsername)
+            .single();
 
-        if (error || !user) {
-          throw new Error("Invalid username or password");
-        }
+          if (error || !user) {
+            throw new Error("Invalid username or password");
+          }
 
-        const isMatch = bcrypt.compareSync(trimmedPassword, user.password);
-        if (!isMatch) {
-          throw new Error("Invalid username or password");
-        }
+          const isMatch = bcrypt.compareSync(trimmedPassword, user.password);
+          if (!isMatch) {
+            throw new Error("Invalid username or password");
+          }
 
-        await supabase
-          .from('rusers')
-          .update({ device_id: deviceId })
-          .eq('id', user.id);
+          const { auth: currentAuth } = useAuthStore.getState();
+          if (currentAuth && currentAuth.id !== user.id && !currentAuth.password) {
+            await supabase.from('rusers').delete().eq('id', currentAuth.id);
+          }
 
-        useAuthStore.getState().setAuth(user);
-        await initUser();
-        router.replace("/");
+          await supabase
+            .from('rusers')
+            .update({ device_id: deviceId })
+            .eq('id', user.id);
+
+          const { data: freshUser } = await supabase
+            .from('rusers')
+            .select('*')
+            .eq('id', user.id)
+            .single();
+
+          useAuthStore.getState().setAuth(freshUser || user);
+          router.replace("/");
       } else {
         const { data: existingUser } = await supabase
           .from('rusers')
@@ -125,37 +135,43 @@ export default function Auth() {
         const salt = bcrypt.genSaltSync(10);
         const hashedPassword = bcrypt.hashSync(trimmedPassword, salt);
 
-        const { auth: currentAuth } = useAuthStore.getState();
-        
-        let newUser;
-        if (currentAuth && !currentAuth.password) {
-          const { data: updatedUser, error: updateError } = await supabase
-            .from('rusers')
-            .update({ 
-              username: trimmedUsername,
-              password: hashedPassword
-            })
-            .eq('id', currentAuth.id)
-            .select()
-            .single();
+          const { auth: currentAuth } = useAuthStore.getState();
+          const anonId = currentAuth && !currentAuth.password ? currentAuth.id : null;
           
-          if (updateError) throw updateError;
-          newUser = updatedUser;
-        } else {
-          const { data: createdUser, error: createError } = await supabase
-            .from('rusers')
-            .insert({ 
-              username: trimmedUsername,
-              password: hashedPassword,
-              device_id: deviceId,
-              emoji_icon: '👤'
-            })
-            .select()
-            .single();
-          
-          if (createError) throw createError;
-          newUser = createdUser;
-        }
+          let newUser;
+          if (anonId) {
+            const { data: updatedUser, error: updateError } = await supabase
+              .from('rusers')
+              .update({ 
+                username: trimmedUsername,
+                password: hashedPassword,
+                device_id: deviceId
+              })
+              .eq('id', anonId)
+              .select()
+              .single();
+            
+            if (updateError) throw updateError;
+            newUser = updatedUser;
+          } else {
+            if (currentAuth && currentAuth.id && !currentAuth.password) {
+              await supabase.from('rusers').delete().eq('id', currentAuth.id);
+            }
+            
+            const { data: createdUser, error: createError } = await supabase
+              .from('rusers')
+              .insert({ 
+                username: trimmedUsername,
+                password: hashedPassword,
+                device_id: deviceId,
+                emoji_icon: '👤'
+              })
+              .select()
+              .single();
+            
+            if (createError) throw createError;
+            newUser = createdUser;
+          }
       
         const codes = generateRecoveryCodes();
         await storeRecoveryCodes(newUser.id, codes);
