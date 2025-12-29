@@ -30,14 +30,21 @@ import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { Audio } from 'expo-av';
-import { 
-  LiveKitRoom, 
-  useLocalParticipant, 
-  useTracks,
-  AudioSession,
-  AudioConference,
-  TrackReferenceOrPlaceholder,
-} from '@livekit/react-native';
+// LiveKit imports are handled dynamically to prevent crashes in environments without native modules
+let LiveKitRoom, useLocalParticipant, AudioSession;
+
+const isExpoGo = Constants.appOwnership === "expo";
+
+if (Platform.OS !== 'web' && !isExpoGo) {
+  try {
+    const lk = require('@livekit/react-native');
+    LiveKitRoom = lk.LiveKitRoom;
+    useLocalParticipant = lk.useLocalParticipant;
+    AudioSession = lk.AudioSession;
+  } catch (e) {
+    console.log('LiveKit native modules not available');
+  }
+}
 
 const SOUNDS = {
   ringing: 'https://assets.mixkit.co/sfx/preview/mixkit-phone-ringing-bell-586.mp3',
@@ -120,8 +127,11 @@ export default function FloatingChat() {
     }
   };
 
-  const LiveKitRoomContent = ({ onConnected }) => {
-    const { localParticipant } = useLocalParticipant();
+    const LiveKitRoomContent = ({ onConnected }) => {
+      if (!useLocalParticipant || !AudioSession) return null;
+      
+      const { localParticipant } = useLocalParticipant();
+
     
     useEffect(() => {
       const startSession = async () => {

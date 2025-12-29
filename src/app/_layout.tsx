@@ -18,16 +18,24 @@ import Constants from "expo-constants";
 import { ErrorBoundaryWrapper } from "../../__create/SharedErrorBoundary";
 import * as Notifications from "expo-notifications";
 import { registerForPushNotificationsAsync } from "@/utils/notifications";
-import { registerGlobals } from "@livekit/react-native";
-
-if (Platform.OS !== "web") {
-  registerGlobals();
-}
+// registerGlobals() is handled dynamically below to prevent crashes in environments without native modules
 
 import NotificationPanel from "@/components/NotificationPanel";
 import FloatingChat from "@/components/FloatingChat";
 
 const isExpoGo = Constants.appOwnership === "expo";
+
+if (Platform.OS !== "web" && !isExpoGo) {
+  try {
+    const { registerGlobals } = require("@livekit/react-native");
+    if (typeof registerGlobals === 'function') {
+      registerGlobals();
+      console.log('LiveKit globals registered');
+    }
+  } catch (e) {
+    console.log('LiveKit native module failed to load, skipping registration');
+  }
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
