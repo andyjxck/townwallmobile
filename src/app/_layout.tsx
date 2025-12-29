@@ -18,6 +18,11 @@ import Constants from "expo-constants";
 import { ErrorBoundaryWrapper } from "../../__create/SharedErrorBoundary";
 import * as Notifications from "expo-notifications";
 import { registerForPushNotificationsAsync } from "@/utils/notifications";
+import { registerGlobals } from "@livekit/react-native";
+
+if (Platform.OS !== "web") {
+  registerGlobals();
+}
 
 import NotificationPanel from "@/components/NotificationPanel";
 import FloatingChat from "@/components/FloatingChat";

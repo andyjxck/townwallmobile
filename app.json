@@ -10,23 +10,27 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.andysocial.townwall",
-      "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false,
-        "LSApplicationQueriesSchemes": [
-          "tel",
-          "telprompt",
-          "mailto",
-          "itms-apps",
-          "https",
-          "http"
-        ],
-        "NSCameraUsageDescription": "Allow $(PRODUCT_NAME) to access your camera to take photos for your business listing or profile.",
-        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to access your microphone for recording videos.",
-        "NSLocationWhenInUseUsageDescription": "Allow $(PRODUCT_NAME) to access your location to show nearby businesses and talent.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "Allow $(PRODUCT_NAME) to access your location to show nearby businesses and talent.",
-        "NSContactsUsageDescription": "Allow $(PRODUCT_NAME) to access your contacts to help you find friends.",
-        "NSCalendarsUsageDescription": "Allow $(PRODUCT_NAME) to access your calendar to save local events."
-      }
+        "infoPlist": {
+          "ITSAppUsesNonExemptEncryption": false,
+          "LSApplicationQueriesSchemes": [
+            "tel",
+            "telprompt",
+            "mailto",
+            "itms-apps",
+            "https",
+            "http"
+          ],
+          "NSCameraUsageDescription": "Allow $(PRODUCT_NAME) to access your camera to take photos for your business listing or profile.",
+          "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to access your microphone for audio calls in chat.",
+          "NSLocationWhenInUseUsageDescription": "Allow $(PRODUCT_NAME) to access your location to show nearby businesses and talent.",
+          "NSLocationAlwaysAndWhenInUseUsageDescription": "Allow $(PRODUCT_NAME) to access your location to show nearby businesses and talent.",
+          "NSContactsUsageDescription": "Allow $(PRODUCT_NAME) to access your contacts to help you find friends.",
+          "NSCalendarsUsageDescription": "Allow $(PRODUCT_NAME) to access your calendar to save local events.",
+          "UIBackgroundModes": [
+            "audio",
+            "remote-notification"
+          ]
+        }
     },
     "android": {
       "adaptiveIcon": {
@@ -47,9 +51,18 @@
       ],
       "package": "com.andysocial.townwall"
     },
-    "plugins": [
-      [
-        "expo-camera",
+      "plugins": [
+        [
+          "@livekit/react-native-expo-plugin",
+          {
+            "android": {
+              "audioType": "communication"
+            }
+          }
+        ],
+        "@config-plugins/react-native-webrtc",
+        [
+          "expo-camera",
         {
           "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera"
         }

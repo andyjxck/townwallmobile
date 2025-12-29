@@ -30,6 +30,14 @@ import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { Audio } from 'expo-av';
+import { 
+  LiveKitRoom, 
+  useLocalParticipant, 
+  useTracks,
+  AudioSession,
+  AudioConference,
+  TrackReferenceOrPlaceholder,
+} from '@livekit/react-native';
 
 const SOUNDS = {
   ringing: 'https://assets.mixkit.co/sfx/preview/mixkit-phone-ringing-bell-586.mp3',
@@ -72,8 +80,9 @@ export default function FloatingChat() {
   const [userSearchResults, setUserSearchResults] = useState([]);
   const [groupMembers, setGroupMembers] = useState([]);
   
-  const [activeCall, setActiveCall] = useState(null);
-  const [isMuted, setIsMuted] = useState(false);
+    const [activeCall, setActiveCall] = useState(null);
+    const [callToken, setCallToken] = useState(null);
+    const [isMuted, setIsMuted] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
   const callTimerRef = useRef(null);
   const soundObjects = useRef({});
@@ -83,6 +92,42 @@ export default function FloatingChat() {
     const slideAnim = useRef(new Animated.Value(height)).current;
 
   const flatListRef = useRef();
+
+  const fetchCallToken = async (roomName) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('livekit-token', {
+        body: { identity: user.username, roomName }
+      });
+      if (error) throw error;
+      return data.token;
+    } catch (error) {
+      console.error('Error fetching call token:', error);
+      return null;
+    }
+  };
+
+  const LiveKitRoomContent = ({ onConnected }) => {
+    const { localParticipant } = useLocalParticipant();
+    
+    useEffect(() => {
+      const startSession = async () => {
+        await AudioSession.startAudioSession();
+        if (onConnected) onConnected();
+      };
+      startSession();
+      return () => {
+        AudioSession.stopAudioSession();
+      };
+    }, []);
+
+    useEffect(() => {
+      if (localParticipant) {
+        localParticipant.setMicrophoneEnabled(!isMuted);
+      }
+    }, [isMuted, localParticipant]);
+
+    return null;
+  };
 
   useEffect(() => {
     if (activeCall?.status === 'ringing') {
@@ -288,6 +333,7 @@ export default function FloatingChat() {
 
   const endCallUI = () => {
     setActiveCall(null);
+    setCallToken(null);
     setIsMuted(false);
     setCallDuration(0);
     if (callTimerRef.current) {
@@ -516,6 +562,15 @@ export default function FloatingChat() {
 
       setActiveCall({ ...call, chat: activeChat, isOutgoing: true });
       
+      const token = await fetchCallToken(call.id);
+      if (token) {
+        setCallToken(token);
+      } else {
+        Alert.alert('Error', 'Failed to start call engine');
+        endCall();
+        return;
+      }
+      
       if (activeChat.is_group) {
         for (const member of groupMembers) {
           if (member.user_id !== user.id) {
@@ -543,10 +598,19 @@ export default function FloatingChat() {
     }
   };
 
-  const answerCall = async () => {
-    if (!activeCall) return;
-    
-    await supabase.from('rcalls').update({ status: 'active' }).eq('id', activeCall.id);
+    const answerCall = async () => {
+      if (!activeCall) return;
+      
+      const token = await fetchCallToken(activeCall.id);
+      if (token) {
+        setCallToken(token);
+      } else {
+        Alert.alert('Error', 'Failed to join call engine');
+        declineCall();
+        return;
+      }
+
+      await supabase.from('rcalls').update({ status: 'active' }).eq('id', activeCall.id);
     await supabase.from('rcall_participants').insert({
       call_id: activeCall.id,
       user_id: user.id
@@ -687,12 +751,24 @@ export default function FloatingChat() {
         </View>
       )}
 
-      {activeCall && (
-        <Modal visible={true} animationType="fade" transparent>
-          <View style={styles.callOverlay}>
-            <BlurView intensity={100} style={StyleSheet.absoluteFill} tint="dark" />
-            
-            {/* Background decorative elements */}
+        {activeCall && (
+          <Modal visible={true} animationType="fade" transparent>
+            <View style={styles.callOverlay}>
+              <BlurView intensity={100} style={StyleSheet.absoluteFill} tint="dark" />
+              
+              {callToken && (
+                <LiveKitRoom
+                  serverUrl={process.env.EXPO_PUBLIC_LIVEKIT_URL}
+                  token={callToken}
+                  connect={true}
+                  audio={true}
+                  video={false}
+                >
+                  <LiveKitRoomContent />
+                </LiveKitRoom>
+              )}
+
+              {/* Background decorative elements */}
             <View style={[styles.callBgCircle, { top: -100, left: -50, backgroundColor: theme.colors.primary + '20' }]} />
             <View style={[styles.callBgCircle, { bottom: -100, right: -50, backgroundColor: '#4ADE8020' }]} />
 
