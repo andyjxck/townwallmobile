@@ -148,7 +148,9 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
   const timeAgo = getTimeAgo(new Date(item.created_at));
     const isModOrAdmin = user?.is_admin || user?.is_moderator;
     const isBlurredByMod = item.is_blurred && item.blur_reason;
-    const isCurrentlyBlurred = (shouldBlur && !revealed) || (isBlurredByMod && !blurRevealed);
+    const isRedactedMode = shouldBlur || isBlurredByMod;
+    const isRevealed = (shouldBlur && revealed) || (isBlurredByMod && blurRevealed);
+    const isCurrentlyBlurred = isRedactedMode && !isRevealed;
 
     const handleModAction = async (action, reason = null) => {
 
@@ -173,13 +175,13 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
           <Text style={styles.pendingText}>Pending - Will sync when online</Text>
         </View>
       )}
-      <View style={styles.card}>
-        <View style={styles.header}>
-          {isCurrentlyBlurred ? (
-            <View style={[styles.avatar, styles.redactedAvatar]}>
-              <User size={20} color="rgba(255,255,255,0.3)" />
-            </View>
-          ) : (
+        <View style={styles.card}>
+          <View style={styles.header}>
+            {isRedactedMode ? (
+              <View style={[styles.avatar, styles.redactedAvatar]}>
+                <User size={20} color="rgba(255,255,255,0.3)" />
+              </View>
+            ) : (
             <TouchableOpacity onPress={() => !item.is_anonymous && router.push(`/profile?userId=${item.user_id}`)} disabled={item.is_anonymous}>
               {item.user?.avatar_url ? (
                 <Image source={{ uri: item.user.avatar_url }} style={styles.avatar} />
@@ -190,7 +192,7 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
           )}
 
           <View style={styles.headerInfo}>
-            {isCurrentlyBlurred ? (
+            {isRedactedMode ? (
               <View style={styles.redactedHeaderContainer}>
                 <View style={[styles.redactedBar, { width: 80, height: 14, marginBottom: 6 }]} />
                 <View style={{ flexDirection: 'row', gap: 4 }}>
@@ -223,7 +225,7 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
             )}
           </View>
 
-          {!isCurrentlyBlurred && user?.id === item.user_id && (
+          {!isCurrentlyBlurred && user?.id === item.user_id && !isRedactedMode && (
             <TouchableOpacity onPress={() => onEdit?.(item)}><Pencil size={18} color={theme.colors.textSecondary} /></TouchableOpacity>
           )}
           {isModOrAdmin && (
@@ -238,9 +240,9 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
             if (isCurrentlyBlurred) {
               if (shouldBlur) setRevealed(true);
               else if (isBlurredByMod) setBlurRevealed(true);
-            } else if (shouldBlur || isBlurredByMod) {
-              setRevealed(false);
-              setBlurRevealed(false);
+            } else if (isRedactedMode) {
+              // Revealed redacted state - tapping does nothing (actions disabled)
+              return;
             } else {
               setIsExpanded(!isExpanded);
             }
@@ -265,8 +267,8 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
             </View>
           ) : (
             <>
-              {item.title && <Text style={styles.title}>{item.title}</Text>}
-              <Text style={styles.bodyText} numberOfLines={isExpanded ? undefined : 4}>
+              {item.title && <Text style={[styles.title, isRedactedMode && styles.greyedOutText]}>{item.title}</Text>}
+              <Text style={[styles.bodyText, isRedactedMode && styles.greyedOutText]} numberOfLines={(isExpanded || isRedactedMode) ? undefined : 4}>
                 {item.text?.replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ')}
               </Text>
               {item.poll_id && <PollComponent pollId={item.poll_id} />}
@@ -293,34 +295,49 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
         )}
 
         {!isCurrentlyBlurred && (
-          <View style={styles.footer}>
+          <View style={[styles.footer, isRedactedMode && { opacity: 0.5 }]}>
             <View style={styles.actions}>
               <TouchableOpacity 
-                onPress={() => onReaction(item.id, "helpful", userReactions.helpful)} 
+                onPress={() => !isRedactedMode && onReaction(item.id, "helpful", userReactions.helpful)} 
                 style={styles.actionBtn}
+                disabled={isRedactedMode}
               >
                 <Heart size={20} color={userReactions.helpful ? theme.colors.error : theme.colors.textSecondary} fill={userReactions.helpful ? theme.colors.error : "transparent"} />
-                <TouchableOpacity onPress={() => { fetchLikers('helpful'); setShowLikersModal(true); }}>
+                <TouchableOpacity 
+                  onPress={() => !isRedactedMode && fetchLikers('helpful').then(() => setShowLikersModal(true))}
+                  disabled={isRedactedMode}
+                >
                   <Text style={styles.actionText}>{helpfulCount}</Text>
                 </TouchableOpacity>
               </TouchableOpacity>
               
               <TouchableOpacity 
-                onPress={() => onReaction(item.id, "superlike", userReactions.superlike)} 
+                onPress={() => !isRedactedMode && onReaction(item.id, "superlike", userReactions.superlike)} 
                 style={styles.actionBtn}
+                disabled={isRedactedMode}
               >
                 <Star size={20} color={userReactions.superlike ? "#FBBF24" : theme.colors.textSecondary} fill={userReactions.superlike ? "#FBBF24" : "transparent"} />
-                <TouchableOpacity onPress={() => { fetchLikers('superlike'); setShowSuperlikersModal(true); }}>
+                <TouchableOpacity 
+                  onPress={() => !isRedactedMode && fetchLikers('superlike').then(() => setShowSuperlikersModal(true))}
+                  disabled={isRedactedMode}
+                >
                   <Text style={styles.actionText}>{superlikeCount}</Text>
                 </TouchableOpacity>
               </TouchableOpacity>
 
-              <TouchableOpacity onPress={() => onShare(item)} style={styles.actionBtn}>
+              <TouchableOpacity 
+                onPress={() => !isRedactedMode && onShare(item)} 
+                style={styles.actionBtn}
+                disabled={isRedactedMode}
+              >
                 <ShareIcon size={20} color={theme.colors.textSecondary} />
                 <Text style={styles.actionText}>{item.share_count || 0}</Text>
               </TouchableOpacity>
             </View>
-            <TouchableOpacity onPress={() => onReaction(item.id, "fake", userReactions.fake)}>
+            <TouchableOpacity 
+              onPress={() => !isRedactedMode && onReaction(item.id, "fake", userReactions.fake)}
+              disabled={isRedactedMode}
+            >
               <Flag size={18} color={userReactions.fake ? theme.colors.error : theme.colors.textSecondary} />
             </TouchableOpacity>
           </View>
@@ -738,13 +755,16 @@ const styles = StyleSheet.create({
       alignItems: 'center',
       gap: 8,
     },
-    tapToRevealText: {
-      fontSize: 12,
-      color: 'rgba(255,255,255,0.4)',
-      marginTop: 4,
-      fontWeight: '600',
-    },
-    modMenuContent: {
+      tapToRevealText: {
+        fontSize: 12,
+        color: 'rgba(255,255,255,0.4)',
+        marginTop: 4,
+        fontWeight: '600',
+      },
+      greyedOutText: {
+        color: 'rgba(255,255,255,0.4)',
+      },
+      modMenuContent: {
 
     backgroundColor: '#1A1A1A',
     borderTopLeftRadius: 20,
