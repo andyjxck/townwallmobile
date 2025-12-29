@@ -90,6 +90,11 @@ export const isOnline = (lastSeen) => {
 };
 
 export const getStoredUser = async () => {
+  // First check the memory store
+  const { auth } = useAuthStore.getState();
+  if (auth) return auth;
+  
+  // Fallback to AsyncStorage
   const data = await AsyncStorage.getItem(USER_DATA_KEY);
   return data ? JSON.parse(data) : null;
 };

@@ -43,6 +43,7 @@ import { ShareManager } from "../components/ShareManager";
 import { theme } from "../utils/theme";
 import { useTheme } from "@/utils/ThemeContext";
 import { sendFriendRequestNotification, sendFriendAcceptedNotification } from "../utils/notifications";
+import { useAuthStore, useChatStore } from "../utils/auth";
 
 const { width } = Dimensions.get('window');
 const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", "🐵", "🦄", "🐲", "🤖", "👻", "👾", "👽", "💩"];
@@ -82,7 +83,7 @@ export default function Profile() {
     loadData();
 
     const setupRealtimeSubscriptions = async () => {
-      const storedUser = await getStoredUser();
+      const storedUser = useAuthStore.getState().auth;
       if (!storedUser) return;
 
       const channel = supabase
@@ -108,18 +109,20 @@ export default function Profile() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const storedUser = await getStoredUser();
+      const storedUser = useAuthStore.getState().auth;
       setCurrentUser(storedUser);
       
       let profileUserId = userId ? parseInt(userId) : storedUser?.id;
-    const viewingOwnProfile = !userId || (storedUser?.id && parseInt(userId) === storedUser.id);
-    setIsOwnProfile(viewingOwnProfile);
-    
-    let userData;
+      const viewingOwnProfile = !userId || (storedUser?.id && parseInt(userId) === storedUser.id);
+      setIsOwnProfile(viewingOwnProfile);
+      
+      let userData;
       if (viewingOwnProfile && storedUser?.id) {
         const { data: freshUser } = await supabase.from('rusers').select('*').eq('id', storedUser.id).single();
         if (freshUser) {
           userData = freshUser;
+          // Sync store and storage if fresh data found
+          useAuthStore.getState().setAuth(freshUser);
           await AsyncStorage.setItem("@redditch_user_data", JSON.stringify(freshUser));
         } else {
           userData = storedUser;
@@ -130,6 +133,7 @@ export default function Profile() {
       }
 
       if (!userData && viewingOwnProfile) userData = await initUser();
+      
       setUser(userData);
       setBioText(userData?.bio || "");
       setUsernameText(userData?.username || "");
@@ -339,7 +343,7 @@ export default function Profile() {
 
   const handleMessageUser = async () => {
     try {
-      const storedUser = await getStoredUser();
+      const storedUser = useAuthStore.getState().auth;
       if (!storedUser) return;
       
       // Check if chat exists

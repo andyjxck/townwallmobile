@@ -964,17 +964,13 @@ export default function FloatingChat() {
                   )}
                 </View>
                 
-                {isNear && (
-                  <View style={styles.proximityOverlay} />
-                )}
+                  {isNear && (
+                    <View style={styles.proximityOverlay} />
+                  )}
+                </View>
               </View>
             </Modal>
           )}
-              </View>
-            </View>
-          </View>
-        </Modal>
-      )}
 
       <Modal visible={showNewGroupModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>

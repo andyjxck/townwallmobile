@@ -119,8 +119,9 @@ export default function Auth() {
             .eq('id', user.id)
             .single();
 
-          useAuthStore.getState().setAuth(freshUser || user);
-          router.replace("/");
+            useAuthStore.getState().setAuth(freshUser || user);
+            await initUser();
+            router.replace("/");
       } else {
         const { data: existingUser } = await supabase
           .from('rusers')
