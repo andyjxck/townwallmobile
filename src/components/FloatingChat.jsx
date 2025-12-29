@@ -18,7 +18,7 @@ import {
   ScrollView,
   Alert
 } from 'react-native';
-import { MessageCircle, X, Send, ChevronLeft, MoreHorizontal, User, Users, Check, CheckCheck, Settings, Plus, UserPlus, Mic, MicOff, Phone as PhoneIcon, PhoneOff as PhoneOffIcon, PhoneIncoming, PhoneOutgoing, Phone } from 'lucide-react-native';
+import { MessageCircle, X, Send, ChevronLeft, MoreHorizontal, User, Users, Check, CheckCheck, Settings, Plus, UserPlus, Mic, MicOff, Phone as PhoneIcon, PhoneOff as PhoneOffIcon, PhoneIncoming, PhoneOutgoing, Phone, Volume2, VolumeX } from 'lucide-react-native';
 import { supabase } from '../utils/supabase';
 import { getStoredUser } from '../utils/user';
 import { theme } from '../utils/theme';
@@ -30,6 +30,7 @@ import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { Audio } from 'expo-av';
+import { Accelerometer } from 'expo-sensors';
 import Constants from 'expo-constants';
 // LiveKit imports are handled dynamically to prevent crashes in environments without native modules
 let LiveKitRoom, useLocalParticipant, AudioSession;
@@ -105,7 +106,9 @@ export default function FloatingChat() {
     const [activeCall, setActiveCall] = useState(null);
     const [callToken, setCallToken] = useState(null);
     const [isMuted, setIsMuted] = useState(false);
-  const [callDuration, setCallDuration] = useState(0);
+    const [isSpeakerOn, setIsSpeakerOn] = useState(false);
+    const [isNear, setIsNear] = useState(false);
+    const [callDuration, setCallDuration] = useState(0);
   const callTimerRef = useRef(null);
   const soundObjects = useRef({});
   
@@ -141,14 +144,45 @@ export default function FloatingChat() {
     
     useEffect(() => {
       const startSession = async () => {
-        await AudioSession.startAudioSession();
-        if (onConnected) onConnected();
+        try {
+          // Initial configuration
+          await AudioSession.configureAudio({
+            android: {
+              preferredOutputList: [isSpeakerOn ? 'speaker' : 'earpiece'],
+            },
+            ios: {
+              defaultOutput: isSpeakerOn ? 'speaker' : 'none',
+            }
+          });
+          await AudioSession.startAudioSession();
+          if (onConnected) onConnected();
+        } catch (e) {
+          console.log('Error starting audio session:', e);
+        }
       };
       startSession();
       return () => {
         AudioSession.stopAudioSession();
       };
     }, []);
+
+    useEffect(() => {
+      const updateAudio = async () => {
+        try {
+          await AudioSession.configureAudio({
+            android: {
+              preferredOutputList: [isSpeakerOn ? 'speaker' : 'earpiece'],
+            },
+            ios: {
+              defaultOutput: isSpeakerOn ? 'speaker' : 'none',
+            }
+          });
+        } catch (e) {
+          console.log('Error configuring audio:', e);
+        }
+      };
+      updateAudio();
+    }, [isSpeakerOn]);
 
     useEffect(() => {
       if (localParticipant) {
@@ -158,6 +192,25 @@ export default function FloatingChat() {
 
     return null;
   };
+
+  useEffect(() => {
+    let subscription = null;
+    if (activeCall?.status === 'active' && !isSpeakerOn) {
+      // Accelerometer heuristic for proximity (ear detection)
+      // When phone is vertical and tilted towards the face
+      subscription = Accelerometer.addListener(data => {
+        const isVertical = data.y < -0.8;
+        const isTilted = Math.abs(data.z) > 0.6;
+        setIsNear(isVertical && isTilted);
+      });
+      Accelerometer.setUpdateInterval(500);
+    } else {
+      setIsNear(false);
+    }
+    return () => {
+      if (subscription) subscription.remove();
+    };
+  }, [activeCall?.status, isSpeakerOn]);
 
   useEffect(() => {
     if (activeCall?.status === 'ringing') {
@@ -883,14 +936,24 @@ export default function FloatingChat() {
                     </TouchableOpacity>
                   </View>
                 ) : (
-                  <View style={styles.activeActions}>
-                    <TouchableOpacity onPress={toggleMute} style={[styles.callBtn, isMuted && styles.callBtnMuted]}>
-                      <View style={styles.iconCircle}>
-                        {isMuted ? <MicOff size={24} color="#FFF" /> : <Mic size={24} color="#FFF" />}
-                      </View>
-                      <Text style={styles.callBtnLabel}>{isMuted ? 'Unmute' : 'Mute'}</Text>
-                    </TouchableOpacity>
-                    
+                    <View style={styles.activeActions}>
+                      <TouchableOpacity onPress={toggleMute} style={[styles.callBtn, isMuted && styles.callBtnMuted]}>
+                        <View style={styles.iconCircle}>
+                          {isMuted ? <MicOff size={24} color="#FFF" /> : <Mic size={24} color="#FFF" />}
+                        </View>
+                        <Text style={styles.callBtnLabel}>{isMuted ? 'Unmute' : 'Mute'}</Text>
+                      </TouchableOpacity>
+                      
+                      <TouchableOpacity onPress={() => {
+                        setIsSpeakerOn(!isSpeakerOn);
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      }} style={styles.callBtn}>
+                        <View style={[styles.iconCircle, isSpeakerOn && { backgroundColor: theme.colors.primary }]}>
+                          <Volume2 size={24} color={isSpeakerOn ? "#000" : "#FFF"} />
+                        </View>
+                        <Text style={styles.callBtnLabel}>{isSpeakerOn ? 'Speaker On' : 'Speaker Off'}</Text>
+                      </TouchableOpacity>
+                      
                       <TouchableOpacity onPress={endCall} style={[styles.callBtn, styles.callBtnEnd]}>
                         <View style={[styles.iconCircle, { backgroundColor: '#EF4444' }]}>
                           <PhoneOffIcon size={28} color="#FFF" />
@@ -898,7 +961,15 @@ export default function FloatingChat() {
                         <Text style={styles.callBtnLabel}>End</Text>
                       </TouchableOpacity>
                     </View>
+                  )}
+                </View>
+                
+                {isNear && (
+                  <View style={styles.proximityOverlay} />
                 )}
+              </View>
+            </Modal>
+          )}
               </View>
             </View>
           </View>
@@ -1791,14 +1862,19 @@ const styles = StyleSheet.create({
   callBtnMuted: {
     opacity: 0.8,
   },
-  callBtnLabel: {
-    color: '#FFF',
-    fontSize: 14,
-    fontWeight: '700',
-    marginTop: 4,
-  },
-  modalOverlay: {
-    flex: 1,
+    callBtnLabel: {
+      color: '#FFF',
+      fontSize: 14,
+      fontWeight: '700',
+      marginTop: 4,
+    },
+    proximityOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: '#000',
+      zIndex: 10000,
+    },
+    modalOverlay: {
+      flex: 1,
     backgroundColor: 'rgba(0,0,0,0.8)',
     justifyContent: 'flex-end',
   },
