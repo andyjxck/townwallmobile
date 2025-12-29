@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { ChevronLeft, Music, Youtube, Globe, Info, Plus, ExternalLink, ShieldCheck, Instagram, CheckCircle2, Star, Camera, Search, X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme } from "@/utils/ThemeContext";
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import Purchases from 'react-native-purchases';
@@ -14,6 +15,7 @@ import { getStoredUser } from '@/utils/user';
 import { BannerAd } from '@/components/BannerAd';
 
 export default function LocalTalent() {
+  const { isHippie } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -253,11 +255,13 @@ export default function LocalTalent() {
   };
 
   return (
-    <View style={styles.container}>
-      <LinearGradient
-        colors={['#0F172A', '#000000', '#000000']}
-        style={StyleSheet.absoluteFill}
-      />
+    <View style={[styles.container, isHippie && { backgroundColor: 'transparent' }]}>
+      {!isHippie && (
+        <LinearGradient
+          colors={['#0F172A', '#000000', '#000000']}
+          style={StyleSheet.absoluteFill}
+        />
+      )}
       <View style={{ paddingTop: insets.top, flex: 1 }}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>

@@ -38,9 +38,12 @@ const SOUNDS = {
   mute: 'https://assets.mixkit.co/sfx/preview/mixkit-interface-click-1126.mp3',
 };
 
+import { ThemeProvider, useTheme } from "@/utils/ThemeContext";
+
 const { width, height } = Dimensions.get('window');
 
 export default function FloatingChat() {
+  const { isHippie } = useTheme();
   const router = useRouter();
   const { isOpen, open: setOpen, close: setClose, toggle: toggleChatGlobal } = useChatStore();
   const [activeChat, setActiveChat] = useState(null);
@@ -847,8 +850,9 @@ export default function FloatingChat() {
             <BlurView intensity={20} style={StyleSheet.absoluteFill} tint="dark" />
           </TouchableOpacity>
           
-          <Animated.View style={[styles.chatWindow, { transform: [{ translateY: slideAnim }] }]}>
-            <View style={styles.chatHeader}>
+            <Animated.View style={[styles.chatWindow, isHippie && { backgroundColor: 'transparent' }, { transform: [{ translateY: slideAnim }] }]}>
+              <View style={[styles.chatHeader, isHippie && { backgroundColor: 'transparent' }]}>
+
               {showSettings ? (
                 <View style={styles.headerNav}>
                   <TouchableOpacity onPress={() => setShowSettings(false)} style={styles.iconBtn}>

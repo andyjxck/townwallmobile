@@ -4,13 +4,15 @@ import { useRouter } from 'expo-router';
 import { ChevronLeft, Info } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '@/utils/theme';
+import { useTheme } from "@/utils/ThemeContext";
 
 export default function Guidelines() {
+  const { isHippie } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <View style={[styles.container, { backgroundColor: isHippie ? 'transparent' : theme.colors.background }]}>
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <ChevronLeft size={28} color={theme.colors.text} />

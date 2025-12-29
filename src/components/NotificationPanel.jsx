@@ -13,9 +13,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetchNotifications, markAsRead, markAllAsRead } from '@/utils/notifications';
 import { getStoredUser } from '@/utils/user';
 import { supabase } from '@/utils/supabase';
+import { useTheme } from "@/utils/ThemeContext";
 import * as Haptics from 'expo-haptics';
 
 export default function NotificationPanel({ visible, onClose }) {
+  const { isHippie } = useTheme();
   const insets = useSafeAreaInsets();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -125,8 +127,9 @@ export default function NotificationPanel({ visible, onClose }) {
       transparent={true}
       onRequestClose={onClose}
     >
-      <View style={styles.overlay}>
-        <View style={[styles.container, { paddingTop: insets.top + 20 }]}>
+    <View style={[styles.overlay, isHippie && { backgroundColor: 'transparent' }]}>
+      <View style={[styles.container, { paddingTop: insets.top + 20 }]}>
+
           <View style={styles.header}>
             <View style={styles.headerTitleRow}>
               <Bell size={24} color="#FBBF24" />

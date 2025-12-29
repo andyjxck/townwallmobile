@@ -11,6 +11,7 @@ import { useRouter } from "expo-router";
 import { supabase } from "@/utils/supabase";
 import { setOnboardingComplete } from "@/utils/onboarding";
 import { theme } from "@/utils/theme";
+import { useTheme } from "@/utils/ThemeContext";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
@@ -18,6 +19,7 @@ import { MapPin, ChevronRight } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 
 export default function ZonesScreen() {
+  const { isHippie } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [zones, setZones] = useState([]);
@@ -49,12 +51,14 @@ export default function ZonesScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isHippie && { backgroundColor: 'transparent' }]}>
       <StatusBar style="light" />
-      <LinearGradient
-        colors={["#0F172A", "#000000"]}
-        style={StyleSheet.absoluteFill}
-      />
+      {!isHippie && (
+        <LinearGradient
+          colors={["#0F172A", "#000000"]}
+          style={StyleSheet.absoluteFill}
+        />
+      )}
 
       <View style={[styles.content, { paddingTop: insets.top + 40 }]}>
         <View style={styles.header}>

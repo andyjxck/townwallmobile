@@ -23,6 +23,7 @@ import bcrypt from 'bcryptjs';
 import { generateRecoveryCodes, storeRecoveryCodes } from "../utils/recoveryCode";
 import RecoveryCodesDisplay from "../components/RecoveryCodesDisplay";
 import { theme } from "../utils/theme";
+import { useTheme } from "@/utils/ThemeContext";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -42,6 +43,7 @@ if (typeof global.crypto.getRandomValues !== 'function') {
 }
 
 export default function Auth() {
+  const { isHippie } = useTheme();
   const router = useRouter();
   const params = useLocalSearchParams();
   const insets = useSafeAreaInsets();
@@ -187,13 +189,15 @@ export default function Auth() {
   return (
     <KeyboardAvoidingView 
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.container}
+      style={[styles.container, isHippie && { backgroundColor: 'transparent' }]}
     >
       <StatusBar style="light" />
-      <LinearGradient
-        colors={['#0F172A', '#000000']}
-        style={StyleSheet.absoluteFill}
-      />
+      {!isHippie && (
+        <LinearGradient
+          colors={['#0F172A', '#000000']}
+          style={StyleSheet.absoluteFill}
+        />
+      )}
 
       <ScrollView 
         contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 40 }]}

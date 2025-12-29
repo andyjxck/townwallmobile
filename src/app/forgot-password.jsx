@@ -16,6 +16,11 @@ import { ChevronLeft, User, Key } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import bcrypt from 'bcryptjs';
 import * as Crypto from 'expo-crypto';
+import { theme } from "../utils/theme";
+import { useTheme } from "@/utils/ThemeContext";
+import { LinearGradient } from "expo-linear-gradient";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
 import { verifyRecoveryCode } from '../utils/recoveryCode';
 
 // Set random fallback for bcryptjs
@@ -25,7 +30,7 @@ bcrypt.setRandomFallback((len) => {
 });
 
 export default function ForgotPassword() {
-
+  const { isHippie } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(false);
@@ -69,13 +74,15 @@ export default function ForgotPassword() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.container}
+      style={[styles.container, isHippie && { backgroundColor: 'transparent' }]}
     >
       <StatusBar style="light" />
-      <LinearGradient
-        colors={['#0F172A', '#000000']}
-        style={StyleSheet.absoluteFill}
-      />
+      {!isHippie && (
+        <LinearGradient
+          colors={['#0F172A', '#000000']}
+          style={StyleSheet.absoluteFill}
+        />
+      )}
 
       <ScrollView
         contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 20 }]}

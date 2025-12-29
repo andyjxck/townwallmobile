@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { ChevronLeft, LogOut, Shield, Info, Bell, Key, BarChart2, ChevronRight } from "lucide-react-native";
 import { theme } from "../utils/theme";
+import { useTheme } from "@/utils/ThemeContext";
 import { useAuth } from "../utils/auth/useAuth";
 import { useAuthStore } from "../utils/auth";
 import * as Haptics from "expo-haptics";
@@ -30,7 +31,7 @@ if (typeof global.crypto.getRandomValues !== 'function') {
 }
 
 export default function SettingsScreen() {
-
+  const { isHippie } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { signOut } = useAuth();
@@ -212,7 +213,7 @@ export default function SettingsScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <View style={[styles.container, { backgroundColor: isHippie ? 'transparent' : theme.colors.background }]}>
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <ChevronLeft size={28} color={theme.colors.text} />
@@ -282,7 +283,7 @@ export default function SettingsScreen() {
       </Modal>
 
       <Modal visible={showStatusModal} animationType="slide">
-        <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <View style={[styles.container, { backgroundColor: isHippie ? 'transparent' : theme.colors.background }]}>
           <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
             <TouchableOpacity onPress={() => setShowStatusModal(false)} style={styles.backBtn}>
               <ChevronLeft size={28} color={theme.colors.text} />
@@ -298,7 +299,7 @@ export default function SettingsScreen() {
       </Modal>
 
       <Modal visible={showRecoveryCodes} animationType="fade">
-        <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <View style={[styles.container, { backgroundColor: isHippie ? 'transparent' : theme.colors.background }]}>
           <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
             <Text style={[styles.headerTitle, { color: theme.colors.text, flex: 1, textAlign: 'center' }]}>New Recovery Codes</Text>
           </View>

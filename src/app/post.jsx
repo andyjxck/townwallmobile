@@ -22,10 +22,12 @@ import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
 import { theme } from "../utils/theme";
+import { useTheme } from "@/utils/ThemeContext";
 import { RichTextEditor } from "../components/RichTextEditor";
 import { offlineStorage, checkNetworkStatus } from "../utils/offline";
 
 export default function PostScreen() {
+  const { isHippie } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -174,7 +176,7 @@ export default function PostScreen() {
 
   if (step === 'zone' || step === 'tag') {
     return (
-      <View style={[styles.container, { paddingTop: insets.top, backgroundColor: theme.colors.background }]}>
+      <View style={[styles.container, { paddingTop: insets.top, backgroundColor: isHippie ? 'transparent' : theme.colors.background }]}>
         <View style={[styles.overlayHeader, { borderBottomColor: theme.colors.border }]}>
           <Text style={[styles.overlayTitle, { color: theme.colors.text }]}>Select {step.toUpperCase()}</Text>
           <TouchableOpacity onPress={() => setStep('write')}>
@@ -208,7 +210,7 @@ export default function PostScreen() {
 
   if (step === 'poll') {
     return (
-      <View style={[styles.container, { paddingTop: insets.top, backgroundColor: theme.colors.background }]}>
+      <View style={[styles.container, { paddingTop: insets.top, backgroundColor: isHippie ? 'transparent' : theme.colors.background }]}>
         <View style={[styles.overlayHeader, { borderBottomColor: theme.colors.border }]}>
           <Text style={[styles.overlayTitle, { color: theme.colors.text }]}>Add Poll</Text>
           <TouchableOpacity onPress={() => setStep('write')}>

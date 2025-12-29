@@ -25,10 +25,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/utils/supabase';
 import { getStoredUser } from '@/utils/user';
 import { sendNotification } from '@/utils/notifications';
+import { useTheme } from "@/utils/ThemeContext";
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from "expo-linear-gradient";
 
 export default function ModerationAdmin() {
+  const { isHippie } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -600,8 +602,8 @@ const handleOverrideDelete = async () => {
   if (!isAdmin) return null;
 
   return (
-    <View style={styles.container}>
-      <LinearGradient colors={['#0F172A', '#000000', '#000000']} style={StyleSheet.absoluteFill} />
+    <View style={[styles.container, isHippie && { backgroundColor: 'transparent' }]}>
+      {!isHippie && <LinearGradient colors={['#0F172A', '#000000', '#000000']} style={StyleSheet.absoluteFill} />}
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
         style={{ paddingTop: insets.top, flex: 1 }}

@@ -11,11 +11,13 @@ import * as ImagePicker from 'expo-image-picker';
 import { decode } from 'base64-arraybuffer';
 
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme } from "@/utils/ThemeContext";
 
 import MapView, { Marker, Callout } from 'react-native-maps';
 import { BannerAd } from '@/components/BannerAd';
 
 export default function LocalBusinesses() {
+  const { isHippie } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -394,11 +396,13 @@ export default function LocalBusinesses() {
   };
 
   return (
-    <View style={styles.container}>
-      <LinearGradient
-        colors={['#0F172A', '#000000', '#000000']}
-        style={StyleSheet.absoluteFill}
-      />
+    <View style={[styles.container, isHippie && { backgroundColor: 'transparent' }]}>
+      {!isHippie && (
+        <LinearGradient
+          colors={['#0F172A', '#000000', '#000000']}
+          style={StyleSheet.absoluteFill}
+        />
+      )}
       <View style={{ paddingTop: insets.top, flex: 1 }}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>

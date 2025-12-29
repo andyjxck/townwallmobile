@@ -5,9 +5,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { MapPin, ThumbsUp, Flag, Clock, Shield } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
+import { useTheme } from "@/utils/ThemeContext";
 import { LinearGradient } from "expo-linear-gradient";
 
 export default function WelcomeScreen() {
+  const { isHippie } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
@@ -17,11 +19,13 @@ export default function WelcomeScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#000000" }}>
-      <LinearGradient
-        colors={['#0F172A', '#000000']}
-        style={StyleSheet.absoluteFill}
-      />
+    <View style={{ flex: 1, backgroundColor: isHippie ? 'transparent' : "#000000" }}>
+      {!isHippie && (
+        <LinearGradient
+          colors={['#0F172A', '#000000']}
+          style={StyleSheet.absoluteFill}
+        />
+      )}
       <StatusBar style="light" />
 
       <View

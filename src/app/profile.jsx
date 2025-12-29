@@ -41,12 +41,14 @@ import { Image } from "expo-image";
 import PostItem from "../components/PostItem";
 import { ShareManager } from "../components/ShareManager";
 import { theme } from "../utils/theme";
+import { useTheme } from "@/utils/ThemeContext";
 import { sendFriendRequestNotification, sendFriendAcceptedNotification } from "../utils/notifications";
 
 const { width } = Dimensions.get('window');
 const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", "🐵", "🦄", "🐲", "🤖", "👻", "👾", "👽", "💩"];
 
 export default function Profile() {
+  const { isHippie } = useTheme();
   const router = useRouter();
   const params = useLocalSearchParams();
   const userId = params.userId;
@@ -383,14 +385,14 @@ export default function Profile() {
 
   if (loading && !user) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
+      <View style={[styles.loadingContainer, { backgroundColor: isHippie ? 'transparent' : theme.colors.background }]}>
         <ActivityIndicator color={theme.colors.primary} />
       </View>
     );
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <View style={[styles.container, { backgroundColor: isHippie ? 'transparent' : theme.colors.background }]}>
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.headerIcon}>
           <ChevronLeft color={theme.colors.text} size={28} />

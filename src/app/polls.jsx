@@ -32,6 +32,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/utils/supabase';
 import { getStoredUser } from '@/utils/user';
+import { useTheme } from "@/utils/ThemeContext";
 import { moderateContent } from '@/utils/ai';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from "expo-linear-gradient";
@@ -39,6 +40,7 @@ import { LinearGradient } from "expo-linear-gradient";
 const { width } = Dimensions.get('window');
 
 export default function PollsScreen() {
+  const { isHippie } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -432,8 +434,8 @@ export default function PollsScreen() {
 
   return (
     <TouchableWithoutFeedback onPress={() => setShowFilterSortMenu(false)}>
-      <View style={styles.container}>
-        <LinearGradient colors={['#0F172A', '#000000', '#000000']} style={StyleSheet.absoluteFill} />
+      <View style={[styles.container, isHippie && { backgroundColor: 'transparent' }]}>
+        {!isHippie && <LinearGradient colors={['#0F172A', '#000000', '#000000']} style={StyleSheet.absoluteFill} />}
         <View style={{ paddingTop: insets.top, flex: 1 }}>
             <View style={styles.header}>
               <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>

@@ -9,9 +9,11 @@ import { getAIAssistantResponse } from '@/utils/ai';
 import { sendNotification } from '@/utils/notifications';
 import * as Haptics from 'expo-haptics';
 
+import { useTheme } from "@/utils/ThemeContext";
 import { LinearGradient } from "expo-linear-gradient";
 
 export default function HelpContact() {
+  const { isHippie } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const flatListRef = useRef(null);
@@ -261,11 +263,13 @@ export default function HelpContact() {
   };
 
   return (
-    <View style={styles.container}>
-      <LinearGradient
-        colors={['#0F172A', '#000000', '#000000']}
-        style={StyleSheet.absoluteFill}
-      />
+    <View style={[styles.container, isHippie && { backgroundColor: 'transparent' }]}>
+      {!isHippie && (
+        <LinearGradient
+          colors={['#0F172A', '#000000', '#000000']}
+          style={StyleSheet.absoluteFill}
+        />
+      )}
       <View style={{ paddingTop: insets.top, flex: 1 }}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
