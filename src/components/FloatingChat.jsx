@@ -505,14 +505,18 @@ export default function FloatingChat() {
   };
 
     const handleSendMessage = async () => {
-      if (!inputText.trim() || !activeChat || isSendingRef.current) return;
+      const currentText = inputText.trim();
+      if (!currentText || !activeChat || isSendingRef.current) return;
       
-      const text = inputText.trim();
       isSendingRef.current = true;
+      
+      if (inputRef.current) {
+        inputRef.current.setNativeProps({ text: '' });
+      }
       setInputText('');
-      inputRef.current?.clear();
       
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      const text = currentText;
 
       try {
         const { data, error } = await supabase
@@ -1213,12 +1217,9 @@ export default function FloatingChat() {
                               placeholder={activeChat?.status === 'pending' && !activeChat?.is_group ? "Waiting for approval..." : "Type a message..."}
                               value={inputText}
                               onChangeText={setInputText}
-                              onKeyPress={handleKeyPress}
-                              onSubmitEditing={handleSendMessage}
                               placeholderTextColor="rgba(255,255,255,0.3)"
                               multiline
                               blurOnSubmit={false}
-                              returnKeyType="send"
                               editable={activeChat?.status === 'accepted' || activeChat?.initiated_by === user?.id || activeChat?.is_group}
                             />
                       <TouchableOpacity 
