@@ -52,6 +52,11 @@ target 'TownWall' do
           # Suppress common C warnings that fail builds in newer Xcode
           config.build_settings['OTHER_CFLAGS'] = (config.build_settings['OTHER_CFLAGS'] || ['$(inherited)']) + ['-Wno-error=strict-prototypes', '-Wno-error=comma', '-Wno-error=incompatible-pointer-types', '-Wno-uninitialized']
           
+          # Specific fix for SDWebImageWebPCoder header visibility
+          if target.name == 'SDWebImageWebPCoder'
+            config.build_settings['HEADER_SEARCH_PATHS'] = '$(inherited) "${PODS_ROOT}/Headers/Public/SDWebImage"'
+          end
+
           # Specific fix for ZXingObjC header visibility
           if target.name == 'ZXingObjC'
             config.build_settings['HEADER_SEARCH_PATHS'] = '$(inherited) "${PODS_ROOT}/Headers/Public/ZXingObjC" "${PODS_ROOT}/Headers/Public/ZXingObjC/ZXingObjC"'
