@@ -119,11 +119,15 @@
       "expo-web-browser",
       [
         "expo-notifications",
-        {
-          "icon": "./assets/images/icon.png",
-          "color": "#ffffff",
-          "sounds": []
-        }
+          {
+            "icon": "./assets/images/icon.png",
+            "color": "#ffffff",
+            "sounds": [
+              "./assets/sounds/alert.mp3",
+              "./assets/sounds/message.mp3",
+              "./assets/sounds/ringtone.mp3"
+            ]
+          }
       ],
       [
         "react-native-google-mobile-ads",

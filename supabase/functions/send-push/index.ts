@@ -66,6 +66,10 @@ serve(async (req) => {
       return new Response(JSON.stringify({ skipped: true, reason: 'User is active' }), { status: 200 })
     }
 
+    // Map sound and channel based on notification type
+    const sound = type === 'call' ? 'ringtone.mp3' : (type === 'message' ? 'message.mp3' : 'alert.mp3');
+    const channelId = type === 'call' ? 'calls' : (type === 'message' ? 'messages' : 'default');
+
     // Send to Expo
     console.log(`[send-push] [${requestId}] Sending push to user ${user_id} token ${user.push_token.substring(0, 10)}...: "${title}"`)
     const res = await fetch(EXPO_PUSH_URL, {
@@ -78,7 +82,8 @@ serve(async (req) => {
         title: title || 'New Notification',
         body: message || 'You have a new update', // Expo requires a non-null body
         data: { type, link, user_id },
-        sound: 'default',
+        sound: sound,
+        channelId: channelId,
         priority: 'high',
       }),
     })

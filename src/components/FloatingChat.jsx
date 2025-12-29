@@ -49,10 +49,10 @@ if (Platform.OS !== 'web' && !isExpoGo) {
 }
 
 const SOUNDS = {
-  ringing: 'https://assets.mixkit.co/sfx/preview/mixkit-phone-ringing-bell-586.mp3',
-  connect: 'https://assets.mixkit.co/sfx/preview/mixkit-positive-interface-click-1112.mp3',
-  disconnect: 'https://assets.mixkit.co/sfx/preview/mixkit-modern-click-box-check-1120.mp3',
-  mute: 'https://assets.mixkit.co/sfx/preview/mixkit-interface-click-1126.mp3',
+  ringing: require('../../assets/sounds/ringtone.mp3'),
+  connect: require('../../assets/sounds/alert.mp3'),
+  disconnect: require('../../assets/sounds/alert.mp3'),
+  mute: require('../../assets/sounds/alert.mp3'),
 };
 
 import { ThemeProvider, useTheme } from "@/utils/ThemeContext";
@@ -236,7 +236,7 @@ export default function FloatingChat() {
         await soundObjects.current[name].unloadAsync();
       }
       const { sound } = await Audio.Sound.createAsync(
-        { uri: SOUNDS[name] },
+        SOUNDS[name],
         { shouldPlay: true, isLooping: loop }
       );
       soundObjects.current[name] = sound;

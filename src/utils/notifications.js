@@ -56,14 +56,30 @@ export async function registerForPushNotificationsAsync(userId) {
         .eq('id', userId);
     }
 
-    if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('default', {
-        name: 'default',
-        importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#22C55E',
-      });
-    }
+      if (Platform.OS === 'android') {
+        await Notifications.setNotificationChannelAsync('default', {
+          name: 'default',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#22C55E',
+        });
+        
+        await Notifications.setNotificationChannelAsync('messages', {
+          name: 'Messages',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#22C55E',
+          sound: 'message.mp3',
+        });
+
+        await Notifications.setNotificationChannelAsync('calls', {
+          name: 'Calls',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#22C55E',
+          sound: 'ringtone.mp3',
+        });
+      }
   } catch (error) {
     console.error('Error registering for push notifications:', error);
   }
