@@ -349,37 +349,38 @@ export default function Profile() {
         .or(`and(user1_id.eq.${storedUser.id},user2_id.eq.${user.id}),and(user1_id.eq.${user.id},user2_id.eq.${storedUser.id})`)
         .single();
       
-      if (existing) {
-        if (existing.status === 'rejected') {
-          Alert.alert("Error", "You cannot message this user.");
-          return;
-        }
-        Alert.alert("Chat", "You already have a chat with this user. Click the chat bubble to continue.");
-      } else {
-        // Check if they are friends
-        const { data: friendship } = await supabase
-          .from('friends')
-          .select('id')
-          .or(`and(user_id.eq.${storedUser.id},friend_id.eq.${user.id}),and(user_id.eq.${user.id},friend_id.eq.${storedUser.id})`)
-          .eq('status', 'accepted')
-          .single();
-
-        const status = friendship ? 'accepted' : 'pending';
-
-        await supabase.from('rchats').insert({
-          user1_id: Math.min(storedUser.id, user.id),
-          user2_id: Math.max(storedUser.id, user.id),
-          last_message: status === 'pending' ? "Chat Request" : "Chat started",
-          status: status,
-          initiated_by: storedUser.id
-        });
-
-        if (status === 'pending') {
-          Alert.alert("Request Sent", "Message request sent! They'll need to approve it before you can chat.");
+        if (existing) {
+          if (existing.status === 'rejected') {
+            Alert.alert("Error", "You cannot message this user.");
+            return;
+          }
+          useChatStore.getState().open(existing.id);
         } else {
-          Alert.alert("Success", "Chat started! Click the bubble to message.");
+          // Check if they are friends
+          const { data: friendship } = await supabase
+            .from('friends')
+            .select('id')
+            .or(`and(user_id.eq.${storedUser.id},friend_id.eq.${user.id}),and(user_id.eq.${user.id},friend_id.eq.${storedUser.id})`)
+            .eq('status', 'accepted')
+            .single();
+
+          const status = friendship ? 'accepted' : 'pending';
+
+          const { data: newChat } = await supabase.from('rchats').insert({
+            user1_id: Math.min(storedUser.id, user.id),
+            user2_id: Math.max(storedUser.id, user.id),
+            last_message: status === 'pending' ? "Chat Request" : "Chat started",
+            status: status,
+            initiated_by: storedUser.id
+          }).select().single();
+
+          if (newChat) {
+            useChatStore.getState().open(newChat.id);
+            if (status === 'pending') {
+              Alert.alert("Request Sent", "Message request sent! They'll need to approve it before you can chat.");
+            }
+          }
         }
-      }
     } catch (error) { console.error(error); }
   };
 

@@ -39,11 +39,13 @@ export const useAuthModal = create((set) => ({
 }));
 
 /**
- * This store manages the state of the chat visibility.
+ * This store manages the state of the chat visibility and active chat.
  */
 export const useChatStore = create((set) => ({
   isOpen: false,
-  open: () => set({ isOpen: true }),
-  close: () => set({ isOpen: false }),
+  activeChatId: null,
+  open: (chatId = null) => set({ isOpen: true, activeChatId: chatId }),
+  close: () => set({ isOpen: false, activeChatId: null }),
   toggle: () => set((state) => ({ isOpen: !state.isOpen })),
+  setActiveChatId: (id) => set({ activeChatId: id }),
 }));

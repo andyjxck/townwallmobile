@@ -53,13 +53,27 @@ const { width, height } = Dimensions.get('window');
 export default function FloatingChat() {
   const { isHippie } = useTheme();
   const router = useRouter();
-  const { isOpen, open: setOpen, close: setClose, toggle: toggleChatGlobal } = useChatStore();
+  const { isOpen, activeChatId, open: setOpen, close: setClose, toggle: toggleChatGlobal, setActiveChatId } = useChatStore();
   const [activeChat, setActiveChat] = useState(null);
   const activeChatRef = useRef(null);
 
   useEffect(() => {
     activeChatRef.current = activeChat;
   }, [activeChat]);
+
+  // Sync activeChat with activeChatId from store
+  useEffect(() => {
+    if (activeChatId) {
+      const chat = chats.find(c => c.id === activeChatId);
+      if (chat) {
+        setActiveChat(chat);
+        setShowChatList(false);
+      }
+    } else if (isOpen && !activeChat && !showSettings) {
+      // If we're open but have no active chat, show the list
+      setShowChatList(true);
+    }
+  }, [activeChatId, chats, isOpen]);
 
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
@@ -519,6 +533,7 @@ export default function FloatingChat() {
   const selectChat = (chat) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setActiveChat(chat);
+    setActiveChatId(chat.id);
     setShowChatList(false);
   };
 
