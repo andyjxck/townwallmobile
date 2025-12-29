@@ -234,7 +234,17 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
         </View>
 
         <TouchableOpacity 
-          onPress={() => isCurrentlyBlurred ? (shouldBlur ? setRevealed(true) : setBlurRevealed(true)) : setIsExpanded(!isExpanded)} 
+          onPress={() => {
+            if (isCurrentlyBlurred) {
+              if (shouldBlur) setRevealed(true);
+              else if (isBlurredByMod) setBlurRevealed(true);
+            } else if (shouldBlur || isBlurredByMod) {
+              setRevealed(false);
+              setBlurRevealed(false);
+            } else {
+              setIsExpanded(!isExpanded);
+            }
+          }} 
           style={styles.body}
         >
           {isCurrentlyBlurred ? (
