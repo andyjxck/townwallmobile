@@ -51,12 +51,12 @@ target 'TownWall' do
 
           # Suppress common C warnings that fail builds in newer Xcode
           config.build_settings['OTHER_CFLAGS'] = (config.build_settings['OTHER_CFLAGS'] || ['$(inherited)']) + ['-Wno-error=strict-prototypes', '-Wno-error=comma', '-Wno-error=incompatible-pointer-types', '-Wno-uninitialized']
-        end
-        
-        # Specific fix for ZXingObjC header visibility
-        if target.name == 'ZXingObjC'
-          target.build_configurations.each do |config|
-            config.build_settings['HEADER_SEARCH_PATHS'] = '$(inherited) "${PODS_ROOT}/Headers/Public/ZXingObjC"'
+          
+          # Specific fix for ZXingObjC header visibility
+          if target.name == 'ZXingObjC'
+            config.build_settings['HEADER_SEARCH_PATHS'] = '$(inherited) "${PODS_ROOT}/Headers/Public/ZXingObjC" "${PODS_ROOT}/Headers/Public/ZXingObjC/ZXingObjC"'
+            config.build_settings['USER_HEADER_SEARCH_PATHS'] = '"${PODS_ROOT}/ZXingObjC"'
+            config.build_settings['USE_HEADERMAP'] = 'YES'
           end
         end
       end
