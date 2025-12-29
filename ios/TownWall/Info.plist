@@ -33,13 +33,22 @@
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
-	<string>17</string>
+	<string>20</string>
 	<key>GADApplicationIdentifier</key>
 	<string>ca-app-pub-1505977777207758~6195707754</string>
 	<key>GADDelayAppMeasurementInit</key>
 	<false/>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>tel</string>
+		<string>telprompt</string>
+		<string>mailto</string>
+		<string>itms-apps</string>
+		<string>https</string>
+		<string>http</string>
+	</array>
 	<key>LSMinimumSystemVersion</key>
 	<string>12.0</string>
 	<key>LSRequiresIPhoneOS</key>
@@ -52,23 +61,23 @@
 		<true/>
 	</dict>
 	<key>NSCalendarsFullAccessUsageDescription</key>
-	<string>Allow $(PRODUCT_NAME) to access your calendars</string>
+	<string>Allow $(PRODUCT_NAME) to access your calendar.</string>
 	<key>NSCalendarsUsageDescription</key>
-	<string>Allow $(PRODUCT_NAME) to access your calendars</string>
+	<string>Allow $(PRODUCT_NAME) to access your calendar.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Allow $(PRODUCT_NAME) to access your camera</string>
 	<key>NSContactsUsageDescription</key>
-	<string>Allow $(PRODUCT_NAME) to access your contacts</string>
+	<string>Allow $(PRODUCT_NAME) to access your contacts.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Allow $(PRODUCT_NAME) to access your Face ID biometric data.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Allow $(PRODUCT_NAME) to access your location</string>
+	<string>Allow $(PRODUCT_NAME) to use your location.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>Allow $(PRODUCT_NAME) to access your location</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Allow $(PRODUCT_NAME) to access your location</string>
+	<string>Allow $(PRODUCT_NAME) to access your location to show nearby businesses and talent.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Allow $(PRODUCT_NAME) to access your microphone</string>
+	<string>Allow $(PRODUCT_NAME) to access your microphone for audio calls in chat.</string>
 	<key>NSMotionUsageDescription</key>
 	<string>Allow $(PRODUCT_NAME) to access your device motion</string>
 	<key>NSPhotoLibraryUsageDescription</key>
