@@ -41,26 +41,12 @@ target 'TownWall' do
     :privacy_file_aggregation_enabled => podfile_properties['apple.privacyManifestAggregationEnabled'] != 'false',
   )
 
-    post_install do |installer|
-      react_native_post_install(
-        installer,
-        config[:reactNativePath],
-        :mac_catalyst_enabled => false,
-        :ccache_enabled => podfile_properties['apple.ccacheEnabled'] == 'true',
-      )
-
-      installer.pods_project.targets.each do |target|
-        if target.name.include?('livekit') || target.name.include?('WebRTC')
-          target.build_configurations.each do |config|
-            config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
-          end
-        end
-
-        if target.name.include?('react-native-skia')
-          target.build_configurations.each do |config|
-            config.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] = 'NO'
-          end
-        end
-      end
-    end
+  post_install do |installer|
+    react_native_post_install(
+      installer,
+      config[:reactNativePath],
+      :mac_catalyst_enabled => false,
+      :ccache_enabled => podfile_properties['apple.ccacheEnabled'] == 'true',
+    )
+  end
 end
