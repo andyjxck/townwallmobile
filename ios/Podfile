@@ -50,7 +50,14 @@ target 'TownWall' do
           config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
 
           # Suppress common C warnings that fail builds in newer Xcode
-          config.build_settings['OTHER_CFLAGS'] = (config.build_settings['OTHER_CFLAGS'] || ['$(inherited)']) + ['-Wno-error=strict-prototypes', '-Wno-error=comma', '-Wno-error=incompatible-pointer-types']
+          config.build_settings['OTHER_CFLAGS'] = (config.build_settings['OTHER_CFLAGS'] || ['$(inherited)']) + ['-Wno-error=strict-prototypes', '-Wno-error=comma', '-Wno-error=incompatible-pointer-types', '-Wno-uninitialized']
+        end
+        
+        # Specific fix for ZXingObjC header visibility
+        if target.name == 'ZXingObjC'
+          target.build_configurations.each do |config|
+            config.build_settings['HEADER_SEARCH_PATHS'] = '$(inherited) "${PODS_ROOT}/Headers/Public/ZXingObjC"'
+          end
         end
       end
       react_native_post_install(
