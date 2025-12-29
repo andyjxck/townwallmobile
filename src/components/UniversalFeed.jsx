@@ -32,6 +32,7 @@ import {
     WifiOff,
     CloudUpload,
     MessageCircle,
+    Sparkles,
 } from "lucide-react-native";
 import { Image } from "expo-image";
 import { getDeviceId } from "../utils/deviceId";
@@ -51,7 +52,7 @@ import { offlineStorage, syncService, subscribeToNetworkChanges, checkNetworkSta
 export default function UniversalFeed() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { theme, isHippie } = useTheme();
+    const { theme, isHippie, isUnlocked, toggleHippie } = useTheme();
   
   const [posts, setPosts] = useState([]);
   const [zones, setZones] = useState([]);
@@ -252,6 +253,17 @@ export default function UniversalFeed() {
             <Image source={require("../../assets/images/icon.png")} style={{ width: 32, height: 32 }} contentFit="contain" />
           </TouchableOpacity>
         <View style={styles.headerActions}>
+          {isUnlocked && (
+            <TouchableOpacity 
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                toggleHippie(!isHippie);
+              }} 
+              style={styles.headerIcon}
+            >
+              <Sparkles color={isHippie ? theme.colors.primary : theme.colors.text} size={24} />
+            </TouchableOpacity>
+          )}
           <TouchableOpacity onPress={() => setShowFilterSort(true)} style={styles.headerIcon}>
             <ListFilter color={theme.colors.text} size={24} />
           </TouchableOpacity>

@@ -5,6 +5,7 @@ import { theme } from './theme';
 
 const ThemeContext = createContext({
   isHippie: false,
+  isUnlocked: false,
   theme: theme,
   toggleHippie: () => {},
   refreshTheme: () => {},
@@ -14,6 +15,7 @@ export const useTheme = () => useContext(ThemeContext);
 
 export const ThemeProvider = ({ children }) => {
   const [isHippie, setIsHippie] = useState(false);
+  const [isUnlocked, setIsUnlocked] = useState(false);
 
   const hippieTheme = {
     ...theme,
@@ -33,16 +35,18 @@ export const ThemeProvider = ({ children }) => {
   const fetchThemeStatus = async () => {
     if (!user?.id) {
       setIsHippie(false);
+      setIsUnlocked(false);
       return;
     }
     const { data } = await supabase
       .from('rusers')
-      .select('hippie_theme_enabled')
+      .select('hippie_theme_enabled, hippie_discovered_at')
       .eq('id', user.id)
       .single();
     
     if (data) {
       setIsHippie(!!data.hippie_theme_enabled);
+      setIsUnlocked(!!data.hippie_discovered_at);
     }
   };
 
@@ -64,7 +68,7 @@ export const ThemeProvider = ({ children }) => {
   };
 
   return (
-    <ThemeContext.Provider value={{ isHippie, theme: activeTheme, toggleHippie, refreshTheme: fetchThemeStatus }}>
+    <ThemeContext.Provider value={{ isHippie, isUnlocked, theme: activeTheme, toggleHippie, refreshTheme: fetchThemeStatus }}>
       {children}
     </ThemeContext.Provider>
   );
