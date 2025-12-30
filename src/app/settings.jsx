@@ -14,6 +14,8 @@ import * as Crypto from 'expo-crypto';
 import { supabase } from "../utils/supabase";
 import { generateRecoveryCodes, storeRecoveryCodes, getRecoveryCodesStatus } from "../utils/recoveryCode";
 import RecoveryCodesDisplay from "../components/RecoveryCodesDisplay";
+import { useLocationStore } from "../utils/locationStore";
+import { MapPin } from "lucide-react-native";
 
 // Polyfill for bcryptjs in React Native/Expo
 if (typeof global.crypto !== 'object') {
@@ -35,6 +37,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { signOut } = useAuth();
   const { auth } = useAuthStore();
+  const { city_name, zone_name } = useLocationStore();
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -220,6 +223,22 @@ export default function SettingsScreen() {
       </View>
 
         <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}>
+              <View style={styles.section}>
+                <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>LOCATION</Text>
+                <TouchableOpacity onPress={() => router.push("/onboarding/city")} style={[styles.item, { borderBottomColor: theme.colors.border }]}>
+                  <View style={styles.itemLeft}>
+                    <MapPin size={20} color={theme.colors.textSecondary} />
+                    <View>
+                      <Text style={[styles.itemTitle, { color: theme.colors.text }]}>Your Town</Text>
+                      <Text style={{ color: theme.colors.textSecondary, fontSize: 13, marginTop: 2 }}>
+                        {city_name || "Not set"}{zone_name ? ` • ${zone_name}` : ""}
+                      </Text>
+                    </View>
+                  </View>
+                  <ChevronRight size={18} color={theme.colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+
               <View style={styles.section}>
                 <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>SECURITY</Text>
                 <SettingsItem icon={<Key size={20} color={theme.colors.textSecondary} />} title={hasPasswordLocal ? "Change Password" : "Set Account Password"} onPress={() => { setShowChangePassword(true); setPasswordError(""); }} />
