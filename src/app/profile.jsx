@@ -243,7 +243,7 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
         });
 
           if (viewingOwnProfile) {
-            const { data: savedData } = await supabase.from('rsaved_posts').select(`post:post_id (id, title, text, created_at, user_id, zone_id, tag_id, image_url, image_urls, media_type, is_anonymous, moderation_status, is_deleted, user:rusers!user_id (username, emoji_icon, avatar_url), zone:rzones!zone_id (name), tag:rtags!tag_id (name), poll_id, reactions:rreactions (reaction_type, device_id))`).eq('user_id', userData.id);
+            const { data: savedData } = await supabase.from('rsaved_posts').select(`post:post_id (id, title, text, created_at, user_id, zone_id, tag_id, image_url, image_urls, media_type, cta_type, cta_group_id, is_anonymous, moderation_status, is_deleted, user:rusers!user_id (username, emoji_icon, avatar_url), zone:rzones!zone_id (name), tag:rtags!tag_id (name), poll_id, reactions:rreactions (reaction_type, device_id))`).eq('user_id', userData.id);
             setSavedPosts(savedData?.map(s => s.post).filter(p => p && !p.is_deleted) || []);
 
             const requests = await fetchPendingRequests(userData.id);
@@ -256,7 +256,7 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
         setFriends(friendsList);
         const friendIds = viewingOwnProfile ? friendsList.map(f => f.id) : [];
 
-        const { data: feedPosts } = await supabase.from('rposts').select(`id, title, text, created_at, user_id, zone_id, tag_id, image_url, image_urls, media_type, is_anonymous, moderation_status, is_deleted, user:rusers!user_id (username, emoji_icon, avatar_url), zone:rzones!zone_id (name), tag:rtags!tag_id (name), poll_id, reactions:rreactions (reaction_type, device_id)`).in('user_id', viewingOwnProfile ? [userData.id, ...friendIds] : [userData.id]).eq('is_deleted', false).order('created_at', { ascending: false });
+        const { data: feedPosts } = await supabase.from('rposts').select(`id, title, text, created_at, user_id, zone_id, tag_id, image_url, image_urls, media_type, cta_type, cta_group_id, is_anonymous, moderation_status, is_deleted, user:rusers!user_id (username, emoji_icon, avatar_url), zone:rzones!zone_id (name), tag:rtags!tag_id (name), poll_id, reactions:rreactions (reaction_type, device_id)`).in('user_id', viewingOwnProfile ? [userData.id, ...friendIds] : [userData.id]).eq('is_deleted', false).order('created_at', { ascending: false });
         setUserPosts(feedPosts || []);
 
         if (viewingOwnProfile) {

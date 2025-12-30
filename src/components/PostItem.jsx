@@ -189,6 +189,15 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
     if (isExpanded) fetchComments();
   }, [isExpanded, item.id]);
 
+  useEffect(() => {
+    if (images.length > 1) {
+      const interval = setInterval(() => {
+        setCurrentImageIndex((prev) => (prev + 1) % images.length);
+      }, 3000); // Cycle every 3 seconds
+      return () => clearInterval(interval);
+    }
+  }, [images.length]);
+
     const fetchComments = async () => {
       setLoadingComments(true);
       try {
@@ -346,46 +355,65 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
           )}
         </View>
 
-        <TouchableOpacity 
-          onPress={() => {
-            if (isCurrentlyBlurred) {
-              if (shouldBlur) setRevealed(true);
-              else if (isBlurredByMod) setBlurRevealed(true);
-            } else if (isRedactedMode) {
-              // Revealed redacted state - tapping does nothing (actions disabled)
-              return;
-            } else {
-              setIsExpanded(!isExpanded);
-            }
-          }} 
-          style={[styles.body, isCurrentlyBlurred && { marginBottom: 0 }]}
-        >
-          {isCurrentlyBlurred ? (
-            <View style={styles.blurredContentWrapper}>
-              {isBlurredByMod ? (
-                <View style={styles.modBlurOverlay}>
-                  <EyeOff size={18} color="#FFF" />
-                  <Text style={styles.blurTextContent}>Post blurred: {item.blur_reason}</Text>
-                  <Text style={styles.tapToRevealText}>Tap to reveal</Text>
+          <View style={[styles.mainContent, isCurrentlyBlurred && { marginBottom: 0 }]}>
+            <TouchableOpacity 
+              onPress={() => {
+                if (isCurrentlyBlurred) {
+                  if (shouldBlur) setRevealed(true);
+                  else if (isBlurredByMod) setBlurRevealed(true);
+                } else if (isRedactedMode) {
+                  return;
+                } else {
+                  setIsExpanded(!isExpanded);
+                }
+              }} 
+              style={[styles.body, { flex: 1 }]}
+            >
+              {isCurrentlyBlurred ? (
+                <View style={styles.blurredContentWrapper}>
+                  {isBlurredByMod ? (
+                    <View style={styles.modBlurOverlay}>
+                      <EyeOff size={18} color="#FFF" />
+                      <Text style={styles.blurTextContent}>Post blurred: {item.blur_reason}</Text>
+                      <Text style={styles.tapToRevealText}>Tap to reveal</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.communityBlurOverlay}>
+                      <AlertTriangle size={18} color={theme.colors.error} />
+                      <Text style={[styles.blurText, { color: theme.colors.error }]}>Reported Content</Text>
+                      <Text style={styles.tapToRevealText}>Tap to reveal</Text>
+                    </View>
+                  )}
                 </View>
               ) : (
-                <View style={styles.communityBlurOverlay}>
-                  <AlertTriangle size={18} color={theme.colors.error} />
-                  <Text style={[styles.blurText, { color: theme.colors.error }]}>Reported Content</Text>
-                  <Text style={styles.tapToRevealText}>Tap to reveal</Text>
-                </View>
+                <>
+                  {item.title && <Text style={[styles.title, isRedactedMode && styles.greyedOutText]}>{item.title}</Text>}
+                  <Text style={[styles.bodyText, isRedactedMode && styles.greyedOutText]} numberOfLines={(isExpanded || isRedactedMode) ? undefined : 4}>
+                    {item.text?.replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ')}
+                  </Text>
+                  {item.poll_id && <PollComponent pollId={item.poll_id} />}
+                </>
               )}
-            </View>
-          ) : (
-            <>
-              {item.title && <Text style={[styles.title, isRedactedMode && styles.greyedOutText]}>{item.title}</Text>}
-              <Text style={[styles.bodyText, isRedactedMode && styles.greyedOutText]} numberOfLines={(isExpanded || isRedactedMode) ? undefined : 4}>
-                {item.text?.replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ')}
-              </Text>
-                {item.poll_id && <PollComponent pollId={item.poll_id} />}
-              </>
+            </TouchableOpacity>
+
+            {!isCurrentlyBlurred && images.length > 0 && !isRedactedMode && (
+              <TouchableOpacity onPress={() => setShowFullImage(true)} style={styles.sideMediaContainer}>
+                {isVideo ? (
+                  <Video
+                    source={{ uri: images[currentImageIndex] }}
+                    style={styles.sideMedia}
+                    resizeMode="cover"
+                    shouldPlay={isExpanded}
+                    isLooping
+                    isMuted
+                    useNativeControls={false}
+                  />
+                ) : (
+                  <Image source={{ uri: images[currentImageIndex] }} style={styles.sideMedia} contentFit="cover" />
+                )}
+              </TouchableOpacity>
             )}
-          </TouchableOpacity>
+          </View>
 
           {!isCurrentlyBlurred && item.cta_type && item.cta_type !== 'none' && (
             <TouchableOpacity 
@@ -413,27 +441,8 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
             </TouchableOpacity>
           )}
 
-          {!isCurrentlyBlurred && images.length > 0 && (
-
-          <TouchableOpacity onPress={() => setShowFullImage(true)} style={styles.mediaContainer}>
-            {isVideo ? (
-              <Video
-                source={{ uri: images[0] }}
-                style={styles.media}
-                resizeMode="cover"
-                shouldPlay={isExpanded}
-                isLooping
-                isMuted
-                useNativeControls={false}
-              />
-            ) : (
-              <Image source={{ uri: images[0] }} style={styles.media} contentFit="cover" />
-            )}
-          </TouchableOpacity>
-        )}
-
-        {!isCurrentlyBlurred && (
-          <View style={[styles.footer, isRedactedMode && { opacity: 0.5 }]}>
+          {!isCurrentlyBlurred && (
+            <View style={[styles.footer, isRedactedMode && { opacity: 0.5 }]}>
             <View style={styles.actions}>
               <TouchableOpacity 
                 onPress={() => !isRedactedMode && onReaction(item.id, "helpful", userReactions.helpful)} 
@@ -565,24 +574,23 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
           </View>
         )}
 
-        <Modal visible={showFullImage} transparent animationType="fade">
-        <View style={styles.fullImageOverlay}>
-          <TouchableOpacity style={styles.closeBtn} onPress={() => setShowFullImage(false)}><X color="#FFF" size={32} /></TouchableOpacity>
-          {isVideo ? (
-            <Video
-  source={{ uri: images[0] }}
-  style={styles.fullMedia}
-  resizeMode="contain"
-  shouldPlay
-  isLooping
-  useNativeControls
-/>
-
-          ) : (
-            <Image source={{ uri: images[0] }} style={styles.fullMedia} contentFit="contain" />
-          )}
-        </View>
-      </Modal>
+          <Modal visible={showFullImage} transparent animationType="fade">
+          <View style={styles.fullImageOverlay}>
+            <TouchableOpacity style={styles.closeBtn} onPress={() => setShowFullImage(false)}><X color="#FFF" size={32} /></TouchableOpacity>
+            {isVideo ? (
+              <Video
+                source={{ uri: images[currentImageIndex] }}
+                style={styles.fullMedia}
+                resizeMode="contain"
+                shouldPlay
+                isLooping
+                useNativeControls
+              />
+            ) : (
+              <Image source={{ uri: images[currentImageIndex] }} style={styles.fullMedia} contentFit="contain" />
+            )}
+          </View>
+        </Modal>
 
       <Modal visible={showLikersModal || showSuperlikersModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
@@ -732,8 +740,21 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
   },
-  mediaContainer: { height: 200, borderRadius: 12, overflow: 'hidden', marginBottom: 12 },
-  media: { width: '100%', height: '100%' },
+  mainContent: {
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  sideMediaContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginLeft: 12,
+  },
+  sideMedia: {
+    width: '100%',
+    height: '100%',
+  },
   footer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10 },
   actions: { flexDirection: 'row', gap: 24 },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
