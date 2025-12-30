@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo } from 'react';
 import { create } from 'zustand';
 import { Modal, View, Platform } from 'react-native';
 import { useAuthModal, useAuthStore, authKey } from './store';
+import { logoutUser, initUser } from '../user';
 
 
 /**
@@ -60,9 +61,10 @@ export const useAuth = () => {
   }, [open]);
 
   const signOut = useCallback(async () => {
-    setAuth(null);
+    await logoutUser();
+    await initUser();
     close();
-  }, [close, setAuth]);
+  }, [close]);
 
   return {
     isReady,

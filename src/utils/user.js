@@ -6,6 +6,41 @@ import { useAuthStore } from "./auth";
 
 const USER_DATA_KEY = "@redditch_user_data";
 
+export const mergeAnonDataToUser = async (anonUserId, targetUserId) => {
+  try {
+    await supabase.from('rposts').update({ user_id: targetUserId }).eq('user_id', anonUserId);
+    await supabase.from('rcomments').update({ user_id: targetUserId }).eq('user_id', anonUserId);
+    await supabase.from('rnotifications').update({ user_id: targetUserId }).eq('user_id', anonUserId);
+    await supabase.from('rmessages').update({ sender_id: targetUserId }).eq('sender_id', anonUserId);
+    await supabase.from('rhelp_messages').update({ sender_id: targetUserId }).eq('sender_id', anonUserId);
+    await supabase.from('rshares').update({ user_id: targetUserId }).eq('user_id', anonUserId);
+    await supabase.from('rsaved_posts').update({ user_id: targetUserId }).eq('user_id', anonUserId);
+    await supabase.from('rreactions').update({ user_id: targetUserId }).eq('user_id', anonUserId);
+    await supabase.from('rfeature_suggestions').update({ user_id: targetUserId }).eq('user_id', anonUserId);
+    await supabase.from('rhelp_reviews').update({ user_id: targetUserId }).eq('user_id', anonUserId);
+    await supabase.from('rtalent').update({ user_id: targetUserId }).eq('user_id', anonUserId);
+    await supabase.from('rbusinesses').update({ user_id: targetUserId }).eq('user_id', anonUserId);
+    await supabase.from('rchat_members').update({ user_id: targetUserId }).eq('user_id', anonUserId);
+    await supabase.from('rcall_participants').update({ user_id: targetUserId }).eq('user_id', anonUserId);
+    await supabase.from('rchats').update({ user1_id: targetUserId }).eq('user1_id', anonUserId);
+    await supabase.from('rchats').update({ user2_id: targetUserId }).eq('user2_id', anonUserId);
+    await supabase.from('rpoll_votes').update({ user_id: targetUserId }).eq('user_id', anonUserId);
+    await supabase.from('recovery_codes').delete().eq('user_id', anonUserId);
+    return true;
+  } catch (error) {
+    console.error("Error merging anon data:", error);
+    return false;
+  }
+};
+
+export const checkAnonHasData = async (anonUserId) => {
+  const { count: postsCount } = await supabase.from('rposts').select('*', { count: 'exact', head: true }).eq('user_id', anonUserId);
+  const { count: commentsCount } = await supabase.from('rcomments').select('*', { count: 'exact', head: true }).eq('user_id', anonUserId);
+  const { count: messagesCount } = await supabase.from('rmessages').select('*', { count: 'exact', head: true }).eq('sender_id', anonUserId);
+  const { count: helpMessagesCount } = await supabase.from('rhelp_messages').select('*', { count: 'exact', head: true }).eq('sender_id', anonUserId);
+  return (postsCount || 0) + (commentsCount || 0) + (messagesCount || 0) + (helpMessagesCount || 0) > 0;
+};
+
 export const initUser = async () => {
   try {
     const deviceId = await getDeviceId();

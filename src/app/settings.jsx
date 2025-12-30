@@ -11,7 +11,6 @@ import { useAuthStore } from "../utils/auth";
 import * as Haptics from "expo-haptics";
 import bcrypt from 'bcryptjs';
 import * as Crypto from 'expo-crypto';
-import { logoutUser, initUser } from "../utils/user";
 import { supabase } from "../utils/supabase";
 import { generateRecoveryCodes, storeRecoveryCodes, getRecoveryCodesStatus } from "../utils/recoveryCode";
 import RecoveryCodesDisplay from "../components/RecoveryCodesDisplay";
@@ -204,10 +203,8 @@ export default function SettingsScreen() {
     Alert.alert("Sign Out", "Are you sure?", [
       { text: "Cancel", style: "cancel" },
       { text: "Sign Out", style: "destructive", onPress: async () => {
-        await logoutUser();
         await signOut();
-        await initUser();
-        router.replace("/onboarding/welcome");
+        router.replace("/");
       }}
     ]);
   };

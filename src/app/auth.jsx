@@ -16,7 +16,7 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { supabase } from "../utils/supabase";
 import { useAuthStore } from "../utils/auth";
 import { getDeviceId } from "../utils/deviceId";
-import { initUser } from "../utils/user";
+import { initUser, mergeAnonDataToUser, checkAnonHasData } from "../utils/user";
 import { ChevronLeft, User, Lock } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import bcrypt from 'bcryptjs';
@@ -72,6 +72,23 @@ export default function Auth() {
     }
   };
 
+  const completeLogin = async (user, deviceId) => {
+    await supabase
+      .from('rusers')
+      .update({ device_id: deviceId })
+      .eq('id', user.id);
+
+    const { data: freshUser } = await supabase
+      .from('rusers')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    useAuthStore.getState().setAuth(freshUser || user);
+    await initUser();
+    router.replace("/");
+  };
+
   const handleAuth = async () => {
     const trimmedUsername = username.trim();
     const trimmedPassword = password.trim();
@@ -88,40 +105,59 @@ export default function Auth() {
       const deviceId = await getDeviceId();
 
         if (isLogin) {
-          const { data: user, error } = await supabase
-            .from('rusers')
-            .select('*')
-            .ilike('username', trimmedUsername)
-            .single();
+            const { data: user, error } = await supabase
+              .from('rusers')
+              .select('*')
+              .ilike('username', trimmedUsername)
+              .single();
 
-          if (error || !user) {
-            throw new Error("Invalid username or password");
-          }
+            if (error || !user) {
+              throw new Error("Invalid username or password");
+            }
 
-          const isMatch = bcrypt.compareSync(trimmedPassword, user.password);
-          if (!isMatch) {
-            throw new Error("Invalid username or password");
-          }
+            const isMatch = bcrypt.compareSync(trimmedPassword, user.password);
+            if (!isMatch) {
+              throw new Error("Invalid username or password");
+            }
 
-          const { auth: currentAuth } = useAuthStore.getState();
-          if (currentAuth && currentAuth.id !== user.id && !currentAuth.password) {
-            await supabase.from('rusers').delete().eq('id', currentAuth.id);
-          }
+            const { auth: currentAuth } = useAuthStore.getState();
+              if (currentAuth && currentAuth.id !== user.id && !currentAuth.password) {
+                const hasData = await checkAnonHasData(currentAuth.id);
+                if (hasData) {
+                  setLoading(false);
+                  Alert.alert(
+                    "Transfer Data?",
+                    "You have posts, comments, or messages from your anonymous session. Would you like to transfer them to your account?",
+                    [
+                      {
+                        text: "No, discard",
+                        style: "destructive",
+                        onPress: async () => {
+                          setLoading(true);
+                          await supabase.from('rusers').delete().eq('id', currentAuth.id);
+                          await completeLogin(user, deviceId);
+                          setLoading(false);
+                        }
+                      },
+                      {
+                        text: "Yes, transfer",
+                        onPress: async () => {
+                          setLoading(true);
+                          await mergeAnonDataToUser(currentAuth.id, user.id);
+                          await supabase.from('rusers').delete().eq('id', currentAuth.id);
+                          await completeLogin(user, deviceId);
+                          setLoading(false);
+                        }
+                      }
+                    ]
+                  );
+                  return;
+                } else {
+                  await supabase.from('rusers').delete().eq('id', currentAuth.id);
+                }
+              }
 
-          await supabase
-            .from('rusers')
-            .update({ device_id: deviceId })
-            .eq('id', user.id);
-
-          const { data: freshUser } = await supabase
-            .from('rusers')
-            .select('*')
-            .eq('id', user.id)
-            .single();
-
-            useAuthStore.getState().setAuth(freshUser || user);
-            await initUser();
-            router.replace("/");
+            await completeLogin(user, deviceId);
       } else {
         const { data: existingUser } = await supabase
           .from('rusers')

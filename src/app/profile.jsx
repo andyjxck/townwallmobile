@@ -262,7 +262,7 @@ export default function Profile() {
   const handleLogout = async () => {
     Alert.alert("Sign Out", "Are you sure?", [
       { text: "Cancel", style: "cancel" },
-      { text: "Sign Out", style: "destructive", onPress: async () => { await logoutUser(); router.replace("/"); } }
+      { text: "Sign Out", style: "destructive", onPress: async () => { await logoutUser(); await initUser(); router.replace("/"); } }
     ]);
   };
 
