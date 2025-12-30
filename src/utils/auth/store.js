@@ -44,8 +44,10 @@ export const useAuthModal = create((set) => ({
 export const useChatStore = create((set) => ({
   isOpen: false,
   activeChatId: null,
+  pendingCallUserId: null,
   open: (chatId = null) => set({ isOpen: true, activeChatId: chatId }),
-  close: () => set({ isOpen: false, activeChatId: null }),
+  close: () => set({ isOpen: false, activeChatId: null, pendingCallUserId: null }),
   toggle: () => set((state) => ({ isOpen: !state.isOpen })),
   setActiveChatId: (id) => set({ activeChatId: id }),
+  setPendingCallUserId: (userId) => set({ pendingCallUserId: userId, isOpen: true }),
 }));

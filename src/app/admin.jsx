@@ -56,6 +56,7 @@ export default function ModerationAdmin() {
       { id: 'business', label: 'BUSINESS', icon: Briefcase },
       { id: 'ai', label: 'AI LOGS', icon: Bot },
       { id: 'news', label: 'FAKE NEWS', icon: Flag },
+      { id: 'reports', label: 'REPORTS', icon: AlertCircle },
     ];
 
   if (isSuperAdmin) {
@@ -175,7 +176,15 @@ export default function ModerationAdmin() {
           .order('created_at', { ascending: false });
         if (error) throw error;
         result = news;
-      } else if (activeTab === 'logs' && isSuperAdmin) {
+        } else if (activeTab === 'reports') {
+          const { data: reports, error } = await supabase
+            .from('rmoderation_logs')
+            .select(`*, target:rusers!rmoderation_logs_target_id_fkey(username)`)
+            .eq('action', 'report')
+            .order('created_at', { ascending: false });
+          if (error) throw error;
+          result = reports;
+        } else if (activeTab === 'logs' && isSuperAdmin) {
         const { data: logsData, error } = await supabase
           .from('rmoderation_logs')
           .select(`*, moderator:rusers!rmoderation_logs_moderator_id_fkey(username)`)

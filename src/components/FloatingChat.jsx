@@ -62,15 +62,26 @@ const { width, height } = Dimensions.get('window');
 export default function FloatingChat() {
   const { isHippie } = useTheme();
   const router = useRouter();
-  const { isOpen, activeChatId, open: setOpen, close: setClose, toggle: toggleChatGlobal, setActiveChatId } = useChatStore();
-  const [activeChat, setActiveChat] = useState(null);
-  const activeChatRef = useRef(null);
+  const { isOpen, activeChatId, open: setOpen, close: setClose, toggle: toggleChatGlobal, setActiveChatId, pendingCallUserId } = useChatStore();
 
   useEffect(() => {
-    activeChatRef.current = activeChat;
-  }, [activeChat]);
+    if (pendingCallUserId && user && chats.length > 0 && !activeCall) {
+      const chat = chats.find(c => 
+        !c.is_group && (c.user1_id === pendingCallUserId || c.user2_id === pendingCallUserId)
+      );
+      if (chat) {
+        if (activeChatId !== chat.id) {
+          setActiveChatId(chat.id);
+        } else {
+          // Chat already active, trigger call
+          startCall();
+          // Clear pending call so it doesn't trigger again
+          useChatStore.setState({ pendingCallUserId: null });
+        }
+      }
+    }
+  }, [pendingCallUserId, user, chats, activeChatId, activeCall]);
 
-  // Sync activeChat with activeChatId from store
   useEffect(() => {
     if (activeChatId) {
       const chat = chats.find(c => c.id === activeChatId);

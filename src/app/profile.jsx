@@ -27,12 +27,15 @@ import { getDeviceId } from "../utils/deviceId";
       Check,
       X as XIcon,
       Settings as SettingsIcon,
-      Search,
-      Pencil,
-      MessageCircle,
-      Bell,
-      UserCheck,
-    } from "lucide-react-native";
+        Search,
+        Pencil,
+        MessageCircle,
+        Bell,
+        UserCheck,
+        Phone,
+        ShieldAlert,
+        MoreVertical,
+      } from "lucide-react-native";
   import AsyncStorage from "@react-native-async-storage/async-storage";
   import * as ImagePicker from "expo-image-picker";
   import * as FileSystem from "expo-file-system";
@@ -497,67 +500,179 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
       }
     };
 
-    const handleMessageUser = async () => {
+    const handleMessageUser = async (targetUser = null) => {
+      const target = targetUser || user;
+      if (!target) return;
 
-    try {
-      const storedUser = useAuthStore.getState().auth;
-      if (!storedUser) return;
-      
-      // Check if chat exists
-      const { data: existing } = await supabase
-        .from('rchats')
-        .select('id, status')
-        .or(`and(user1_id.eq.${storedUser.id},user2_id.eq.${user.id}),and(user1_id.eq.${user.id},user2_id.eq.${storedUser.id})`)
-        .single();
-      
-          if (existing) {
-            if (existing.status === 'rejected') {
-              Alert.alert("Error", "You cannot message this user.");
-              return;
-            }
-            
-            // If it's pending, check if they are friends now
-            if (existing.status === 'pending') {
-              const { data: friendship } = await supabase
-                .from('friends')
-                .select('id')
-                .match({ user_id: storedUser.id, friend_id: user.id, status: 'accepted' })
-                .single();
+      try {
+        const storedUser = useAuthStore.getState().auth;
+        if (!storedUser) return;
+        
+        // Check if chat exists
+        const { data: existing } = await supabase
+          .from('rchats')
+          .select('id, status')
+          .or(`and(user1_id.eq.${storedUser.id},user2_id.eq.${target.id}),and(user1_id.eq.${target.id},user2_id.eq.${storedUser.id})`)
+          .single();
+        
+            if (existing) {
+              if (existing.status === 'rejected') {
+                Alert.alert("Error", "You cannot message this user.");
+                return;
+              }
               
-              if (friendship) {
-                await supabase.from('rchats').update({ status: 'accepted' }).eq('id', existing.id);
+              // If it's pending, check if they are friends now
+              if (existing.status === 'pending') {
+                const { data: friendship } = await supabase
+                  .from('friends')
+                  .select('id')
+                  .match({ user_id: storedUser.id, friend_id: target.id, status: 'accepted' })
+                  .single();
+                
+                if (friendship) {
+                  await supabase.from('rchats').update({ status: 'accepted' }).eq('id', existing.id);
+                }
+              }
+
+              useChatStore.getState().open(existing.id);
+            } else {
+            // Check if they are friends
+            const { data: friendship } = await supabase
+              .from('friends')
+              .select('id')
+              .or(`and(user_id.eq.${storedUser.id},friend_id.eq.${target.id}),and(user_id.eq.${target.id},friend_id.eq.${storedUser.id})`)
+              .eq('status', 'accepted')
+              .single();
+
+            const status = friendship ? 'accepted' : 'pending';
+
+            const { data: newChat } = await supabase.from('rchats').insert({
+              user1_id: Math.min(storedUser.id, target.id),
+              user2_id: Math.max(storedUser.id, target.id),
+              last_message: status === 'pending' ? "Chat Request" : "Chat started",
+              status: status,
+              initiated_by: storedUser.id
+            }).select().single();
+
+            if (newChat) {
+              useChatStore.getState().open(newChat.id);
+              if (status === 'pending') {
+                Alert.alert("Request Sent", "Message request sent! They'll need to approve it before you can chat.");
               }
             }
-
-            useChatStore.getState().open(existing.id);
-          } else {
-          // Check if they are friends
-          const { data: friendship } = await supabase
-            .from('friends')
-            .select('id')
-            .or(`and(user_id.eq.${storedUser.id},friend_id.eq.${user.id}),and(user_id.eq.${user.id},friend_id.eq.${storedUser.id})`)
-            .eq('status', 'accepted')
-            .single();
-
-          const status = friendship ? 'accepted' : 'pending';
-
-          const { data: newChat } = await supabase.from('rchats').insert({
-            user1_id: Math.min(storedUser.id, user.id),
-            user2_id: Math.max(storedUser.id, user.id),
-            last_message: status === 'pending' ? "Chat Request" : "Chat started",
-            status: status,
-            initiated_by: storedUser.id
-          }).select().single();
-
-          if (newChat) {
-            useChatStore.getState().open(newChat.id);
-            if (status === 'pending') {
-              Alert.alert("Request Sent", "Message request sent! They'll need to approve it before you can chat.");
-            }
           }
-        }
-    } catch (error) { console.error(error); }
-  };
+      } catch (error) { console.error(error); }
+    };
+
+    const handleCallUser = async (targetUser) => {
+      Alert.alert("Call?", `Do you want to call @${targetUser.username}?`, [
+        { text: "Cancel", style: "cancel" },
+        { text: "Call", onPress: async () => {
+          try {
+            const storedUser = useAuthStore.getState().auth;
+            if (!storedUser) return;
+            
+            // 1. Find or create chat
+            const { data: existing } = await supabase
+              .from('rchats')
+              .select('id, status')
+              .or(`and(user1_id.eq.${storedUser.id},user2_id.eq.${targetUser.id}),and(user1_id.eq.${targetUser.id},user2_id.eq.${storedUser.id})`)
+              .single();
+            
+            let chatId;
+            if (existing) {
+              chatId = existing.id;
+              // Ensure it's accepted if they are friends
+              if (existing.status === 'pending') {
+                await supabase.from('rchats').update({ status: 'accepted' }).eq('id', chatId);
+              }
+            } else {
+              const { data: newChat } = await supabase.from('rchats').insert({
+                user1_id: Math.min(storedUser.id, targetUser.id),
+                user2_id: Math.max(storedUser.id, targetUser.id),
+                status: 'accepted',
+                initiated_by: storedUser.id
+              }).select().single();
+              chatId = newChat.id;
+            }
+
+            // 2. Open chat and signal call
+            useChatStore.getState().open(chatId);
+            useChatStore.getState().setPendingCallUserId(targetUser.id);
+          } catch (error) {
+            console.error(error);
+          }
+        }}
+      ]);
+    };
+
+    const handleRemoveFriend = async (targetUser) => {
+      Alert.alert("Remove Friend", `Are you sure you want to remove @${targetUser.username} from your friends?`, [
+        { text: "Cancel", style: "cancel" },
+        { text: "Remove", style: "destructive", onPress: async () => {
+          try {
+            const storedUser = useAuthStore.getState().auth;
+            await supabase.from('friends')
+              .delete()
+              .or(`and(user_id.eq.${storedUser.id},friend_id.eq.${targetUser.id}),and(user_id.eq.${targetUser.id},friend_id.eq.${storedUser.id})`);
+            loadData();
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          } catch (error) {
+            console.error(error);
+          }
+        }}
+      ]);
+    };
+
+    const handleReportUser = async (targetUser) => {
+      if (Platform.OS === 'ios' || Platform.OS === 'android') {
+        Alert.prompt(
+          "Report User",
+          "Please provide a reason for reporting this user:",
+          [
+            { text: "Cancel", style: "cancel" },
+            { text: "Report", style: "destructive", onPress: async (reason) => {
+              if (!reason) return;
+              await submitReport(targetUser, reason);
+            }}
+          ],
+          "plain-text"
+        );
+      } else {
+        const reason = window.prompt("Reason for reporting:");
+        if (reason) await submitReport(targetUser, reason);
+      }
+    };
+
+    const submitReport = async (targetUser, reason) => {
+      try {
+        const storedUser = useAuthStore.getState().auth;
+        await supabase.from('rmoderation_logs').insert({
+          target_id: targetUser.id,
+          target_type: 'user',
+          action: 'report',
+          reason: reason,
+          metadata: { reported_by: storedUser.id, username: targetUser.username }
+        });
+        Alert.alert("Thank you", "Your report has been submitted for review.");
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch (error) {
+        console.error(error);
+        Alert.alert("Error", "Failed to submit report.");
+      }
+    };
+
+    const handleMoreActions = (friend) => {
+      Alert.alert(
+        `@${friend.username}`,
+        null,
+        [
+          { text: "Report User", onPress: () => handleReportUser(friend) },
+          { text: "Remove Friend", style: "destructive", onPress: () => handleRemoveFriend(friend) },
+          { text: "Cancel", style: "cancel" }
+        ]
+      );
+    };
 
   if (loading && !user) {
     return (
@@ -871,13 +986,34 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
 
                 <Text style={[styles.sectionTitle, { color: theme.colors.text, marginTop: 20 }]}>Friends ({friends.length})</Text>
                   {friends.map(f => (
-                    <TouchableOpacity key={f.id} style={styles.friendItem} onPress={() => router.push(`/profile?userId=${f.id}`)}>
-                      <View style={styles.friendAvatarContainer}>
-                        <Text style={{ fontSize: 24 }}>{f.emoji_icon || "👤"}</Text>
-                        {isOnline(f.last_seen) && <View style={styles.friendOnlineDot} />}
+                    <View key={f.id} style={styles.friendItem}>
+                      <TouchableOpacity 
+                        style={[styles.friendInfo, { flex: 1 }]} 
+                        onPress={() => router.push(`/profile?userId=${f.id}`)}
+                      >
+                        <View style={styles.friendAvatarContainer}>
+                          {f.avatar_url ? (
+                            <Image source={{ uri: f.avatar_url }} style={styles.friendAvatar} />
+                          ) : (
+                            <Text style={{ fontSize: 24 }}>{f.emoji_icon || "👤"}</Text>
+                          )}
+                          {isOnline(f.last_seen) && <View style={styles.friendOnlineDot} />}
+                        </View>
+                        <Text style={[styles.friendName, { color: theme.colors.text }]} numberOfLines={1}>@{f.username}</Text>
+                      </TouchableOpacity>
+                      
+                      <View style={styles.friendActions}>
+                        <TouchableOpacity onPress={() => handleMessageUser(f)} style={styles.friendActionBtn}>
+                          <MessageCircle size={20} color={theme.colors.primary} />
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => handleCallUser(f)} style={styles.friendActionBtn}>
+                          <Phone size={20} color={theme.colors.success} />
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => handleMoreActions(f)} style={styles.friendActionBtn}>
+                          <MoreVertical size={20} color={theme.colors.textSecondary} />
+                        </TouchableOpacity>
                       </View>
-                      <Text style={[styles.friendName, { color: theme.colors.text }]}>@{f.username}</Text>
-                    </TouchableOpacity>
+                    </View>
                   ))}
               </View>
             )}
@@ -1063,10 +1199,14 @@ const styles = StyleSheet.create({
     requestBtns: { flexDirection: 'row', gap: 8 },
     acceptBtn: { padding: 8, borderRadius: 8 },
     rejectBtn: { padding: 8, borderRadius: 8 },
-    friendItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
-    friendAvatarContainer: { position: 'relative' },
-    friendOnlineDot: { position: 'absolute', bottom: 0, right: 0, width: 8, height: 8, borderRadius: 4, backgroundColor: '#10B981', borderWidth: 1, borderColor: '#000' },
-    friendName: { fontWeight: 'bold' },
+      friendItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
+      friendInfo: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+      friendAvatar: { width: 44, height: 44, borderRadius: 22 },
+      friendAvatarContainer: { position: 'relative' },
+      friendOnlineDot: { position: 'absolute', bottom: 0, right: 0, width: 10, height: 10, borderRadius: 5, backgroundColor: '#10B981', borderWidth: 2, borderColor: '#000' },
+      friendName: { fontWeight: 'bold', fontSize: 15 },
+      friendActions: { flexDirection: 'row', gap: 12, alignItems: 'center' },
+      friendActionBtn: { padding: 8, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.05)' },
     footer: { paddingVertical: 30, alignItems: 'center' },
     footerText: { fontSize: 12, fontWeight: '600' },
     actionRow: { flexDirection: 'row', paddingVertical: 10, alignItems: 'center', width: '100%', paddingHorizontal: 20 },
