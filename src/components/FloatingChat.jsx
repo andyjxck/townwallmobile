@@ -18,12 +18,14 @@ import {
   ScrollView,
   Alert
 } from 'react-native';
-import { MessageCircle, X, Send, ChevronLeft, MoreHorizontal, User, Users, Check, CheckCheck, Settings, Plus, UserPlus, Mic, MicOff, Phone as PhoneIcon, PhoneOff as PhoneOffIcon, PhoneIncoming, PhoneOutgoing, Phone, Volume2, VolumeX } from 'lucide-react-native';
+import { MessageCircle, X, Send, ChevronLeft, MoreHorizontal, User, Users, Check, CheckCheck, Settings, Plus, UserPlus, Mic, MicOff, Phone as PhoneIcon, PhoneOff as PhoneOffIcon, PhoneIncoming, PhoneOutgoing, Phone, Volume2, VolumeX, Image as ImageIcon, Video as VideoIcon, Film, Play, Maximize2 } from 'lucide-react-native';
 import { supabase } from '../utils/supabase';
 import { getStoredUser } from '../utils/user';
 import { theme } from '../utils/theme';
 import { sendNotification, sendMessageNotification, sendCallNotification } from '../utils/notifications';
 import { useChatStore } from '../utils/auth';
+import * as ImagePicker from 'expo-image-picker';
+import { Video, useVideoPlayer, VideoView } from 'expo-video';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -32,6 +34,8 @@ import { useRouter } from 'expo-router';
 import { Audio } from 'expo-av';
 import { Accelerometer } from 'expo-sensors';
 import Constants from 'expo-constants';
+import { decode } from 'base64-arraybuffer';
+import * as FileSystem from 'expo-file-system';
 let LiveKitRoom, useLocalParticipant, useParticipants, AudioSession, useIOSAudioManagement, useRoom;
 
 const isExpoGo = Constants.appOwnership === "expo";
@@ -120,6 +124,8 @@ export default function FloatingChat() {
     const [groupName, setGroupName] = useState('');
     const [groupIcon, setGroupIcon] = useState('👥');
     const [selectedUsers, setSelectedUsers] = useState([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [fullscreenMedia, setFullscreenMedia] = useState(null);
 
   const [searchUsers, setSearchUsers] = useState('');
   const [userSearchResults, setUserSearchResults] = useState([]);
@@ -674,11 +680,62 @@ export default function FloatingChat() {
     setTimeout(() => flatListRef.current?.scrollToEnd(), 100);
   };
 
-    const handleSendMessage = async () => {
-      const text = inputText.trim();
-      if (!text || !activeChat || isSendingRef.current) return;
-      
-      // Clear immediately to prevent double-send and show responsiveness
+  const uploadMedia = async (uri, type) => {
+    try {
+      const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+      const extension = type === 'video' ? 'mp4' : 'jpg';
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${extension}`;
+      const filePath = `${user.id}/${fileName}`;
+
+      const { data, error } = await supabase.storage
+        .from('chat_media')
+        .upload(filePath, decode(base64), {
+          contentType: type === 'video' ? 'video/mp4' : 'image/jpeg',
+          cacheControl: '3600'
+        });
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('chat_media')
+        .getPublicUrl(filePath);
+
+      return publicUrl;
+    } catch (error) {
+      console.error('Error uploading media:', error);
+      Alert.alert('Upload Error', 'Failed to upload media. Please try again.');
+      return null;
+    }
+  };
+
+  const handlePickMedia = async (type) => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: type === 'video' ? ImagePicker.MediaTypeOptions.Videos : ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.7,
+      });
+
+      if (!result.canceled) {
+        setIsUploading(true);
+        const mediaUrl = await uploadMedia(result.assets[0].uri, type);
+        if (mediaUrl) {
+          await handleSendMessage(null, mediaUrl, type);
+        }
+        setIsUploading(false);
+      }
+    } catch (error) {
+      console.error('Error picking media:', error);
+      setIsUploading(false);
+    }
+  };
+
+  const handleSendMessage = async (textOverride = null, mediaUrl = null, mediaType = null) => {
+    const text = textOverride !== null ? textOverride : inputText.trim();
+    if (!text && !mediaUrl || !activeChat || isSendingRef.current) return;
+    
+    // Clear immediately to prevent double-send and show responsiveness
+    if (!mediaUrl) {
       isSendingRef.current = true;
       setInputText('');
       if (inputRef.current) {
@@ -688,55 +745,61 @@ export default function FloatingChat() {
           inputRef.current.setNativeProps({ text: '' });
         }
       }
-      
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-      try {
-        const { data, error } = await supabase
-          .from('rmessages')
-          .insert({
-            chat_id: activeChat.id,
-            sender_id: user.id,
-            text
-          }).select().single();
+    try {
+      const { data, error } = await supabase
+        .from('rmessages')
+        .insert({
+          chat_id: activeChat.id,
+          sender_id: user.id,
+          text: text || '',
+          media_url: mediaUrl,
+          media_type: mediaType
+        }).select().single();
 
-        if (error) throw error;
+      if (error) throw error;
 
-        if (data) {
-          await supabase.from('rchats').update({
-            last_message: text,
-            last_message_at: new Date().toISOString()
-          }).eq('id', activeChat.id);
+      if (data) {
+        await supabase.from('rchats').update({
+          last_message: mediaUrl ? `Sent a ${mediaType}` : text,
+          last_message_at: new Date().toISOString()
+        }).eq('id', activeChat.id);
 
-          if (activeChat.is_group) {
-            const otherMembers = groupMembers.filter(m => m.user_id !== user.id);
-            for (const member of otherMembers) {
-              await sendMessageNotification({
-                senderId: user.id,
-                receiverId: member.user_id,
-                senderUsername: user.username,
-                messageText: `[${activeChat.group_name}] ${text}`
-              });
-            }
-          } else {
-            const otherUser = getOtherUser(activeChat);
-            if (otherUser) {
-              await sendMessageNotification({
-                senderId: user.id,
-                receiverId: otherUser.id,
-                senderUsername: user.username,
-                messageText: text
-              });
-            }
+        const notificationText = mediaUrl ? `Sent a ${mediaType}` : text;
+
+        if (activeChat.is_group) {
+          const otherMembers = groupMembers.filter(m => m.user_id !== user.id);
+          for (const member of otherMembers) {
+            await sendMessageNotification({
+              senderId: user.id,
+              receiverId: member.user_id,
+              senderUsername: user.username,
+              messageText: `[${activeChat.group_name}] ${notificationText}`
+            });
+          }
+        } else {
+          const otherUser = getOtherUser(activeChat);
+          if (otherUser) {
+            await sendMessageNotification({
+              senderId: user.id,
+              receiverId: otherUser.id,
+              senderUsername: user.username,
+              messageText: notificationText
+            });
           }
         }
-      } catch (error) {
-        console.error('Error sending message:', error);
-        // On error, we might want to restore text, but usually it's better to just log
-      } finally {
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+    } finally {
+      if (!mediaUrl) {
         isSendingRef.current = false;
       }
-    };
+    }
+  };
 
     const handleKeyPress = (e) => {
       if (e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
@@ -956,9 +1019,82 @@ export default function FloatingChat() {
 
   const hasUnread = totalUnreadCount > 0;
 
-  return (
-    <View style={styles.container} pointerEvents="box-none">
-      {!isOpen && isVisible && hasUnread && (
+    const FullscreenMediaModal = () => {
+      if (!fullscreenMedia) return null;
+      
+      const player = fullscreenMedia.type === 'video' ? useVideoPlayer(fullscreenMedia.url, (player) => {
+        player.loop = true;
+        player.play();
+      }) : null;
+
+      return (
+        <Modal visible={true} transparent animationType="fade">
+          <BlurView intensity={100} tint="dark" style={StyleSheet.absoluteFill}>
+            <TouchableOpacity 
+              style={styles.fullscreenClose} 
+              onPress={() => setFullscreenMedia(null)}
+            >
+              <X size={32} color="#FFF" />
+            </TouchableOpacity>
+            
+            <View style={styles.fullscreenContent}>
+              {fullscreenMedia.type === 'video' ? (
+                <VideoView 
+                  player={player} 
+                  style={styles.fullscreenVideo} 
+                  contentFit="contain"
+                />
+              ) : (
+                <Image 
+                  source={{ uri: fullscreenMedia.url }} 
+                  style={styles.fullscreenImage} 
+                  contentFit="contain"
+                />
+              )}
+            </View>
+          </BlurView>
+        </Modal>
+      );
+    };
+
+    const MediaPreview = ({ url, type, isMyMessage }) => {
+      const player = type === 'video' ? useVideoPlayer(url, (player) => {
+        player.muted = true;
+        player.loop = true;
+        player.play();
+      }) : null;
+
+      return (
+        <TouchableOpacity 
+          style={styles.mediaPreviewContainer}
+          onPress={() => setFullscreenMedia({ url, type })}
+          activeOpacity={0.9}
+        >
+          {type === 'video' ? (
+            <View style={styles.videoPreviewWrapper}>
+              <VideoView 
+                player={player} 
+                style={styles.mediaPreview} 
+                contentFit="cover"
+                allowsFullscreen={false}
+                allowsPictureInPicture={false}
+              />
+              <View style={styles.videoOverlay}>
+                <Play size={24} color="#FFF" fill="#FFF" />
+              </View>
+            </View>
+          ) : (
+            <Image source={{ uri: url }} style={styles.mediaPreview} contentFit="cover" />
+          )}
+        </TouchableOpacity>
+      );
+    };
+
+    return (
+      <View style={styles.container} pointerEvents="box-none">
+        <FullscreenMediaModal />
+        {!isOpen && isVisible && hasUnread && (
+
         <View style={styles.fixedBubbleContainer}>
           <View style={styles.bubbleContainer}>
             <TouchableOpacity onPress={toggleChat} activeOpacity={0.8}>
@@ -1355,37 +1491,46 @@ export default function FloatingChat() {
                   </View>
                 ) : (
                   <>
-                  <FlatList
-                    ref={flatListRef}
-                    data={messages}
-                    keyExtractor={item => item.id}
-                    renderItem={({ item }) => {
-                      const isMyMessage = item.sender_id === user?.id;
-                      return (
-                        <View style={[styles.messageBubble, isMyMessage ? styles.myMessage : styles.theirMessage]}>
-                          {activeChat?.is_group && !isMyMessage && (
-                            <Text style={styles.senderName}>@{item.sender?.username}</Text>
-                          )}
-                          <Text style={[styles.messageText, { color: isMyMessage ? '#000' : '#FFF' }]}>
-                            {item.text}
-                          </Text>
-                          <View style={styles.msgFooter}>
-                            <Text style={[styles.msgTime, { color: isMyMessage ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.4)' }]}>
-                              {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </Text>
-                            {isMyMessage && (
-                              <View style={styles.readStatus}>
-                                {item.is_read ? (
-                                  <CheckCheck size={14} color="rgba(0,0,0,0.5)" />
-                                ) : (
-                                  <Check size={14} color="rgba(0,0,0,0.5)" />
-                                )}
-                              </View>
+                    <FlatList
+                      ref={flatListRef}
+                      data={messages}
+                      keyExtractor={item => item.id}
+                      renderItem={({ item }) => {
+                        const isMyMessage = item.sender_id === user?.id;
+                        return (
+                          <View style={[styles.messageBubble, isMyMessage ? styles.myMessage : styles.theirMessage, item.media_url && styles.mediaMessage]}>
+                            {activeChat?.is_group && !isMyMessage && (
+                              <Text style={styles.senderName}>@{item.sender?.username}</Text>
                             )}
+                            
+                            {item.media_url && (
+                              <MediaPreview url={item.media_url} type={item.media_type} isMyMessage={isMyMessage} />
+                            )}
+
+                            {item.text ? (
+                              <Text style={[styles.messageText, { color: isMyMessage ? '#000' : '#FFF' }]}>
+                                {item.text}
+                              </Text>
+                            ) : null}
+
+                            <View style={styles.msgFooter}>
+                              <Text style={[styles.msgTime, { color: isMyMessage ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.4)' }]}>
+                                {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </Text>
+                              {isMyMessage && (
+                                <View style={styles.readStatus}>
+                                  {item.is_read ? (
+                                    <CheckCheck size={14} color="rgba(0,0,0,0.5)" />
+                                  ) : (
+                                    <Check size={14} color="rgba(0,0,0,0.5)" />
+                                  )}
+                                </View>
+                              )}
+                            </View>
                           </View>
-                        </View>
-                      );
-                    }}
+                        );
+                      }}
+
                     style={styles.messagesList}
                     contentContainerStyle={{ padding: 16 }}
                     onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
@@ -1412,24 +1557,46 @@ export default function FloatingChat() {
                   )}
                   </>
                 )}
-                {(!activeChat || activeChat.status === 'accepted' || activeChat.initiated_by === user?.id || activeChat.is_group) && (
-                  <View style={styles.inputContainer}>
-                    <View style={styles.inputWrapper}>
-                            <TextInput
-                              ref={inputRef}
-                              style={styles.input}
-                              placeholder={activeChat?.status === 'pending' && !activeChat?.is_group ? "Waiting for approval..." : "Type a message..."}
-                                value={inputText}
-                                onChangeText={setInputText}
-                                onKeyPress={handleKeyPress}
-                                onSubmitEditing={handleSendMessage}
-                                placeholderTextColor="rgba(255,255,255,0.3)"
+                  {(!activeChat || activeChat.status === 'accepted' || activeChat.initiated_by === user?.id || activeChat.is_group) && (
+                    <View style={styles.inputContainer}>
+                      {isUploading && (
+                        <View style={styles.uploadingIndicator}>
+                          <ActivityIndicator size="small" color={theme.colors.primary} />
+                          <Text style={styles.uploadingText}>Uploading media...</Text>
+                        </View>
+                      )}
+                      <View style={styles.inputWrapper}>
+                        <View style={styles.attachmentButtons}>
+                          <TouchableOpacity 
+                            onPress={() => handlePickMedia('image')} 
+                            style={styles.attachBtn}
+                            disabled={isUploading}
+                          >
+                            <ImageIcon size={20} color="rgba(255,255,255,0.6)" />
+                          </TouchableOpacity>
+                          <TouchableOpacity 
+                            onPress={() => handlePickMedia('video')} 
+                            style={styles.attachBtn}
+                            disabled={isUploading}
+                          >
+                            <VideoIcon size={20} color="rgba(255,255,255,0.6)" />
+                          </TouchableOpacity>
+                        </View>
 
+                        <TextInput
+                          ref={inputRef}
+                          style={styles.input}
+                          placeholder={activeChat?.status === 'pending' && !activeChat?.is_group ? "Waiting for approval..." : "Type a message..."}
+                          value={inputText}
+                          onChangeText={setInputText}
+                          onKeyPress={handleKeyPress}
+                          onSubmitEditing={() => handleSendMessage()}
+                          placeholderTextColor="rgba(255,255,255,0.3)"
+                          multiline
+                          blurOnSubmit={false}
+                          editable={!isUploading && (activeChat?.status === 'accepted' || activeChat?.initiated_by === user?.id || activeChat?.is_group)}
+                        />
 
-                              multiline
-                              blurOnSubmit={false}
-                              editable={activeChat?.status === 'accepted' || activeChat?.initiated_by === user?.id || activeChat?.is_group}
-                            />
                       <TouchableOpacity 
                         onPress={handleSendMessage} 
                         style={[styles.sendBtn, (!inputText.trim() || (activeChat?.status === 'pending' && activeChat?.initiated_by === user?.id && !activeChat?.is_group)) && { opacity: 0.5 }]}
@@ -1817,6 +1984,80 @@ const styles = StyleSheet.create({
   },
   sendBtn: {
     padding: 4,
+  },
+  attachmentButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingRight: 8,
+    gap: 8,
+  },
+  attachBtn: {
+    padding: 4,
+  },
+  uploadingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingVertical: 8,
+    borderRadius: 12,
+    marginBottom: 8,
+    gap: 8,
+  },
+  uploadingText: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  mediaMessage: {
+    padding: 6,
+    borderRadius: 22,
+  },
+  mediaPreviewContainer: {
+    width: width * 0.6,
+    height: width * 0.6,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 4,
+  },
+  videoPreviewWrapper: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mediaPreview: {
+    width: '100%',
+    height: '100%',
+  },
+  videoOverlay: {
+    position: 'absolute',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullscreenClose: {
+    position: 'absolute',
+    top: 60,
+    right: 20,
+    zIndex: 10,
+    padding: 10,
+  },
+  fullscreenContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullscreenImage: {
+    width: width,
+    height: height * 0.8,
+  },
+  fullscreenVideo: {
+    width: width,
+    height: height * 0.8,
   },
   sendIconBg: {
     width: 36,
