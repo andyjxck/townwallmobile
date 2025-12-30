@@ -33,7 +33,7 @@ import { Audio } from 'expo-av';
 import { Accelerometer } from 'expo-sensors';
 import Constants from 'expo-constants';
 // LiveKit imports are handled dynamically to prevent crashes in environments without native modules
-let LiveKitRoom, useLocalParticipant, AudioSession;
+let LiveKitRoom, useLocalParticipant, useParticipants, AudioSession;
 
 const isExpoGo = Constants.appOwnership === "expo";
 
@@ -42,6 +42,7 @@ if (Platform.OS !== 'web' && !isExpoGo) {
     const lk = require('@livekit/react-native');
     LiveKitRoom = lk.LiveKitRoom;
     useLocalParticipant = lk.useLocalParticipant;
+    useParticipants = lk.useParticipants;
     AudioSession = lk.AudioSession;
   } catch (e) {
     console.log('LiveKit native modules not available');
@@ -157,12 +158,22 @@ export default function FloatingChat() {
   };
 
     const LiveKitRoomContent = ({ onConnected }) => {
-      if (!useLocalParticipant || !AudioSession) return null;
+      if (!useLocalParticipant || !AudioSession || !useParticipants) return null;
       
       const { localParticipant } = useLocalParticipant();
+      const participants = useParticipants();
 
-    
-    useEffect(() => {
+      useEffect(() => {
+        // For 1-on-1 calls, end if the other participant leaves
+        if (activeCall && !activeCall.is_group_call && activeCall.status === 'active') {
+          // If only 1 participant (us) is left, the other person has dropped
+          if (participants.length === 1) {
+            endCall();
+          }
+        }
+      }, [participants.length, activeCall?.status, activeCall?.is_group_call]);
+
+      useEffect(() => {
       const startSession = async () => {
         try {
           // Initial configuration
