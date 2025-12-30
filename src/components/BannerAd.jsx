@@ -18,10 +18,10 @@ if (!isExpoGo) {
 
 const adUnitId = __DEV__ 
   ? (TestIds?.BANNER || 'ca-app-pub-3940256099942544/6300978111') 
-  : Platform.select({
-      ios: 'ca-app-pub-1505977777207758/1638367758', 
-      android: 'ca-app-pub-1505977777207758/6195707754',
-    });
+    : Platform.select({
+        ios: 'ca-app-pub-1505977777207758/9856407709', 
+        android: 'ca-app-pub-1505977777207758/9856407709',
+      });
 
 export function BannerAd() {
   if (!RNBannerAd || !BannerAdSize) {
