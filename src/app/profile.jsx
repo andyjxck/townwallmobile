@@ -598,50 +598,56 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
               </View>
 
                   {!isOwnProfile && (
-                    <View style={styles.actionRow}>
-                      <TouchableOpacity 
-                        onPress={handleMessageUser} 
-                        style={[styles.messageBtn, { flex: 1 }]}
-                      >
-                        <LinearGradient
-                          colors={[theme.colors.primary, '#4ADE80']}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 0 }}
-                          style={styles.messageBtnGradient}
+                      <View style={styles.actionRow}>
+                        <TouchableOpacity 
+                          onPress={handleMessageUser} 
+                          style={[styles.messageBtn, { flex: 1 }]}
                         >
-                          <MessageCircle size={20} color="#000" />
-                          <Text style={styles.messageBtnText}>Message</Text>
-                        </LinearGradient>
-                      </TouchableOpacity>
+                          <LinearGradient
+                            colors={[theme.colors.primary, '#4ADE80']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={styles.messageBtnGradient}
+                          >
+                            <MessageCircle size={20} color="#000" />
+                            <Text style={styles.messageBtnText}>Message</Text>
+                          </LinearGradient>
+                        </TouchableOpacity>
 
-                      <TouchableOpacity 
-                        onPress={handleActionFriend} 
-                        disabled={addingFriend || friendshipStatus?.status === 'accepted'}
-                        style={[
-                          styles.actionBtn, 
-                          { backgroundColor: theme.colors.surface, flex: 1 },
-                          friendshipStatus?.status === 'accepted' && { opacity: 0.7 }
-                        ]}
-                      >
-                        {addingFriend ? (
-                          <ActivityIndicator size="small" color={theme.colors.text} />
-                        ) : (
-                          <>
-                            {friendshipStatus?.status === 'accepted' ? (
-                              <Check size={20} color={theme.colors.success} />
+                        <TouchableOpacity 
+                          onPress={handleActionFriend} 
+                          disabled={addingFriend || friendshipStatus?.status === 'accepted'}
+                          style={[styles.messageBtn, { flex: 1, marginLeft: 10 }]}
+                        >
+                          <LinearGradient
+                            colors={['#818CF8', '#C084FC']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={[
+                              styles.messageBtnGradient,
+                              friendshipStatus?.status === 'accepted' && { opacity: 0.7 }
+                            ]}
+                          >
+                            {addingFriend ? (
+                              <ActivityIndicator size="small" color="#000" />
                             ) : (
-                              <UserPlus size={20} color={theme.colors.text} />
+                              <>
+                                {friendshipStatus?.status === 'accepted' ? (
+                                  <Check size={20} color="#000" />
+                                ) : (
+                                  <UserPlus size={20} color="#000" />
+                                )}
+                                <Text style={styles.messageBtnText}>
+                                  {friendshipStatus ? (
+                                    friendshipStatus.status === 'accepted' ? 'Friends' :
+                                    friendshipStatus.isRequester ? 'Requested' : 'Accept'
+                                  ) : 'Add Friend'}
+                                </Text>
+                              </>
                             )}
-                            <Text style={[styles.actionBtnText, { color: theme.colors.text }]}>
-                              {friendshipStatus ? (
-                                friendshipStatus.status === 'accepted' ? 'Friends' :
-                                friendshipStatus.isRequester ? 'Requested' : 'Accept'
-                              ) : 'Add Friend'}
-                            </Text>
-                          </>
-                        )}
-                      </TouchableOpacity>
-                    </View>
+                          </LinearGradient>
+                        </TouchableOpacity>
+                      </View>
                   )}
 
 
