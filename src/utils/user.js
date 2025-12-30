@@ -2,6 +2,7 @@ import { supabase } from "./supabase";
 import { getDeviceId } from "./deviceId";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Purchases from 'react-native-purchases';
+import { Platform } from 'react-native';
 import { useAuthStore } from "./auth";
 
 const USER_DATA_KEY = "@redditch_user_data";
