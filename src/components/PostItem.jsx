@@ -289,21 +289,23 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
                 <User size={20} color="rgba(255,255,255,0.3)" />
               </View>
             ) : (
-              <TouchableOpacity 
-                onPress={() => {
-                  const isUserAnon = !item.user?.supabase_uid;
-                  if (!item.is_anonymous && !isUserAnon) {
-                    router.push(`/profile?userId=${item.user_id}`);
-                  }
-                }} 
-                disabled={item.is_anonymous || !item.user?.supabase_uid}
-              >
-                {item.user?.avatar_url ? (
-                  <Image source={{ uri: item.user.avatar_url }} style={styles.avatar} />
-                ) : (
-                  <Text style={styles.emojiAvatar}>{item.user?.emoji_icon || "👤"}</Text>
-                )}
-              </TouchableOpacity>
+                <TouchableOpacity 
+                  onPress={() => {
+                    const isUserAnon = !item.user?.supabase_uid;
+                    if (!item.is_anonymous && !isUserAnon) {
+                      router.push(`/profile?userId=${item.user_id}`);
+                    }
+                  }} 
+                  disabled={item.is_anonymous || !item.user?.supabase_uid}
+                >
+                  {item.is_anonymous ? (
+                    <Text style={styles.emojiAvatar}>👤</Text>
+                  ) : item.user?.avatar_url ? (
+                    <Image source={{ uri: item.user.avatar_url }} style={styles.avatar} />
+                  ) : (
+                    <Text style={styles.emojiAvatar}>{item.user?.emoji_icon || "👤"}</Text>
+                  )}
+                </TouchableOpacity>
             )}
 
           <View style={styles.headerInfo}>
