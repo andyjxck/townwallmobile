@@ -15,6 +15,7 @@ import { useTheme } from "@/utils/ThemeContext";
 
 import MapView, { Marker, Callout } from 'react-native-maps';
 import { BannerAd } from '@/components/BannerAd';
+import { useLocationStore } from "@/utils/locationStore";
 
 export default function LocalBusinesses() {
   const { isHippie } = useTheme();
@@ -26,8 +27,10 @@ export default function LocalBusinesses() {
   const [businesses, setBusinesses] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState('list'); // 'list' or 'map'
+  const [viewMode, setViewMode] = useState('list');
   const { width } = Dimensions.get('window');
+  
+  const { city_id } = useLocationStore();
   
   const [form, setForm] = useState({
     name: '',
@@ -57,12 +60,15 @@ export default function LocalBusinesses() {
 
     const fetchBusinesses = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('rbusinesses')
         .select('*')
         .eq('status', 'approved')
-        .eq('is_deleted', false)
-        .order('created_at', { ascending: false });
+        .eq('is_deleted', false);
+      
+      if (city_id) query = query.eq('city_id', city_id);
+      
+      const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) throw error;
       setBusinesses(data || []);
@@ -261,21 +267,22 @@ export default function LocalBusinesses() {
         avatarUrl = await uploadImage(user?.id);
       }
 
-      const { error } = await supabase
-        .from('rbusinesses')
-        .insert({
-          user_id: user?.id,
-          name: form.name,
-          category: form.category,
-          link: form.link,
-          address: form.address,
-          phone: form.phone,
-          description: form.description,
-          avatar_url: avatarUrl,
-          rating: form.rating ? parseFloat(form.rating) : null,
-          payment_status: 'mock_paid',
-          status: 'pending' 
-        });
+const { error } = await supabase
+          .from('rbusinesses')
+          .insert({
+            user_id: user?.id,
+            name: form.name,
+            category: form.category,
+            link: form.link,
+            address: form.address,
+            phone: form.phone,
+            description: form.description,
+            avatar_url: avatarUrl,
+            rating: form.rating ? parseFloat(form.rating) : null,
+            payment_status: 'mock_paid',
+            status: 'pending',
+            city_id: city_id
+          });
 
       if (error) throw error;
       

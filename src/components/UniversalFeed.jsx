@@ -48,6 +48,8 @@ import { BannerAd } from "@/components/BannerAd";
 import PostItem from "./PostItem";
 import { subscribeToUnreadCount, sendNotification, sendReactionNotification } from "../utils/notifications";
 import { offlineStorage, syncService, subscribeToNetworkChanges, checkNetworkStatus } from "../utils/offline";
+import { useLocationStore } from "../utils/locationStore";
+import { fetchZonesForCity } from "../utils/location";
 
 export default function UniversalFeed() {
   const insets = useSafeAreaInsets();
@@ -72,6 +74,9 @@ export default function UniversalFeed() {
   const [isOnline, setIsOnline] = useState(true);
   const [pendingPosts, setPendingPosts] = useState([]);
   const [syncing, setSyncing] = useState(false);
+  
+  const { city_id, city_name } = useLocationStore();
+  const [showCityPicker, setShowCityPicker] = useState(false);
   
   const postsWithAds = useMemo(() => {
     const offlinePosts = pendingPosts.map(p => ({
@@ -105,11 +110,11 @@ export default function UniversalFeed() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rreactions' }, () => fetchPosts(true))
       .subscribe();
 
-    return () => { 
-      supabase.removeChannel(postsSub); 
-      unsubscribeNetwork();
-    };
-  }, [selectedZone, sortBy]);
+return () => { 
+        supabase.removeChannel(postsSub); 
+        unsubscribeNetwork();
+      };
+    }, [selectedZone, sortBy, city_id]);
 
   const loadPendingPosts = async () => {
     const pending = await offlineStorage.getPendingPosts();
@@ -156,14 +161,16 @@ export default function UniversalFeed() {
   };
 
   const fetchZones = async () => {
-    const { data } = await supabase.from('rzones').select('*').order('name');
-    if (data) setZones(data);
+    if (!city_id) return;
+    const zonesData = await fetchZonesForCity(city_id);
+    setZones(zonesData || []);
   };
 
   const fetchPosts = async (isRefreshing = false) => {
     if (!isRefreshing) setLoading(true);
     try {
-      let query = supabase.from("rposts").select(`id, title, text, created_at, user_id, zone_id, tag_id, image_url, image_urls, is_anonymous, moderation_status, is_deleted, is_blurred, blur_reason, comments_disabled, user:rusers (username, emoji_icon, avatar_url, last_seen), zone:rzones (name), tag:rtags (name), poll_id, reactions:rreactions (reaction_type, device_id)`).eq("is_deleted", false).eq("moderation_status", "approved");
+      let query = supabase.from("rposts").select(`id, title, text, created_at, user_id, zone_id, tag_id, image_url, image_urls, is_anonymous, moderation_status, is_deleted, is_blurred, blur_reason, comments_disabled, city_id, user:rusers (username, emoji_icon, avatar_url, last_seen), zone:rzones (name), tag:rtags (name), poll_id, reactions:rreactions (reaction_type, device_id)`).eq("is_deleted", false).eq("moderation_status", "approved");
+      if (city_id) query = query.eq("city_id", city_id);
       if (selectedZone) query = query.eq("zone_id", selectedZone);
       query = query.order("created_at", { ascending: sortBy === 'oldest' });
       const { data } = await query.limit(50);
@@ -227,10 +234,10 @@ export default function UniversalFeed() {
   const onRefresh = useCallback(() => { 
     setRefreshing(true); 
     loadPendingPosts();
-    if (isOnline) syncPendingPosts();
-    fetchPosts(true); 
-  }, [selectedZone, sortBy, isOnline]);
-  useEffect(() => { fetchPosts(); }, [selectedZone, sortBy]);
+if (isOnline) syncPendingPosts();
+      fetchPosts(true); 
+    }, [selectedZone, sortBy, isOnline, city_id]);
+    useEffect(() => { fetchPosts(); }, [selectedZone, sortBy, city_id]);
 
     const [logoClicks, setLogoClicks] = useState(0);
 
@@ -248,10 +255,15 @@ export default function UniversalFeed() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
-        <TouchableOpacity onPress={handleLogoClick} activeOpacity={0.7} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <Image source={require("../../assets/images/icon.png")} style={{ width: 32, height: 32 }} contentFit="contain" />
-          </TouchableOpacity>
+<View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+          <TouchableOpacity onPress={handleLogoClick} activeOpacity={0.7} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <Image source={require("../../assets/images/icon.png")} style={{ width: 32, height: 32 }} contentFit="contain" />
+              {city_name && (
+                <TouchableOpacity onPress={() => router.push("/onboarding/city")} activeOpacity={0.7}>
+                  <Text style={styles.cityNameText}>{city_name}</Text>
+                </TouchableOpacity>
+              )}
+            </TouchableOpacity>
         <View style={styles.headerActions}>
           {isUnlocked && (
             <TouchableOpacity 
@@ -372,6 +384,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 10 },
   logo: { fontSize: 24, fontWeight: 'bold' },
+  cityNameText: { fontSize: 14, color: '#888', fontWeight: '500' },
   headerActions: { flexDirection: 'row', gap: 15 },
   headerIcon: { position: 'relative' },
   badge: { position: 'absolute', top: -2, right: -2, width: 10, height: 10, borderRadius: 5, borderWidth: 2, borderColor: '#FFF' },

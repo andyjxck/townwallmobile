@@ -13,6 +13,7 @@ import { decode } from 'base64-arraybuffer';
 import * as ImagePicker from 'expo-image-picker';
 import { getStoredUser } from '@/utils/user';
 import { BannerAd } from '@/components/BannerAd';
+import { useLocationStore } from "@/utils/locationStore";
 
 export default function LocalTalent() {
   const { isHippie } = useTheme();
@@ -25,6 +26,8 @@ export default function LocalTalent() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(null);
   const { width } = Dimensions.get('window');
+  
+  const { city_id } = useLocationStore();
   
   const categories = ['YouTuber', 'Podcaster', 'Musician', 'Artist', 'Developer', 'Photography', 'Other'];
 
@@ -55,12 +58,15 @@ export default function LocalTalent() {
 
   const fetchTalents = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('rtalent')
         .select('*')
         .eq('status', 'approved')
-        .eq('is_deleted', false)
-        .order('created_at', { ascending: false });
+        .eq('is_deleted', false);
+      
+      if (city_id) query = query.eq('city_id', city_id);
+      
+      const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) throw error;
       setTalents(data || []);
@@ -165,20 +171,21 @@ export default function LocalTalent() {
         avatarUrl = await uploadImage(user?.id);
       }
 
-      const { error } = await supabase
-        .from('rtalent')
-        .insert({
-          user_id: user?.id,
-          name: form.name,
-          title: form.title,
-          platform: form.platform,
-          link: form.link,
-          description: form.description,
-          category: form.category,
-          avatar_url: avatarUrl,
-          payment_status: paymentStatus,
-          status: 'pending' // Moderation pending
-        });
+const { error } = await supabase
+          .from('rtalent')
+          .insert({
+            user_id: user?.id,
+            name: form.name,
+            title: form.title,
+            platform: form.platform,
+            link: form.link,
+            description: form.description,
+            category: form.category,
+            avatar_url: avatarUrl,
+            payment_status: paymentStatus,
+            status: 'pending',
+            city_id: city_id
+          });
 
       if (error) throw error;
       

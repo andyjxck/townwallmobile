@@ -8,15 +8,15 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { supabase } from "@/utils/supabase";
 import { setOnboardingComplete } from "@/utils/onboarding";
-import { theme } from "@/utils/theme";
 import { useTheme } from "@/utils/ThemeContext";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
 import { MapPin, ChevronRight } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
+import { useLocationStore } from "@/utils/locationStore";
+import { fetchZonesForCity } from "@/utils/location";
 
 export default function ZonesScreen() {
   const { isHippie } = useTheme();
@@ -24,19 +24,21 @@ export default function ZonesScreen() {
   const insets = useSafeAreaInsets();
   const [zones, setZones] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  const { city_id, city_name, setZone } = useLocationStore();
 
   useEffect(() => {
-    fetchZones();
-  }, []);
+    if (!city_id) {
+      router.replace("/onboarding/city");
+      return;
+    }
+    loadZones();
+  }, [city_id]);
 
-  const fetchZones = async () => {
+  const loadZones = async () => {
     try {
-      const { data, error } = await supabase
-        .from("rzones")
-        .select("*")
-        .order("name");
-      if (error) throw error;
-      setZones(data || []);
+      const zonesData = await fetchZonesForCity(city_id);
+      setZones(zonesData || []);
     } catch (err) {
       console.error("Error fetching zones:", err);
     } finally {
@@ -44,8 +46,16 @@ export default function ZonesScreen() {
     }
   };
 
-  const handleSelectZone = async (zoneId) => {
+  const handleSelectZone = async (zone) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setZone({ id: zone.id, name: zone.name });
+    await setOnboardingComplete(true);
+    router.replace("/");
+  };
+
+  const handleSkip = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setZone(null);
     await setOnboardingComplete(true);
     router.replace("/");
   };
@@ -64,7 +74,10 @@ export default function ZonesScreen() {
         <View style={styles.header}>
           <Text style={styles.title}>Pick your area</Text>
           <Text style={styles.subtitle}>
-            Connect with people and updates in your specific part of town.
+            Connect with people and updates in your specific part of {city_name || "town"}.
+          </Text>
+          <Text style={styles.hint}>
+            This helps keep posts relevant to your local area
           </Text>
         </View>
 
@@ -75,14 +88,14 @@ export default function ZonesScreen() {
         ) : (
           <ScrollView
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
+            contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
           >
             <View style={styles.zoneList}>
               {zones.map((zone) => (
                 <TouchableOpacity
                   key={zone.id}
                   style={styles.zoneItem}
-                  onPress={() => handleSelectZone(zone.id)}
+                  onPress={() => handleSelectZone(zone)}
                 >
                   <View style={styles.zoneIcon}>
                     <MapPin size={20} color="#FFFFFF" />
@@ -94,6 +107,15 @@ export default function ZonesScreen() {
             </View>
           </ScrollView>
         )}
+
+        <View style={[styles.footer, { paddingBottom: insets.bottom + 20 }]}>
+          <TouchableOpacity
+            style={styles.skipButton}
+            onPress={handleSkip}
+          >
+            <Text style={styles.skipText}>I don't want to say</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -122,6 +144,12 @@ const styles = StyleSheet.create({
     fontSize: 17,
     color: "rgba(255,255,255,0.5)",
     lineHeight: 24,
+  },
+  hint: {
+    fontSize: 14,
+    color: "rgba(255,255,255,0.3)",
+    marginTop: 8,
+    lineHeight: 20,
   },
   center: {
     flex: 1,
@@ -154,5 +182,23 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 17,
     fontWeight: "600",
+  },
+  footer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    backgroundColor: "rgba(0,0,0,0.9)",
+  },
+  skipButton: {
+    paddingVertical: 16,
+    alignItems: "center",
+  },
+  skipText: {
+    fontSize: 16,
+    color: "#4ADE80",
+    fontWeight: "500",
   },
 });

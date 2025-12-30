@@ -15,7 +15,7 @@ export default function WelcomeScreen() {
 
   const handleContinue = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push("/onboarding/zones");
+    router.push("/onboarding/city");
   };
 
   return (

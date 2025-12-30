@@ -36,6 +36,7 @@ import { useTheme } from "@/utils/ThemeContext";
 import { moderateContent } from '@/utils/ai';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from "expo-linear-gradient";
+import { useLocationStore } from "@/utils/locationStore";
 
 const { width } = Dimensions.get('window');
 
@@ -53,6 +54,8 @@ export default function PollsScreen() {
     const [sortBy, setSortBy] = useState('newest');
     const [filterBy, setFilterBy] = useState('all');
     const [showFilterSortMenu, setShowFilterSortMenu] = useState(false);
+  
+  const { city_id } = useLocationStore();
   
   // Admin state
   const [showAdminForm, setShowAdminForm] = useState(false);
@@ -236,13 +239,14 @@ export default function PollsScreen() {
         return;
       }
 
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      const { error } = await supabase
-        .from('rfeature_suggestions')
-        .insert({
-          user_id: user.id,
-          suggestion_text: suggestion.trim()
-        });
+Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        const { error } = await supabase
+          .from('rfeature_suggestions')
+          .insert({
+            user_id: user.id,
+            suggestion_text: suggestion.trim(),
+            city_id: city_id
+          });
 
         if (error) throw error;
         
@@ -292,14 +296,15 @@ export default function PollsScreen() {
         }
       }
 
-      const { data: poll, error: pollError } = await supabase
-        .from('rpolls')
-        .insert({
-          question: newPollQuestion.trim(),
-          is_active: true
-        })
-        .select()
-        .single();
+const { data: poll, error: pollError } = await supabase
+          .from('rpolls')
+          .insert({
+            question: newPollQuestion.trim(),
+            is_active: true,
+            city_id: city_id
+          })
+          .select()
+          .single();
 
       if (pollError) throw pollError;
 

@@ -26,6 +26,8 @@ import { useTheme } from "@/utils/ThemeContext";
 import { RichTextEditor } from "../components/RichTextEditor";
 import { offlineStorage, checkNetworkStatus } from "../utils/offline";
 import { sendNewPostNotification } from "../utils/notifications";
+import { useLocationStore } from "../utils/locationStore";
+import { fetchZonesForCity } from "../utils/location";
 
 export default function PostScreen() {
   const { isHippie } = useTheme();
@@ -51,6 +53,8 @@ export default function PostScreen() {
   const [pollOptions, setPollOptions] = useState(["", ""]);
   const [hasPoll, setHasPoll] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
+  
+  const { city_id, zone_id } = useLocationStore();
 
   useEffect(() => {
     checkNetworkStatus().then(setIsOnline);
@@ -82,12 +86,16 @@ export default function PostScreen() {
 
   const fetchData = async () => {
     const [zRes, tRes] = await Promise.all([
-      supabase.from('rzones').select('*').order('name'),
+      city_id ? fetchZonesForCity(city_id) : supabase.from('rzones').select('*').order('name').then(r => r.data),
       supabase.from('rtags').select('*').order('name')
     ]);
-    setZones(zRes.data || []);
+    const zonesData = Array.isArray(zRes) ? zRes : (zRes?.data || []);
+    setZones(zonesData);
     setTags(tRes.data || []);
-    if (zRes.data && !postId) setSelectedZone(zRes.data[0]);
+    if (zonesData.length && !postId) {
+      const defaultZone = zone_id ? zonesData.find(z => z.id === zone_id) : zonesData[0];
+      setSelectedZone(defaultZone || zonesData[0]);
+    }
   };
 
   const pickMedia = async () => {
@@ -114,17 +122,18 @@ export default function PostScreen() {
         }
       }
 
-      const postData = {
-        title: title.trim(),
-        text: text.trim(),
-        zone_id: selectedZone?.id,
-        tag_id: selectedTag?.id,
-        device_id: deviceId,
-        user_id: user?.id,
-        is_anonymous: isAnonymous,
-        moderation_status: moderation.status,
-        localMedia: media,
-      };
+const postData = {
+          title: title.trim(),
+          text: text.trim(),
+          zone_id: selectedZone?.id,
+          tag_id: selectedTag?.id,
+          device_id: deviceId,
+          user_id: user?.id,
+          is_anonymous: isAnonymous,
+          moderation_status: moderation.status,
+          localMedia: media,
+          city_id: city_id,
+        };
 
       if (!online) {
         await offlineStorage.savePendingPost(postData);
@@ -153,19 +162,20 @@ export default function PostScreen() {
         imageUrls.push(supabase.storage.from('posts').getPublicUrl(fileName).data.publicUrl);
       }
 
-      const dbPostData = {
-        title: title.trim(),
-        text: text.trim(),
-        zone_id: selectedZone?.id,
-        tag_id: selectedTag?.id,
-        device_id: deviceId,
-        user_id: user?.id,
-        is_anonymous: isAnonymous,
-        image_url: imageUrls[0] || null,
-        image_urls: imageUrls,
-        poll_id: createdPollId,
-        moderation_status: moderation.status,
-      };
+const dbPostData = {
+          title: title.trim(),
+          text: text.trim(),
+          zone_id: selectedZone?.id,
+          tag_id: selectedTag?.id,
+          device_id: deviceId,
+          user_id: user?.id,
+          is_anonymous: isAnonymous,
+          image_url: imageUrls[0] || null,
+          image_urls: imageUrls,
+          poll_id: createdPollId,
+          moderation_status: moderation.status,
+          city_id: city_id,
+        };
 
       if (postId) await supabase.from('rposts').update(dbPostData).eq('id', postId);
       else {
