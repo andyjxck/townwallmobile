@@ -24,7 +24,7 @@ if (!isExpoGo) {
 const adUnitId = __DEV__ 
   ? 'ca-app-pub-3940256099942544/2247696110'
     : Platform.select({
-        ios: 'ca-app-pub-1505977777207758/9856407709', 
+        ios: 'ca-app-pub-1505977777207758/8766030770', 
         android: 'ca-app-pub-1505977777207758/9856407709',
       });
 
