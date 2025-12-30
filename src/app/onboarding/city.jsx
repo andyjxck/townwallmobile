@@ -12,7 +12,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
+  import AsyncStorage from '@react-native-async-storage/async-storage';
   import { useLocationStore } from "../../utils/locationStore";
   import { setOnboardingComplete } from "../../utils/onboarding";
   import {
@@ -24,6 +25,7 @@ import { useRouter } from "expo-router";
 
 export default function CityScreen() {
   const router = useRouter();
+  const { mode } = useLocalSearchParams();
   const { setCity } = useLocationStore();
   
   const [loading, setLoading] = useState(true);
@@ -37,8 +39,23 @@ export default function CityScreen() {
 
   useEffect(() => {
     loadCities();
-    attemptAutoDetection();
-  }, []);
+    if (mode !== 'manual') {
+      attemptAutoDetectionOnce();
+    }
+  }, [mode]);
+
+  const attemptAutoDetectionOnce = async () => {
+    try {
+      const attempted = await AsyncStorage.getItem('@auto_location_attempted');
+      if (!attempted) {
+        await attemptAutoDetection();
+        await AsyncStorage.setItem('@auto_location_attempted', 'true');
+      }
+    } catch (e) {
+      console.error('Error in auto detection check:', e);
+      await attemptAutoDetection();
+    }
+  };
 
   const loadCities = async () => {
     const citiesData = await fetchCities();

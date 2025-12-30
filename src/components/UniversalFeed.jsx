@@ -469,7 +469,7 @@ if (isOnline) syncPendingPosts();
 
                 <View style={{ height: 1, backgroundColor: theme.colors.border, marginVertical: 15 }} />
 
-                <TouchableOpacity onPress={() => { setShowLocationPicker(false); router.push("/onboarding/city"); }} style={styles.locationOption}>
+                <TouchableOpacity onPress={() => { setShowLocationPicker(false); router.push("/onboarding/city?mode=manual"); }} style={styles.locationOption}>
                   <View style={styles.locationOptionLeft}>
                     <Settings size={22} color={theme.colors.textSecondary} />
                     <View>
