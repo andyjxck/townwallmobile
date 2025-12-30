@@ -12,6 +12,7 @@ import {
   Platform,
   ScrollView,
 } from "react-native";
+import { Image } from "expo-image";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { supabase } from "../utils/supabase";
 import { useAuthStore } from "../utils/auth";
@@ -153,7 +154,8 @@ export default function Auth() {
                               await saveProfile({
                                 username: trimmedUsername,
                                 password: trimmedPassword,
-                                emoji_icon: user.emoji_icon
+                                emoji_icon: user.emoji_icon,
+                                avatar_url: user.avatar_url
                               });
                             }
                             setLoading(false);
@@ -170,7 +172,8 @@ export default function Auth() {
                               await saveProfile({
                                 username: trimmedUsername,
                                 password: trimmedPassword,
-                                emoji_icon: user.emoji_icon
+                                emoji_icon: user.emoji_icon,
+                                avatar_url: user.avatar_url
                               });
                             }
                             setLoading(false);
@@ -377,22 +380,26 @@ export default function Auth() {
                   contentContainerStyle={styles.savedProfilesList}
                 >
                   {savedProfiles.map((profile) => (
-                    <TouchableOpacity
-                      key={profile.username}
-                      style={styles.profileCard}
-                      onPress={() => handleQuickLogin(profile)}
-                      onLongPress={() => handleRemoveSavedProfile(profile.username)}
-                    >
-                      <View style={styles.profileEmojiContainer}>
-                        <Text style={styles.profileEmoji}>{profile.emoji || '👤'}</Text>
-                      </View>
-                      <View style={styles.profileInfo}>
-                        <Text style={styles.profileName} numberOfLines={1}>{profile.username}</Text>
-                        <Text style={styles.lastLogin}>
-                          {formatDistanceToNow(new Date(profile.lastLogin), { addSuffix: true })}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
+                      <TouchableOpacity
+                        key={profile.username}
+                        style={styles.profileCard}
+                        onPress={() => handleQuickLogin(profile)}
+                        onLongPress={() => handleRemoveSavedProfile(profile.username)}
+                      >
+                        <View style={styles.profileEmojiContainer}>
+                          {profile.avatar_url ? (
+                            <Image source={{ uri: profile.avatar_url }} style={styles.profileAvatar} />
+                          ) : (
+                            <Text style={styles.profileEmoji}>{profile.emoji || '👤'}</Text>
+                          )}
+                        </View>
+                        <View style={styles.profileInfo}>
+                          <Text style={styles.profileName} numberOfLines={1}>{profile.username}</Text>
+                          <Text style={styles.lastLogin}>
+                            {formatDistanceToNow(new Date(profile.lastLogin), { addSuffix: true })}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
                   ))}
                 </ScrollView>
               </View>
@@ -621,16 +628,22 @@ const styles = StyleSheet.create({
       borderWidth: 1,
       borderColor: "rgba(255,255,255,0.1)",
     },
-    profileEmojiContainer: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
-      backgroundColor: "rgba(255,255,255,0.1)",
-      justifyContent: "center",
-      alignItems: "center",
-      marginRight: 12,
-    },
-    profileEmoji: {
+      profileEmojiContainer: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: "rgba(255,255,255,0.1)",
+        justifyContent: "center",
+        alignItems: "center",
+        marginRight: 12,
+        overflow: "hidden",
+      },
+      profileAvatar: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+      },
+      profileEmoji: {
       fontSize: 24,
     },
     profileInfo: {

@@ -22,6 +22,7 @@ export const saveProfile = async (profile) => {
       password: profile.password,
       name: profile.username, // Default to username if no name
       emoji: profile.emoji_icon || '👤',
+      avatar_url: profile.avatar_url || null,
       lastLogin: new Date().toISOString(),
     };
 
