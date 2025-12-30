@@ -54,7 +54,8 @@ export default function PostScreen() {
   const [hasPoll, setHasPoll] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
   
-  const { city_id, zone_id } = useLocationStore();
+    const { city_id, zone_id, feedView } = useLocationStore();
+
 
   useEffect(() => {
     checkNetworkStatus().then(setIsOnline);
@@ -342,16 +343,18 @@ const dbPostData = {
       <ScrollView style={styles.scrollView} keyboardShouldPersistTaps="handled">
         <View style={styles.form}>
           <View style={styles.topOptions}>
-            <TouchableOpacity 
-              onPress={() => setStep('zone')} 
-              style={[styles.option, { backgroundColor: 'rgba(255,255,255,0.08)' }]}
-            >
-              <Text style={styles.optionLabel}>In </Text>
-              <Text style={[styles.optionValue, { color: theme.colors.primary }]}>
-                {selectedZone?.name || "Select Zone"}
-              </Text>
-              <ChevronRight size={14} color="rgba(255,255,255,0.3)" />
-            </TouchableOpacity>
+            {feedView !== "global" && (
+              <TouchableOpacity 
+                onPress={() => setStep('zone')} 
+                style={[styles.option, { backgroundColor: 'rgba(255,255,255,0.08)' }]}
+              >
+                <Text style={styles.optionLabel}>In </Text>
+                <Text style={[styles.optionValue, { color: theme.colors.primary }]}>
+                  {selectedZone?.name || "Select Zone"}
+                </Text>
+                <ChevronRight size={14} color="rgba(255,255,255,0.3)" />
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity 
               onPress={() => setStep('tag')} 

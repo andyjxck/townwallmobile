@@ -80,8 +80,9 @@ export default function UniversalFeed() {
   const [pendingPosts, setPendingPosts] = useState([]);
   const [syncing, setSyncing] = useState(false);
   
-  const { city_id, city_name, zone_id, zone_name, feedView, setFeedView } = useLocationStore();
-  const [showLocationPicker, setShowLocationPicker] = useState(false);
+    const { city_id, city_name, zone_id, zone_name, feedView, setFeedView, savedCity } = useLocationStore();
+    const [showLocationPicker, setShowLocationPicker] = useState(false);
+
   
   const postsWithAds = useMemo(() => {
     const offlinePosts = pendingPosts.map(p => ({
@@ -171,19 +172,27 @@ return () => {
     setZones(zonesData || []);
   };
 
-  const fetchPosts = async (isRefreshing = false) => {
-    if (!isRefreshing) setLoading(true);
-    try {
-      let query = supabase.from("rposts").select(`id, title, text, created_at, user_id, zone_id, tag_id, image_url, image_urls, is_anonymous, moderation_status, is_deleted, is_blurred, blur_reason, comments_disabled, city_id, user:rusers (username, emoji_icon, avatar_url, last_seen), zone:rzones (name), tag:rtags (name), poll_id, reactions:rreactions (reaction_type, device_id)`).eq("is_deleted", false).eq("moderation_status", "approved");
-      if (feedView === "city" && city_id) query = query.eq("city_id", city_id);
-      else if (feedView === "zone" && zone_id) query = query.eq("zone_id", zone_id);
-      if (selectedZone && feedView !== "zone") query = query.eq("zone_id", selectedZone);
-      query = query.order("created_at", { ascending: sortBy === 'oldest' });
-      const { data } = await query.limit(50);
-      setPosts(data || []);
-    } catch (err) { console.error(err); }
-    finally { setLoading(false); setRefreshing(false); }
-  };
+    const fetchPosts = async (isRefreshing = false) => {
+      if (!isRefreshing) setLoading(true);
+      try {
+        let query = supabase.from("rposts").select(`id, title, text, created_at, user_id, zone_id, tag_id, image_url, image_urls, is_anonymous, moderation_status, is_deleted, is_blurred, blur_reason, comments_disabled, city_id, user:rusers (username, emoji_icon, avatar_url, last_seen), zone:rzones (name), tag:rtags (name), poll_id, reactions:rreactions (reaction_type, device_id)`).eq("is_deleted", false).eq("moderation_status", "approved");
+        
+        if (feedView === "global") {
+          query = query.eq("city_id", 321);
+        } else if (feedView === "city" && city_id) {
+          query = query.eq("city_id", city_id);
+          if (selectedZone) query = query.eq("zone_id", selectedZone);
+        } else if (feedView === "zone" && zone_id) {
+          query = query.eq("zone_id", zone_id);
+        }
+
+        query = query.order("created_at", { ascending: sortBy === 'oldest' });
+        const { data } = await query.limit(50);
+        setPosts(data || []);
+      } catch (err) { console.error(err); }
+      finally { setLoading(false); setRefreshing(false); }
+    };
+
 
   const handleModAction = async (postId, action, reason = null) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -369,24 +378,31 @@ if (isOnline) syncPendingPosts();
           <Plus color="#000" size={30} />
         </TouchableOpacity>
 
-        <Modal visible={showFilterSort} animationType="slide" transparent>
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { backgroundColor: isHippie ? '#1a1a1a' : theme.colors.background }]}>
-              <Text style={[styles.modalTitle, isHippie && { color: '#FFF' }]}>Filters & Sorting</Text>
-              <Text style={[styles.label, isHippie && { color: '#AAA' }]}>Sort By</Text>
-              <View style={styles.row}>
+          <Modal visible={showFilterSort} animationType="slide" transparent>
+            <View style={styles.modalOverlay}>
+              <View style={[styles.modalContent, { backgroundColor: isHippie ? '#1a1a1a' : theme.colors.background }]}>
+                <Text style={[styles.modalTitle, isHippie && { color: '#FFF' }]}>Filters & Sorting</Text>
+                
+                <Text style={[styles.label, isHippie && { color: '#AAA' }]}>Sort By</Text>
+                <View style={styles.row}>
                   {['newest', 'oldest'].map(s => (
                     <TouchableOpacity key={s} onPress={() => setSortBy(s)} style={[styles.pill, isHippie && { backgroundColor: '#333' }, sortBy === s && { backgroundColor: theme.colors.primary }]}><Text style={[styles.pillText, (isHippie || sortBy === s) && { color: sortBy === s ? '#000' : '#FFF' }]}>{s}</Text></TouchableOpacity>
                   ))}
                 </View>
-                <Text style={[styles.label, isHippie && { color: '#AAA' }]}>Zone</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.row}>
-                  <TouchableOpacity onPress={() => setSelectedZone(null)} style={[styles.pill, isHippie && { backgroundColor: '#333' }, !selectedZone && { backgroundColor: theme.colors.primary }]}><Text style={[styles.pillText, (isHippie || !selectedZone) && { color: !selectedZone ? '#000' : '#FFF' }]}>All</Text></TouchableOpacity>
-                  {zones.map(z => (
-                    <TouchableOpacity key={z.id} onPress={() => setSelectedZone(z.id)} style={[styles.pill, isHippie && { backgroundColor: '#333' }, selectedZone === z.id && { backgroundColor: theme.colors.primary }]}><Text style={[styles.pillText, (isHippie || selectedZone === z.id) && { color: selectedZone === z.id ? '#000' : '#FFF' }]}>{z.name}</Text></TouchableOpacity>
-                  ))}
-                </ScrollView>
-<TouchableOpacity onPress={() => setShowFilterSort(false)} style={[styles.closeBtn, { backgroundColor: theme.colors.primary }]}><Text style={styles.closeBtnText}>Apply</Text></TouchableOpacity>
+
+                {feedView !== "global" && (
+                  <>
+                    <Text style={[styles.label, isHippie && { color: '#AAA' }]}>Zone</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.row}>
+                      <TouchableOpacity onPress={() => setSelectedZone(null)} style={[styles.pill, isHippie && { backgroundColor: '#333' }, !selectedZone && { backgroundColor: theme.colors.primary }]}><Text style={[styles.pillText, (isHippie || !selectedZone) && { color: !selectedZone ? '#000' : '#FFF' }]}>All</Text></TouchableOpacity>
+                      {zones.map(z => (
+                        <TouchableOpacity key={z.id} onPress={() => setSelectedZone(z.id)} style={[styles.pill, isHippie && { backgroundColor: '#333' }, selectedZone === z.id && { backgroundColor: theme.colors.primary }]}><Text style={[styles.pillText, (isHippie || selectedZone === z.id) && { color: selectedZone === z.id ? '#000' : '#FFF' }]}>{z.name}</Text></TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </>
+                )}
+
+                <TouchableOpacity onPress={() => setShowFilterSort(false)} style={[styles.closeBtn, { backgroundColor: theme.colors.primary }]}><Text style={styles.closeBtnText}>Apply</Text></TouchableOpacity>
               </View>
             </View>
           </Modal>
@@ -407,13 +423,13 @@ if (isOnline) syncPendingPosts();
                   {feedView === "global" && <Check size={20} color={theme.colors.primary} />}
                 </TouchableOpacity>
 
-                {city_name && (
+                {savedCity && (
                   <TouchableOpacity onPress={() => handleLocationSelect("city")} style={[styles.locationOption, feedView === "city" && { backgroundColor: theme.colors.primary + '20' }]}>
                     <View style={styles.locationOptionLeft}>
                       <MapPin size={22} color={feedView === "city" ? theme.colors.primary : theme.colors.textSecondary} />
                       <View>
-                        <Text style={[styles.locationOptionTitle, { color: theme.colors.text }]}>{city_name}</Text>
-                        <Text style={[styles.locationOptionDesc, { color: theme.colors.textSecondary }]}>Posts from your town</Text>
+                        <Text style={[styles.locationOptionTitle, { color: theme.colors.text }]}>Posts from your town</Text>
+                        <Text style={[styles.locationOptionDesc, { color: theme.colors.textSecondary }]}>{savedCity.name}</Text>
                       </View>
                     </View>
                     {feedView === "city" && <Check size={20} color={theme.colors.primary} />}

@@ -5,42 +5,87 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 export const useLocationStore = create(
   persist(
     (set, get) => ({
-      city_id: null,
-      city_name: null,
+      city_id: 321,
+      city_name: "Global",
       city_source: null,
       zone_id: null,
       zone_name: null,
       isLocationSet: false,
-      feedView: "city",
+      feedView: "global",
+      savedCity: null,
 
-      setCity: (city) =>
-        set({
-          city_id: city.id,
-          city_name: city.name,
-          city_source: city.source || "manual",
-          isLocationSet: true,
-        }),
+      setCity: (city) => {
+        if (city.id === 321) {
+          set({
+            city_id: 321,
+            city_name: "Global",
+            feedView: "global",
+            zone_id: null,
+            zone_name: null,
+          });
+        } else {
+          set({
+            city_id: city.id,
+            city_name: city.name,
+            city_source: city.source || "manual",
+            isLocationSet: true,
+            feedView: "city",
+            savedCity: city,
+          });
+        }
+      },
+
+      switchToTown: () => {
+        const { savedCity } = get();
+        if (savedCity) {
+          set({
+            city_id: savedCity.id,
+            city_name: savedCity.name,
+            feedView: "city",
+          });
+        }
+      },
 
       setZone: (zone) =>
         set({
           zone_id: zone?.id || null,
           zone_name: zone?.name || null,
+          feedView: zone?.id ? "zone" : get().feedView,
         }),
 
-      setFeedView: (view) =>
-        set({
-          feedView: view,
-        }),
+      setFeedView: (view) => {
+        if (view === "global") {
+          set({ 
+            feedView: "global",
+            city_id: 321,
+            city_name: "Global",
+            zone_id: null,
+            zone_name: null 
+          });
+        } else if (view === "city") {
+          const { savedCity } = get();
+          if (savedCity) {
+            set({ 
+              feedView: "city",
+              city_id: savedCity.id,
+              city_name: savedCity.name
+            });
+          }
+        } else {
+          set({ feedView: view });
+        }
+      },
 
       clearLocation: () =>
         set({
-          city_id: null,
-          city_name: null,
+          city_id: 321,
+          city_name: "Global",
           city_source: null,
           zone_id: null,
           zone_name: null,
           isLocationSet: false,
           feedView: "global",
+          savedCity: null,
         }),
 
       updateCitySource: (source) =>
