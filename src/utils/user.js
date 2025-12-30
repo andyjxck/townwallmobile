@@ -96,14 +96,19 @@ export const initUser = async () => {
       ruser = newUser;
     }
 
-    // Sync with RevenueCat
-    if (ruser?.id && process.env.EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY) {
-      try {
-        await Purchases.logIn(ruser.id.toString());
-      } catch (e) {
-        console.error("RevenueCat login error:", e);
-      }
-    }
+// Sync with RevenueCat
+const apiKey = process.env.EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY;
+if (ruser?.id && apiKey && Platform.OS !== 'web') {
+try {
+const isConfigured = await Purchases.isConfigured();
+if (isConfigured) {
+await Purchases.logIn(ruser.id.toString());
+}
+} catch (e) {
+console.error("RevenueCat login error:", e);
+}
+}
+
 
     await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(ruser));
     
@@ -134,22 +139,35 @@ export const getStoredUser = async () => {
   return data ? JSON.parse(data) : null;
 };
 
-export const logoutUser = async () => {
-  try {
-    const userData = await getStoredUser();
-    if (userData && userData.id) {
-      // Disassociate this device from the user on logout
-      // so the next initUser creates a fresh anonymous profile
-      await supabase
-        .from('rusers')
-        .update({ device_id: null })
-        .eq('id', userData.id);
+  export const logoutUser = async () => {
+    try {
+      const userData = await getStoredUser();
+      if (userData && userData.id) {
+        // Disassociate this device from the user on logout
+        // so the next initUser creates a fresh anonymous profile
+        await supabase
+          .from('rusers')
+          .update({ device_id: null })
+          .eq('id', userData.id);
+      }
+      
+      // Logout from RevenueCat
+      if (Platform.OS !== 'web') {
+        try {
+          const isConfigured = await Purchases.isConfigured();
+          if (isConfigured) {
+            await Purchases.logOut();
+          }
+        } catch (e) {
+          // Ignore if not configured
+        }
+      }
+    } catch (e) {
+      console.error("Error during logout:", e);
     }
-    // Logout from RevenueCat
-    await Purchases.logOut();
-  } catch (e) {
-    console.error("Error during logout:", e);
-  }
-  await AsyncStorage.removeItem(USER_DATA_KEY);
-  useAuthStore.getState().setAuth(null);
-};
+    
+    // Clear local storage and memory store
+    await AsyncStorage.removeItem(USER_DATA_KEY);
+    useAuthStore.getState().setAuth(null);
+  };
+

@@ -48,12 +48,14 @@ import { useAuthStore, useChatStore } from "../utils/auth";
 const { width } = Dimensions.get('window');
 const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", "🐵", "🦄", "🐲", "🤖", "👻", "👾", "👽", "💩"];
 
-export default function Profile() {
-  const { isHippie } = useTheme();
-  const router = useRouter();
-  const params = useLocalSearchParams();
-  const userId = params.userId;
-  const insets = useSafeAreaInsets();
+  export default function Profile() {
+    const { isHippie } = useTheme();
+    const router = useRouter();
+    const params = useLocalSearchParams();
+    const userId = params.userId;
+    const insets = useSafeAreaInsets();
+    const { signOut } = useAuth();
+
   
   const [user, setUser] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
@@ -262,7 +264,10 @@ export default function Profile() {
   const handleLogout = async () => {
     Alert.alert("Sign Out", "Are you sure?", [
       { text: "Cancel", style: "cancel" },
-      { text: "Sign Out", style: "destructive", onPress: async () => { await logoutUser(); await initUser(); router.replace("/"); } }
+      { text: "Sign Out", style: "destructive", onPress: async () => {
+        await signOut();
+        router.replace("/");
+      }}
     ]);
   };
 

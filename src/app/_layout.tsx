@@ -131,7 +131,10 @@ const initRevenueCat = async () => {
       console.log('RevenueCat initialized');
     }
   } catch (error) {
-    console.warn('RevenueCat initialization skipped:', error.message);
+    // If it's already configured, ignore the error
+    if (!error.message?.includes("singleton instance")) {
+      console.warn('RevenueCat initialization skipped:', error.message);
+    }
   }
 };
 
