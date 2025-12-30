@@ -61,9 +61,18 @@ export const useAuth = () => {
   }, [open]);
 
   const signOut = useCallback(async () => {
-    await logoutUser();
-    await initUser();
-    close();
+    try {
+      await logoutUser();
+      // Small delay to ensure DB updates propagate before re-initializing
+      if (Platform.OS !== 'web') {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      await initUser();
+    } catch (e) {
+      console.error("Sign out error:", e);
+    } finally {
+      close();
+    }
   }, [close]);
 
   return {

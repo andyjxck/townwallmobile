@@ -140,35 +140,52 @@ export const getStoredUser = async () => {
   return data ? JSON.parse(data) : null;
 };
 
-  export const logoutUser = async () => {
-    try {
-      const userData = await getStoredUser();
-      if (userData && userData.id) {
-        // Disassociate this device from the user on logout
-        // so the next initUser creates a fresh anonymous profile
-        await supabase
-          .from('rusers')
-          .update({ device_id: null })
-          .eq('id', userData.id);
-      }
-      
-      // Logout from RevenueCat
-      if (Platform.OS !== 'web') {
-        try {
-          const isConfigured = await Purchases.isConfigured();
-          if (isConfigured) {
-            await Purchases.logOut();
-          }
-        } catch (e) {
-          // Ignore if not configured
-        }
-      }
-    } catch (e) {
-      console.error("Error during logout:", e);
+export const logoutUser = async () => {
+  try {
+    // 1. Get current user data before clearing
+    const userData = await getStoredUser();
+    
+    // 2. Clear Supabase Auth session first
+    await supabase.auth.signOut();
+    
+    if (userData && userData.id) {
+      // 3. Disassociate this device from the user in the DB
+      // This is crucial so the next initUser creates a fresh anonymous profile
+      await supabase
+        .from('rusers')
+        .update({ device_id: null })
+        .eq('id', userData.id);
     }
     
-    // Clear local storage and memory store
+    // 4. Logout from RevenueCat
+    if (Platform.OS !== 'web') {
+      try {
+        const isConfigured = await Purchases.isConfigured();
+        if (isConfigured) {
+          await Purchases.logOut();
+        }
+      } catch (e) {
+        // Ignore if not configured
+      }
+    }
+  } catch (e) {
+    console.error("Error during logout:", e);
+  }
+  
+  // 5. Clear all local storage and memory store
+  try {
     await AsyncStorage.removeItem(USER_DATA_KEY);
-    useAuthStore.getState().setAuth(null);
-  };
+    if (Platform.OS === 'web') {
+      localStorage.removeItem(authKey);
+    } else {
+      const { authKey } = require('./auth/store');
+      const SecureStore = require('expo-secure-store');
+      await SecureStore.deleteItemAsync(authKey);
+    }
+  } catch (e) {
+    console.error("Storage clear error:", e);
+  }
+  
+  useAuthStore.getState().setAuth(null);
+};
 
