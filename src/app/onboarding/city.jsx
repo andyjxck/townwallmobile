@@ -13,9 +13,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useLocationStore } from "../../utils/locationStore";
-import {
-  detectLocation,
+  import { useLocationStore } from "../../utils/locationStore";
+  import { setOnboardingComplete } from "../../utils/onboarding";
+  import {
+    detectLocation,
   fetchCities,
   findCityByName,
 } from "../../utils/location";
@@ -76,16 +77,17 @@ export default function CityScreen() {
     setShowConfirmModal(true);
   };
 
-  const handleConfirm = () => {
-    if (selectedCity) {
-      setCity({
-        id: selectedCity.id,
-        name: selectedCity.name,
-        source: detectedCity?.id === selectedCity.id ? "auto" : "manual",
-      });
-      router.push("/onboarding/zones");
-    }
-  };
+    const handleConfirm = async () => {
+      if (selectedCity) {
+        setCity({
+          id: selectedCity.id,
+          name: selectedCity.name,
+          source: detectedCity?.id === selectedCity.id ? "auto" : "manual",
+        });
+        await setOnboardingComplete(true);
+        router.replace("/");
+      }
+    };
 
   const handleChangeCity = () => {
     setShowConfirmModal(false);
