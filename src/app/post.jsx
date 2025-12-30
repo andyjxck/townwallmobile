@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { X, ChevronRight, Image as ImageIcon, Shield, BarChart2, Plus, ChevronLeft, WifiOff, MessageCircle, Users, Layout } from "lucide-react-native";
+import { X, ChevronRight, Image as ImageIcon, Shield, BarChart2, Plus, ChevronLeft, WifiOff, MessageCircle, Users, Layout, Check } from "lucide-react-native";
 import { getStoredUser } from "../utils/user";
 import { getDeviceId } from "../utils/deviceId";
 import { supabase } from "../utils/supabase";

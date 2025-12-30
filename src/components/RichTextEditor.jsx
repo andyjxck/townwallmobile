@@ -114,10 +114,8 @@ export function RichTextEditor({ value, onChange, placeholder, onPollPress, minH
   return (
     <View style={styles.container}>
       <View style={styles.toolbarContainer}>
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.toolbarContent}
+        <View 
+          style={styles.toolbarContent}
         >
           <ToolbarDropdown 
             icon={List} 
@@ -197,6 +195,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   toolbarContent: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     paddingHorizontal: 8,
   },
