@@ -408,16 +408,17 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
         friendUser = data;
       }
 
-      if (friendUser.id === user.id) throw new Error("You can't add yourself");
+      const myId = currentUser?.id || user.id;
+      if (friendUser.id === myId) throw new Error("You can't add yourself");
       
-      const { data: existing } = await supabase.from('friends').select('*').match({ user_id: user.id, friend_id: friendUser.id }).single();
+      const { data: existing } = await supabase.from('friends').select('*').match({ user_id: myId, friend_id: friendUser.id }).single();
       if (existing) throw new Error("Friend request already sent or accepted");
 
-      const { data: newRel, error: insertError } = await supabase.from('friends').insert({ user_id: user.id, friend_id: friendUser.id, status: 'pending' }).select().single();
+      const { data: newRel, error: insertError } = await supabase.from('friends').insert({ user_id: myId, friend_id: friendUser.id, status: 'pending' }).select().single();
       if (insertError) throw insertError;
       
       await sendFriendRequestNotification({
-        senderId: user.id,
+        senderId: myId,
         senderUsername: user.username,
         receiverId: friendUser.id,
         requestId: newRel.id
@@ -456,6 +457,10 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
       if (!currentUser || !user) return;
       setAddingFriend(true);
       try {
+        if (currentUser.id === user.id) {
+          Alert.alert("Error", "You can't add yourself");
+          return;
+        }
         if (!friendshipStatus) {
           // Send request
           const { data: newRel, error } = await supabase.from('friends').insert({ 

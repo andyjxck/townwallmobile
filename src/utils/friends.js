@@ -27,12 +27,14 @@ export const acceptFriendRequest = async (requestId, userId, friendId, username)
     
     if (updateError) throw updateError;
 
-    // Create the reciprocal friendship record
-    const { error: insertError } = await supabase
-      .from('friends')
-      .insert({ user_id: userId, friend_id: friendId, status: 'accepted' });
-    
-    if (insertError) throw insertError;
+    // Create the reciprocal friendship record (if not self-friending)
+    if (userId !== friendId) {
+      const { error: insertError } = await supabase
+        .from('friends')
+        .insert({ user_id: userId, friend_id: friendId, status: 'accepted' });
+      
+      if (insertError) throw insertError;
+    }
 
     // Send notification to the requester
     await sendFriendAcceptedNotification({
