@@ -19,19 +19,22 @@ export const useAuth = () => {
     const initiate = useCallback(() => {
       if (Platform.OS === 'web') {
         // Fallback for web since SecureStore is not natively supported
-        try {
-          const auth = localStorage.getItem(authKey);
-          useAuthStore.setState({
-            auth: auth ? JSON.parse(auth) : null,
-            isReady: true,
-          });
-        } catch (e) {
-          useAuthStore.setState({ auth: null, isReady: true });
-        }
-        return;
+        return new Promise((resolve) => {
+          try {
+            const auth = localStorage.getItem(authKey);
+            useAuthStore.setState({
+              auth: auth ? JSON.parse(auth) : null,
+              isReady: true,
+            });
+            resolve();
+          } catch (e) {
+            useAuthStore.setState({ auth: null, isReady: true });
+            resolve();
+          }
+        });
       }
 
-      SecureStore.getItemAsync(authKey)
+      return SecureStore.getItemAsync(authKey)
         .then((auth) => {
           useAuthStore.setState({
             auth: auth ? JSON.parse(auth) : null,
