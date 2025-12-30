@@ -192,9 +192,25 @@ return () => {
           query = query.eq("zone_id", zone_id);
         }
 
-        query = query.order("created_at", { ascending: sortBy === 'oldest' });
-        const { data } = await query.limit(50);
-        setPosts(data || []);
+        if (sortBy === 'popular') {
+          query = query.order("created_at", { ascending: false });
+        } else {
+          query = query.order("created_at", { ascending: sortBy === 'oldest' });
+        }
+
+        const limitCount = sortBy === 'popular' ? 100 : 50;
+        const { data } = await query.limit(limitCount);
+        
+        let finalData = data || [];
+        if (sortBy === 'popular') {
+          finalData = [...finalData].sort((a, b) => {
+            const aCount = (a.reactions || []).filter(r => r.reaction_type === 'superlike').length;
+            const bCount = (b.reactions || []).filter(r => r.reaction_type === 'superlike').length;
+            return bCount - aCount;
+          });
+        }
+        
+        setPosts(finalData);
       } catch (err) { console.error(err); }
       finally { setLoading(false); setRefreshing(false); }
     };
@@ -389,12 +405,12 @@ if (isOnline) syncPendingPosts();
               <View style={[styles.modalContent, { backgroundColor: isHippie ? '#1a1a1a' : theme.colors.background }]}>
                 <Text style={[styles.modalTitle, isHippie && { color: '#FFF' }]}>Filters & Sorting</Text>
                 
-                <Text style={[styles.label, isHippie && { color: '#AAA' }]}>Sort By</Text>
-                <View style={styles.row}>
-                  {['newest', 'oldest'].map(s => (
-                    <TouchableOpacity key={s} onPress={() => setSortBy(s)} style={[styles.pill, isHippie && { backgroundColor: '#333' }, sortBy === s && { backgroundColor: theme.colors.primary }]}><Text style={[styles.pillText, (isHippie || sortBy === s) && { color: sortBy === s ? '#000' : '#FFF' }]}>{s}</Text></TouchableOpacity>
-                  ))}
-                </View>
+                  <Text style={[styles.label, isHippie && { color: '#AAA' }]}>Sort By</Text>
+                  <View style={styles.row}>
+                    {['newest', 'oldest', 'popular'].map(s => (
+                      <TouchableOpacity key={s} onPress={() => setSortBy(s)} style={[styles.pill, isHippie && { backgroundColor: '#333' }, sortBy === s && { backgroundColor: theme.colors.primary }]}><Text style={[styles.pillText, (isHippie || sortBy === s) && { color: sortBy === s ? '#000' : '#FFF' }]}>{s}</Text></TouchableOpacity>
+                    ))}
+                  </View>
 
                   {feedView !== "global" && (
                     <>
