@@ -17,9 +17,10 @@ import { useRouter } from "expo-router";
   import { setOnboardingComplete } from "../../utils/onboarding";
   import {
     detectLocation,
-  fetchCities,
-  findCityByName,
-} from "../../utils/location";
+    fetchCities,
+    findCityByName,
+    fetchZonesForCity,
+  } from "../../utils/location";
 
 export default function CityScreen() {
   const router = useRouter();
