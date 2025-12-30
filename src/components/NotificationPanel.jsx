@@ -8,13 +8,15 @@ import {
   Modal, 
   ActivityIndicator 
 } from 'react-native';
-import { X, Bell, CheckCircle, MessageSquare, Shield, Info } from 'lucide-react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { fetchNotifications, markAsRead, markAllAsRead } from '@/utils/notifications';
-import { getStoredUser } from '@/utils/user';
-import { supabase } from '@/utils/supabase';
-import { useTheme } from "@/utils/ThemeContext";
-import * as Haptics from 'expo-haptics';
+  import { X, Bell, CheckCircle, MessageSquare, Shield, Info, UserPlus, Check, X as XIcon } from 'lucide-react-native';
+  import { useSafeAreaInsets } from 'react-native-safe-area-context';
+  import { fetchNotifications, markAsRead, markAllAsRead } from '@/utils/notifications';
+  import { getStoredUser } from '@/utils/user';
+  import { supabase } from '@/utils/supabase';
+  import { useTheme } from "@/utils/ThemeContext";
+  import { acceptFriendRequest, rejectFriendRequest } from '@/utils/friends';
+  import * as Haptics from 'expo-haptics';
+
 
 export default function NotificationPanel({ visible, onClose }) {
   const { isHippie } = useTheme();
@@ -90,6 +92,35 @@ export default function NotificationPanel({ visible, onClose }) {
     }
   };
 
+  const onAcceptFriend = async (notification) => {
+    if (!notification.metadata?.requestId) return;
+    const user = await getStoredUser();
+    if (!user) return;
+    
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    const { success } = await acceptFriendRequest(
+      notification.metadata.requestId,
+      user.id,
+      notification.metadata.senderId,
+      user.username
+    );
+    
+    if (success) {
+      handleMarkAsRead(notification.id);
+    }
+  };
+
+  const onRejectFriend = async (notification) => {
+    if (!notification.metadata?.requestId) return;
+    
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const { success } = await rejectFriendRequest(notification.metadata.requestId);
+    
+    if (success) {
+      handleMarkAsRead(notification.id);
+    }
+  };
+
   const renderItem = ({ item }) => {
     let Icon = Info;
     let iconColor = "#60A5FA";
@@ -100,23 +131,49 @@ export default function NotificationPanel({ visible, onClose }) {
     } else if (item.type === 'moderation') {
       Icon = Shield;
       iconColor = item.title.includes('Approved') ? "#4ADE80" : "#EF4444";
+    } else if (item.type === 'friend_request') {
+      Icon = UserPlus;
+      iconColor = "#A78BFA";
     }
 
+    const isFriendRequest = item.type === 'friend_request' && !item.is_read;
+
     return (
-      <TouchableOpacity 
-        style={[styles.notificationItem, !item.is_read && styles.unreadItem]}
-        onPress={() => handleMarkAsRead(item.id)}
-      >
-        <View style={[styles.iconBox, { backgroundColor: `${iconColor}20` }]}>
-          <Icon size={18} color={iconColor} />
-        </View>
-        <View style={styles.contentBox}>
-          <Text style={styles.title}>{item.title}</Text>
-          <Text style={styles.message}>{item.message}</Text>
-          <Text style={styles.time}>{new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
-        </View>
-        {!item.is_read && <View style={styles.unreadDot} />}
-      </TouchableOpacity>
+      <View style={[styles.notificationItem, !item.is_read && styles.unreadItem, { flexDirection: 'column', alignItems: 'stretch' }]}>
+        <TouchableOpacity 
+          style={{ flexDirection: 'row', alignItems: 'center' }}
+          onPress={() => handleMarkAsRead(item.id)}
+        >
+          <View style={[styles.iconBox, { backgroundColor: `${iconColor}20` }]}>
+            <Icon size={18} color={iconColor} />
+          </View>
+          <View style={styles.contentBox}>
+            <Text style={styles.title}>{item.title}</Text>
+            <Text style={styles.message}>{item.message}</Text>
+            <Text style={styles.time}>{new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+          </View>
+          {!item.is_read && <View style={styles.unreadDot} />}
+        </TouchableOpacity>
+        
+        {isFriendRequest && (
+          <View style={styles.actionButtons}>
+            <TouchableOpacity 
+              style={[styles.actionBtn, styles.acceptBtn]} 
+              onPress={() => onAcceptFriend(item)}
+            >
+              <Check size={16} color="#000" />
+              <Text style={styles.actionBtnText}>Accept</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.actionBtn, styles.declineBtn]} 
+              onPress={() => onRejectFriend(item)}
+            >
+              <XIcon size={16} color="#FFF" />
+              <Text style={[styles.actionBtnText, { color: '#FFF' }]}>Decline</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
     );
   };
 
@@ -243,14 +300,42 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
   },
-  unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#FBBF24',
-    marginLeft: 10,
-  },
-  emptyContainer: {
+    unreadDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: '#FBBF24',
+      marginLeft: 10,
+    },
+    actionButtons: {
+      flexDirection: 'row',
+      marginTop: 12,
+      gap: 10,
+      paddingLeft: 54, // iconBox width + margin
+    },
+    actionBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 10,
+    },
+    acceptBtn: {
+      backgroundColor: '#4ADE80',
+    },
+    declineBtn: {
+      backgroundColor: 'rgba(239, 68, 68, 0.2)',
+      borderWidth: 1,
+      borderColor: '#EF4444',
+    },
+    actionBtnText: {
+      fontSize: 12,
+      fontWeight: 'bold',
+      color: '#000',
+    },
+    emptyContainer: {
+
     paddingVertical: 100,
     alignItems: 'center',
     gap: 15,

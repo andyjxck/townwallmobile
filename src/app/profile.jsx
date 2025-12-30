@@ -14,37 +14,41 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { supabase } from "../utils/supabase";
 import { getStoredUser, logoutUser, initUser, isOnline } from "../utils/user";
 import { getDeviceId } from "../utils/deviceId";
-import { 
-    ChevronLeft, 
-    Camera, 
-    LogOut, 
-    User as UserIcon,
-    Shield,
-    UserPlus,
-    Trash2,
-    Image as ImageIcon,
-    Check,
-    X as XIcon,
-    Settings as SettingsIcon,
-    Search,
-    Pencil,
-    MessageCircle,
-  } from "lucide-react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system";
-import * as Haptics from "expo-haptics";
-import { decode } from "base64-arraybuffer";
-import { LinearGradient } from "expo-linear-gradient";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Image } from "expo-image";
-import PostItem from "../components/PostItem";
-import { ShareManager } from "../components/ShareManager";
-import { theme } from "../utils/theme";
-import { useTheme } from "@/utils/ThemeContext";
-import { sendFriendRequestNotification, sendFriendAcceptedNotification } from "../utils/notifications";
-import { getSavedProfiles, saveProfile, removeProfile } from "../utils/savedProfiles";
-import { useAuth, useAuthStore, useChatStore } from "../utils/auth";
+  import { 
+      ChevronLeft, 
+      Camera, 
+      LogOut, 
+      User as UserIcon,
+      Shield,
+      UserPlus,
+      Trash2,
+      Image as ImageIcon,
+      Check,
+      X as XIcon,
+      Settings as SettingsIcon,
+      Search,
+      Pencil,
+      MessageCircle,
+      Bell,
+      UserCheck,
+    } from "lucide-react-native";
+  import AsyncStorage from "@react-native-async-storage/async-storage";
+  import * as ImagePicker from "expo-image-picker";
+  import * as FileSystem from "expo-file-system";
+  import * as Haptics from "expo-haptics";
+  import { decode } from "base64-arraybuffer";
+  import { LinearGradient } from "expo-linear-gradient";
+  import { useSafeAreaInsets } from "react-native-safe-area-context";
+  import { Image } from "expo-image";
+  import PostItem from "../components/PostItem";
+  import { ShareManager } from "../components/ShareManager";
+  import { theme } from "../utils/theme";
+  import { useTheme } from "@/utils/ThemeContext";
+  import { sendFriendRequestNotification, sendFriendAcceptedNotification } from "../utils/notifications";
+  import { getSavedProfiles, saveProfile, removeProfile } from "../utils/savedProfiles";
+  import { useAuth, useAuthStore, useChatStore } from "../utils/auth";
+  import { acceptFriendRequest, rejectFriendRequest, fetchPendingRequests } from "../utils/friends";
+
 
 const { width } = Dimensions.get('window');
 const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", "🐵", "🦄", "🐲", "🤖", "👻", "👾", "👽", "💩"];
@@ -72,6 +76,7 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
     const [addingFriend, setAddingFriend] = useState(false);
     const [friendshipStatus, setFriendshipStatus] = useState(null); // { status: 'pending'|'accepted', isRequester: boolean }
     const [userPosts, setUserPosts] = useState([]);
+    const [showRequestsModal, setShowRequestsModal] = useState(false);
 
     const [savedPosts, setSavedPosts] = useState([]);
     const [pendingRequests, setPendingRequests] = useState([]);
@@ -233,13 +238,14 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
           joined: new Date(userData.created_at).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
         });
 
-        if (viewingOwnProfile) {
-          const { data: savedData } = await supabase.from('rsaved_posts').select(`post:post_id (id, title, text, created_at, user_id, zone_id, tag_id, image_url, image_urls, media_type, is_anonymous, moderation_status, is_deleted, user:rusers!user_id (username, emoji_icon, avatar_url), zone:rzones!zone_id (name), tag:rtags!tag_id (name), poll_id, reactions:rreactions (reaction_type, device_id))`).eq('user_id', userData.id);
-          setSavedPosts(savedData?.map(s => s.post).filter(p => p && !p.is_deleted) || []);
+          if (viewingOwnProfile) {
+            const { data: savedData } = await supabase.from('rsaved_posts').select(`post:post_id (id, title, text, created_at, user_id, zone_id, tag_id, image_url, image_urls, media_type, is_anonymous, moderation_status, is_deleted, user:rusers!user_id (username, emoji_icon, avatar_url), zone:rzones!zone_id (name), tag:rtags!tag_id (name), poll_id, reactions:rreactions (reaction_type, device_id))`).eq('user_id', userData.id);
+            setSavedPosts(savedData?.map(s => s.post).filter(p => p && !p.is_deleted) || []);
 
-          const { data: requestsData } = await supabase.from('friends').select('id, user_id, rusers!friends_user_id_fkey(id, username, emoji_icon, avatar_url)').eq('friend_id', userData.id).eq('status', 'pending');
-          setPendingRequests(requestsData?.map(r => ({ ...r.rusers, requestId: r.id })) || []);
-        }
+            const requests = await fetchPendingRequests(userData.id);
+            setPendingRequests(requests);
+          }
+
 
         const { data: friendData } = await supabase.from('friends').select('friend_id, rusers!friends_friend_id_fkey(id, username, emoji_icon, avatar_url)').eq('user_id', userData.id).eq('status', 'accepted');
         const friendsList = friendData?.map(f => f.rusers) || [];
@@ -406,12 +412,14 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
       const { data: existing } = await supabase.from('friends').select('*').match({ user_id: user.id, friend_id: friendUser.id }).single();
       if (existing) throw new Error("Friend request already sent or accepted");
 
-      await supabase.from('friends').insert({ user_id: user.id, friend_id: friendUser.id, status: 'pending' });
+      const { data: newRel, error: insertError } = await supabase.from('friends').insert({ user_id: user.id, friend_id: friendUser.id, status: 'pending' }).select().single();
+      if (insertError) throw insertError;
       
       await sendFriendRequestNotification({
         senderId: user.id,
         senderUsername: user.username,
-        receiverId: friendUser.id
+        receiverId: friendUser.id,
+        requestId: newRel.id
       });
       
       Alert.alert("Success", `Friend request sent to @${friendUser.username}!`);
@@ -544,13 +552,24 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
         <TouchableOpacity onPress={() => router.back()} style={styles.headerIcon}>
           <ChevronLeft color={theme.colors.text} size={28} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Profile</Text>
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            {isOwnProfile && (
-              <TouchableOpacity onPress={() => router.push("/settings")} style={styles.headerIcon}>
-                <SettingsIcon color={theme.colors.text} size={24} />
-              </TouchableOpacity>
-            )}
+          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Profile</Text>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              {isOwnProfile && (
+                <TouchableOpacity onPress={() => setShowRequestsModal(true)} style={styles.headerIcon}>
+                  <Bell color={pendingRequests.length > 0 ? theme.colors.primary : theme.colors.text} size={24} />
+                  {pendingRequests.length > 0 && (
+                    <View style={[styles.requestBadge, { backgroundColor: theme.colors.primary }]}>
+                      <Text style={styles.requestBadgeText}>{pendingRequests.length}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              )}
+              {isOwnProfile && (
+                <TouchableOpacity onPress={() => router.push("/settings")} style={styles.headerIcon}>
+                  <SettingsIcon color={theme.colors.text} size={24} />
+                </TouchableOpacity>
+              )}
+
               {isOwnProfile && (
                 user?.password ? (
                   <TouchableOpacity onPress={handleLogout} style={styles.headerIcon}>
@@ -868,17 +887,106 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
         </View>
       )}
 
-      <ShareManager ref={shareRef} />
-    </View>
-  );
-}
+        <ShareManager ref={shareRef} />
+  
+        <Modal
+          visible={showRequestsModal}
+          animationType="fade"
+          transparent={true}
+          onRequestClose={() => setShowRequestsModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: theme.colors.background, maxHeight: '80%' }]}>
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: theme.colors.text, marginBottom: 0 }]}>Friend Requests</Text>
+                <TouchableOpacity onPress={() => setShowRequestsModal(false)}>
+                  <XIcon color={theme.colors.text} size={24} />
+                </TouchableOpacity>
+              </View>
+              
+              <ScrollView style={{ marginTop: 20 }}>
+                {pendingRequests.length > 0 ? (
+                  pendingRequests.map(r => (
+                    <View key={r.requestId} style={[styles.requestItem, { borderBottomWidth: 1, borderBottomColor: theme.colors.border, paddingVertical: 12 }]}>
+                      <TouchableOpacity 
+                        style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 }}
+                        onPress={() => {
+                          setShowRequestsModal(false);
+                          router.push(`/profile?userId=${r.id}`);
+                        }}
+                      >
+                        {r.avatar_url ? (
+                          <Image source={{ uri: r.avatar_url }} style={styles.resultAvatar} />
+                        ) : (
+                          <Text style={{ fontSize: 32 }}>{r.emoji_icon || "👤"}</Text>
+                        )}
+                        <View>
+                          <Text style={[styles.requestName, { color: theme.colors.text }]}>@{r.username}</Text>
+                          <Text style={{ color: theme.colors.textSecondary, fontSize: 12 }}>wants to be friends</Text>
+                        </View>
+                      </TouchableOpacity>
+                      <View style={styles.requestBtns}>
+                        <TouchableOpacity 
+                          onPress={async () => {
+                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                            const { success } = await acceptFriendRequest(r.requestId, user.id, r.id, user.username);
+                            if (success) loadData();
+                          }} 
+                          style={[styles.acceptBtn, { backgroundColor: theme.colors.success }]}
+                        >
+                          <Check color="#000" size={18} />
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                          onPress={async () => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                            const { success } = await rejectFriendRequest(r.requestId);
+                            if (success) loadData();
+                          }} 
+                          style={[styles.rejectBtn, { backgroundColor: 'rgba(239, 68, 68, 0.2)', borderWidth: 1, borderColor: '#ef4444' }]}
+                        >
+                          <XIcon color="#ef4444" size={18} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ))
+                ) : (
+                  <View style={{ padding: 40, alignItems: 'center', gap: 10 }}>
+                    <UserCheck size={48} color={theme.colors.textSecondary} opacity={0.2} />
+                    <Text style={{ color: theme.colors.textSecondary, textAlign: 'center' }}>No pending requests</Text>
+                  </View>
+                )}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+      </View>
+    );
+  }
+
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 16 },
-  headerIcon: { padding: 8 },
-  headerTitle: { fontSize: 20, fontWeight: 'bold' },
+    headerIcon: { padding: 8, position: 'relative' },
+    requestBadge: {
+      position: 'absolute',
+      right: 4,
+      top: 4,
+      minWidth: 16,
+      height: 16,
+      borderRadius: 8,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 4,
+    },
+    requestBadgeText: {
+      color: '#000',
+      fontSize: 10,
+      fontWeight: 'bold',
+    },
+    headerTitle: { fontSize: 20, fontWeight: 'bold' },
+
   profileInfo: { paddingHorizontal: 16, paddingTop: 20 },
   avatarSection: { alignItems: 'center', marginBottom: 24 },
   avatarContainer: { width: 100, height: 100, borderRadius: 50, justifyContent: 'center', alignItems: 'center', marginBottom: 16, position: 'relative' },
@@ -972,8 +1080,10 @@ const styles = StyleSheet.create({
       alignItems: 'center',
       zIndex: 1000
     },
-  modalContent: { width: '80%', padding: 20, borderRadius: 20 },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', textAlign: 'center', marginBottom: 20 },
+    modalContent: { width: '80%', padding: 20, borderRadius: 20 },
+    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' },
+    modalTitle: { fontSize: 18, fontWeight: 'bold', textAlign: 'center', marginBottom: 20 },
+
   emojiGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 15, marginBottom: 20 },
   emojiItem: { padding: 5 },
   emojiText: { fontSize: 32 },

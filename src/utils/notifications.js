@@ -132,91 +132,94 @@ export async function sendPushNotification(expoPushToken, title, body, data = {}
   }
 }
 
-    export const sendNotification = async ({ userId, title, message, type, link }) => {
-      try {
-        // For reactions and shares, we want to be very strict to prevent spamming.
-        // We only ever send the FIRST notification for these types per specific content/link.
-        const isStrictType = ['reaction', 'share'].includes(type);
-        
-        let query = supabase
+      export const sendNotification = async ({ userId, title, message, type, link, metadata }) => {
+        try {
+          // For reactions and shares, we want to be very strict to prevent spamming.
+          // We only ever send the FIRST notification for these types per specific content/link.
+          const isStrictType = ['reaction', 'share'].includes(type);
+          
+          let query = supabase
+            .from('rnotifications')
+            .select('id')
+            .eq('user_id', userId)
+            .eq('type', type);
+  
+          if (isStrictType) {
+            // For reactions/shares, check if THIS specific notification (based on link/post) already exists
+            if (link) query = query.eq('link', link);
+            // If it's a reaction, we also want to avoid spamming the same user even if the message varies slightly
+            // but usually the message is unique per reactor anyway.
+            // To be safe, we check if ANY notification of this type for this content already exists.
+          } else {
+            // For others, use a 1-minute window
+            const timeWindow = new Date(Date.now() - 60000).toISOString();
+            query = query.eq('title', title).eq('message', message).gt('created_at', timeWindow);
+          }
+      
+          const { data: existing } = await query.limit(1);
+      
+          if (existing && existing.length > 0) {
+            console.log(`Skipping duplicate notification (type: ${type})`);
+            return { success: true, skipped: true };
+          }
+    
+        const { data: newNotification, error } = await supabase
           .from('rnotifications')
-          .select('id')
-          .eq('user_id', userId)
-          .eq('type', type);
-
-        if (isStrictType) {
-          // For reactions/shares, check if THIS specific notification (based on link/post) already exists
-          if (link) query = query.eq('link', link);
-          // If it's a reaction, we also want to avoid spamming the same user even if the message varies slightly
-          // but usually the message is unique per reactor anyway.
-          // To be safe, we check if ANY notification of this type for this content already exists.
-        } else {
-          // For others, use a 1-minute window
-          const timeWindow = new Date(Date.now() - 60000).toISOString();
-          query = query.eq('title', title).eq('message', message).gt('created_at', timeWindow);
-        }
+          .insert({
+            user_id: userId,
+            title,
+            message,
+            type,
+            link,
+            metadata
+          })
+          .select('*')
+          .single();
     
-        const { data: existing } = await query.limit(1);
+        if (error) throw error;
     
-        if (existing && existing.length > 0) {
-          console.log(`Skipping duplicate notification (type: ${type})`);
-          return { success: true, skipped: true };
-        }
+        return { success: true, data: newNotification };
+      } catch (error) {
+        console.error('Error sending notification:', error);
+        return { success: false, error };
+      }
+    };
   
-      const { data: newNotification, error } = await supabase
-        .from('rnotifications')
-        .insert({
-          user_id: userId,
-          title,
-          message,
-          type,
-          link
-        })
-        .select('*')
-        .single();
+  export const sendMessageNotification = async ({ senderId, receiverId, senderUsername, messageText }) => {
+    return sendNotification({
+      userId: receiverId,
+      title: `New message from @${senderUsername}`,
+      message: messageText.length > 50 ? messageText.substring(0, 50) + '...' : messageText,
+      type: 'message',
+      link: `/chat`
+    });
+  };
   
-      if (error) throw error;
+  export const sendReactionNotification = async ({ reactorUsername, reactorId, postOwnerId, postTitle, reactionType }) => {
+    if (reactorId === postOwnerId) return { success: true, skipped: true };
+    
+    const reactionLabel = reactionType === 'helpful' ? 'liked' : reactionType === 'superlike' ? 'superliked' : 'reacted to';
+    
+    return sendNotification({
+      userId: postOwnerId,
+      title: `New ${reactionType === 'superlike' ? 'Superlike' : 'Like'}!`,
+      message: `@${reactorUsername} ${reactionLabel} your post: "${postTitle || 'Untitled'}"`,
+      type: 'reaction',
+      link: `/post`
+    });
+  };
   
-      return { success: true, data: newNotification };
-    } catch (error) {
-      console.error('Error sending notification:', error);
-      return { success: false, error };
-    }
+  export const sendFriendRequestNotification = async ({ senderId, senderUsername, receiverId, requestId }) => {
+    return sendNotification({
+      userId: receiverId,
+      title: 'New Friend Request!',
+      message: `@${senderUsername} wants to be your friend`,
+      type: 'friend_request',
+      link: `/profile`,
+      metadata: { requestId, senderId, senderUsername }
+    });
   };
 
-export const sendMessageNotification = async ({ senderId, receiverId, senderUsername, messageText }) => {
-  return sendNotification({
-    userId: receiverId,
-    title: `New message from @${senderUsername}`,
-    message: messageText.length > 50 ? messageText.substring(0, 50) + '...' : messageText,
-    type: 'message',
-    link: `/chat`
-  });
-};
-
-export const sendReactionNotification = async ({ reactorUsername, reactorId, postOwnerId, postTitle, reactionType }) => {
-  if (reactorId === postOwnerId) return { success: true, skipped: true };
-  
-  const reactionLabel = reactionType === 'helpful' ? 'liked' : reactionType === 'superlike' ? 'superliked' : 'reacted to';
-  
-  return sendNotification({
-    userId: postOwnerId,
-    title: `New ${reactionType === 'superlike' ? 'Superlike' : 'Like'}!`,
-    message: `@${reactorUsername} ${reactionLabel} your post: "${postTitle || 'Untitled'}"`,
-    type: 'reaction',
-    link: `/post`
-  });
-};
-
-export const sendFriendRequestNotification = async ({ senderId, senderUsername, receiverId }) => {
-  return sendNotification({
-    userId: receiverId,
-    title: 'New Friend Request!',
-    message: `@${senderUsername} wants to be your friend`,
-    type: 'friend_request',
-    link: `/profile`
-  });
-};
 
 export const sendFriendAcceptedNotification = async ({ acceptorId, acceptorUsername, requesterId }) => {
   return sendNotification({
