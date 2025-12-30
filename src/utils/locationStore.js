@@ -11,6 +11,7 @@ export const useLocationStore = create(
       zone_id: null,
       zone_name: null,
       isLocationSet: false,
+      feedView: "city",
 
       setCity: (city) =>
         set({
@@ -26,6 +27,11 @@ export const useLocationStore = create(
           zone_name: zone?.name || null,
         }),
 
+      setFeedView: (view) =>
+        set({
+          feedView: view,
+        }),
+
       clearLocation: () =>
         set({
           city_id: null,
@@ -34,6 +40,7 @@ export const useLocationStore = create(
           zone_id: null,
           zone_name: null,
           isLocationSet: false,
+          feedView: "global",
         }),
 
       updateCitySource: (source) =>

@@ -33,6 +33,11 @@ import {
     CloudUpload,
     MessageCircle,
     Sparkles,
+    Globe,
+    MapPin,
+    ChevronDown,
+    Check,
+    Settings,
 } from "lucide-react-native";
 import { Image } from "expo-image";
 import { getDeviceId } from "../utils/deviceId";
@@ -75,8 +80,8 @@ export default function UniversalFeed() {
   const [pendingPosts, setPendingPosts] = useState([]);
   const [syncing, setSyncing] = useState(false);
   
-  const { city_id, city_name } = useLocationStore();
-  const [showCityPicker, setShowCityPicker] = useState(false);
+  const { city_id, city_name, zone_id, zone_name, feedView, setFeedView } = useLocationStore();
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
   
   const postsWithAds = useMemo(() => {
     const offlinePosts = pendingPosts.map(p => ({
@@ -114,7 +119,7 @@ return () => {
         supabase.removeChannel(postsSub); 
         unsubscribeNetwork();
       };
-    }, [selectedZone, sortBy, city_id]);
+    }, [selectedZone, sortBy, city_id, feedView]);
 
   const loadPendingPosts = async () => {
     const pending = await offlineStorage.getPendingPosts();
@@ -170,8 +175,9 @@ return () => {
     if (!isRefreshing) setLoading(true);
     try {
       let query = supabase.from("rposts").select(`id, title, text, created_at, user_id, zone_id, tag_id, image_url, image_urls, is_anonymous, moderation_status, is_deleted, is_blurred, blur_reason, comments_disabled, city_id, user:rusers (username, emoji_icon, avatar_url, last_seen), zone:rzones (name), tag:rtags (name), poll_id, reactions:rreactions (reaction_type, device_id)`).eq("is_deleted", false).eq("moderation_status", "approved");
-      if (city_id) query = query.eq("city_id", city_id);
-      if (selectedZone) query = query.eq("zone_id", selectedZone);
+      if (feedView === "city" && city_id) query = query.eq("city_id", city_id);
+      else if (feedView === "zone" && zone_id) query = query.eq("zone_id", zone_id);
+      if (selectedZone && feedView !== "zone") query = query.eq("zone_id", selectedZone);
       query = query.order("created_at", { ascending: sortBy === 'oldest' });
       const { data } = await query.limit(50);
       setPosts(data || []);
@@ -236,8 +242,8 @@ return () => {
     loadPendingPosts();
 if (isOnline) syncPendingPosts();
       fetchPosts(true); 
-    }, [selectedZone, sortBy, isOnline, city_id]);
-    useEffect(() => { fetchPosts(); }, [selectedZone, sortBy, city_id]);
+    }, [selectedZone, sortBy, isOnline, city_id, feedView]);
+    useEffect(() => { fetchPosts(); }, [selectedZone, sortBy, city_id, feedView]);
 
     const [logoClicks, setLogoClicks] = useState(0);
 
@@ -253,16 +259,27 @@ if (isOnline) syncPendingPosts();
         }
     };
 
+    const getLocationDisplayText = () => {
+      if (feedView === "global") return "Global";
+      if (feedView === "zone" && zone_name) return zone_name;
+      return city_name || "Select Location";
+    };
+
+    const handleLocationSelect = (view) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setFeedView(view);
+      setShowLocationPicker(false);
+    };
+
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
 <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
           <TouchableOpacity onPress={handleLogoClick} activeOpacity={0.7} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               <Image source={require("../../assets/images/icon.png")} style={{ width: 32, height: 32 }} contentFit="contain" />
-              {city_name && (
-                <TouchableOpacity onPress={() => router.push("/onboarding/city")} activeOpacity={0.7}>
-                  <Text style={styles.cityNameText}>{city_name}</Text>
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity onPress={() => setShowLocationPicker(true)} activeOpacity={0.7} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Text style={[styles.cityNameText, { color: theme.colors.text }]}>{getLocationDisplayText()}</Text>
+                <ChevronDown size={16} color={theme.colors.textSecondary} />
+              </TouchableOpacity>
             </TouchableOpacity>
         <View style={styles.headerActions}>
           {isUnlocked && (
@@ -369,10 +386,71 @@ if (isOnline) syncPendingPosts();
                     <TouchableOpacity key={z.id} onPress={() => setSelectedZone(z.id)} style={[styles.pill, isHippie && { backgroundColor: '#333' }, selectedZone === z.id && { backgroundColor: theme.colors.primary }]}><Text style={[styles.pillText, (isHippie || selectedZone === z.id) && { color: selectedZone === z.id ? '#000' : '#FFF' }]}>{z.name}</Text></TouchableOpacity>
                   ))}
                 </ScrollView>
-              <TouchableOpacity onPress={() => setShowFilterSort(false)} style={[styles.closeBtn, { backgroundColor: theme.colors.primary }]}><Text style={styles.closeBtnText}>Apply</Text></TouchableOpacity>
+<TouchableOpacity onPress={() => setShowFilterSort(false)} style={[styles.closeBtn, { backgroundColor: theme.colors.primary }]}><Text style={styles.closeBtnText}>Apply</Text></TouchableOpacity>
+              </View>
             </View>
-          </View>
-        </Modal>
+          </Modal>
+
+          <Modal visible={showLocationPicker} animationType="slide" transparent>
+            <View style={styles.modalOverlay}>
+              <View style={[styles.modalContent, { backgroundColor: isHippie ? '#1a1a1a' : theme.colors.background }]}>
+                <Text style={[styles.modalTitle, isHippie && { color: '#FFF' }]}>Choose Feed</Text>
+                
+                <TouchableOpacity onPress={() => handleLocationSelect("global")} style={[styles.locationOption, feedView === "global" && { backgroundColor: theme.colors.primary + '20' }]}>
+                  <View style={styles.locationOptionLeft}>
+                    <Globe size={22} color={feedView === "global" ? theme.colors.primary : theme.colors.textSecondary} />
+                    <View>
+                      <Text style={[styles.locationOptionTitle, { color: theme.colors.text }]}>Global</Text>
+                      <Text style={[styles.locationOptionDesc, { color: theme.colors.textSecondary }]}>Posts from everywhere</Text>
+                    </View>
+                  </View>
+                  {feedView === "global" && <Check size={20} color={theme.colors.primary} />}
+                </TouchableOpacity>
+
+                {city_name && (
+                  <TouchableOpacity onPress={() => handleLocationSelect("city")} style={[styles.locationOption, feedView === "city" && { backgroundColor: theme.colors.primary + '20' }]}>
+                    <View style={styles.locationOptionLeft}>
+                      <MapPin size={22} color={feedView === "city" ? theme.colors.primary : theme.colors.textSecondary} />
+                      <View>
+                        <Text style={[styles.locationOptionTitle, { color: theme.colors.text }]}>{city_name}</Text>
+                        <Text style={[styles.locationOptionDesc, { color: theme.colors.textSecondary }]}>Posts from your town</Text>
+                      </View>
+                    </View>
+                    {feedView === "city" && <Check size={20} color={theme.colors.primary} />}
+                  </TouchableOpacity>
+                )}
+
+                {zone_name && (
+                  <TouchableOpacity onPress={() => handleLocationSelect("zone")} style={[styles.locationOption, feedView === "zone" && { backgroundColor: theme.colors.primary + '20' }]}>
+                    <View style={styles.locationOptionLeft}>
+                      <MapPin size={22} color={feedView === "zone" ? theme.colors.primary : theme.colors.textSecondary} />
+                      <View>
+                        <Text style={[styles.locationOptionTitle, { color: theme.colors.text }]}>{zone_name}</Text>
+                        <Text style={[styles.locationOptionDesc, { color: theme.colors.textSecondary }]}>Posts from your zone only</Text>
+                      </View>
+                    </View>
+                    {feedView === "zone" && <Check size={20} color={theme.colors.primary} />}
+                  </TouchableOpacity>
+                )}
+
+                <View style={{ height: 1, backgroundColor: theme.colors.border, marginVertical: 15 }} />
+
+                <TouchableOpacity onPress={() => { setShowLocationPicker(false); router.push("/onboarding/city"); }} style={styles.locationOption}>
+                  <View style={styles.locationOptionLeft}>
+                    <Settings size={22} color={theme.colors.textSecondary} />
+                    <View>
+                      <Text style={[styles.locationOptionTitle, { color: theme.colors.text }]}>Change Location</Text>
+                      <Text style={[styles.locationOptionDesc, { color: theme.colors.textSecondary }]}>Select a different town</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity onPress={() => setShowLocationPicker(false)} style={[styles.closeBtn, { backgroundColor: theme.colors.surface, marginTop: 20 }]}>
+                  <Text style={[styles.closeBtnText, { color: theme.colors.text }]}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
 
       <NotificationPanel visible={showNotifications} onClose={() => setShowNotifications(false)} />
       <ShareManager ref={shareRef} />
@@ -384,7 +462,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 10 },
   logo: { fontSize: 24, fontWeight: 'bold' },
-  cityNameText: { fontSize: 14, color: '#888', fontWeight: '500' },
+  cityNameText: { fontSize: 16, fontWeight: '600' },
   headerActions: { flexDirection: 'row', gap: 15 },
   headerIcon: { position: 'relative' },
   badge: { position: 'absolute', top: -2, right: -2, width: 10, height: 10, borderRadius: 5, borderWidth: 2, borderColor: '#FFF' },
@@ -413,5 +491,9 @@ const styles = StyleSheet.create({
   pill: { paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20, backgroundColor: '#EEE' },
   pillText: { fontSize: 14 },
   closeBtn: { marginTop: 30, padding: 15, borderRadius: 10, alignItems: 'center' },
-    closeBtnText: { color: '#000', fontWeight: 'bold' },
+  closeBtnText: { color: '#000', fontWeight: 'bold' },
+  locationOption: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderRadius: 12, marginBottom: 8 },
+  locationOptionLeft: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  locationOptionTitle: { fontSize: 16, fontWeight: '600' },
+  locationOptionDesc: { fontSize: 13, marginTop: 2 },
 });
