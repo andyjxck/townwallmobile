@@ -142,40 +142,32 @@ export const getStoredUser = async () => {
 
 export const logoutUser = async () => {
   try {
-    // 1. Get current user data before clearing
     const userData = await getStoredUser();
     
-    // 2. Disassociate this device from the user in the DB FIRST
-    // We do this while still authenticated to avoid RLS issues
     if (userData && userData.id) {
+      const dummyDeviceId = `logged_out_${Date.now()}_${Math.random().toString(36).substring(7)}`;
       await supabase
         .from('rusers')
-        .update({ device_id: null })
+        .update({ device_id: dummyDeviceId })
         .eq('id', userData.id);
     }
 
-    // 3. Clear Supabase Auth session
     await supabase.auth.signOut();
     
-    // 4. Logout from RevenueCat
     if (Platform.OS !== 'web') {
       try {
         const isConfigured = await Purchases.isConfigured();
         if (isConfigured) {
           await Purchases.logOut();
         }
-      } catch (e) {
-        // Ignore if not configured
-      }
+      } catch (e) {}
     }
   } catch (e) {
     console.error("Error during logout:", e);
   }
   
-  // 5. Clear all local storage and memory store
   try {
     await AsyncStorage.removeItem(USER_DATA_KEY);
-    // Explicitly clear multiple potential keys to be safe
     await AsyncStorage.removeItem("@redditch_user_data");
     await AsyncStorage.removeItem("supabase.auth.token");
     
@@ -185,7 +177,6 @@ export const logoutUser = async () => {
     } else {
       const SecureStore = require('expo-secure-store');
       await SecureStore.deleteItemAsync(authKey);
-      // Supabase default storage key for mobile
       await SecureStore.deleteItemAsync('supabase.auth.token');
     }
   } catch (e) {
