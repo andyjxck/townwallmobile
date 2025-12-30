@@ -1,63 +1,60 @@
-# -------------------------------------------------
-# Environment variables (NEVER COMMIT)
-# -------------------------------------------------
-.env
-.env.*
-.env*.local
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
-# -------------------------------------------------
-# Dependencies
-# -------------------------------------------------
+# dependencies
 node_modules/
 
-# -------------------------------------------------
 # Expo
-# -------------------------------------------------
 .expo/
 dist/
 web-build/
 expo-env.d.ts
 
-# -------------------------------------------------
-# Metro / React Native
-# -------------------------------------------------
-.metro-health-check*
-.metro-virtual/*
-caches/*
-
-# -------------------------------------------------
-# Native / Mobile credentials (DO NOT COMMIT)
-# -------------------------------------------------
+# Native
+android/build/
+android/.gradle/
+android/app/build/
+ios/build/
+ios/Pods/
+ios/DerivedData/
+*.orig.*
 *.jks
 *.p8
 *.p12
 *.key
 *.mobileprovision
-*.orig.*
 
-# -------------------------------------------------
-# Debug / Logs
-# -------------------------------------------------
+# Metro
+.metro-health-check*
+.metro-virtual/
+
+# debug
 npm-debug.*
 yarn-debug.*
 yarn-error.*
+*.log
 
-# -------------------------------------------------
-# TypeScript / Build
-# -------------------------------------------------
-*.tsbuildinfo
-
-# -------------------------------------------------
 # macOS
-# -------------------------------------------------
 .DS_Store
-
-# -------------------------------------------------
-# Certificates / Keys (extra safety)
-# -------------------------------------------------
 *.pem
 
-# -------------------------------------------------
-# Examples / Scratch
-# -------------------------------------------------
-app-example
+# typescript
+*.tsbuildinfo
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# app-example
+app-example/
+
+# caches
+caches/
+.cache/
+
+# public
+public/
+
+# Environment variables
+.env*.local

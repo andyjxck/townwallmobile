@@ -1,38 +1,46 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+# EAS Build Ignore
+# This file is used to ignore files when uploading your project to EAS.
+# It helps reduce upload time and prevents unnecessary files from being sent.
 
-# dependencies
+# Dependencies (EAS handles these)
 node_modules/
 
-# Expo
+# Native build artifacts
+android/build/
+android/.gradle/
+android/app/build/
+ios/build/
+ios/Pods/
+ios/DerivedData/
+
+# Expo artifacts
 .expo/
 dist/
 web-build/
-expo-env.d.ts
-
-# Native
-*.orig.*
-*.jks
-*.p8
-*.p12
-*.key
-*.mobileprovision
 
 # Metro
 .metro-health-check*
+.metro-virtual/
 
-# debug
+# Version control
+.git/
+
+# Debug and Logs
+*.log
 npm-debug.*
 yarn-debug.*
 yarn-error.*
 
-# macOS
-.DS_Store
-*.pem
+# IDEs
+.vscode/
+.idea/
 
-# typescript
-*.tsbuildinfo
+# Environment
+.env*.local
 
-app-example
-
+# Caches
 caches/
-public/
+.cache/
+
+# Examples
+app-example/
