@@ -62,188 +62,6 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
   const [showBlurModal, setShowBlurModal] = useState(false);
   const [blurReasonInput, setBlurReasonInput] = useState("");
 
-  const [loadingLikers, setLoadingLikers] = useState(false);
-  const [likers, setLikers] = useState([]);
-  const [superlikers, setSuperlikers] = useState([]);
-  const [showLikersModal, setShowLikersModal] = useState(false);
-    const [showSuperlikersModal, setShowSuperlikersModal] = useState(false);
-    
-    const [ctaLoading, setCtaLoading] = useState(false);
-
-    const handleCTA = async () => {
-      if (!user) {
-        Alert.alert("Authentication Required", "Please sign in to use this feature.");
-        return;
-      }
-      
-      setCtaLoading(true);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-      try {
-        if (item.cta_type === 'chat') {
-          // One-on-one chat
-          if (item.user_id === user.id) {
-            Alert.alert("Note", "This is your own post!");
-            return;
-          }
-
-            // Check if chat already exists
-            const { data: existingChats } = await supabase
-              .from('rchats')
-              .select('*')
-              .or(`and(user1_id.eq.${user.id},user2_id.eq.${item.user_id}),and(user1_id.eq.${item.user_id},user2_id.eq.${user.id})`)
-              .eq('is_group', false);
-
-            let chatId;
-            if (existingChats && existingChats.length > 0) {
-              chatId = existingChats[0].id;
-              // If it's pending, check if they are friends now
-              if (existingChats[0].status === 'pending') {
-                const { data: friendship } = await supabase
-                  .from('friends')
-                  .select('id')
-                  .match({ user_id: user.id, friend_id: item.user_id, status: 'accepted' })
-                  .single();
-                
-                if (friendship) {
-                  await supabase.from('rchats').update({ status: 'accepted' }).eq('id', chatId);
-                }
-              }
-            } else {
-              // Check if they are friends
-              const { data: friendship } = await supabase
-                .from('friends')
-                .select('id')
-                .match({ user_id: user.id, friend_id: item.user_id, status: 'accepted' })
-                .single();
-              
-              const status = friendship ? 'accepted' : 'pending';
-
-              const { data: newChat } = await supabase
-                .from('rchats')
-                .insert({
-                  user1_id: Math.min(user.id, item.user_id),
-                  user2_id: Math.max(user.id, item.user_id),
-                  initiated_by: user.id,
-                  status: status,
-                  is_group: false,
-                  last_message: status === 'pending' ? 'Chat Request' : 'Chat started'
-                })
-                .select()
-                .single();
-              chatId = newChat.id;
-            }
-          
-          if (chatId) {
-            useChatStore.getState().setActiveChatId(chatId);
-            useChatStore.getState().open();
-          }
-        } else if (item.cta_type === 'group' && item.cta_group_id) {
-          // Join group chat
-          const { data: membership } = await supabase
-            .from('rchat_members')
-            .select('*')
-            .eq('chat_id', item.cta_group_id)
-            .eq('user_id', user.id)
-            .single();
-
-          if (!membership) {
-            await supabase.from('rchat_members').insert({
-              chat_id: item.cta_group_id,
-              user_id: user.id,
-              is_admin: false
-            });
-          }
-
-          useChatStore.getState().setActiveChatId(item.cta_group_id);
-          useChatStore.getState().open();
-        }
-      } catch (e) {
-        console.error(e);
-        Alert.alert("Error", "Failed to process request");
-      } finally {
-        setCtaLoading(false);
-      }
-    };
-
-    const fetchLikers = async (type) => {
-
-
-    setLoadingLikers(true);
-    try {
-      const { data } = await supabase
-        .from('rreactions')
-        .select('user:rusers!user_id(id, username, emoji_icon, avatar_url, supabase_uid)')
-        .eq('post_id', item.id)
-        .eq('reaction_type', type);
-      const users = data?.map(r => r.user).filter(Boolean) || [];
-      if (type === 'helpful') setLikers(users);
-      else setSuperlikers(users);
-    } catch (e) { console.error(e); }
-    finally { setLoadingLikers(false); }
-  };
-
-  const isVideo = item.media_type === 'video' || (item.image_url && (item.image_url.endsWith('.mp4') || item.image_url.endsWith('.mov')));
-
-  useEffect(() => {
-    if (isExpanded) fetchComments();
-  }, [isExpanded, item.id]);
-
-  useEffect(() => {
-    if (images.length > 1) {
-      const interval = setInterval(() => {
-        setCurrentImageIndex((prev) => (prev + 1) % images.length);
-      }, 3000); // Cycle every 3 seconds
-      return () => clearInterval(interval);
-    }
-  }, [images.length]);
-
-    const fetchComments = async () => {
-      setLoadingComments(true);
-      try {
-        const { data } = await supabase.from('rcomments').select(`*, user:rusers (username, emoji_icon, avatar_url, nickname)`).eq('post_id', item.id).order('created_at', { ascending: true });
-        setComments(data || []);
-        
-        const storedUser = await getStoredUser();
-        if (storedUser) {
-          const { data: profile } = await supabase.from('rusers').select('nickname').eq('id', storedUser.id).single();
-          setUserNickname(profile?.nickname || "");
-        }
-      } catch (error) { console.error(error); }
-      finally { setLoadingComments(false); }
-    };
-
-    const handleSendComment = async () => {
-      if (!commentText.trim()) return;
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      try {
-        const storedUser = await getStoredUser();
-        const { data: commentData } = await supabase.from('rcomments').insert({
-          post_id: item.id,
-          user_id: storedUser?.id,
-          text: commentText.trim(),
-          device_id: deviceId,
-          is_anonymous: isAnonComment,
-          nickname: isAnonComment ? userNickname : null
-        }).select(`*, user:rusers (username, emoji_icon, avatar_url, nickname)`).single();
-
-        if (item.user_id && item.user_id !== storedUser?.id) {
-            await sendCommentNotification({
-              commenterUsername: storedUser?.username || 'Someone',
-              commenterId: storedUser?.id,
-              postOwnerId: item.user_id,
-              postId: item.id,
-              postTitle: item.title,
-              commentText: commentText.trim()
-            });
-          }
-
-      setComments([...comments, commentData]);
-      setCommentText("");
-      if (onComment) onComment(item.id);
-    } catch (error) { console.error(error); }
-  };
-
   const images = item.image_urls || (item.image_url ? [item.image_url] : []);
   const reactions = item.reactions || item.rreactions || [];
   const helpfulCount = reactions.filter(r => r.reaction_type === 'helpful').length;
@@ -258,11 +76,187 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
 
   const shouldBlur = fakeCount > 5 && fakeCount > helpfulCount;
   const timeAgo = getTimeAgo(new Date(item.created_at));
-    const isModOrAdmin = !!(user?.is_admin || user?.is_moderator);
-    const isBlurredByMod = !!(item.is_blurred && item.blur_reason);
-    const isRedactedMode = !!(shouldBlur || isBlurredByMod);
-    const isRevealed = !!((shouldBlur && revealed) || (isBlurredByMod && blurRevealed));
-    const isCurrentlyBlurred = !!(isRedactedMode && !isRevealed);
+  const isVideo = item.media_type === 'video' || (item.image_url && (item.image_url.endsWith('.mp4') || item.image_url.endsWith('.mov')));
+
+  const [loadingLikers, setLoadingLikers] = useState(false);
+  const [likers, setLikers] = useState([]);
+  const [superlikers, setSuperlikers] = useState([]);
+  const [showLikersModal, setShowLikersModal] = useState(false);
+  const [showSuperlikersModal, setShowSuperlikersModal] = useState(false);
+  
+  const [ctaLoading, setCtaLoading] = useState(false);
+
+  useEffect(() => {
+    if (images.length > 1) {
+      const interval = setInterval(() => {
+        setCurrentImageIndex((prev) => (prev + 1) % images.length);
+      }, 3000); 
+      return () => clearInterval(interval);
+    }
+  }, [images.length]);
+
+  useEffect(() => {
+    if (isExpanded) fetchComments();
+  }, [isExpanded, item.id]);
+
+  const handleCTA = async () => {
+    if (!user) {
+      Alert.alert("Authentication Required", "Please sign in to use this feature.");
+      return;
+    }
+    
+    setCtaLoading(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    try {
+      if (item.cta_type === 'chat') {
+        if (item.user_id === user.id) {
+          Alert.alert("Note", "This is your own post!");
+          return;
+        }
+
+          const { data: existingChats } = await supabase
+            .from('rchats')
+            .select('*')
+            .or(`and(user1_id.eq.${user.id},user2_id.eq.${item.user_id}),and(user1_id.eq.${item.user_id},user2_id.eq.${user.id})`)
+            .eq('is_group', false);
+
+          let chatId;
+          if (existingChats && existingChats.length > 0) {
+            chatId = existingChats[0].id;
+            if (existingChats[0].status === 'pending') {
+              const { data: friendship } = await supabase
+                .from('friends')
+                .select('id')
+                .match({ user_id: user.id, friend_id: item.user_id, status: 'accepted' })
+                .single();
+              
+              if (friendship) {
+                await supabase.from('rchats').update({ status: 'accepted' }).eq('id', chatId);
+              }
+            }
+          } else {
+            const { data: friendship } = await supabase
+              .from('friends')
+              .select('id')
+              .match({ user_id: user.id, friend_id: item.user_id, status: 'accepted' })
+              .single();
+            
+            const status = friendship ? 'accepted' : 'pending';
+
+            const { data: newChat } = await supabase
+              .from('rchats')
+              .insert({
+                user1_id: Math.min(user.id, item.user_id),
+                user2_id: Math.max(user.id, item.user_id),
+                initiated_by: user.id,
+                status: status,
+                is_group: false,
+                last_message: status === 'pending' ? 'Chat Request' : 'Chat started'
+              })
+              .select()
+              .single();
+            chatId = newChat.id;
+          }
+        
+        if (chatId) {
+          useChatStore.getState().setActiveChatId(chatId);
+          useChatStore.getState().open();
+        }
+      } else if (item.cta_type === 'group' && item.cta_group_id) {
+        const { data: membership } = await supabase
+          .from('rchat_members')
+          .select('*')
+          .eq('chat_id', item.cta_group_id)
+          .eq('user_id', user.id)
+          .single();
+
+        if (!membership) {
+          await supabase.from('rchat_members').insert({
+            chat_id: item.cta_group_id,
+            user_id: user.id,
+            is_admin: false
+          });
+        }
+
+        useChatStore.getState().setActiveChatId(item.cta_group_id);
+        useChatStore.getState().open();
+      }
+    } catch (e) {
+      console.error(e);
+      Alert.alert("Error", "Failed to process request");
+    } finally {
+      setCtaLoading(false);
+    }
+  };
+
+  const fetchLikers = async (type) => {
+    setLoadingLikers(true);
+    try {
+      const { data } = await supabase
+        .from('rreactions')
+        .select('user:rusers!user_id(id, username, emoji_icon, avatar_url, supabase_uid)')
+        .eq('post_id', item.id)
+        .eq('reaction_type', type);
+      const users = data?.map(r => r.user).filter(Boolean) || [];
+      if (type === 'helpful') setLikers(users);
+      else setSuperlikers(users);
+    } catch (e) { console.error(e); }
+    finally { setLoadingLikers(false); }
+  };
+
+  const fetchComments = async () => {
+    setLoadingComments(true);
+    try {
+      const { data } = await supabase.from('rcomments').select(`*, user:rusers (username, emoji_icon, avatar_url, nickname)`).eq('post_id', item.id).order('created_at', { ascending: true });
+      setComments(data || []);
+      
+      const storedUser = await getStoredUser();
+      if (storedUser) {
+        const { data: profile } = await supabase.from('rusers').select('nickname').eq('id', storedUser.id).single();
+        setUserNickname(profile?.nickname || "");
+      }
+    } catch (error) { console.error(error); }
+    finally { setLoadingComments(false); }
+  };
+
+  const handleSendComment = async () => {
+    if (!commentText.trim()) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      const storedUser = await getStoredUser();
+      const { data: commentData } = await supabase.from('rcomments').insert({
+        post_id: item.id,
+        user_id: storedUser?.id,
+        text: commentText.trim(),
+        device_id: deviceId,
+        is_anonymous: isAnonComment,
+        nickname: isAnonComment ? userNickname : null
+      }).select(`*, user:rusers (username, emoji_icon, avatar_url, nickname)`).single();
+
+      if (item.user_id && item.user_id !== storedUser?.id) {
+          await sendCommentNotification({
+            commenterUsername: storedUser?.username || 'Someone',
+            commenterId: storedUser?.id,
+            postOwnerId: item.user_id,
+            postId: item.id,
+            postTitle: item.title,
+            commentText: commentText.trim()
+          });
+        }
+
+      setComments([...comments, commentData]);
+      setCommentText("");
+      if (onComment) onComment(item.id);
+    } catch (error) { console.error(error); }
+  };
+
+  const isModOrAdmin = !!(user?.is_admin || user?.is_moderator);
+  const isBlurredByMod = !!(item.is_blurred && item.blur_reason);
+  const isRedactedMode = !!(shouldBlur || isBlurredByMod);
+  const isRevealed = !!((shouldBlur && revealed) || (isBlurredByMod && blurRevealed));
+  const isCurrentlyBlurred = !!(isRedactedMode && !isRevealed);
+
 
     const handleModAction = async (action, reason = null) => {
 
