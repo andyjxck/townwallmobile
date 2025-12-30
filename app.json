@@ -1,6 +1,7 @@
 {
   "expo": {
     "name": "Town Wall",
+    "slug": "townwall",
     "version": "1.0.0",
     "scheme": "townwall",
     "orientation": "portrait",
