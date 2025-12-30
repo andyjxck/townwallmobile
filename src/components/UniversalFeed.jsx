@@ -67,8 +67,9 @@ export default function UniversalFeed() {
   const [refreshing, setRefreshing] = useState(false);
   const [deviceId, setDeviceId] = useState(null);
   
-  const [selectedZone, setSelectedZone] = useState(null);
-  const [sortBy, setSortBy] = useState('newest');
+    const [selectedZone, setSelectedZone] = useState(null);
+    const [zoneSearch, setZoneSearch] = useState("");
+    const [sortBy, setSortBy] = useState('newest');
   const [showMenu, setShowMenu] = useState(false);
   const [showFilterSort, setShowFilterSort] = useState(false);
   const [isModerator, setIsModerator] = useState(false);
@@ -84,17 +85,22 @@ export default function UniversalFeed() {
     const [showLocationPicker, setShowLocationPicker] = useState(false);
 
   
-  const postsWithAds = useMemo(() => {
-    const offlinePosts = pendingPosts.map(p => ({
-      ...p,
-      isPending: true,
-      user: null,
-      zone: null,
-      tag: null,
-      reactions: [],
-    }));
-    return [...offlinePosts, ...posts];
-  }, [posts, pendingPosts]);
+    const postsWithAds = useMemo(() => {
+      const offlinePosts = pendingPosts.map(p => ({
+        ...p,
+        isPending: true,
+        user: null,
+        zone: null,
+        tag: null,
+        reactions: [],
+      }));
+      return [...offlinePosts, ...posts];
+    }, [posts, pendingPosts]);
+
+    const filteredZones = useMemo(() => {
+      if (!zoneSearch) return zones;
+      return zones.filter(z => z.name.toLowerCase().includes(zoneSearch.toLowerCase()));
+    }, [zones, zoneSearch]);
 
     useEffect(() => {
     getDeviceId().then(setDeviceId);
@@ -390,19 +396,44 @@ if (isOnline) syncPendingPosts();
                   ))}
                 </View>
 
-                {feedView !== "global" && (
-                  <>
-                    <Text style={[styles.label, isHippie && { color: '#AAA' }]}>Zone</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.row}>
-                      <TouchableOpacity onPress={() => setSelectedZone(null)} style={[styles.pill, isHippie && { backgroundColor: '#333' }, !selectedZone && { backgroundColor: theme.colors.primary }]}><Text style={[styles.pillText, (isHippie || !selectedZone) && { color: !selectedZone ? '#000' : '#FFF' }]}>All</Text></TouchableOpacity>
-                      {zones.map(z => (
-                        <TouchableOpacity key={z.id} onPress={() => setSelectedZone(z.id)} style={[styles.pill, isHippie && { backgroundColor: '#333' }, selectedZone === z.id && { backgroundColor: theme.colors.primary }]}><Text style={[styles.pillText, (isHippie || selectedZone === z.id) && { color: selectedZone === z.id ? '#000' : '#FFF' }]}>{z.name}</Text></TouchableOpacity>
-                      ))}
-                    </ScrollView>
-                  </>
-                )}
+                  {feedView !== "global" && (
+                    <>
+                      <Text style={[styles.label, isHippie && { color: '#AAA' }]}>Zone</Text>
+                      <View style={[styles.searchContainer, isHippie && { backgroundColor: '#333' }]}>
+                        <Search size={18} color={isHippie ? "#AAA" : "#666"} />
+                        <RNTextInput
+                          style={[styles.searchInput, isHippie && { color: '#FFF' }]}
+                          placeholder="Search neighborhoods..."
+                          placeholderTextColor={isHippie ? "#666" : "#999"}
+                          value={zoneSearch}
+                          onChangeText={setZoneSearch}
+                        />
+                      </View>
+                      <View style={{ maxHeight: 250, marginTop: 10 }}>
+                        <ScrollView showsVerticalScrollIndicator={true} nestedScrollEnabled={true}>
+                          <View style={styles.zoneGrid}>
+                            <TouchableOpacity 
+                              onPress={() => setSelectedZone(null)} 
+                              style={[styles.pill, { marginBottom: 8 }, isHippie && { backgroundColor: '#333' }, !selectedZone && { backgroundColor: theme.colors.primary }]}
+                            >
+                              <Text style={[styles.pillText, (isHippie || !selectedZone) && { color: !selectedZone ? '#000' : '#FFF' }]}>All Zones</Text>
+                            </TouchableOpacity>
+                            {filteredZones.map(z => (
+                              <TouchableOpacity 
+                                key={z.id} 
+                                onPress={() => setSelectedZone(z.id)} 
+                                style={[styles.pill, { marginBottom: 8 }, isHippie && { backgroundColor: '#333' }, selectedZone === z.id && { backgroundColor: theme.colors.primary }]}
+                              >
+                                <Text style={[styles.pillText, (isHippie || selectedZone === z.id) && { color: selectedZone === z.id ? '#000' : '#FFF' }]}>{z.name}</Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        </ScrollView>
+                      </View>
+                    </>
+                  )}
 
-                <TouchableOpacity onPress={() => setShowFilterSort(false)} style={[styles.closeBtn, { backgroundColor: theme.colors.primary }]}><Text style={styles.closeBtnText}>Apply</Text></TouchableOpacity>
+                  <TouchableOpacity onPress={() => { setShowFilterSort(false); setZoneSearch(""); }} style={[styles.closeBtn, { backgroundColor: theme.colors.primary }]}><Text style={styles.closeBtnText}>Apply</Text></TouchableOpacity>
               </View>
             </View>
           </Modal>
@@ -493,9 +524,12 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 10 },
   pill: { paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20, backgroundColor: '#EEE' },
   pillText: { fontSize: 14 },
-  closeBtn: { marginTop: 30, padding: 15, borderRadius: 10, alignItems: 'center' },
-  closeBtnText: { color: '#000', fontWeight: 'bold' },
-  locationOption: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderRadius: 12, marginBottom: 8 },
+    closeBtn: { marginTop: 30, padding: 15, borderRadius: 10, alignItems: 'center' },
+    closeBtnText: { color: '#000', fontWeight: 'bold' },
+    searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F3F4F6', borderRadius: 10, paddingHorizontal: 12, marginBottom: 10 },
+    searchInput: { flex: 1, paddingVertical: 10, marginLeft: 8, fontSize: 14 },
+    zoneGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    locationOption: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderRadius: 12, marginBottom: 8 },
   locationOptionLeft: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   locationOptionTitle: { fontSize: 16, fontWeight: '600' },
   locationOptionDesc: { fontSize: 13, marginTop: 2 },
