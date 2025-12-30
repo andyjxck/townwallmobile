@@ -674,7 +674,31 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
       );
     };
 
-  if (loading && !user) {
+    const handleModAction = async (postId, action, reason = null) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      try {
+        if (action === 'delete') {
+          await supabase.from('rposts').update({ is_deleted: true }).eq('id', postId);
+          Alert.alert("Success", "Post deleted");
+        } else if (action === 'toggle_comments') {
+          const post = userPosts.find(p => p.id === postId) || savedPosts.find(p => p.id === postId);
+          await supabase.from('rposts').update({ comments_disabled: !post?.comments_disabled }).eq('id', postId);
+          Alert.alert("Success", post?.comments_disabled ? "Comments enabled" : "Comments disabled");
+        } else if (action === 'blur') {
+          await supabase.from('rposts').update({ is_blurred: true, blur_reason: reason }).eq('id', postId);
+          Alert.alert("Success", "Post blurred");
+        } else if (action === 'unblur') {
+          await supabase.from('rposts').update({ is_blurred: false, blur_reason: null }).eq('id', postId);
+          Alert.alert("Success", "Blur removed");
+        }
+        loadData();
+      } catch (e) { 
+        console.error(e); 
+        Alert.alert("Error", "Failed to perform action");
+      }
+    };
+
+    if (loading && !user) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: isHippie ? 'transparent' : theme.colors.background }]}>
         <ActivityIndicator color={theme.colors.primary} />
@@ -897,14 +921,14 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
             <View style={styles.tabContent}>
               {activeTab === "posts" && (
                 userPosts.length > 0 ? (
-                  userPosts.map(post => <PostItem key={post.id} item={post} deviceId={deviceId} onReaction={handleReaction} user={currentUser} onComment={loadData} />)
+                  userPosts.map(post => <PostItem key={post.id} item={post} deviceId={deviceId} onReaction={handleReaction} user={currentUser} onComment={loadData} onModAction={handleModAction} />)
                 ) : (
                   <View style={styles.emptyContainer}><Text style={styles.emptyText}>No posts yet</Text></View>
                 )
               )}
               {activeTab === "starred" && (
                 savedPosts.length > 0 ? (
-                  savedPosts.map(post => <PostItem key={post.id} item={post} deviceId={deviceId} onReaction={handleReaction} user={currentUser} onComment={loadData} />)
+                  savedPosts.map(post => <PostItem key={post.id} item={post} deviceId={deviceId} onReaction={handleReaction} user={currentUser} onComment={loadData} onModAction={handleModAction} />)
                 ) : (
                   <View style={styles.emptyContainer}><Text style={styles.emptyText}>No starred posts</Text></View>
                 )

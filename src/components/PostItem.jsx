@@ -252,8 +252,9 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
     } catch (error) { console.error(error); }
   };
 
-  const isModOrAdmin = !!(user?.is_admin || user?.is_moderator);
-  const isBlurredByMod = !!(item.is_blurred && item.blur_reason);
+    const isModOrAdmin = !!(user?.is_admin || user?.is_moderator);
+    const isOwner = user?.id === item.user_id;
+    const isBlurredByMod = !!(item.is_blurred && item.blur_reason);
   const isRedactedMode = !!(shouldBlur || isBlurredByMod);
   const isRevealed = !!((shouldBlur && revealed) || (isBlurredByMod && blurRevealed));
   const isCurrentlyBlurred = !!(isRedactedMode && !isRevealed);
@@ -345,7 +346,7 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
           {!isCurrentlyBlurred && user?.id === item.user_id && !isRedactedMode && (
             <TouchableOpacity onPress={() => onEdit?.(item)}><Pencil size={18} color={theme.colors.textSecondary} /></TouchableOpacity>
           )}
-          {isModOrAdmin && (
+          {(isModOrAdmin || isOwner) && (
             <TouchableOpacity onPress={() => setShowModMenu(true)} style={{ marginLeft: 8 }}>
               <MoreVertical size={18} color={theme.colors.textSecondary} />
             </TouchableOpacity>
@@ -633,32 +634,34 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
           </View>
         </Modal>
 
-        <Modal visible={showModMenu} transparent animationType="slide">
-          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowModMenu(false)}>
-            <View style={styles.modMenuContent}>
-              <Text style={styles.modMenuTitle}>Moderator Actions</Text>
-              
-              <TouchableOpacity style={styles.modMenuItem} onPress={() => { handleModAction('delete'); }}>
-                <Trash2 size={20} color={theme.colors.error} />
-                <Text style={[styles.modMenuText, { color: theme.colors.error }]}>Delete Post</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.modMenuItem} onPress={() => { handleModAction('toggle_comments'); }}>
-                <MessageSquareOff size={20} color={theme.colors.textSecondary} />
-                <Text style={styles.modMenuText}>{item.comments_disabled ? 'Enable Comments' : 'Disable Comments'}</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.modMenuItem} onPress={() => { setShowModMenu(false); setShowBlurModal(true); }}>
-                <EyeOff size={20} color="#FBBF24" />
-                <Text style={[styles.modMenuText, { color: '#FBBF24' }]}>Blur Post</Text>
-              </TouchableOpacity>
-
-              {item.is_blurred && (
-                <TouchableOpacity style={styles.modMenuItem} onPress={() => { handleModAction('unblur'); }}>
-                  <EyeOff size={20} color="#10B981" />
-                  <Text style={[styles.modMenuText, { color: '#10B981' }]}>Remove Blur</Text>
+          <Modal visible={showModMenu} transparent animationType="slide">
+            <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowModMenu(false)}>
+              <View style={styles.modMenuContent}>
+                <Text style={styles.modMenuTitle}>{isModOrAdmin ? "Moderator Actions" : "Post Options"}</Text>
+                
+                <TouchableOpacity style={styles.modMenuItem} onPress={() => { handleModAction('delete'); }}>
+                  <Trash2 size={20} color={theme.colors.error} />
+                  <Text style={[styles.modMenuText, { color: theme.colors.error }]}>Delete Post</Text>
                 </TouchableOpacity>
-              )}
+                
+                <TouchableOpacity style={styles.modMenuItem} onPress={() => { handleModAction('toggle_comments'); }}>
+                  <MessageSquareOff size={20} color={theme.colors.textSecondary} />
+                  <Text style={styles.modMenuText}>{item.comments_disabled ? 'Enable Comments' : 'Disable Comments'}</Text>
+                </TouchableOpacity>
+                
+                {isModOrAdmin && (
+                  <TouchableOpacity style={styles.modMenuItem} onPress={() => { setShowModMenu(false); setShowBlurModal(true); }}>
+                    <EyeOff size={20} color="#FBBF24" />
+                    <Text style={[styles.modMenuText, { color: '#FBBF24' }]}>Blur Post</Text>
+                  </TouchableOpacity>
+                )}
+
+                {isModOrAdmin && item.is_blurred && (
+                  <TouchableOpacity style={styles.modMenuItem} onPress={() => { handleModAction('unblur'); }}>
+                    <EyeOff size={20} color="#10B981" />
+                    <Text style={[styles.modMenuText, { color: '#10B981' }]}>Remove Blur</Text>
+                  </TouchableOpacity>
+                )}
               
               <TouchableOpacity style={[styles.modMenuItem, styles.modMenuCancel]} onPress={() => setShowModMenu(false)}>
                 <Text style={styles.modMenuCancelText}>Cancel</Text>
