@@ -17,7 +17,7 @@ import { supabase } from "../utils/supabase";
 import { useAuthStore } from "../utils/auth";
 import { getDeviceId } from "../utils/deviceId";
 import { initUser, mergeAnonDataToUser, checkAnonHasData } from "../utils/user";
-import { ChevronLeft, User, Lock } from "lucide-react-native";
+import { ChevronLeft, User, Lock, Save, Trash2 } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import bcrypt from 'bcryptjs';
 import { generateRecoveryCodes, storeRecoveryCodes } from "../utils/recoveryCode";
@@ -27,6 +27,8 @@ import { useTheme } from "@/utils/ThemeContext";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
+import { getSavedProfiles, saveProfile, removeProfile } from "../utils/savedProfiles";
+import { formatDistanceToNow } from "date-fns";
 
 // Polyfill for bcryptjs in React Native/Expo
 if (typeof global.crypto !== 'object') {
@@ -55,6 +57,17 @@ export default function Auth() {
   const [showRecoveryCodes, setShowRecoveryCodes] = useState(false);
   const [recoveryCodes, setRecoveryCodes] = useState([]);
   const [pendingUser, setPendingUser] = useState(null);
+  const [savedProfiles, setSavedProfiles] = useState([]);
+  const [saveProfileEnabled, setSaveProfileEnabled] = useState(true);
+
+  useEffect(() => {
+    loadSavedProfiles();
+  }, []);
+
+  const loadSavedProfiles = async () => {
+    const profiles = await getSavedProfiles();
+    setSavedProfiles(profiles);
+  };
 
   useEffect(() => {
     if (params.mode === "login") {
@@ -115,49 +128,71 @@ export default function Auth() {
               throw new Error("Invalid username or password");
             }
 
-            const isMatch = bcrypt.compareSync(trimmedPassword, user.password);
-            if (!isMatch) {
-              throw new Error("Invalid username or password");
-            }
-
-            const { auth: currentAuth } = useAuthStore.getState();
-              if (currentAuth && currentAuth.id !== user.id && !currentAuth.password) {
-                const hasData = await checkAnonHasData(currentAuth.id);
-                if (hasData) {
-                  setLoading(false);
-                  Alert.alert(
-                    "Transfer Data?",
-                    "You have posts, comments, or messages from your anonymous session. Would you like to transfer them to your account?",
-                    [
-                      {
-                        text: "No, discard",
-                        style: "destructive",
-                        onPress: async () => {
-                          setLoading(true);
-                          await supabase.from('rusers').delete().eq('id', currentAuth.id);
-                          await completeLogin(user, deviceId);
-                          setLoading(false);
-                        }
-                      },
-                      {
-                        text: "Yes, transfer",
-                        onPress: async () => {
-                          setLoading(true);
-                          await mergeAnonDataToUser(currentAuth.id, user.id);
-                          await supabase.from('rusers').delete().eq('id', currentAuth.id);
-                          await completeLogin(user, deviceId);
-                          setLoading(false);
-                        }
-                      }
-                    ]
-                  );
-                  return;
-                } else {
-                  await supabase.from('rusers').delete().eq('id', currentAuth.id);
-                }
+              const isMatch = bcrypt.compareSync(trimmedPassword, user.password);
+              if (!isMatch) {
+                throw new Error("Invalid username or password");
               }
 
-            await completeLogin(user, deviceId);
+              const { auth: currentAuth } = useAuthStore.getState();
+                if (currentAuth && currentAuth.id !== user.id && !currentAuth.password) {
+                  const hasData = await checkAnonHasData(currentAuth.id);
+                  if (hasData) {
+                    setLoading(false);
+                    Alert.alert(
+                      "Transfer Data?",
+                      "You have posts, comments, or messages from your anonymous session. Would you like to transfer them to your account?",
+                      [
+                        {
+                          text: "No, discard",
+                          style: "destructive",
+                          onPress: async () => {
+                            setLoading(true);
+                            await supabase.from('rusers').delete().eq('id', currentAuth.id);
+                            await completeLogin(user, deviceId);
+                            if (saveProfileEnabled) {
+                              await saveProfile({
+                                username: trimmedUsername,
+                                password: trimmedPassword,
+                                emoji_icon: user.emoji_icon
+                              });
+                            }
+                            setLoading(false);
+                          }
+                        },
+                        {
+                          text: "Yes, transfer",
+                          onPress: async () => {
+                            setLoading(true);
+                            await mergeAnonDataToUser(currentAuth.id, user.id);
+                            await supabase.from('rusers').delete().eq('id', currentAuth.id);
+                            await completeLogin(user, deviceId);
+                            if (saveProfileEnabled) {
+                              await saveProfile({
+                                username: trimmedUsername,
+                                password: trimmedPassword,
+                                emoji_icon: user.emoji_icon
+                              });
+                            }
+                            setLoading(false);
+                          }
+                        }
+                      ]
+                    );
+                    return;
+                  } else {
+                    await supabase.from('rusers').delete().eq('id', currentAuth.id);
+                  }
+                }
+
+              await completeLogin(user, deviceId);
+              if (saveProfileEnabled) {
+                await saveProfile({
+                  username: trimmedUsername,
+                  password: trimmedPassword,
+                  emoji_icon: user.emoji_icon
+                });
+              }
+
       } else {
         const { data: existingUser } = await supabase
           .from('rusers')
@@ -224,6 +259,66 @@ export default function Auth() {
     }
   };
 
+  const handleQuickLogin = async (profile) => {
+    setLoading(true);
+    setUsername(profile.username);
+    setPassword(profile.password);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    try {
+      const deviceId = await getDeviceId();
+      const { data: user, error } = await supabase
+        .from('rusers')
+        .select('*')
+        .ilike('username', profile.username)
+        .single();
+
+      if (error || !user) {
+        throw new Error("Saved profile no longer valid");
+      }
+
+      const isMatch = bcrypt.compareSync(profile.password, user.password);
+      if (!isMatch) {
+        throw new Error("Saved password no longer valid");
+      }
+
+      await completeLogin(user, deviceId);
+      await saveProfile({
+        username: profile.username,
+        password: profile.password,
+        emoji_icon: user.emoji_icon
+      });
+    } catch (error) {
+      Alert.alert("Error", error.message);
+      // Remove invalid profile
+      if (error.message.includes("no longer valid")) {
+        await removeProfile(profile.username);
+        await loadSavedProfiles();
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRemoveSavedProfile = async (username) => {
+    Alert.alert(
+      "Remove Profile",
+      `Are you sure you want to remove ${username} from saved profiles?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Remove", 
+          style: "destructive",
+          onPress: async () => {
+            await removeProfile(username);
+            await loadSavedProfiles();
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          }
+        }
+      ]
+    );
+  };
+
   if (showRecoveryCodes) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -263,40 +358,89 @@ export default function Auth() {
           <ChevronLeft color="#FFFFFF" size={28} />
         </TouchableOpacity>
 
-        <View style={styles.content}>
-          <View style={styles.titleSection}>
-            <Text style={styles.title}>{isLogin ? "Welcome Back" : "Join Town Wall"}</Text>
-            <Text style={styles.subtitle}>
-              {isLogin 
-                ? "Sign in to continue sharing with your community" 
-                : "Create an account to start posting and interacting locally"}
-            </Text>
-          </View>
-
-          <View style={styles.form}>
-            <View style={styles.inputContainer}>
-              <User size={20} color="rgba(255,255,255,0.4)" style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Username"
-                placeholderTextColor="rgba(255,255,255,0.3)"
-                value={username}
-                onChangeText={setUsername}
-                autoCapitalize="none"
-              />
+          <View style={styles.content}>
+            <View style={styles.titleSection}>
+              <Text style={styles.title}>{isLogin ? "Welcome Back" : "Join Town Wall"}</Text>
+              <Text style={styles.subtitle}>
+                {isLogin 
+                  ? "Sign in to continue sharing with your community" 
+                  : "Create an account to start posting and interacting locally"}
+              </Text>
             </View>
 
-            <View style={styles.inputContainer}>
-              <Lock size={20} color="rgba(255,255,255,0.4)" style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Password"
-                placeholderTextColor="rgba(255,255,255,0.3)"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-              />
-            </View>
+            {isLogin && savedProfiles.length > 0 && (
+              <View style={styles.savedProfilesSection}>
+                <Text style={styles.sectionLabel}>Saved Profiles</Text>
+                <ScrollView 
+                  horizontal 
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.savedProfilesList}
+                >
+                  {savedProfiles.map((profile) => (
+                    <TouchableOpacity
+                      key={profile.username}
+                      style={styles.profileCard}
+                      onPress={() => handleQuickLogin(profile)}
+                      onLongPress={() => handleRemoveSavedProfile(profile.username)}
+                    >
+                      <View style={styles.profileEmojiContainer}>
+                        <Text style={styles.profileEmoji}>{profile.emoji || '👤'}</Text>
+                      </View>
+                      <View style={styles.profileInfo}>
+                        <Text style={styles.profileName} numberOfLines={1}>{profile.username}</Text>
+                        <Text style={styles.lastLogin}>
+                          {formatDistanceToNow(new Date(profile.lastLogin), { addSuffix: true })}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
+            <View style={styles.form}>
+              <View style={styles.inputContainer}>
+                <User size={20} color="rgba(255,255,255,0.4)" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Username"
+                  placeholderTextColor="rgba(255,255,255,0.3)"
+                  value={username}
+                  onChangeText={setUsername}
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Lock size={20} color="rgba(255,255,255,0.4)" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Password"
+                  placeholderTextColor="rgba(255,255,255,0.3)"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry
+                />
+              </View>
+
+              {isLogin && (
+                <TouchableOpacity 
+                  style={styles.saveProfileToggle}
+                  onPress={() => {
+                    setSaveProfileEnabled(!saveProfileEnabled);
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  }}
+                >
+                  <View style={[
+                    styles.checkbox,
+                    saveProfileEnabled && styles.checkboxChecked
+                  ]}>
+                    {saveProfileEnabled && <Save size={12} color="#000000" />}
+                  </View>
+                  <Text style={styles.saveProfileText}>Save profile for next time</Text>
+                </TouchableOpacity>
+              )}
+
 
             <TouchableOpacity 
               style={styles.primaryButton} 
@@ -445,11 +589,86 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 18,
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#FFFFFF",
-    textAlign: "center",
-    marginBottom: 20,
-  }
-});
+    headerTitle: {
+      fontSize: 20,
+      fontWeight: "bold",
+      color: "#FFFFFF",
+      textAlign: "center",
+      marginBottom: 20,
+    },
+    savedProfilesSection: {
+      marginBottom: 32,
+    },
+    sectionLabel: {
+      fontSize: 14,
+      fontWeight: "700",
+      color: "rgba(255,255,255,0.4)",
+      textTransform: "uppercase",
+      letterSpacing: 1,
+      marginBottom: 16,
+    },
+    savedProfilesList: {
+      paddingRight: 24,
+      gap: 12,
+    },
+    profileCard: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: "rgba(255,255,255,0.06)",
+      padding: 12,
+      borderRadius: 20,
+      minWidth: 160,
+      borderWidth: 1,
+      borderColor: "rgba(255,255,255,0.1)",
+    },
+    profileEmojiContainer: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: "rgba(255,255,255,0.1)",
+      justifyContent: "center",
+      alignItems: "center",
+      marginRight: 12,
+    },
+    profileEmoji: {
+      fontSize: 24,
+    },
+    profileInfo: {
+      flex: 1,
+    },
+    profileName: {
+      color: "#FFFFFF",
+      fontSize: 15,
+      fontWeight: "700",
+      marginBottom: 2,
+    },
+    lastLogin: {
+      color: "rgba(255,255,255,0.4)",
+      fontSize: 12,
+    },
+    saveProfileToggle: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: 8,
+    },
+    checkbox: {
+      width: 20,
+      height: 20,
+      borderRadius: 6,
+      borderWidth: 2,
+      borderColor: "rgba(255,255,255,0.2)",
+      marginRight: 10,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    checkboxChecked: {
+      backgroundColor: "#FFFFFF",
+      borderColor: "#FFFFFF",
+    },
+    saveProfileText: {
+      color: "rgba(255,255,255,0.6)",
+      fontSize: 14,
+      fontWeight: "500",
+    }
+  });
+
