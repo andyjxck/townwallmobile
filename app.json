@@ -51,9 +51,10 @@
       ],
       "package": "com.andysocial.townwall"
     },
-      "plugins": [
-        [
-          "@livekit/react-native-expo-plugin",
+        "plugins": [
+          "./plugins/withNonModularHeaders",
+          [
+            "@livekit/react-native-expo-plugin",
           {
             "android": {
               "audioType": "communication"
