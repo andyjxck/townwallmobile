@@ -24,6 +24,7 @@ import { Image } from "expo-image";
 import { theme } from "../utils/theme";
 import { useTheme } from "@/utils/ThemeContext";
 import { RichTextEditor } from "../components/RichTextEditor";
+import HippieBackground from "../components/HippieBackground";
 import { offlineStorage, checkNetworkStatus } from "../utils/offline";
 import { sendNewPostNotification } from "../utils/notifications";
 import { useLocationStore } from "../utils/locationStore";
@@ -217,7 +218,7 @@ const dbPostData = {
   };
 
   if (step === 'zone' || step === 'tag') {
-    return (
+    const content = (
       <View style={[styles.container, { paddingTop: insets.top, backgroundColor: isHippie ? 'transparent' : theme.colors.background }]}>
         <View style={[styles.overlayHeader, { borderBottomColor: theme.colors.border }]}>
           <Text style={[styles.overlayTitle, { color: theme.colors.text }]}>Select {step.toUpperCase()}</Text>
@@ -248,6 +249,8 @@ const dbPostData = {
         </ScrollView>
       </View>
     );
+
+    return isHippie ? <HippieBackground>{content}</HippieBackground> : content;
   }
 
   const handleCreateGroup = async () => {
@@ -288,7 +291,7 @@ const dbPostData = {
   };
 
   if (step === 'cta') {
-    return (
+    const content = (
       <View style={[styles.container, { paddingTop: insets.top, backgroundColor: isHippie ? 'transparent' : theme.colors.background }]}>
         <View style={[styles.overlayHeader, { borderBottomColor: theme.colors.border }]}>
           <TouchableOpacity onPress={() => setStep('write')}>
@@ -296,7 +299,7 @@ const dbPostData = {
           </TouchableOpacity>
           <Text style={[styles.overlayTitle, { color: theme.colors.text }]}>Call to Action</Text>
           <TouchableOpacity onPress={() => setStep('write')}>
-            <Check size={24} color={theme.colors.primary} />
+            <Check size={24} color={isHippie ? '#FFF' : theme.colors.primary} />
           </TouchableOpacity>
         </View>
         <ScrollView contentContainerStyle={styles.form}>
@@ -316,7 +319,7 @@ const dbPostData = {
                 style={[
                   styles.ctaTypeCard,
                   { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: theme.colors.border },
-                  ctaType === type.id && { borderColor: theme.colors.primary, backgroundColor: theme.colors.primary + '10' }
+                  ctaType === type.id && { borderColor: theme.colors.primary, backgroundColor: theme.colors.primary + '20' }
                 ]}
               >
                 <type.icon size={24} color={ctaType === type.id ? theme.colors.primary : "rgba(255,255,255,0.5)"} />
@@ -394,17 +397,19 @@ const dbPostData = {
 
           <TouchableOpacity 
             onPress={() => setStep('write')}
-            style={[styles.saveCtaBtn, { backgroundColor: theme.colors.primary }]}
+            style={[styles.saveCtaBtn, { backgroundColor: isHippie ? '#FFF' : theme.colors.primary }]}
           >
-            <Text style={styles.saveCtaBtnText}>Apply CTA</Text>
+            <Text style={[styles.saveCtaBtnText, { color: '#000' }]}>Apply CTA</Text>
           </TouchableOpacity>
         </ScrollView>
       </View>
     );
+
+    return isHippie ? <HippieBackground>{content}</HippieBackground> : content;
   }
 
   if (step === 'poll') {
-    return (
+    const content = (
       <View style={[styles.container, { paddingTop: insets.top, backgroundColor: isHippie ? 'transparent' : theme.colors.background }]}>
         <View style={[styles.overlayHeader, { borderBottomColor: theme.colors.border }]}>
           <Text style={[styles.overlayTitle, { color: theme.colors.text }]}>Add Poll</Text>
@@ -466,21 +471,23 @@ const dbPostData = {
               setHasPoll(true);
               setStep('write');
             }}
-            style={[styles.savePollBtn, { backgroundColor: theme.colors.primary }]}
+            style={[styles.savePollBtn, { backgroundColor: isHippie ? '#FFF' : theme.colors.primary }]}
           >
-            <Text style={styles.savePollBtnText}>Done</Text>
+            <Text style={[styles.savePollBtnText, { color: '#000' }]}>Done</Text>
           </TouchableOpacity>
         </ScrollView>
       </View>
     );
+
+    return isHippie ? <HippieBackground>{content}</HippieBackground> : content;
   }
 
-  return (
+  const mainContent = (
     <KeyboardAvoidingView 
       behavior={Platform.OS === "ios" ? "padding" : "height"} 
-      style={[styles.container, { backgroundColor: theme.colors.background }]}
+      style={[styles.container, { backgroundColor: isHippie ? 'transparent' : theme.colors.background }]}
     >
-      <View style={[styles.header, { paddingTop: insets.top + 10, borderBottomColor: theme.colors.border }]}>
+      <View style={[styles.header, { paddingTop: insets.top + 10, borderBottomColor: isHippie ? 'rgba(255,255,255,0.1)' : theme.colors.border }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
           <X size={24} color={theme.colors.text} />
         </TouchableOpacity>
@@ -493,12 +500,12 @@ const dbPostData = {
         <TouchableOpacity 
           onPress={handlePost} 
           disabled={loading}
-          style={[styles.publishBtn, { backgroundColor: theme.colors.primary }]}
+          style={[styles.publishBtn, { backgroundColor: isHippie ? '#FFF' : theme.colors.primary }]}
         >
           {loading ? (
             <ActivityIndicator size="small" color="#000" />
           ) : (
-            <Text style={styles.publishBtnText}>
+            <Text style={[styles.publishBtnText, { color: '#000' }]}>
               {isOnline ? (postId ? "Update" : "Post") : "Save"}
             </Text>
           )}
@@ -520,10 +527,10 @@ const dbPostData = {
             {feedView !== "global" && (
               <TouchableOpacity 
                 onPress={() => setStep('zone')} 
-                style={[styles.option, { backgroundColor: 'rgba(255,255,255,0.08)' }]}
+                style={[styles.option, { backgroundColor: isHippie ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.08)' }]}
               >
-                <Text style={styles.optionLabel}>In </Text>
-                <Text style={[styles.optionValue, { color: theme.colors.primary }]}>
+                <Text style={[styles.optionLabel, { color: isHippie ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.4)' }]}>In </Text>
+                <Text style={[styles.optionValue, { color: isHippie ? '#FFF' : theme.colors.primary }]}>
                   {selectedZone?.name || "Select Zone"}
                 </Text>
                 <ChevronRight size={14} color="rgba(255,255,255,0.3)" />
@@ -532,10 +539,10 @@ const dbPostData = {
 
             <TouchableOpacity 
               onPress={() => setStep('tag')} 
-              style={[styles.option, { backgroundColor: 'rgba(255,255,255,0.08)' }]}
+              style={[styles.option, { backgroundColor: isHippie ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.08)' }]}
             >
-              <Text style={styles.optionLabel}>As </Text>
-              <Text style={[styles.optionValue, { color: theme.colors.primary }]}>
+              <Text style={[styles.optionLabel, { color: isHippie ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.4)' }]}>As </Text>
+              <Text style={[styles.optionValue, { color: isHippie ? '#FFF' : theme.colors.primary }]}>
                 {selectedTag?.name || "Select Tag"}
               </Text>
               <ChevronRight size={14} color="rgba(255,255,255,0.3)" />
@@ -548,14 +555,14 @@ const dbPostData = {
               }}
               style={[
                 styles.anonOption, 
-                { backgroundColor: 'rgba(255,255,255,0.08)' },
-                isAnonymous && { backgroundColor: theme.colors.primary }
+                { backgroundColor: isHippie ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.08)' },
+                isAnonymous && { backgroundColor: isHippie ? '#FFF' : theme.colors.primary }
               ]}
             >
-              <Shield size={14} color={isAnonymous ? "#000" : "rgba(255,255,255,0.5)"} />
+              <Shield size={14} color={isAnonymous ? "#000" : (isHippie ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.5)")} />
               <Text style={[
                 styles.anonOptionText, 
-                { color: "rgba(255,255,255,0.5)" },
+                { color: isHippie ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.5)" },
                 isAnonymous && { color: "#000" }
               ]}>
                 Anon
@@ -565,14 +572,14 @@ const dbPostData = {
 
           <TouchableOpacity 
             onPress={() => setStep('cta')} 
-            style={[styles.ctaOption, { backgroundColor: 'rgba(255,255,255,0.08)', borderColor: theme.colors.border }]}
+            style={[styles.ctaOption, { backgroundColor: isHippie ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.08)', borderColor: isHippie ? 'rgba(255,255,255,0.2)' : theme.colors.border }]}
           >
-            <Layout size={20} color={ctaType !== 'none' ? theme.colors.primary : "rgba(255,255,255,0.5)"} />
+            <Layout size={20} color={ctaType !== 'none' ? (isHippie ? '#FFF' : theme.colors.primary) : "rgba(255,255,255,0.5)"} />
             <View style={{ flex: 1, marginLeft: 12 }}>
               <Text style={[styles.ctaOptionTitle, { color: theme.colors.text }]}>
                 {ctaType === 'none' ? "Add Call to Action" : ctaType === 'chat' ? "Chat Button" : "Group Button"}
               </Text>
-              <Text style={styles.ctaOptionDesc}>
+              <Text style={[styles.ctaOptionDesc, { color: isHippie ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.4)' }]}>
                 {ctaType === 'none' ? "Help people get in touch" : ctaType === 'chat' ? "Adds a 'Chat to me' button" : "Adds a 'Join group' button"}
               </Text>
             </View>
@@ -594,6 +601,7 @@ const dbPostData = {
             placeholder="Share what's on your mind..." 
             onPollPress={() => setStep('poll')}
             minHeight={300}
+            backgroundColor={isHippie ? 'transparent' : '#000'}
           />
 
           <View style={styles.mediaSection}>
@@ -609,9 +617,9 @@ const dbPostData = {
                   </TouchableOpacity>
                 </View>
               ))}
-              <TouchableOpacity onPress={pickMedia} style={[styles.addMedia, { borderColor: theme.colors.border }]}>
+              <TouchableOpacity onPress={pickMedia} style={[styles.addMedia, { borderColor: isHippie ? 'rgba(255,255,255,0.3)' : theme.colors.border, backgroundColor: isHippie ? 'rgba(255,255,255,0.05)' : 'transparent' }]}>
                 <Plus size={24} color="rgba(255,255,255,0.5)" />
-                <Text style={styles.addMediaText}>Add Media</Text>
+                <Text style={[styles.addMediaText, { color: isHippie ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.3)' }]}>Add Media</Text>
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -619,6 +627,8 @@ const dbPostData = {
       </ScrollView>
     </KeyboardAvoidingView>
   );
+
+  return isHippie ? <HippieBackground>{mainContent}</HippieBackground> : mainContent;
 }
 
 const styles = StyleSheet.create({

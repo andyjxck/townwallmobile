@@ -95,7 +95,14 @@ function ToolbarDropdown({ icon: Icon, label, options, onSelect, currentValue })
   );
 }
 
-export function RichTextEditor({ value, onChange, placeholder, onPollPress, minHeight = 400 }) {
+export function RichTextEditor({ 
+  value, 
+  onChange, 
+  placeholder, 
+  onPollPress, 
+  minHeight = 400,
+  backgroundColor = '#000000'
+}) {
   const richText = useRef();
 
   const handleListSelect = (type) => {
@@ -112,7 +119,7 @@ export function RichTextEditor({ value, onChange, placeholder, onPollPress, minH
   ];
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor }]}>
       <View style={styles.toolbarContainer}>
         <View 
           style={styles.toolbarContent}
@@ -158,14 +165,14 @@ export function RichTextEditor({ value, onChange, placeholder, onPollPress, minH
         </View>
       </View>
 
-      <View style={[styles.editorWrapper, { minHeight }]}>
+      <View style={[styles.editorWrapper, { minHeight, backgroundColor }]}>
         <RichEditor
           ref={richText}
           initialContentHTML={value}
           onChange={onChange}
           placeholder={placeholder}
           editorStyle={{
-            backgroundColor: '#000000',
+            backgroundColor: backgroundColor,
             color: '#FFFFFF',
             placeholderColor: 'rgba(255,255,255,0.2)',
             contentCSSText: `
