@@ -45,8 +45,10 @@ import { useRouter, useLocalSearchParams, usePathname } from "expo-router";
 import { theme } from "../utils/theme";
 
 export default function PostItem({ item, deviceId, onReaction, onComment, onDelete, onShare, onEdit, user, onFilterZone, onFilterTag, onModAction }) {
+  if (!item) return null;
   const { width } = useWindowDimensions();
   const router = useRouter();
+  const images = item?.image_urls || (item?.image_url ? [item.image_url] : []);
   
   const [revealed, setRevealed] = useState(false);
   const [blurRevealed, setBlurRevealed] = useState(false);
@@ -62,7 +64,6 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
   const [showBlurModal, setShowBlurModal] = useState(false);
   const [blurReasonInput, setBlurReasonInput] = useState("");
 
-  const images = item.image_urls || (item.image_url ? [item.image_url] : []);
   const reactions = item.reactions || item.rreactions || [];
   const helpfulCount = reactions.filter(r => r.reaction_type === 'helpful').length;
   const superlikeCount = reactions.filter(r => r.reaction_type === 'superlike').length;
