@@ -40,6 +40,7 @@ export default function SettingsScreen() {
   const { city_name, zone_name } = useLocationStore();
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [doNotDisturb, setDoNotDisturb] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showRecoveryCodes, setShowRecoveryCodes] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
@@ -52,18 +53,18 @@ export default function SettingsScreen() {
   const [hasPasswordLocal, setHasPasswordLocal] = useState(!!auth?.password);
   const [passwordError, setPasswordError] = useState("");
 
-    const loadingMessages = [
-      "Generating your secure recovery codes...",
-      "I know this can take a while.. I promise it's working!",
-      "Almost there... securing your account...",
-      "Encryption in progress...",
-      "Hashing codes for maximum safety...",
-      "One-time use, lifetime security...",
-      "Double checking the locks...",
-      "Your account's safety is our priority...",
-      "Wrapping things up for you...",
-      "Finalizing your vault...",
-    ];
+  const loadingMessages = [
+    "Generating your secure recovery codes...",
+    "I know this can take a while.. I promise it's working!",
+    "Almost there... securing your account...",
+    "Encryption in progress...",
+    "Hashing codes for maximum safety...",
+    "One-time use, lifetime security...",
+    "Double checking the locks...",
+    "Your account's safety is our priority...",
+    "Wrapping things up for you...",
+    "Finalizing your vault...",
+  ];
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
 
   useEffect(() => {
@@ -80,20 +81,37 @@ export default function SettingsScreen() {
 
   useEffect(() => {
     setHasPasswordLocal(!!auth?.password);
-  }, [auth?.password]);
+    setDoNotDisturb(auth?.do_not_disturb || false);
+  }, [auth?.password, auth?.do_not_disturb]);
 
   useEffect(() => {
     const checkPassword = async () => {
       if (!auth?.password && auth?.id) {
-        const { data } = await supabase.from('rusers').select('password').eq('id', auth.id).single();
-        if (data?.password) {
-          setHasPasswordLocal(true);
-          useAuthStore.getState().setAuth({ ...auth, password: data.password });
+        const { data } = await supabase.from('rusers').select('password, do_not_disturb').eq('id', auth.id).single();
+        if (data) {
+          if (data.password) {
+            setHasPasswordLocal(true);
+          }
+          setDoNotDisturb(data.do_not_disturb || false);
+          useAuthStore.getState().setAuth({ ...auth, ...data });
         }
       }
     };
     checkPassword();
   }, []);
+
+  const toggleDND = async (value) => {
+    setDoNotDisturb(value);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      const { data, error } = await supabase.from('rusers').update({ do_not_disturb: value }).eq('id', auth.id).select().single();
+      if (data) {
+        useAuthStore.getState().setAuth(data);
+      }
+    } catch (error) {
+      console.error("Error toggling DND:", error);
+    }
+  };
 
   const fetchRecoveryStatus = async () => {
     if (!auth?.id) return;
@@ -223,6 +241,25 @@ export default function SettingsScreen() {
       </View>
 
         <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}>
+              <View style={styles.section}>
+                <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>PREFERENCES</Text>
+                <View style={[styles.item, { borderBottomColor: theme.colors.border }]}>
+                  <View style={styles.itemLeft}>
+                    <Bell size={20} color={theme.colors.textSecondary} />
+                    <View>
+                      <Text style={[styles.itemTitle, { color: theme.colors.text }]}>Do Not Disturb</Text>
+                      <Text style={{ color: theme.colors.textSecondary, fontSize: 12 }}>Silence all push notifications</Text>
+                    </View>
+                  </View>
+                  <Switch
+                    value={doNotDisturb}
+                    onValueChange={toggleDND}
+                    trackColor={{ false: '#334155', true: theme.colors.primary }}
+                    thumbColor={Platform.OS === 'ios' ? '#FFFFFF' : (doNotDisturb ? theme.colors.primary : '#f4f3f4')}
+                  />
+                </View>
+              </View>
+
               <View style={styles.section}>
                 <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>LOCATION</Text>
                 <TouchableOpacity onPress={() => router.push("/onboarding/city")} style={[styles.item, { borderBottomColor: theme.colors.border }]}>

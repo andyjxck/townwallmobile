@@ -255,15 +255,16 @@ return () => {
           user_id: user?.id 
         }).select('*, post:rposts(user_id, title)').single();
 
-          if (reactionData?.post?.user_id && reactionData.post.user_id !== user?.id) {
-            await sendReactionNotification({
-              reactorUsername: user?.username || 'Someone',
-              reactorId: user?.id,
-              postOwnerId: reactionData.post.user_id,
-              postTitle: reactionData.post.title,
-              reactionType: type
-            });
-          }
+            if (reactionData?.post?.user_id && reactionData.post.user_id !== user?.id) {
+              await sendReactionNotification({
+                reactorUsername: user?.username || 'Someone',
+                reactorId: user?.id,
+                postOwnerId: reactionData.post.user_id,
+                postId: postId,
+                postTitle: reactionData.post.title,
+                reactionType: type
+              });
+            }
       }
       fetchPosts(true);
     } catch (e) { console.error(e); }

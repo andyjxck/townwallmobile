@@ -218,15 +218,16 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
           nickname: isAnonComment ? userNickname : null
         }).select(`*, user:rusers (username, emoji_icon, avatar_url, nickname)`).single();
 
-      if (item.user_id && item.user_id !== storedUser?.id) {
-          await sendCommentNotification({
-            commenterUsername: storedUser?.username || 'Someone',
-            commenterId: storedUser?.id,
-            postOwnerId: item.user_id,
-            postTitle: item.title,
-            commentText: commentText.trim()
-          });
-        }
+        if (item.user_id && item.user_id !== storedUser?.id) {
+            await sendCommentNotification({
+              commenterUsername: storedUser?.username || 'Someone',
+              commenterId: storedUser?.id,
+              postOwnerId: item.user_id,
+              postId: item.id,
+              postTitle: item.title,
+              commentText: commentText.trim()
+            });
+          }
 
       setComments([...comments, commentData]);
       setCommentText("");

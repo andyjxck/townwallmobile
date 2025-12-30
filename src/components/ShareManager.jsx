@@ -26,6 +26,7 @@ export const ShareManager = forwardRef((props, ref) => {
           sharerUsername: user?.username || 'Someone',
           sharerId: user?.id,
           postOwnerId: post.user_id,
+          postId: post.id,
           postTitle: post.title
         });
       }

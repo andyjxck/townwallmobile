@@ -258,7 +258,7 @@ export const sendMessageNotification = async ({ senderId, receiverId, senderUser
     });
   };
   
-  export const sendReactionNotification = async ({ reactorUsername, reactorId, postOwnerId, postTitle, reactionType }) => {
+  export const sendReactionNotification = async ({ reactorUsername, reactorId, postOwnerId, postId, postTitle, reactionType }) => {
     if (reactorId === postOwnerId) return { success: true, skipped: true };
     
     const reactionLabel = reactionType === 'helpful' ? 'liked' : reactionType === 'superlike' ? 'superliked' : 'reacted to';
@@ -268,7 +268,7 @@ export const sendMessageNotification = async ({ senderId, receiverId, senderUser
       title: `New ${reactionType === 'superlike' ? 'Superlike' : 'Like'}!`,
       message: `@${reactorUsername} ${reactionLabel} your post: "${postTitle || 'Untitled'}"`,
       type: 'reaction',
-      link: `/post`
+      link: `/post?id=${postId}`
     });
   };
   
@@ -278,7 +278,7 @@ export const sendMessageNotification = async ({ senderId, receiverId, senderUser
       title: 'New Friend Request!',
       message: `@${senderUsername} wants to be your friend`,
       type: 'friend_request',
-      link: `/profile`,
+      link: `/profile?userId=${senderId}`,
       metadata: { requestId, senderId, senderUsername }
     });
   };
@@ -294,7 +294,7 @@ export const sendFriendAcceptedNotification = async ({ acceptorId, acceptorUsern
   });
 };
 
-export const sendShareNotification = async ({ sharerUsername, sharerId, postOwnerId, postTitle }) => {
+export const sendShareNotification = async ({ sharerUsername, sharerId, postOwnerId, postId, postTitle }) => {
   if (sharerId === postOwnerId) return { success: true, skipped: true };
   
   return sendNotification({
@@ -302,11 +302,11 @@ export const sendShareNotification = async ({ sharerUsername, sharerId, postOwne
     title: 'Your Post Was Shared!',
     message: `@${sharerUsername} shared your post: "${postTitle || 'Untitled'}"`,
     type: 'share',
-    link: `/post`
+    link: `/post?id=${postId}`
   });
 };
 
-export const sendCommentNotification = async ({ commenterUsername, commenterId, postOwnerId, postTitle, commentText }) => {
+export const sendCommentNotification = async ({ commenterUsername, commenterId, postOwnerId, postId, postTitle, commentText }) => {
   if (commenterId === postOwnerId) return { success: true, skipped: true };
   
   return sendNotification({
@@ -314,7 +314,7 @@ export const sendCommentNotification = async ({ commenterUsername, commenterId, 
     title: 'New Comment!',
     message: `@${commenterUsername} commented: "${commentText.length > 30 ? commentText.substring(0, 30) + '...' : commentText}"`,
     type: 'comment',
-    link: `/post`
+    link: `/post?id=${postId}`
   });
 };
 

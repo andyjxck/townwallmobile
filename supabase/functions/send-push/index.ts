@@ -39,16 +39,21 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    // Get user's push token
+    // Get user's push token and DND status
     const { data: user, error: userError } = await supabase
       .from('rusers')
-      .select('push_token, last_seen')
+      .select('push_token, last_seen, do_not_disturb')
       .eq('id', user_id)
       .single()
 
     if (userError) {
       console.error(`[send-push] [${requestId}] Database error fetching user ${user_id}:`, userError.message)
       return new Response(JSON.stringify({ error: 'User not found or database error' }), { status: 404 })
+    }
+
+    if (user?.do_not_disturb) {
+      console.log(`[send-push] [${requestId}] Skipped for user ${user_id}: Do Not Disturb is ON.`)
+      return new Response(JSON.stringify({ skipped: true, reason: 'Do Not Disturb' }), { status: 200 })
     }
 
     if (!user?.push_token) {

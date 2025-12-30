@@ -259,15 +259,21 @@ export default function RootLayout() {
           }
         });
 
-        responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
-          const data = response.notification.request.content.data as any;
-          if (data?.type === 'call' && data?.callId) {
-            const { useChatStore } = require('@/utils/auth');
-            useChatStore.getState().open();
-          } else if (data?.link && typeof data.link === 'string') {
-            router.push(data.link as any);
-          }
-        });
+          responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+            const data = response.notification.request.content.data as any;
+            if (data?.type === 'call' && data?.callId) {
+              const { useChatStore } = require('@/utils/auth');
+              useChatStore.getState().open();
+            } else if (data?.link === '/chat') {
+              const { useChatStore } = require('@/utils/auth');
+              if (data.chatId) {
+                useChatStore.getState().setActiveChatId(data.chatId);
+              }
+              useChatStore.getState().open();
+            } else if (data?.link && typeof data.link === 'string') {
+              router.push(data.link as any);
+            }
+          });
 
         return () => {
           if (notificationListener.current) {
