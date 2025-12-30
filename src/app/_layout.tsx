@@ -244,33 +244,41 @@ export default function RootLayout() {
   const lastRegisteredUserId = useRef<string | null>(null);
 
   useEffect(() => {
-    if (isReady && auth?.id && Platform.OS !== 'web') {
-      if (lastRegisteredUserId.current === auth.id) return;
-      lastRegisteredUserId.current = auth.id;
-      
-      registerForPushNotificationsAsync(auth.id);
+      if (isReady && auth?.id && Platform.OS !== 'web') {
+        if (lastRegisteredUserId.current === auth.id) return;
+        lastRegisteredUserId.current = auth.id;
+        
+        registerForPushNotificationsAsync(auth.id);
 
-      notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
-        console.log('Notification received:', notification);
-      });
+        notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
+          console.log('Notification received:', notification);
+          const data = notification.request.content.data as any;
+          if (data?.type === 'call' && data?.callId) {
+            const { useChatStore } = require('@/utils/auth');
+            useChatStore.getState().open();
+          }
+        });
 
-      responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
-        const data = response.notification.request.content.data;
-        if (data?.link && typeof data.link === 'string') {
-          router.push(data.link as any);
-        }
-      });
+        responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+          const data = response.notification.request.content.data as any;
+          if (data?.type === 'call' && data?.callId) {
+            const { useChatStore } = require('@/utils/auth');
+            useChatStore.getState().open();
+          } else if (data?.link && typeof data.link === 'string') {
+            router.push(data.link as any);
+          }
+        });
 
-      return () => {
-        if (notificationListener.current) {
-          notificationListener.current.remove();
-        }
-        if (responseListener.current) {
-          responseListener.current.remove();
-        }
-      };
-    }
-  }, [isReady, auth]);
+        return () => {
+          if (notificationListener.current) {
+            notificationListener.current.remove();
+          }
+          if (responseListener.current) {
+            responseListener.current.remove();
+          }
+        };
+      }
+    }, [isReady, auth]);
 
   const lastLastSeenUserId = useRef<string | null>(null);
 

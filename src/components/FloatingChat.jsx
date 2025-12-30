@@ -22,7 +22,7 @@ import { MessageCircle, X, Send, ChevronLeft, MoreHorizontal, User, Users, Check
 import { supabase } from '../utils/supabase';
 import { getStoredUser } from '../utils/user';
 import { theme } from '../utils/theme';
-import { sendNotification, sendMessageNotification } from '../utils/notifications';
+import { sendNotification, sendMessageNotification, sendCallNotification } from '../utils/notifications';
 import { useChatStore } from '../utils/auth';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -32,8 +32,7 @@ import { useRouter } from 'expo-router';
 import { Audio } from 'expo-av';
 import { Accelerometer } from 'expo-sensors';
 import Constants from 'expo-constants';
-// LiveKit imports are handled dynamically to prevent crashes in environments without native modules
-let LiveKitRoom, useLocalParticipant, useParticipants, AudioSession;
+let LiveKitRoom, useLocalParticipant, useParticipants, AudioSession, useIOSAudioManagement, useRoom;
 
 const isExpoGo = Constants.appOwnership === "expo";
 
@@ -44,6 +43,8 @@ if (Platform.OS !== 'web' && !isExpoGo) {
     useLocalParticipant = lk.useLocalParticipant;
     useParticipants = lk.useParticipants;
     AudioSession = lk.AudioSession;
+    useIOSAudioManagement = lk.useIOSAudioManagement;
+    useRoom = lk.useRoom;
   } catch (e) {
     console.log('LiveKit native modules not available');
   }
@@ -157,72 +158,102 @@ export default function FloatingChat() {
     }
   };
 
-    const LiveKitRoomContent = ({ onConnected }) => {
+    const LiveKitRoomContent = ({ onConnected, speakerOn, muted }) => {
       if (!useLocalParticipant || !AudioSession || !useParticipants) return null;
       
       const { localParticipant } = useLocalParticipant();
       const participants = useParticipants();
+      const room = useRoom ? useRoom() : null;
+      const hasStartedRef = useRef(false);
+      const participantCountRef = useRef(0);
 
-      useEffect(() => {
-        // For 1-on-1 calls, end if the other participant leaves
-        if (activeCall && !activeCall.is_group_call && activeCall.status === 'active') {
-          // If only 1 participant (us) is left, the other person has dropped
-          if (participants.length === 1) {
-            endCall();
-          }
-        }
-      }, [participants.length, activeCall?.status, activeCall?.is_group_call]);
-
-      useEffect(() => {
-      const startSession = async () => {
-        try {
-          // Initial configuration
-          await AudioSession.configureAudio({
-            android: {
-              preferredOutputList: [isSpeakerOn ? 'speaker' : 'earpiece'],
-            },
-            ios: {
-              defaultOutput: isSpeakerOn ? 'speaker' : 'none',
-            }
-          });
-          await AudioSession.startAudioSession();
-          if (onConnected) onConnected();
-        } catch (e) {
-          console.log('Error starting audio session:', e);
-        }
-      };
-      startSession();
-      return () => {
-        AudioSession.stopAudioSession();
-      };
-    }, []);
-
-    useEffect(() => {
-      const updateAudio = async () => {
-        try {
-          await AudioSession.configureAudio({
-            android: {
-              preferredOutputList: [isSpeakerOn ? 'speaker' : 'earpiece'],
-            },
-            ios: {
-              defaultOutput: isSpeakerOn ? 'speaker' : 'none',
-            }
-          });
-        } catch (e) {
-          console.log('Error configuring audio:', e);
-        }
-      };
-      updateAudio();
-    }, [isSpeakerOn]);
-
-    useEffect(() => {
-      if (localParticipant) {
-        localParticipant.setMicrophoneEnabled(!isMuted);
+      if (Platform.OS === 'ios' && useIOSAudioManagement && room) {
+        useIOSAudioManagement(room, true, () => ({
+          audioCategory: 'playAndRecord',
+          audioCategoryOptions: [
+            'allowBluetooth',
+            'allowBluetoothA2DP',
+            'allowAirPlay',
+            speakerOn ? 'defaultToSpeaker' : 'duckOthers',
+          ],
+          audioMode: 'voiceChat',
+        }));
       }
-    }, [isMuted, localParticipant]);
 
-    return null;
-  };
+      useEffect(() => {
+        participantCountRef.current = participants.length;
+      }, [participants.length]);
+
+      useEffect(() => {
+        if (participantCountRef.current > 1 && participants.length === 1) {
+          endCall();
+        }
+      }, [participants.length]);
+
+      useEffect(() => {
+        if (hasStartedRef.current) return;
+        hasStartedRef.current = true;
+        
+        const startSession = async () => {
+          try {
+            if (Platform.OS === 'android') {
+              await AudioSession.configureAudio({
+                android: {
+                  preferredOutputList: [speakerOn ? 'speaker' : 'earpiece'],
+                  audioMode: 'inCommunication',
+                  audioFocusMode: 'gain',
+                  audioStreamType: 'voiceCall',
+                  audioAttributesUsageType: 'voiceCommunication',
+                  audioAttributesContentType: 'speech',
+                  forceHandleAudioRouting: true,
+                },
+              });
+            }
+            await AudioSession.startAudioSession();
+            console.log('Audio session started successfully');
+            if (onConnected) onConnected();
+          } catch (e) {
+            console.log('Error starting audio session:', e);
+          }
+        };
+        startSession();
+        
+        return () => {
+          AudioSession.stopAudioSession().catch(console.log);
+        };
+      }, []);
+
+      useEffect(() => {
+        if (Platform.OS === 'android') {
+          const updateAudio = async () => {
+            try {
+              await AudioSession.configureAudio({
+                android: {
+                  preferredOutputList: [speakerOn ? 'speaker' : 'earpiece'],
+                  audioMode: 'inCommunication',
+                  audioFocusMode: 'gain',
+                  audioStreamType: 'voiceCall',
+                  audioAttributesUsageType: 'voiceCommunication',
+                  audioAttributesContentType: 'speech',
+                  forceHandleAudioRouting: true,
+                },
+              });
+            } catch (e) {
+              console.log('Error configuring audio:', e);
+            }
+          };
+          updateAudio();
+        }
+      }, [speakerOn]);
+
+      useEffect(() => {
+        if (localParticipant) {
+          localParticipant.setMicrophoneEnabled(!muted).catch(console.log);
+        }
+      }, [muted, localParticipant]);
+
+      return null;
+    };
 
   useEffect(() => {
     let subscription = null;
@@ -244,22 +275,34 @@ export default function FloatingChat() {
   }, [activeCall?.status, isSpeakerOn]);
 
   useEffect(() => {
-    if (activeCall?.status === 'ringing') {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, { toValue: 1.2, duration: 1000, useNativeDriver: true }),
-          Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true })
-        ])
-      ).start();
-      playSound('ringing', true);
-    } else {
-      pulseAnim.setValue(1);
-      stopSound('ringing');
-      if (activeCall?.status === 'active') {
-        playSound('connect');
+      if (activeCall?.status === 'ringing') {
+        Animated.loop(
+          Animated.sequence([
+            Animated.timing(pulseAnim, { toValue: 1.2, duration: 1000, useNativeDriver: true }),
+            Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true })
+          ])
+        ).start();
+        playSound('ringing', true);
+        
+        const ringTimeout = setTimeout(() => {
+          if (activeCall?.status === 'ringing') {
+            if (activeCall?.isOutgoing) {
+              endCall();
+            } else {
+              declineCall();
+            }
+          }
+        }, 30000);
+        
+        return () => clearTimeout(ringTimeout);
+      } else {
+        pulseAnim.setValue(1);
+        stopSound('ringing');
+        if (activeCall?.status === 'active') {
+          playSound('connect');
+        }
       }
-    }
-  }, [activeCall?.status]);
+    }, [activeCall?.status]);
 
   const playSound = async (name, loop = false) => {
     try {
@@ -332,15 +375,40 @@ export default function FloatingChat() {
       };
 
       const setupChatSubscription = async () => {
-        const storedUser = await getStoredUser();
-        if (!storedUser) return;
-        
-        currentUserId = storedUser.id;
-        setUser(storedUser);
-        setReadReceiptsEnabled(storedUser.read_receipts_enabled !== false);
-        setupPresence(storedUser);
+          const storedUser = await getStoredUser();
+          if (!storedUser) return;
+          
+          currentUserId = storedUser.id;
+          setUser(storedUser);
+          setReadReceiptsEnabled(storedUser.read_receipts_enabled !== false);
+          setupPresence(storedUser);
 
-        if (chatSubRef.current) supabase.removeChannel(chatSubRef.current);
+          const checkForActiveCall = async () => {
+            const { data: incomingCalls } = await supabase
+              .from('rcalls')
+              .select('*, chat:rchats(*, user1:rusers!user1_id(*), user2:rusers!user2_id(*))')
+              .eq('status', 'ringing')
+              .neq('caller_id', storedUser.id)
+              .order('created_at', { ascending: false })
+              .limit(1);
+
+            if (incomingCalls && incomingCalls.length > 0) {
+              const call = incomingCalls[0];
+              const chatData = call.chat;
+              if (chatData) {
+                const isMyChat = chatData.user1_id === storedUser.id || chatData.user2_id === storedUser.id;
+                if (isMyChat && !activeCall) {
+                  setActiveCall({ ...call, chat: chatData });
+                  setOpen();
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                }
+              }
+            }
+          };
+          
+          checkForActiveCall();
+
+          if (chatSubRef.current) supabase.removeChannel(chatSubRef.current);
         const chatSub = supabase
           .channel(`chat_messages_${storedUser.id}`) // Use a consistent channel name to prevent multiple channels
           .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'rmessages' }, async (payload) => {
@@ -403,38 +471,50 @@ export default function FloatingChat() {
         chatSubRef.current = chatSub;
 
         if (callSubRef.current) supabase.removeChannel(callSubRef.current);
-        const callSub = supabase
-          .channel(`calls_${storedUser.id}`)
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'rcalls' }, async (payload) => {
-            if (payload.eventType === 'INSERT') {
-              const call = payload.new;
-              if (call.caller_id !== currentUserId && call.status === 'ringing') {
-                const { data: chatData } = await supabase
-                  .from('rchats')
-                  .select('*, user1:rusers!user1_id(*), user2:rusers!user2_id(*)')
-                  .eq('id', call.chat_id)
-                  .single();
-                
-                if (chatData) {
-                  const isMyChat = chatData.user1_id === currentUserId || chatData.user2_id === currentUserId;
-                  if (isMyChat) {
-                    setActiveCall({ ...call, chat: chatData });
-                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          const callSub = supabase
+            .channel(`calls_${storedUser.id}`)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'rcalls' }, async (payload) => {
+              if (payload.eventType === 'INSERT') {
+                const call = payload.new;
+                if (call.caller_id !== currentUserId && call.status === 'ringing') {
+                  const { data: chatData } = await supabase
+                    .from('rchats')
+                    .select('*, user1:rusers!user1_id(*), user2:rusers!user2_id(*)')
+                    .eq('id', call.chat_id)
+                    .single();
+                  
+                  if (chatData) {
+                    const isMyChat = chatData.user1_id === currentUserId || chatData.user2_id === currentUserId;
+                    if (isMyChat) {
+                      setActiveCall({ ...call, chat: chatData });
+                      setOpen();
+                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                    }
                   }
                 }
-              }
-            } else if (payload.eventType === 'UPDATE') {
-              if (payload.new.status === 'ended' || payload.new.status === 'declined') {
-                if (activeCall?.id === payload.new.id) {
-                  endCallUI();
+              } else if (payload.eventType === 'UPDATE') {
+                const updatedCall = payload.new;
+                if (updatedCall.status === 'ended' || updatedCall.status === 'declined') {
+                  setActiveCall(prev => {
+                    if (prev?.id === updatedCall.id) {
+                      endCallUI();
+                    }
+                    return prev;
+                  });
+                } else if (updatedCall.status === 'active') {
+                  setActiveCall(prev => {
+                    if (prev?.id === updatedCall.id) {
+                      if (prev.status !== 'active') {
+                        startCallTimer();
+                      }
+                      return { ...prev, status: 'active' };
+                    }
+                    return prev;
+                  });
                 }
-              } else if (payload.new.status === 'active' && activeCall?.id === payload.new.id) {
-                setActiveCall(prev => ({ ...prev, status: 'active' }));
-                startCallTimer();
               }
-            }
-          })
-          .subscribe();
+            })
+            .subscribe();
         
         callSubRef.current = callSub;
       };
@@ -724,29 +804,29 @@ export default function FloatingChat() {
       }
       
       if (activeChat.is_group) {
-        for (const member of groupMembers) {
-          if (member.user_id !== user.id) {
-            await sendNotification({
-              userId: member.user_id,
-              type: 'call',
-              title: `${user.username} is calling`,
-              message: `Incoming ${isGroupCall ? 'group ' : ''}audio call from ${activeChat.group_name}`,
-              senderId: user.id
+          for (const member of groupMembers) {
+            if (member.user_id !== user.id) {
+              await sendCallNotification({
+                callerId: user.id,
+                callerUsername: user.username,
+                receiverId: member.user_id,
+                callId: call.id,
+                chatId: activeChat.id
+              });
+            }
+          }
+        } else {
+          const otherUser = getOtherUser(activeChat);
+          if (otherUser) {
+            await sendCallNotification({
+              callerId: user.id,
+              callerUsername: user.username,
+              receiverId: otherUser.id,
+              callId: call.id,
+              chatId: activeChat.id
             });
           }
         }
-      } else {
-        const otherUser = getOtherUser(activeChat);
-        if (otherUser) {
-          await sendNotification({
-            userId: otherUser.id,
-            type: 'call',
-            title: `${user.username} is calling`,
-            message: 'Incoming audio call',
-            senderId: user.id
-          });
-        }
-      }
     }
   };
 
@@ -908,17 +988,24 @@ export default function FloatingChat() {
             <View style={styles.callOverlay}>
               <BlurView intensity={100} style={StyleSheet.absoluteFill} tint="dark" />
               
-              {callToken && (
-                <LiveKitRoom
-                  serverUrl={process.env.EXPO_PUBLIC_LIVEKIT_URL}
-                  token={callToken}
-                  connect={true}
-                  audio={true}
-                  video={false}
-                >
-                  <LiveKitRoomContent />
-                </LiveKitRoom>
-              )}
+              {callToken && LiveKitRoom && (
+                  <LiveKitRoom
+                    serverUrl={process.env.EXPO_PUBLIC_LIVEKIT_URL}
+                    token={callToken}
+                    connect={true}
+                    audio={true}
+                    video={false}
+                    options={{
+                      adaptiveStream: { pixelDensity: 'screen' },
+                      dynacast: true,
+                      publishDefaults: {
+                        simulcast: false,
+                      },
+                    }}
+                  >
+                    <LiveKitRoomContent speakerOn={isSpeakerOn} muted={isMuted} />
+                  </LiveKitRoom>
+                )}
 
               {/* Background decorative elements */}
             <View style={[styles.callBgCircle, { top: -100, left: -50, backgroundColor: theme.colors.primary + '20' }]} />

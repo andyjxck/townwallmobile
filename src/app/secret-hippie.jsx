@@ -66,7 +66,7 @@ export default function SecretHippieScreen() {
       if (!error) {
         setHasDiscovered(true);
         toggleHippie(true);
-        Alert.alert("Success!", "You've unlocked the Secret Hippie Theme!");
+        Alert.alert("Success!", "You've unlocked the Secret Orb Theme!");
         fetchDiscoveryInfo();
       }
     } catch (e) {
@@ -91,8 +91,8 @@ export default function SecretHippieScreen() {
         <Text style={styles.title}>You Found It!</Text>
         <Text style={styles.subtitle}>
           {hasDiscovered 
-            ? "Welcome to the inner circle. Enjoy your custom hippie UI." 
-            : "You've discovered a secret! Be one of the first 5 to unlock the Wavey Hippie Theme."}
+            ? "Welcome to the inner circle. Enjoy your custom UI." 
+            : "You've discovered a secret! Be one of the first 5 to unlock the Orb Theme."}
         </Text>
 
         <View style={styles.infoBox}>
@@ -110,7 +110,7 @@ export default function SecretHippieScreen() {
           </TouchableOpacity>
         ) : (
           <View style={styles.toggleRow}>
-            <Text style={styles.toggleLabel}>Hippie Theme</Text>
+            <Text style={styles.toggleLabel}>Orb Theme</Text>
             <TouchableOpacity 
               style={[styles.toggle, isHippie ? styles.toggleOn : styles.toggleOff]}
               onPress={() => toggleHippie(!isHippie)}

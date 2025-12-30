@@ -6,11 +6,21 @@ import Constants from 'expo-constants';
 import { isOnline } from './user';
 
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: false, // Don't show notifications when app is in foreground
-    shouldPlaySound: false,
-    shouldSetBadge: true,
-  }),
+  handleNotification: async (notification) => {
+    const data = notification.request.content.data;
+    if (data?.type === 'call') {
+      return {
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+      };
+    }
+    return {
+      shouldShowAlert: false,
+      shouldPlaySound: false,
+      shouldSetBadge: true,
+    };
+  },
 });
 
 let hasLoggedDeviceWarning = false;
@@ -185,7 +195,60 @@ export async function sendPushNotification(expoPushToken, title, body, data = {}
       }
     };
   
-  export const sendMessageNotification = async ({ senderId, receiverId, senderUsername, messageText }) => {
+  export const sendCallNotification = async ({ callerId, callerUsername, receiverId, callId, chatId }) => {
+  try {
+    const { data: receiverData } = await supabase
+      .from('rusers')
+      .select('push_token')
+      .eq('id', receiverId)
+      .single();
+
+    if (receiverData?.push_token) {
+      const message = {
+        to: receiverData.push_token,
+        sound: 'ringtone.mp3',
+        title: `${callerUsername} is calling`,
+        body: 'Tap to answer',
+        data: {
+          type: 'call',
+          callId,
+          chatId,
+          callerId,
+          callerUsername,
+          link: '/chat',
+        },
+        priority: 'high',
+        channelId: 'calls',
+        categoryId: 'call',
+        _displayInForeground: true,
+      };
+
+      await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Accept-encoding': 'gzip, deflate',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(message),
+      });
+    }
+
+    return sendNotification({
+      userId: receiverId,
+      title: `${callerUsername} is calling`,
+      message: 'Incoming audio call',
+      type: 'call',
+      link: '/chat',
+      metadata: { callId, chatId, callerId }
+    });
+  } catch (error) {
+    console.error('Error sending call notification:', error);
+    return { success: false, error };
+  }
+};
+
+export const sendMessageNotification = async ({ senderId, receiverId, senderUsername, messageText }) => {
     return sendNotification({
       userId: receiverId,
       title: `New message from @${senderUsername}`,
