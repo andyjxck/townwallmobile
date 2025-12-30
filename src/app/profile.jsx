@@ -119,18 +119,22 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
       const viewingOwnProfile = !userId || (storedUser?.id && parseInt(userId) === storedUser.id);
       setIsOwnProfile(viewingOwnProfile);
       
-      let userData;
-      if (viewingOwnProfile && storedUser?.id) {
-        const { data: freshUser } = await supabase.from('rusers').select('*').eq('id', storedUser.id).single();
-        if (freshUser) {
-          userData = freshUser;
-          // Sync store and storage if fresh data found
-          useAuthStore.getState().setAuth(freshUser);
-          await AsyncStorage.setItem("@redditch_user_data", JSON.stringify(freshUser));
-        } else {
-          userData = storedUser;
-        }
-      } else if (profileUserId) {
+        let userData;
+        if (viewingOwnProfile && storedUser?.id) {
+          const { data: freshUser } = await supabase.from('rusers').select('*').eq('id', storedUser.id).single();
+          if (freshUser) {
+            userData = freshUser;
+            // Only sync store and storage if data actually changed to avoid re-render loops
+            const hasChanged = JSON.stringify(freshUser) !== JSON.stringify(storedUser);
+            if (hasChanged) {
+              useAuthStore.getState().setAuth(freshUser);
+              await AsyncStorage.setItem("@redditch_user_data", JSON.stringify(freshUser));
+            }
+          } else {
+            userData = storedUser;
+          }
+        } else if (profileUserId) {
+
         const { data: otherUser } = await supabase.from('rusers').select('*').eq('id', profileUserId).single();
         userData = otherUser;
       }

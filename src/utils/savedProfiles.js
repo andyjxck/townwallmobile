@@ -19,13 +19,17 @@ export const saveProfile = async (profile) => {
     
     let newProfile;
     if (existingIndex > -1) {
-      // Merge with existing profile to keep password if not provided
+      // Merge with existing profile
+      const oldProfile = profiles[existingIndex];
       newProfile = {
-        ...profiles[existingIndex],
+        ...oldProfile,
         ...profile,
-        name: profile.username || profiles[existingIndex].username,
-        emoji: profile.emoji_icon || profile.emoji || profiles[existingIndex].emoji || '👤',
-        avatar_url: profile.avatar_url !== undefined ? profile.avatar_url : profiles[existingIndex].avatar_url,
+        // Ensure core fields are mapped correctly
+        username: profile.username || oldProfile.username,
+        password: profile.password || oldProfile.password,
+        name: profile.username || oldProfile.username,
+        emoji: profile.emoji_icon || profile.emoji || oldProfile.emoji || '👤',
+        avatar_url: profile.avatar_url !== undefined ? profile.avatar_url : oldProfile.avatar_url,
         lastLogin: new Date().toISOString(),
       };
     } else {

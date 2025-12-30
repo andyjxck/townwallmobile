@@ -189,11 +189,14 @@ export default function Auth() {
 
                 await completeLogin(user, deviceId);
                 if (saveProfileEnabled) {
+                  // Re-fetch to get most up-to-date avatar/emoji
+                  const { data: updatedUser } = await supabase.from('rusers').select('*').eq('id', user.id).single();
+                  const profileToSave = updatedUser || user;
                   await saveProfile({
                     username: trimmedUsername,
                     password: trimmedPassword,
-                    emoji_icon: user.emoji_icon,
-                    avatar_url: user.avatar_url
+                    emoji_icon: profileToSave.emoji_icon,
+                    avatar_url: profileToSave.avatar_url
                   });
                 }
 
@@ -286,13 +289,17 @@ export default function Auth() {
         throw new Error("Saved password no longer valid");
       }
 
-      await completeLogin(user, deviceId);
-      await saveProfile({
-        username: profile.username,
-        password: profile.password,
-        emoji_icon: user.emoji_icon,
-        avatar_url: user.avatar_url
-      });
+        await completeLogin(user, deviceId);
+        // Re-fetch to get most up-to-date avatar/emoji
+        const { data: updatedUser } = await supabase.from('rusers').select('*').eq('id', user.id).single();
+        const profileToSave = updatedUser || user;
+        await saveProfile({
+          username: profile.username,
+          password: profile.password,
+          emoji_icon: profileToSave.emoji_icon,
+          avatar_url: profileToSave.avatar_url
+        });
+
     } catch (error) {
       Alert.alert("Error", error.message);
       // Remove invalid profile

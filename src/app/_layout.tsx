@@ -241,8 +241,13 @@ export default function RootLayout() {
     }
   }, [initiate]);
 
+  const lastRegisteredUserId = useRef<string | null>(null);
+
   useEffect(() => {
     if (isReady && auth?.id && Platform.OS !== 'web') {
+      if (lastRegisteredUserId.current === auth.id) return;
+      lastRegisteredUserId.current = auth.id;
+      
       registerForPushNotificationsAsync(auth.id);
 
       notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
@@ -267,8 +272,13 @@ export default function RootLayout() {
     }
   }, [isReady, auth]);
 
+  const lastLastSeenUserId = useRef<string | null>(null);
+
   useEffect(() => {
     if (isReady && auth?.id) {
+      if (lastLastSeenUserId.current === auth.id) return;
+      lastLastSeenUserId.current = auth.id;
+
       const updateLastSeen = async () => {
         try {
           await supabase
