@@ -1,3 +1,4 @@
+import { AnimatePresence, MotiView } from "moti";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
     View,
@@ -400,61 +401,7 @@ if (isOnline) syncPendingPosts();
           <Plus color="#000" size={30} />
         </TouchableOpacity>
 
-          <Modal visible={showFilterSort} animationType="slide" transparent>
-            <View style={styles.modalOverlay}>
-              <View style={[styles.modalContent, { backgroundColor: isHippie ? '#1a1a1a' : theme.colors.background }]}>
-                <Text style={[styles.modalTitle, isHippie && { color: '#FFF' }]}>Filters & Sorting</Text>
-                
-                  <Text style={[styles.label, isHippie && { color: '#AAA' }]}>Sort By</Text>
-                  <View style={styles.row}>
-                    {['newest', 'oldest', 'popular'].map(s => (
-                      <TouchableOpacity key={s} onPress={() => setSortBy(s)} style={[styles.pill, isHippie && { backgroundColor: '#333' }, sortBy === s && { backgroundColor: theme.colors.primary }]}><Text style={[styles.pillText, (isHippie || sortBy === s) && { color: sortBy === s ? '#000' : '#FFF' }]}>{s}</Text></TouchableOpacity>
-                    ))}
-                  </View>
-
-                  {feedView !== "global" && (
-                    <>
-                      <Text style={[styles.label, isHippie && { color: '#AAA' }]}>Zone</Text>
-                      <View style={[styles.searchContainer, isHippie && { backgroundColor: '#333' }]}>
-                        <Search size={18} color={isHippie ? "#AAA" : "#666"} />
-                        <RNTextInput
-                          style={[styles.searchInput, isHippie && { color: '#FFF' }]}
-                          placeholder="Search neighborhoods..."
-                          placeholderTextColor={isHippie ? "#666" : "#999"}
-                          value={zoneSearch}
-                          onChangeText={setZoneSearch}
-                        />
-                      </View>
-                      <View style={{ maxHeight: 250, marginTop: 10 }}>
-                        <ScrollView showsVerticalScrollIndicator={true} nestedScrollEnabled={true}>
-                          <View style={styles.zoneGrid}>
-                            <TouchableOpacity 
-                              onPress={() => setSelectedZone(null)} 
-                              style={[styles.pill, { marginBottom: 8 }, isHippie && { backgroundColor: '#333' }, !selectedZone && { backgroundColor: theme.colors.primary }]}
-                            >
-                              <Text style={[styles.pillText, (isHippie || !selectedZone) && { color: !selectedZone ? '#000' : '#FFF' }]}>All Zones</Text>
-                            </TouchableOpacity>
-                            {filteredZones.map(z => (
-                              <TouchableOpacity 
-                                key={z.id} 
-                                onPress={() => setSelectedZone(z.id)} 
-                                style={[styles.pill, { marginBottom: 8 }, isHippie && { backgroundColor: '#333' }, selectedZone === z.id && { backgroundColor: theme.colors.primary }]}
-                              >
-                                <Text style={[styles.pillText, (isHippie || selectedZone === z.id) && { color: selectedZone === z.id ? '#000' : '#FFF' }]}>{z.name}</Text>
-                              </TouchableOpacity>
-                            ))}
-                          </View>
-                        </ScrollView>
-                      </View>
-                    </>
-                  )}
-
-                  <TouchableOpacity onPress={() => { setShowFilterSort(false); setZoneSearch(""); }} style={[styles.closeBtn, { backgroundColor: theme.colors.primary }]}><Text style={styles.closeBtnText}>Apply</Text></TouchableOpacity>
-              </View>
-            </View>
-          </Modal>
-
-          <Modal visible={showLocationPicker} animationType="slide" transparent>
+        <Modal visible={showLocationPicker} animationType="slide" transparent>
             <View style={styles.modalOverlay}>
               <View style={[styles.modalContent, { backgroundColor: isHippie ? '#1a1a1a' : theme.colors.background }]}>
                 <Text style={[styles.modalTitle, isHippie && { color: '#FFF' }]}>Choose Feed</Text>
@@ -502,11 +449,127 @@ if (isOnline) syncPendingPosts();
             </View>
           </Modal>
 
-      <NotificationPanel visible={showNotifications} onClose={() => setShowNotifications(false)} />
-      <ShareManager ref={shareRef} />
-    </View>
-  );
+        <NotificationPanel visible={showNotifications} onClose={() => setShowNotifications(false)} />
+        <ShareManager ref={shareRef} />
+
+        <AnimatePresence>
+          {showFilterSort && (
+            <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+              <TouchableOpacity 
+                activeOpacity={1} 
+                style={styles.dropdownOverlay} 
+                onPress={() => setShowFilterSort(false)} 
+              />
+              <MotiView
+                from={{ translateY: -100, opacity: 0, scale: 0.9 }}
+                animate={{ translateY: 0, opacity: 1, scale: 1 }}
+                exit={{ translateY: -100, opacity: 0, scale: 0.9 }}
+                transition={{ type: 'timing', duration: 250 }}
+                style={[
+                  styles.filterWindow, 
+                  { 
+                    top: insets.top + 60, 
+                    backgroundColor: isHippie ? '#1a1a1a' : theme.colors.background,
+                    borderColor: theme.colors.border,
+                    borderWidth: 1,
+                  }
+                ]}
+              >
+                <Text style={[styles.modalTitle, isHippie && { color: '#FFF' }]}>Filters & Sorting</Text>
+                
+                <Text style={[styles.label, isHippie && { color: '#AAA' }]}>Sort By</Text>
+                <View style={styles.row}>
+                  {['newest', 'oldest', 'popular'].map(s => (
+                    <TouchableOpacity 
+                      key={s} 
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        setSortBy(s);
+                      }} 
+                      style={[
+                        styles.pill, 
+                        isHippie && { backgroundColor: '#333' }, 
+                        sortBy === s && { backgroundColor: theme.colors.primary }
+                      ]}
+                    >
+                      <Text style={[styles.pillText, (isHippie || sortBy === s) && { color: sortBy === s ? '#000' : '#FFF' }]}>
+                        {s.charAt(0).toUpperCase() + s.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {feedView !== "global" && (
+                  <>
+                    <Text style={[styles.label, isHippie && { color: '#AAA' }]}>Zone</Text>
+                    <View style={[styles.searchContainer, isHippie && { backgroundColor: '#333' }]}>
+                      <Search size={18} color={isHippie ? "#AAA" : "#666"} />
+                      <RNTextInput
+                        style={[styles.searchInput, isHippie && { color: '#FFF' }]}
+                        placeholder="Search neighborhoods..."
+                        placeholderTextColor={isHippie ? "#666" : "#999"}
+                        value={zoneSearch}
+                        onChangeText={setZoneSearch}
+                      />
+                    </View>
+                    <View style={{ maxHeight: 200, marginTop: 10 }}>
+                      <ScrollView showsVerticalScrollIndicator={true} nestedScrollEnabled={true}>
+                        <View style={styles.zoneGrid}>
+                          <TouchableOpacity 
+                            onPress={() => {
+                              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                              setSelectedZone(null);
+                            }} 
+                            style={[
+                              styles.pill, 
+                              { marginBottom: 8 }, 
+                              isHippie && { backgroundColor: '#333' }, 
+                              !selectedZone && { backgroundColor: theme.colors.primary }
+                            ]}
+                          >
+                            <Text style={[styles.pillText, (isHippie || !selectedZone) && { color: !selectedZone ? '#000' : '#FFF' }]}>All Zones</Text>
+                          </TouchableOpacity>
+                          {filteredZones.map(z => (
+                            <TouchableOpacity 
+                              key={z.id} 
+                              onPress={() => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                setSelectedZone(z.id);
+                              }} 
+                              style={[
+                                styles.pill, 
+                                { marginBottom: 8 }, 
+                                isHippie && { backgroundColor: '#333' }, 
+                                selectedZone === z.id && { backgroundColor: theme.colors.primary }
+                              ]}
+                            >
+                              <Text style={[styles.pillText, (isHippie || selectedZone === z.id) && { color: selectedZone === z.id ? '#000' : '#FFF' }]}>{z.name}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      </ScrollView>
+                    </View>
+                  </>
+                )}
+
+                <TouchableOpacity 
+                  onPress={() => { 
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    setShowFilterSort(false); 
+                    setZoneSearch(""); 
+                  }} 
+                  style={[styles.applyBtn, { backgroundColor: theme.colors.primary }]}
+                >
+                  <Text style={styles.applyBtnText}>Apply</Text>
+                </TouchableOpacity>
+              </MotiView>
+            </View>
+          )}
+        </AnimatePresence>
+      </View>
+    );
 }
+
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
@@ -547,6 +610,36 @@ const styles = StyleSheet.create({
     zoneGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     locationOption: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderRadius: 12, marginBottom: 8 },
   locationOptionLeft: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  locationOptionTitle: { fontSize: 16, fontWeight: '600' },
-  locationOptionDesc: { fontSize: 13, marginTop: 2 },
+    locationOptionTitle: { fontSize: 16, fontWeight: '600' },
+    locationOptionDesc: { fontSize: 13, marginTop: 2 },
+    dropdownOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(0,0,0,0.3)',
+      zIndex: 100,
+    },
+    filterWindow: {
+      position: 'absolute',
+      left: 20,
+      right: 20,
+      borderRadius: 20,
+      padding: 20,
+      zIndex: 101,
+      elevation: 5,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+    },
+    applyBtn: {
+      marginTop: 20,
+      padding: 15,
+      borderRadius: 12,
+      alignItems: 'center',
+    },
+    applyBtnText: {
+      color: '#000',
+      fontWeight: '700',
+      fontSize: 16,
+    },
 });
+
