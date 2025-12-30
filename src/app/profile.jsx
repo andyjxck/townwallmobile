@@ -65,16 +65,18 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
   const [stats, setStats] = useState({ posts: 0, reactions: 0, joined: "" });
   const [replies, setReplies] = useState([]);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [friendUsername, setFriendUsername] = useState("");
+    const [friendUsername, setFriendUsername] = useState("");
+    const [searchResults, setSearchResults] = useState([]);
+    const [searching, setSearching] = useState(false);
     const [friends, setFriends] = useState([]);
     const [addingFriend, setAddingFriend] = useState(false);
     const [friendshipStatus, setFriendshipStatus] = useState(null); // { status: 'pending'|'accepted', isRequester: boolean }
     const [userPosts, setUserPosts] = useState([]);
 
-  const [savedPosts, setSavedPosts] = useState([]);
-  const [pendingRequests, setPendingRequests] = useState([]);
-  const [activeTab, setActiveTab] = useState("posts");
-  const [deviceId, setDeviceId] = useState(null);
+    const [savedPosts, setSavedPosts] = useState([]);
+    const [pendingRequests, setPendingRequests] = useState([]);
+    const [activeTab, setActiveTab] = useState("posts");
+    const [deviceId, setDeviceId] = useState(null);
     const [editingBio, setEditingBio] = useState(false);
     const [editingUsername, setEditingUsername] = useState(false);
     const [editingNickname, setEditingNickname] = useState(false);
@@ -82,6 +84,36 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
     const [usernameText, setUsernameText] = useState("");
     const [nicknameText, setNicknameText] = useState("");
     const shareRef = useRef();
+
+  useEffect(() => {
+    if (activeTab !== 'friends' || !friendUsername || friendUsername.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    const searchUsers = async () => {
+      setSearching(true);
+      try {
+        const { data } = await supabase
+          .from('rusers')
+          .select('id, username, nickname, avatar_url, emoji_icon')
+          .ilike('username', `%${friendUsername}%`)
+          .limit(10);
+        
+        // Filter out current user and existing friends
+        const friendIds = friends.map(f => f.id);
+        const filtered = data?.filter(u => u.id !== currentUser?.id && !friendIds.includes(u.id)) || [];
+        setSearchResults(filtered);
+      } catch (error) {
+        console.error("Search error:", error);
+      } finally {
+        setSearching(false);
+      }
+    };
+
+    const timer = setTimeout(searchUsers, 500);
+    return () => clearTimeout(timer);
+  }, [friendUsername, activeTab, friends]);
 
   useEffect(() => {
     getDeviceId().then(setDeviceId);
@@ -351,16 +383,24 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
     } catch (error) { console.error(error); }
   };
 
-  const handleAddFriend = async () => {
-    if (!friendUsername) return;
+  const handleAddFriend = async (targetUser = null) => {
+    const target = targetUser || (friendUsername ? { username: friendUsername } : null);
+    if (!target) return;
+
     if (!currentUser?.supabase_uid) {
       Alert.alert("Join the Wall", "Please sign up to add friends!");
       return;
     }
     setAddingFriend(true);
     try {
-      const { data: friendUser, error: findError } = await supabase.from('rusers').select('id').eq('username', friendUsername).single();
-      if (findError || !friendUser) throw new Error("User not found");
+      let friendUser = target.id ? target : null;
+      
+      if (!friendUser) {
+        const { data, error: findError } = await supabase.from('rusers').select('id, username').eq('username', target.username).single();
+        if (findError || !data) throw new Error("User not found");
+        friendUser = data;
+      }
+
       if (friendUser.id === user.id) throw new Error("You can't add yourself");
       
       const { data: existing } = await supabase.from('friends').select('*').match({ user_id: user.id, friend_id: friendUser.id }).single();
@@ -374,8 +414,9 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
         receiverId: friendUser.id
       });
       
-      Alert.alert("Success", "Friend request sent!");
+      Alert.alert("Success", `Friend request sent to @${friendUser.username}!`);
       setFriendUsername("");
+      setSearchResults([]);
     } catch (error) { Alert.alert("Error", error.message); }
     finally { setAddingFriend(false); }
   };
@@ -713,24 +754,64 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
                   <View style={styles.emptyContainer}><Text style={styles.emptyText}>No starred posts</Text></View>
                 )
               )}
-              {activeTab === "friends" && (
-                <View style={styles.friendsContainer}>
-                  <View style={styles.addFriendSection}>
-                    <RNTextInput
-                      style={[styles.friendInput, { color: theme.colors.text, borderColor: theme.colors.border }]}
-                      placeholder="Add by username..."
-                      value={friendUsername}
-                      onChangeText={setFriendUsername}
-                      autoCapitalize="none"
-                    />
-                  <TouchableOpacity 
-                      onPress={handleAddFriend} 
-                      disabled={addingFriend}
-                      style={[styles.addBtn, { backgroundColor: '#000' }]}
-                    >
-                      <UserPlus color="#FFF" size={20} />
-                    </TouchableOpacity>
-                </View>
+                {activeTab === "friends" && (
+                  <View style={styles.friendsContainer}>
+                    <View style={styles.addFriendSection}>
+                      <View style={{ flex: 1, position: 'relative' }}>
+                        <RNTextInput
+                          style={[styles.friendInput, { color: theme.colors.text, borderColor: theme.colors.border }]}
+                          placeholder="Search for friends..."
+                          value={friendUsername}
+                          onChangeText={setFriendUsername}
+                          autoCapitalize="none"
+                        />
+                        {searching && (
+                          <ActivityIndicator size="small" color={theme.colors.primary} style={{ position: 'absolute', right: 12, top: 12 }} />
+                        )}
+                      </View>
+                      {!searchResults.length && (
+                        <TouchableOpacity 
+                          onPress={() => handleAddFriend()} 
+                          disabled={addingFriend || !friendUsername}
+                          style={[styles.addBtn, { backgroundColor: '#000', opacity: (!friendUsername || addingFriend) ? 0.5 : 1 }]}
+                        >
+                          <UserPlus color="#FFF" size={20} />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+
+                    {searchResults.length > 0 && (
+                      <View style={[styles.resultsSection, { backgroundColor: theme.colors.surface }]}>
+                        <Text style={[styles.resultsTitle, { color: theme.colors.textSecondary }]}>Search Results</Text>
+                        {searchResults.map(result => (
+                          <View key={result.id} style={[styles.resultItem, { borderBottomColor: theme.colors.border }]}>
+                            <TouchableOpacity 
+                              style={styles.resultInfo}
+                              onPress={() => router.push(`/profile?userId=${result.id}`)}
+                            >
+                              {result.avatar_url ? (
+                                <Image source={{ uri: result.avatar_url }} style={styles.resultAvatar} />
+                              ) : (
+                                <Text style={styles.resultEmoji}>{result.emoji_icon || "👤"}</Text>
+                              )}
+                              <View>
+                                <Text style={[styles.resultUsername, { color: theme.colors.text }]}>@{result.username}</Text>
+                                <Text style={[styles.resultNickname, { color: theme.colors.textSecondary }]} numberOfLines={1}>
+                                  {result.nickname || 'No nickname'}
+                                </Text>
+                              </View>
+                            </TouchableOpacity>
+                            <TouchableOpacity 
+                              onPress={() => handleAddFriend(result)}
+                              style={[styles.resultAddBtn, { backgroundColor: theme.colors.primary }]}
+                            >
+                              <UserPlus color="#000" size={16} />
+                              <Text style={styles.resultAddText}>Add</Text>
+                            </TouchableOpacity>
+                          </View>
+                        ))}
+                      </View>
+                    )}
 
                 {pendingRequests.length > 0 && (
                   <View style={styles.requestsSection}>
@@ -833,6 +914,16 @@ const styles = StyleSheet.create({
     tabContent: { flex: 1, paddingBottom: 40 },
     emptyContainer: { padding: 40, alignItems: 'center' },
     emptyText: { color: '#94a3b8' },
+    resultsSection: { padding: 12, borderRadius: 15, marginBottom: 20 },
+    resultsTitle: { fontSize: 12, fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 10, letterSpacing: 1 },
+    resultItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1 },
+    resultInfo: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+    resultAvatar: { width: 44, height: 44, borderRadius: 22 },
+    resultEmoji: { fontSize: 28, width: 44, textAlign: 'center' },
+    resultUsername: { fontWeight: 'bold', fontSize: 15 },
+    resultNickname: { fontSize: 13 },
+    resultAddBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
+    resultAddText: { fontWeight: 'bold', fontSize: 13, color: '#000' },
     friendsContainer: { padding: 10 },
     addFriendSection: { flexDirection: 'row', gap: 10, marginBottom: 20 },
     friendInput: { flex: 1, borderWidth: 1, borderRadius: 10, padding: 12 },
