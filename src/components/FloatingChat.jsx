@@ -18,7 +18,7 @@ import {
   ScrollView,
   Alert
 } from 'react-native';
-import { MessageCircle, X, Send, ChevronLeft, MoreHorizontal, User, Users, Check, CheckCheck, Settings, Plus, UserPlus, Mic, MicOff, Phone as PhoneIcon, PhoneOff as PhoneOffIcon, PhoneIncoming, PhoneOutgoing, Phone, Volume2, VolumeX, Image as ImageIcon, Video as VideoIcon, Film, Play, Maximize2 } from 'lucide-react-native';
+import { MessageCircle, X, Send, ChevronLeft, MoreHorizontal, User, Users, Check, CheckCheck, Settings, Plus, UserPlus, Mic, MicOff, Phone as PhoneIcon, PhoneOff as PhoneOffIcon, PhoneIncoming, PhoneOutgoing, Phone, Volume2, VolumeX, Image as ImageIcon, Video as VideoIcon, Film, Play, Maximize2, Camera } from 'lucide-react-native';
 import { supabase } from '../utils/supabase';
 import { getStoredUser } from '../utils/user';
 import { theme } from '../utils/theme';
@@ -60,6 +60,8 @@ const SOUNDS = {
   disconnect: require('../../assets/sounds/alert.mp3'),
   mute: require('../../assets/sounds/alert.mp3'),
 };
+
+const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", "🐵", "🦄", "🐲", "🤖", "👻", "👾", "👽", "💩"];
 
 import { ThemeProvider, useTheme } from "@/utils/ThemeContext";
 
@@ -123,6 +125,8 @@ export default function FloatingChat() {
     const [showNewGroupModal, setShowNewGroupModal] = useState(false);
     const [groupName, setGroupName] = useState('');
     const [groupIcon, setGroupIcon] = useState('👥');
+    const [groupAvatarUrl, setGroupAvatarUrl] = useState(null);
+    const [showGroupIconPicker, setShowGroupIconPicker] = useState(false);
     const [selectedUsers, setSelectedUsers] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
   const [fullscreenMedia, setFullscreenMedia] = useState(null);
@@ -971,6 +975,40 @@ export default function FloatingChat() {
     setUserSearchResults(data || []);
   };
 
+  const handleSelectGroupEmoji = (emoji) => {
+    setGroupIcon(emoji);
+    setGroupAvatarUrl(null);
+    setShowGroupIconPicker(false);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  const handlePickGroupAvatar = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+    });
+
+    if (!result.canceled) {
+      try {
+        const image = result.assets[0];
+        const fileName = `group_avatar_${Date.now()}.jpg`;
+        const base64 = await FileSystem.readAsStringAsync(image.uri, { encoding: "base64" });
+        await supabase.storage.from('avatars').upload(fileName, decode(base64), { contentType: 'image/jpeg', upsert: true });
+        const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName);
+        
+        setGroupAvatarUrl(publicUrl);
+        setGroupIcon(null);
+        setShowGroupIconPicker(false);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } catch (error) {
+        console.error('Error uploading group avatar:', error);
+        Alert.alert('Error', 'Failed to upload avatar');
+      }
+    }
+  };
+
   const createGroupChat = async () => {
     if (!groupName.trim() || selectedUsers.length < 2) {
       Alert.alert('Error', 'Please enter a group name and select at least 2 members');
@@ -982,7 +1020,7 @@ export default function FloatingChat() {
       .insert({
         is_group: true,
         group_name: groupName.trim(),
-        group_icon: '👥',
+        group_icon: groupAvatarUrl || groupIcon || '👥',
         status: 'accepted'
       })
       .select()
@@ -1000,6 +1038,8 @@ export default function FloatingChat() {
 
       setShowNewGroupModal(false);
       setGroupName('');
+      setGroupIcon('👥');
+      setGroupAvatarUrl(null);
       setSelectedUsers([]);
       loadUserAndChats();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -1153,11 +1193,15 @@ export default function FloatingChat() {
                 { transform: [{ scale: pulseAnim }] },
                 activeCall.status === 'ringing' && styles.callAvatarRinging
               ]}>
-                {activeCall.chat?.is_group ? (
-                  <View style={styles.callEmojiBg}>
-                    <Text style={styles.callEmoji}>{activeCall.chat.group_icon || '👥'}</Text>
-                  </View>
-                ) : getOtherUser(activeCall.chat)?.avatar_url ? (
+                  {activeCall.chat?.is_group ? (
+                    <View style={styles.callEmojiBg}>
+                      {activeCall.chat.group_icon?.startsWith('http') ? (
+                        <Image source={{ uri: activeCall.chat.group_icon }} style={styles.callAvatarImg} />
+                      ) : (
+                        <Text style={styles.callEmoji}>{activeCall.chat.group_icon || '👥'}</Text>
+                      )}
+                    </View>
+                  ) : getOtherUser(activeCall.chat)?.avatar_url ? (
                   <Image source={{ uri: getOtherUser(activeCall.chat).avatar_url }} style={styles.callAvatarImg} />
                 ) : (
                   <View style={styles.callEmojiBg}>
@@ -1235,28 +1279,32 @@ export default function FloatingChat() {
       <Modal visible={showNewGroupModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>New Group Chat</Text>
-              <TouchableOpacity onPress={() => setShowNewGroupModal(false)}>
-                <X size={24} color="#FFF" />
-              </TouchableOpacity>
-            </View>
-            
-              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
-                <TextInput
-                  style={[styles.modalInput, { width: 60, textAlign: 'center', marginBottom: 0 }]}
-                  placeholder="Icon"
-                  value={groupIcon}
-                  onChangeText={setGroupIcon}
-                />
-                <TextInput
-                  style={[styles.modalInput, { flex: 1, marginBottom: 0 }]}
-                  placeholder="Group Name"
-                  placeholderTextColor="rgba(255,255,255,0.3)"
-                  value={groupName}
-                  onChangeText={setGroupName}
-                />
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>New Group Chat</Text>
+                <TouchableOpacity onPress={() => setShowNewGroupModal(false)}>
+                  <X size={24} color="#FFF" />
+                </TouchableOpacity>
               </View>
+              
+                <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12, alignItems: 'center' }}>
+                  <TouchableOpacity 
+                    onPress={() => setShowGroupIconPicker(true)}
+                    style={[styles.modalInput, { width: 60, height: 60, padding: 0, justifyContent: 'center', alignItems: 'center', marginBottom: 0 }]}
+                  >
+                    {groupAvatarUrl ? (
+                      <Image source={{ uri: groupAvatarUrl }} style={{ width: 40, height: 40, borderRadius: 20 }} />
+                    ) : (
+                      <Text style={{ fontSize: 32 }}>{groupIcon || '👥'}</Text>
+                    )}
+                  </TouchableOpacity>
+                  <TextInput
+                    style={[styles.modalInput, { flex: 1, height: 60, marginBottom: 0 }]}
+                    placeholder="Group Name"
+                    placeholderTextColor="rgba(255,255,255,0.3)"
+                    value={groupName}
+                    onChangeText={setGroupName}
+                  />
+                </View>
 
             
             <TextInput
@@ -1312,9 +1360,31 @@ export default function FloatingChat() {
             </TouchableOpacity>
           </View>
         </View>
-      </Modal>
+        </Modal>
 
-      {isOpen && (
+        {showGroupIconPicker && (
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: '#0F172A' }]}>
+              <Text style={[styles.modalTitle, { color: '#FFF', textAlign: 'center', marginBottom: 20 }]}>Choose Group Icon</Text>
+              <View style={styles.emojiGrid}>
+                {EMOJIS.map(emoji => (
+                  <TouchableOpacity key={emoji} onPress={() => handleSelectGroupEmoji(emoji)} style={styles.emojiItem}>
+                    <Text style={styles.emojiText}>{emoji}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TouchableOpacity onPress={handlePickGroupAvatar} style={[styles.photoBtn, { backgroundColor: 'rgba(255,255,255,0.05)' }]}>
+                <Camera size={20} color="#FFF" />
+                <Text style={[styles.photoBtnText, { color: '#FFF' }]}>upload image</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setShowGroupIconPicker(false)} style={styles.closeBtn}>
+                <Text style={styles.closeBtnText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {isOpen && (
         <Animated.View style={[styles.chatOverlay, { opacity: fadeAnim }]}>
           <TouchableOpacity 
             style={StyleSheet.absoluteFill} 
@@ -1350,16 +1420,20 @@ export default function FloatingChat() {
                   <TouchableOpacity onPress={() => setShowChatList(true)} style={styles.iconBtn}>
                     <ChevronLeft size={24} color="#FFF" />
                   </TouchableOpacity>
-                  {activeChat?.is_group ? (
-                    <View style={styles.headerUserInfo}>
-                      <View style={styles.headerEmojiBg}>
-                        <Text style={styles.headerEmoji}>{activeChat.group_icon || '👥'}</Text>
+                    {activeChat?.is_group ? (
+                      <View style={styles.headerUserInfo}>
+                        <View style={styles.headerEmojiBg}>
+                          {activeChat.group_icon?.startsWith('http') ? (
+                            <Image source={{ uri: activeChat.group_icon }} style={styles.headerAvatar} />
+                          ) : (
+                            <Text style={styles.headerEmoji}>{activeChat.group_icon || '👥'}</Text>
+                          )}
+                        </View>
+                        <View>
+                          <Text style={styles.headerTitle}>{activeChat.group_name}</Text>
+                          <Text style={styles.onlineStatusText}>{groupMembers.length} members</Text>
+                        </View>
                       </View>
-                      <View>
-                        <Text style={styles.headerTitle}>{activeChat.group_name}</Text>
-                        <Text style={styles.onlineStatusText}>{groupMembers.length} members</Text>
-                      </View>
-                    </View>
                   ) : (
                     <TouchableOpacity 
                       style={styles.headerUserInfo}
@@ -1429,12 +1503,16 @@ export default function FloatingChat() {
                   
                   return (
                     <TouchableOpacity onPress={() => selectChat(item)} style={styles.chatListItem}>
-                      <View style={styles.avatarWrapper}>
-                        {isGroup ? (
-                          <View style={styles.listEmojiBg}>
-                            <Text style={styles.listEmoji}>{item.group_icon || '👥'}</Text>
-                          </View>
-                        ) : otherUser?.avatar_url ? (
+                        <View style={styles.avatarWrapper}>
+                          {isGroup ? (
+                            <View style={styles.listEmojiBg}>
+                              {item.group_icon?.startsWith('http') ? (
+                                <Image source={{ uri: item.group_icon }} style={styles.listAvatar} />
+                              ) : (
+                                <Text style={styles.listEmoji}>{item.group_icon || '👥'}</Text>
+                              )}
+                            </View>
+                          ) : otherUser?.avatar_url ? (
                           <Image source={{ uri: otherUser.avatar_url }} style={styles.listAvatar} />
                         ) : (
                           <View style={styles.listEmojiBg}>
@@ -2337,9 +2415,16 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
   },
-  createGroupBtnText: {
-    color: '#000',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-});
+    createGroupBtnText: {
+      color: '#000',
+      fontSize: 16,
+      fontWeight: '800',
+    },
+    emojiGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 15, marginBottom: 20 },
+    emojiItem: { padding: 5 },
+    emojiText: { fontSize: 32 },
+    photoBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, padding: 15, borderRadius: 10, marginBottom: 10 },
+    photoBtnText: { fontWeight: 'bold' },
+    closeBtn: { padding: 15, alignItems: 'center' },
+    closeBtnText: { color: '#ef4444', fontWeight: 'bold' },
+  });
