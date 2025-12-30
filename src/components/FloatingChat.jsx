@@ -1351,38 +1351,39 @@ export default function FloatingChat() {
               ))}
             </ScrollView>
             
-            <TouchableOpacity 
-              onPress={createGroupChat}
-              style={[styles.createGroupBtn, (!groupName.trim() || selectedUsers.length < 2) && { opacity: 0.5 }]}
-              disabled={!groupName.trim() || selectedUsers.length < 2}
-            >
-              <Text style={styles.createGroupBtnText}>Create Group ({selectedUsers.length + 1} members)</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-        </Modal>
+              <TouchableOpacity 
+                onPress={createGroupChat}
+                style={[styles.createGroupBtn, (!groupName.trim() || selectedUsers.length < 2) && { opacity: 0.5 }]}
+                disabled={!groupName.trim() || selectedUsers.length < 2}
+              >
+                <Text style={styles.createGroupBtnText}>Create Group ({selectedUsers.length + 1} members)</Text>
+              </TouchableOpacity>
 
-        <Modal visible={showGroupIconPicker} transparent animationType="fade">
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { backgroundColor: '#0F172A' }]}>
-              <Text style={[styles.modalTitle, { color: '#FFF', textAlign: 'center', marginBottom: 20 }]}>Choose Group Icon</Text>
-              <View style={styles.emojiGrid}>
-                {EMOJIS.map(emoji => (
-                  <TouchableOpacity key={emoji} onPress={() => handleSelectGroupEmoji(emoji)} style={styles.emojiItem}>
-                    <Text style={styles.emojiText}>{emoji}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              <TouchableOpacity onPress={handlePickGroupAvatar} style={[styles.photoBtn, { backgroundColor: 'rgba(255,255,255,0.05)' }]}>
-                <Camera size={20} color="#FFF" />
-                <Text style={[styles.photoBtnText, { color: '#FFF' }]}>upload image</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => setShowGroupIconPicker(false)} style={styles.closeBtn}>
-                <Text style={styles.closeBtnText}>Cancel</Text>
-              </TouchableOpacity>
+              <Modal visible={showGroupIconPicker} transparent animationType="fade">
+                <View style={styles.modalOverlay}>
+                  <View style={[styles.modalContent, { backgroundColor: '#0F172A' }]}>
+                    <Text style={[styles.modalTitle, { color: '#FFF', textAlign: 'center', marginBottom: 20 }]}>Choose Group Icon</Text>
+                    <View style={styles.emojiGrid}>
+                      {EMOJIS.map(emoji => (
+                        <TouchableOpacity key={emoji} onPress={() => handleSelectGroupEmoji(emoji)} style={styles.emojiItem}>
+                          <Text style={styles.emojiText}>{emoji}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                    <TouchableOpacity onPress={handlePickGroupAvatar} style={[styles.photoBtn, { backgroundColor: 'rgba(255,255,255,0.05)' }]}>
+                      <Camera size={20} color="#FFF" />
+                      <Text style={[styles.photoBtnText, { color: '#FFF' }]}>upload image</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => setShowGroupIconPicker(false)} style={styles.closeBtn}>
+                      <Text style={styles.closeBtnText}>Cancel</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </Modal>
             </View>
           </View>
         </Modal>
+
 
         {isOpen && (
         <Animated.View style={[styles.chatOverlay, { opacity: fadeAnim }]}>

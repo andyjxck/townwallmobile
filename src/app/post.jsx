@@ -7,13 +7,15 @@ import {
   ScrollView,
   ActivityIndicator,
   KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-  Alert,
-} from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter, useLocalSearchParams } from "expo-router";
-import { X, ChevronRight, Image as ImageIcon, Shield, BarChart2, Plus, ChevronLeft, WifiOff, MessageCircle, Users, Layout, Check } from "lucide-react-native";
+    Platform,
+    StyleSheet,
+    Alert,
+    Modal,
+  } from "react-native";
+  import { useSafeAreaInsets } from "react-native-safe-area-context";
+  import { useRouter, useLocalSearchParams } from "expo-router";
+  import { X, ChevronRight, Image as ImageIcon, Shield, BarChart2, Plus, ChevronLeft, WifiOff, MessageCircle, Users, Layout, Check, Camera } from "lucide-react-native";
+
 import { getStoredUser } from "../utils/user";
 import { getDeviceId } from "../utils/deviceId";
 import { supabase } from "../utils/supabase";
@@ -29,6 +31,9 @@ import { offlineStorage, checkNetworkStatus } from "../utils/offline";
 import { sendNewPostNotification } from "../utils/notifications";
 import { useLocationStore } from "../utils/locationStore";
 import { fetchZonesForCity } from "../utils/location";
+import { decode } from 'base64-arraybuffer';
+
+const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", "🐵", "🦄", "🐲", "🤖", "👻", "👾", "👽", "💩"];
 
 export default function PostScreen() {
   const { isHippie } = useTheme();
@@ -58,9 +63,12 @@ export default function PostScreen() {
   const [ctaType, setCtaType] = useState('none');
   const [ctaGroupId, setCtaGroupId] = useState(null);
   const [showGroupCreator, setShowGroupCreator] = useState(false);
-  const [newGroupName, setNewGroupName] = useState("");
-  const [newGroupIcon, setNewGroupIcon] = useState("👥");
-  const [myGroups, setMyGroups] = useState([]);
+    const [newGroupName, setNewGroupName] = useState("");
+    const [newGroupIcon, setNewGroupIcon] = useState("👥");
+    const [groupAvatarUrl, setGroupAvatarUrl] = useState(null);
+    const [showGroupIconPicker, setShowGroupIconPicker] = useState(false);
+    const [myGroups, setMyGroups] = useState([]);
+
 
   const { city_id, zone_id, feedView } = useLocationStore();
 
@@ -74,16 +82,51 @@ export default function PostScreen() {
     fetchMyGroups();
   }, [postId]);
 
-  const fetchMyGroups = async () => {
-    const storedUser = await getStoredUser();
-    if (!storedUser) return;
-    const { data } = await supabase
-      .from('rchat_members')
-      .select('chat_id, chat:rchats(*)')
-      .eq('user_id', storedUser.id)
-      .eq('chat.is_group', true);
-    setMyGroups(data?.map(d => d.chat) || []);
-  };
+    const fetchMyGroups = async () => {
+      const storedUser = await getStoredUser();
+      if (!storedUser) return;
+      const { data } = await supabase
+        .from('rchat_members')
+        .select('chat_id, chat:rchats(*)')
+        .eq('user_id', storedUser.id)
+        .eq('chat.is_group', true);
+      setMyGroups(data?.map(d => d.chat) || []);
+    };
+
+    const handleSelectGroupEmoji = (emoji) => {
+      setNewGroupIcon(emoji);
+      setGroupAvatarUrl(null);
+      setShowGroupIconPicker(false);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    };
+
+    const handlePickGroupAvatar = async () => {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.5,
+      });
+
+      if (!result.canceled) {
+        try {
+          const image = result.assets[0];
+          const fileName = `group_avatar_${Date.now()}.jpg`;
+          const arrayBuffer = await (await fetch(image.uri)).arrayBuffer();
+          await supabase.storage.from('avatars').upload(fileName, arrayBuffer, { contentType: 'image/jpeg', upsert: true });
+          const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName);
+          
+          setGroupAvatarUrl(publicUrl);
+          setNewGroupIcon(null);
+          setShowGroupIconPicker(false);
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        } catch (error) {
+          console.error('Error uploading group avatar:', error);
+          Alert.alert('Error', 'Failed to upload avatar');
+        }
+      }
+    };
+
 
   const fetchPostData = async () => {
     setLoading(true);
@@ -262,12 +305,13 @@ const dbPostData = {
     try {
       const { data: chat, error } = await supabase
         .from('rchats')
-        .insert({
-          is_group: true,
-          group_name: newGroupName.trim(),
-          group_icon: newGroupIcon,
-          status: 'accepted'
-        })
+          .insert({
+            is_group: true,
+            group_name: newGroupName.trim(),
+            group_icon: groupAvatarUrl || newGroupIcon,
+            status: 'accepted'
+          })
+
         .select()
         .single();
 
@@ -292,118 +336,147 @@ const dbPostData = {
 
   if (step === 'cta') {
     const content = (
-      <View style={[styles.container, { paddingTop: insets.top, backgroundColor: isHippie ? 'transparent' : theme.colors.background }]}>
-        <View style={[styles.overlayHeader, { borderBottomColor: theme.colors.border }]}>
-          <TouchableOpacity onPress={() => setStep('write')}>
-            <ChevronLeft size={24} color={theme.colors.text} />
-          </TouchableOpacity>
-          <Text style={[styles.overlayTitle, { color: theme.colors.text }]}>Call to Action</Text>
-          <TouchableOpacity onPress={() => setStep('write')}>
-            <Check size={24} color={isHippie ? '#FFF' : theme.colors.primary} />
-          </TouchableOpacity>
-        </View>
-        <ScrollView contentContainerStyle={styles.form}>
-          <Text style={[styles.label, { color: 'rgba(255,255,255,0.5)', marginTop: 0 }]}>Select Type</Text>
-          <View style={styles.ctaTypeGrid}>
-            {[
-              { id: 'none', label: 'None', icon: X },
-              { id: 'chat', label: 'Chat to me', icon: MessageCircle },
-              { id: 'group', label: 'Join group', icon: Users },
-            ].map(type => (
-              <TouchableOpacity
-                key={type.id}
-                onPress={() => {
-                  setCtaType(type.id);
-                  if (type.id !== 'group') setCtaGroupId(null);
-                }}
-                style={[
-                  styles.ctaTypeCard,
-                  { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: theme.colors.border },
-                  ctaType === type.id && { borderColor: theme.colors.primary, backgroundColor: theme.colors.primary + '20' }
-                ]}
-              >
-                <type.icon size={24} color={ctaType === type.id ? theme.colors.primary : "rgba(255,255,255,0.5)"} />
-                <Text style={[styles.ctaTypeLabel, { color: ctaType === type.id ? theme.colors.primary : "rgba(255,255,255,0.7)" }]}>{type.label}</Text>
-              </TouchableOpacity>
-            ))}
+      <>
+        <View style={[styles.container, { paddingTop: insets.top, backgroundColor: isHippie ? 'transparent' : theme.colors.background }]}>
+          <View style={[styles.overlayHeader, { borderBottomColor: theme.colors.border }]}>
+            <TouchableOpacity onPress={() => setStep('write')}>
+              <ChevronLeft size={24} color={theme.colors.text} />
+            </TouchableOpacity>
+            <Text style={[styles.overlayTitle, { color: theme.colors.text }]}>Call to Action</Text>
+            <TouchableOpacity onPress={() => setStep('write')}>
+              <Check size={24} color={isHippie ? '#FFF' : theme.colors.primary} />
+            </TouchableOpacity>
           </View>
-
-          {ctaType === 'group' && (
-            <View style={{ marginTop: 24 }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <Text style={[styles.label, { color: 'rgba(255,255,255,0.5)', marginTop: 0 }]}>Link a Group</Text>
-                <TouchableOpacity onPress={() => setShowGroupCreator(true)} style={styles.addGroupBtn}>
-                  <Plus size={14} color={theme.colors.primary} />
-                  <Text style={{ color: theme.colors.primary, fontSize: 13, fontWeight: '700', marginLeft: 4 }}>New Group</Text>
+          <ScrollView contentContainerStyle={styles.form}>
+            <Text style={[styles.label, { color: 'rgba(255,255,255,0.5)', marginTop: 0 }]}>Select Type</Text>
+            <View style={styles.ctaTypeGrid}>
+              {[
+                { id: 'none', label: 'None', icon: X },
+                { id: 'chat', label: 'Chat to me', icon: MessageCircle },
+                { id: 'group', label: 'Join group', icon: Users },
+              ].map(type => (
+                <TouchableOpacity
+                  key={type.id}
+                  onPress={() => {
+                    setCtaType(type.id);
+                    if (type.id !== 'group') setCtaGroupId(null);
+                  }}
+                  style={[
+                    styles.ctaTypeCard,
+                    { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: theme.colors.border },
+                    ctaType === type.id && { borderColor: theme.colors.primary, backgroundColor: theme.colors.primary + '20' }
+                  ]}
+                >
+                  <type.icon size={24} color={ctaType === type.id ? theme.colors.primary : "rgba(255,255,255,0.5)"} />
+                  <Text style={[styles.ctaTypeLabel, { color: ctaType === type.id ? theme.colors.primary : "rgba(255,255,255,0.7)" }]}>{type.label}</Text>
                 </TouchableOpacity>
-              </View>
+              ))}
+            </View>
 
-              {showGroupCreator ? (
-                <View style={[styles.groupCreator, { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: theme.colors.border }]}>
-                  <View style={styles.groupCreatorHeader}>
-                    <Text style={{ color: '#FFF', fontWeight: '700' }}>Create Group</Text>
-                    <TouchableOpacity onPress={() => setShowGroupCreator(false)}>
-                      <X size={16} color="rgba(255,255,255,0.5)" />
-                    </TouchableOpacity>
-                  </View>
-                  <View style={styles.groupInputRow}>
-                    <TextInput
-                      value={newGroupIcon}
-                      onChangeText={setNewGroupIcon}
-                      style={[styles.groupIconInput, { backgroundColor: 'rgba(255,255,255,0.1)', color: '#FFF' }]}
-                      placeholder="Icon"
-                    />
-                    <TextInput
-                      value={newGroupName}
-                      onChangeText={setNewGroupName}
-                      style={[styles.groupNameInput, { backgroundColor: 'rgba(255,255,255,0.1)', color: '#FFF' }]}
-                      placeholder="Group Name"
-                      placeholderTextColor="rgba(255,255,255,0.3)"
-                    />
-                  </View>
-                  <TouchableOpacity 
-                    onPress={handleCreateGroup}
-                    disabled={loading || !newGroupName.trim()}
-                    style={[styles.groupCreateSubmit, { backgroundColor: theme.colors.primary }]}
-                  >
-                    {loading ? <ActivityIndicator size="small" color="#000" /> : <Text style={{ fontWeight: '800' }}>Create & Link</Text>}
+            {ctaType === 'group' && (
+              <View style={{ marginTop: 24 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <Text style={[styles.label, { color: 'rgba(255,255,255,0.5)', marginTop: 0 }]}>Link a Group</Text>
+                  <TouchableOpacity onPress={() => setShowGroupCreator(true)} style={styles.addGroupBtn}>
+                    <Plus size={14} color={theme.colors.primary} />
+                    <Text style={{ color: theme.colors.primary, fontSize: 13, fontWeight: '700', marginLeft: 4 }}>New Group</Text>
                   </TouchableOpacity>
                 </View>
-              ) : (
-                <View style={styles.groupList}>
-                  {myGroups.length === 0 ? (
-                    <Text style={{ color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: 20 }}>You haven't joined any groups yet</Text>
-                  ) : (
-                    myGroups.map(group => (
-                      <TouchableOpacity
-                        key={group.id}
-                        onPress={() => setCtaGroupId(group.id)}
-                        style={[
-                          styles.groupItem,
-                          { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: theme.colors.border },
-                          ctaGroupId === group.id && { borderColor: theme.colors.primary, backgroundColor: theme.colors.primary + '10' }
-                        ]}
-                      >
-                        <Text style={styles.groupItemIcon}>{group.group_icon || '👥'}</Text>
-                        <Text style={[styles.groupItemName, { color: '#FFF' }]}>{group.group_name}</Text>
-                        {ctaGroupId === group.id && <Check size={18} color={theme.colors.primary} />}
-                      </TouchableOpacity>
-                    ))
-                  )}
-                </View>
-              )}
-            </View>
-          )}
 
-          <TouchableOpacity 
-            onPress={() => setStep('write')}
-            style={[styles.saveCtaBtn, { backgroundColor: isHippie ? '#FFF' : theme.colors.primary }]}
-          >
-            <Text style={[styles.saveCtaBtnText, { color: '#000' }]}>Apply CTA</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </View>
+                {showGroupCreator ? (
+                  <View style={[styles.groupCreator, { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: theme.colors.border }]}>
+                    <View style={styles.groupCreatorHeader}>
+                      <Text style={{ color: '#FFF', fontWeight: '700' }}>Create Group</Text>
+                      <TouchableOpacity onPress={() => setShowGroupCreator(false)}>
+                        <X size={16} color="rgba(255,255,255,0.5)" />
+                      </TouchableOpacity>
+                    </View>
+                    <View style={styles.groupInputRow}>
+                      <TouchableOpacity 
+                        onPress={() => setShowGroupIconPicker(true)}
+                        style={[styles.groupIconInput, { backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' }]}
+                      >
+                        {groupAvatarUrl ? (
+                          <Image source={{ uri: groupAvatarUrl }} style={{ width: 24, height: 24, borderRadius: 12 }} />
+                        ) : (
+                          <Text style={{ fontSize: 20 }}>{newGroupIcon || '👥'}</Text>
+                        )}
+                      </TouchableOpacity>
+                      <TextInput
+                        value={newGroupName}
+                        onChangeText={setNewGroupName}
+                        style={[styles.groupNameInput, { backgroundColor: 'rgba(255,255,255,0.1)', color: '#FFF' }]}
+                        placeholder="Group Name"
+                        placeholderTextColor="rgba(255,255,255,0.3)"
+                      />
+                    </View>
+                    <TouchableOpacity 
+                      onPress={handleCreateGroup}
+                      disabled={loading || !newGroupName.trim()}
+                      style={[styles.groupCreateSubmit, { backgroundColor: theme.colors.primary }]}
+                    >
+                      {loading ? <ActivityIndicator size="small" color="#000" /> : <Text style={{ fontWeight: '800' }}>Create & Link</Text>}
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={styles.groupList}>
+                    {myGroups.length === 0 ? (
+                      <Text style={{ color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: 20 }}>You haven't joined any groups yet</Text>
+                    ) : (
+                      myGroups.map(group => (
+                        <TouchableOpacity
+                          key={group.id}
+                          onPress={() => setCtaGroupId(group.id)}
+                          style={[
+                            styles.groupItem,
+                            { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: theme.colors.border },
+                            ctaGroupId === group.id && { borderColor: theme.colors.primary, backgroundColor: theme.colors.primary + '10' }
+                          ]}
+                        >
+                          <Text style={styles.groupItemIcon}>{group.group_icon?.startsWith('http') ? '🖼️' : (group.group_icon || '👥')}</Text>
+                          <Text style={[styles.groupItemName, { color: '#FFF' }]}>{group.group_name}</Text>
+                          {ctaGroupId === group.id && <Check size={18} color={theme.colors.primary} />}
+                        </TouchableOpacity>
+                      ))
+                    )}
+                  </View>
+                )}
+              </View>
+            )}
+
+            <TouchableOpacity 
+              onPress={() => setStep('write')}
+              style={[styles.saveCtaBtn, { backgroundColor: isHippie ? '#FFF' : theme.colors.primary }]}
+            >
+              <Text style={[styles.saveCtaBtnText, { color: '#000' }]}>Apply CTA</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+
+        <Modal visible={showGroupIconPicker} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: '#0F172A' }]}>
+              <Text style={[styles.modalTitle, { color: '#FFF', textAlign: 'center', marginBottom: 20 }]}>Choose Group Icon</Text>
+              <View style={styles.emojiGrid}>
+                {EMOJIS.map(emoji => (
+                  <TouchableOpacity key={emoji} onPress={() => handleSelectGroupEmoji(emoji)} style={styles.emojiItem}>
+                    <Text style={styles.emojiText}>{emoji}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TouchableOpacity onPress={handlePickGroupAvatar} style={[styles.photoBtn, { backgroundColor: 'rgba(255,255,255,0.05)' }]}>
+                <Camera size={20} color="#FFF" />
+                <Text style={[styles.photoBtnText, { color: '#FFF' }]}>upload image</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setShowGroupIconPicker(false)} style={styles.pickerCloseBtn}>
+                <Text style={styles.pickerCloseBtnText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      </>
     );
+
 
     return isHippie ? <HippieBackground>{content}</HippieBackground> : content;
   }
@@ -776,5 +849,65 @@ const styles = StyleSheet.create({
   addOptionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 12 },
   addOptionText: { fontSize: 14, fontWeight: '700' },
   savePollBtn: { marginTop: 40, padding: 18, borderRadius: 30, alignItems: 'center' },
-  savePollBtnText: { color: '#000', fontWeight: '800', fontSize: 16 },
-});
+    savePollBtnText: { color: '#000', fontWeight: '800', fontSize: 16 },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.8)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 20
+    },
+    modalContent: {
+      width: '100%',
+      maxWidth: 400,
+      borderRadius: 24,
+      padding: 24,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.1)'
+    },
+    modalTitle: {
+      fontSize: 20,
+      fontWeight: '800',
+      letterSpacing: -0.5
+    },
+    emojiGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'center',
+      gap: 12,
+      marginBottom: 24
+    },
+    emojiItem: {
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      backgroundColor: 'rgba(255,255,255,0.05)',
+      justifyContent: 'center',
+      alignItems: 'center'
+    },
+    emojiText: {
+      fontSize: 24
+    },
+    photoBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      padding: 16,
+      borderRadius: 16,
+      marginBottom: 12
+    },
+    photoBtnText: {
+      fontWeight: '700',
+      fontSize: 15
+    },
+    pickerCloseBtn: {
+      padding: 12,
+      alignItems: 'center'
+    },
+    pickerCloseBtnText: {
+      color: 'rgba(255,255,255,0.5)',
+      fontWeight: '600'
+    },
+  });
+
