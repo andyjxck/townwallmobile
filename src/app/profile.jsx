@@ -809,8 +809,8 @@ const styles = StyleSheet.create({
     friendName: { fontWeight: 'bold' },
     footer: { paddingVertical: 30, alignItems: 'center' },
     footerText: { fontSize: 12, fontWeight: '600' },
-    actionRow: { paddingVertical: 10, alignItems: 'center', width: '100%', paddingHorizontal: 20 },
-    messageBtn: { width: '100%', borderRadius: 25, overflow: 'hidden' },
+    actionRow: { flexDirection: 'row', paddingVertical: 10, alignItems: 'center', width: '100%', paddingHorizontal: 20 },
+    messageBtn: { borderRadius: 25, overflow: 'hidden' },
     messageBtnGradient: { 
       flexDirection: 'row', 
       alignItems: 'center', 
