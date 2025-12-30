@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
+  Modal,
   TouchableOpacity,
   StyleSheet,
   ScrollView,
@@ -468,7 +469,8 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
           await sendFriendRequestNotification({
             senderId: currentUser.id,
             senderUsername: currentUser.username,
-            receiverId: user.id
+            receiverId: user.id,
+            requestId: newRel.id
           });
           
           setFriendshipStatus({ id: newRel.id, status: 'pending', isRequester: true });

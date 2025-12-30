@@ -52,10 +52,10 @@ export default function NotificationPanel({ visible, onClose }) {
       };
       
       setupSubscription();
-    } else if (wasVisible.current && !visible) {
-      // Panel was just closed
-      handleMarkAllAsRead();
-    }
+      } else if (wasVisible.current && !visible) {
+        // Panel was just closed
+        // No longer marking all as read automatically
+      }
     
     wasVisible.current = visible;
 
@@ -187,15 +187,20 @@ export default function NotificationPanel({ visible, onClose }) {
     <View style={[styles.overlay, isHippie && { backgroundColor: '#0F172A' }]}>
       <View style={[styles.container, { paddingTop: insets.top + 20 }]}>
 
-          <View style={styles.header}>
-            <View style={styles.headerTitleRow}>
-              <Bell size={24} color="#FBBF24" />
-              <Text style={styles.headerTitle}>NOTIFICATIONS</Text>
+            <View style={styles.header}>
+              <View style={styles.headerTitleRow}>
+                <Bell size={24} color="#FBBF24" />
+                <View>
+                  <Text style={styles.headerTitle}>NOTIFICATIONS</Text>
+                  <TouchableOpacity onPress={handleMarkAllAsRead}>
+                    <Text style={{ color: '#FBBF24', fontSize: 12, fontWeight: 'bold', marginTop: 2 }}>Mark all as read</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                <X size={28} color="#FFFFFF" />
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <X size={28} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
 
           {loading ? (
             <View style={styles.centered}>
