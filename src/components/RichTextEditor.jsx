@@ -17,83 +17,8 @@ import {
   Bold, 
   Italic, 
   Underline, 
-  List, 
-  ListOrdered, 
-  ChevronDown, 
-  Check,
   BarChart2
 } from 'lucide-react-native';
-
-function ToolbarDropdown({ icon: Icon, label, options, onSelect, currentValue }) {
-  const [visible, setVisible] = useState(false);
-  const triggerRef = useRef();
-  const [pos, setPos] = useState({ top: 0, left: 0 });
-
-  const toggle = () => {
-    if (visible) {
-      setVisible(false);
-    } else {
-    triggerRef.current.measure((x, y, width, height, pageX, pageY) => {
-          setPos({ top: pageY + height, left: pageX - 10 });
-          setVisible(true);
-        });
-
-    }
-  };
-
-  return (
-    <View>
-      <TouchableOpacity 
-        ref={triggerRef}
-        style={styles.dropdownTrigger} 
-        onPress={toggle}
-      >
-          <Icon size={18} color="rgba(255,255,255,0.6)" />
-          {label && <Text style={styles.dropdownText}>{label}</Text>}
-          <ChevronDown size={10} color="rgba(255,255,255,0.3)" />
-      </TouchableOpacity>
-
-      <Modal
-        visible={visible}
-        transparent={true}
-        animationType="none"
-        onRequestClose={() => setVisible(false)}
-      >
-        <TouchableWithoutFeedback onPress={() => setVisible(false)}>
-          <View style={styles.modalOverlay}>
-            <View style={[
-              styles.dropdownMenu, 
-              { 
-                position: 'absolute',
-                top: pos.top,
-                left: Math.max(10, Math.min(pos.left, 150)),
-              }
-            ]}>
-              {options.map((option) => (
-                <TouchableOpacity
-                  key={option.value}
-                  style={styles.dropdownItem}
-                  onPress={() => {
-                    onSelect(option.value);
-                    setVisible(false);
-                  }}
-                >
-                  <option.icon size={18} color={currentValue === option.value ? '#007AFF' : '#FFFFFF'} />
-                  <Text style={[
-                    styles.dropdownItemText,
-                    currentValue === option.value && { color: '#007AFF', fontWeight: 'bold' }
-                  ]}>
-                    {option.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
-    </View>
-  );
-}
 
 export function RichTextEditor({ 
   value, 
@@ -105,33 +30,12 @@ export function RichTextEditor({
 }) {
   const richText = useRef();
 
-  const handleListSelect = (type) => {
-    if (type === 'bullets') {
-      richText.current?.executeAction(actions.insertBulletsList);
-    } else if (type === 'numbers') {
-      richText.current?.executeAction(actions.insertOrderedList);
-    }
-  };
-
-  const listOptions = [
-    { label: 'Bullets', value: 'bullets', icon: List },
-    { label: 'Numbers', value: 'numbers', icon: ListOrdered },
-  ];
-
   return (
     <View style={[styles.container, { backgroundColor }]}>
       <View style={styles.toolbarContainer}>
         <View 
           style={styles.toolbarContent}
         >
-          <ToolbarDropdown 
-            icon={List} 
-            options={listOptions}
-            onSelect={handleListSelect}
-          />
-
-          <View style={styles.separator} />
-
           <RichToolbar
             editor={richText}
             actions={[
@@ -220,18 +124,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.1)',
     marginHorizontal: 8,
   },
-  dropdownTrigger: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    gap: 4,
-  },
-  dropdownText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-  },
   pollBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -245,34 +137,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.6)',
     fontSize: 12,
     fontWeight: '700',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'transparent',
-  },
-  dropdownMenu: {
-    backgroundColor: '#1C1C1E',
-    borderRadius: 12,
-    padding: 4,
-    width: 160,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  dropdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 10,
-    gap: 10,
-    borderRadius: 8,
-  },
-  dropdownItemText: {
-    color: '#FFFFFF',
-    fontSize: 14,
   },
   editorWrapper: {
     marginVertical: 10,
