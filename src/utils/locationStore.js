@@ -14,26 +14,27 @@ export const useLocationStore = create(
       feedView: "global",
       savedCity: null,
 
-      setCity: (city) => {
-        if (city.id === 321) {
-          set({
-            city_id: 321,
-            city_name: "Global",
-            feedView: "global",
-            zone_id: null,
-            zone_name: null,
-          });
-        } else {
-          set({
-            city_id: city.id,
-            city_name: city.name,
-            city_source: city.source || "manual",
-            isLocationSet: true,
-            feedView: "city",
-            savedCity: city,
-          });
-        }
-      },
+        setCity: (city) => {
+          if (city.id === 321) {
+            set({
+              city_id: 321,
+              city_name: "Global",
+              feedView: "global",
+              zone_id: null,
+              zone_name: null,
+              isLocationSet: true,
+            });
+          } else {
+            set({
+              city_id: city.id,
+              city_name: city.name,
+              city_source: city.source || "manual",
+              isLocationSet: true,
+              feedView: "city",
+              savedCity: city,
+            });
+          }
+        },
 
       switchToTown: () => {
         const { savedCity } = get();

@@ -84,8 +84,17 @@ export default function CityScreen() {
           name: selectedCity.name,
           source: detectedCity?.id === selectedCity.id ? "auto" : "manual",
         });
-        await setOnboardingComplete(true);
-        router.replace("/");
+        
+        // Check if city has zones
+        const zones = await fetchZonesForCity(selectedCity.id);
+        if (zones && zones.length > 0) {
+          setShowConfirmModal(false);
+          router.push("/onboarding/zones");
+        } else {
+          await setOnboardingComplete(true);
+          setShowConfirmModal(false);
+          router.replace("/");
+        }
       }
     };
 
