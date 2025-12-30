@@ -43,7 +43,7 @@ import { ShareManager } from "../components/ShareManager";
 import { theme } from "../utils/theme";
 import { useTheme } from "@/utils/ThemeContext";
 import { sendFriendRequestNotification, sendFriendAcceptedNotification } from "../utils/notifications";
-import { useAuthStore, useChatStore } from "../utils/auth";
+import { useAuth, useAuthStore, useChatStore } from "../utils/auth";
 
 const { width } = Dimensions.get('window');
 const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", "🐵", "🦄", "🐲", "🤖", "👻", "👾", "👽", "💩"];
