@@ -510,13 +510,27 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
         .or(`and(user1_id.eq.${storedUser.id},user2_id.eq.${user.id}),and(user1_id.eq.${user.id},user2_id.eq.${storedUser.id})`)
         .single();
       
-        if (existing) {
-          if (existing.status === 'rejected') {
-            Alert.alert("Error", "You cannot message this user.");
-            return;
-          }
-          useChatStore.getState().open(existing.id);
-        } else {
+          if (existing) {
+            if (existing.status === 'rejected') {
+              Alert.alert("Error", "You cannot message this user.");
+              return;
+            }
+            
+            // If it's pending, check if they are friends now
+            if (existing.status === 'pending') {
+              const { data: friendship } = await supabase
+                .from('friends')
+                .select('id')
+                .match({ user_id: storedUser.id, friend_id: user.id, status: 'accepted' })
+                .single();
+              
+              if (friendship) {
+                await supabase.from('rchats').update({ status: 'accepted' }).eq('id', existing.id);
+              }
+            }
+
+            useChatStore.getState().open(existing.id);
+          } else {
           // Check if they are friends
           const { data: friendship } = await supabase
             .from('friends')

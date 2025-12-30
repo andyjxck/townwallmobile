@@ -87,30 +87,52 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
             return;
           }
 
-          // Check if chat already exists
-          const { data: existingChats } = await supabase
-            .from('rchats')
-            .select('*')
-            .or(`and(user1_id.eq.${user.id},user2_id.eq.${item.user_id}),and(user1_id.eq.${item.user_id},user2_id.eq.${user.id})`)
-            .eq('is_group', false);
-
-          let chatId;
-          if (existingChats && existingChats.length > 0) {
-            chatId = existingChats[0].id;
-          } else {
-            const { data: newChat } = await supabase
+            // Check if chat already exists
+            const { data: existingChats } = await supabase
               .from('rchats')
-              .insert({
-                user1_id: user.id,
-                user2_id: item.user_id,
-                initiated_by: user.id,
-                status: 'pending',
-                is_group: false
-              })
-              .select()
-              .single();
-            chatId = newChat.id;
-          }
+              .select('*')
+              .or(`and(user1_id.eq.${user.id},user2_id.eq.${item.user_id}),and(user1_id.eq.${item.user_id},user2_id.eq.${user.id})`)
+              .eq('is_group', false);
+
+            let chatId;
+            if (existingChats && existingChats.length > 0) {
+              chatId = existingChats[0].id;
+              // If it's pending, check if they are friends now
+              if (existingChats[0].status === 'pending') {
+                const { data: friendship } = await supabase
+                  .from('friends')
+                  .select('id')
+                  .match({ user_id: user.id, friend_id: item.user_id, status: 'accepted' })
+                  .single();
+                
+                if (friendship) {
+                  await supabase.from('rchats').update({ status: 'accepted' }).eq('id', chatId);
+                }
+              }
+            } else {
+              // Check if they are friends
+              const { data: friendship } = await supabase
+                .from('friends')
+                .select('id')
+                .match({ user_id: user.id, friend_id: item.user_id, status: 'accepted' })
+                .single();
+              
+              const status = friendship ? 'accepted' : 'pending';
+
+              const { data: newChat } = await supabase
+                .from('rchats')
+                .insert({
+                  user1_id: Math.min(user.id, item.user_id),
+                  user2_id: Math.max(user.id, item.user_id),
+                  initiated_by: user.id,
+                  status: status,
+                  is_group: false,
+                  last_message: status === 'pending' ? 'Chat Request' : 'Chat started'
+                })
+                .select()
+                .single();
+              chatId = newChat.id;
+            }
           
           if (chatId) {
             useChatStore.getState().setActiveChatId(chatId);

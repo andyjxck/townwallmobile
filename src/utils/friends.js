@@ -36,12 +36,19 @@ export const acceptFriendRequest = async (requestId, userId, friendId, username)
       if (insertError) throw insertError;
     }
 
-    // Send notification to the requester
-    await sendFriendAcceptedNotification({
-      acceptorId: userId,
-      acceptorUsername: username,
-      requesterId: friendId
-    });
+      // Send notification to the requester
+      await sendFriendAcceptedNotification({
+        acceptorId: userId,
+        acceptorUsername: username,
+        requesterId: friendId
+      });
+
+      // Auto-accept any pending chats between these two users
+      await supabase
+        .from('rchats')
+        .update({ status: 'accepted' })
+        .or(`and(user1_id.eq.${userId},user2_id.eq.${friendId}),and(user1_id.eq.${friendId},user2_id.eq.${userId})`)
+        .eq('status', 'pending');
 
     // Also find and mark the friend_request notification as read for this user
     await supabase
