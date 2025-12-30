@@ -32,7 +32,7 @@ import {
   } from "lucide-react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system/legacy";
+import * as FileSystem from "expo-file-system";
 import * as Haptics from "expo-haptics";
 import { decode } from "base64-arraybuffer";
 import { LinearGradient } from "expo-linear-gradient";
@@ -92,15 +92,32 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
       if (!storedUser) return;
 
       const channel = supabase
-        .channel(`profile_${storedUser.id}`)
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rusers', filter: `id=eq.${storedUser.id}` }, (payload) => {
+        .channel(`profile_${storedUser.id}_${userId || 'self'}`)
+        .on('postgres_changes', { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'rusers', 
+          filter: `id=eq.${userId || storedUser.id}` 
+        }, (payload) => {
           setUser(payload.new);
-          setBioText(payload.new.bio || "");
+          if (isOwnProfile) {
+            setBioText(payload.new.bio || "");
+            setUsernameText(payload.new.username || "");
+            setNicknameText(payload.new.nickname || "");
+          }
         })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'rposts' }, () => loadData())
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'rreactions' }, () => loadData())
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'friends' }, () => loadData())
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'rcomments' }, () => loadData())
+        .on('postgres_changes', { 
+          event: '*', 
+          schema: 'public', 
+          table: 'friends',
+          filter: `user_id=eq.${storedUser.id}`
+        }, () => loadData())
+        .on('postgres_changes', { 
+          event: '*', 
+          schema: 'public', 
+          table: 'friends',
+          filter: `friend_id=eq.${storedUser.id}`
+        }, () => loadData())
         .subscribe();
 
       return channel;
@@ -143,26 +160,26 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
 
         if (!userData && viewingOwnProfile) userData = await initUser();
         
-        // Prevent viewing other anon profiles
-        if (userData && !userData.supabase_uid && !viewingOwnProfile) {
-          Alert.alert("Private Profile", "Anonymous profiles are private and cannot be visited.");
-          router.back();
-          return;
-        }
+          // Prevent viewing other anon profiles
+          if (userData && !userData.password && !viewingOwnProfile) {
+            Alert.alert("Private Profile", "Anonymous profiles are private and cannot be visited.");
+            router.back();
+            return;
+          }
 
-        setUser(userData);
-        setBioText(userData?.bio || "");
-        setUsernameText(userData?.username || "");
-        setNicknameText(userData?.nickname || "");
+          setUser(userData);
+          setBioText(userData?.bio || "");
+          setUsernameText(userData?.username || "");
+          setNicknameText(userData?.nickname || "");
 
-        if (userData) {
-          if (!viewingOwnProfile && storedUser?.id) {
-            // Check friendship status with current user
-            const { data: rel } = await supabase
-              .from('friends')
-              .select('*')
-              .or(`and(user_id.eq.${storedUser.id},friend_id.eq.${userData.id}),and(user_id.eq.${userData.id},friend_id.eq.${storedUser.id})`)
-              .single();
+          if (userData) {
+            if (!viewingOwnProfile && storedUser?.id) {
+              // Check friendship status with current user
+              const { data: rel } = await supabase
+                .from('friends')
+                .select('*')
+                .or(`and(user_id.eq.${storedUser.id},friend_id.eq.${userData.id}),and(user_id.eq.${userData.id},friend_id.eq.${storedUser.id})`)
+                .maybeSingle();
             
             if (rel) {
               setFriendshipStatus({
@@ -493,17 +510,17 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
                 <SettingsIcon color={theme.colors.text} size={24} />
               </TouchableOpacity>
             )}
-            {isOwnProfile && (
-              user?.supabase_uid ? (
-                <TouchableOpacity onPress={handleLogout} style={styles.headerIcon}>
-                  <LogOut color={theme.colors.error} size={24} />
-                </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity onPress={() => router.push("/auth")} style={styles.headerIcon}>
-                    <UserPlus color={theme.colors.primary} size={24} />
+              {isOwnProfile && (
+                user?.password ? (
+                  <TouchableOpacity onPress={handleLogout} style={styles.headerIcon}>
+                    <LogOut color={theme.colors.error} size={24} />
                   </TouchableOpacity>
-                )
-            )}
+                  ) : (
+                    <TouchableOpacity onPress={() => router.push("/auth")} style={styles.headerIcon}>
+                      <UserPlus color={theme.colors.primary} size={24} />
+                    </TouchableOpacity>
+                  )
+              )}
             {!isOwnProfile && <View style={{ width: 40 }} />}
           </View>
       </View>
@@ -612,7 +629,7 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
                         <View style={styles.actionRow}>
                           <TouchableOpacity 
                             onPress={() => {
-                              if (!currentUser?.supabase_uid) {
+                              if (!currentUser?.password) {
                                 Alert.alert("Join the Wall", "Please sign up to message other users!");
                                 return;
                               }
@@ -631,17 +648,17 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
                             </LinearGradient>
                           </TouchableOpacity>
 
-                          <TouchableOpacity 
-                            onPress={() => {
-                              if (!currentUser?.supabase_uid) {
-                                Alert.alert("Join the Wall", "Please sign up to add friends!");
-                                return;
-                              }
-                              handleActionFriend();
-                            }} 
-                            disabled={addingFriend || friendshipStatus?.status === 'accepted'}
-                            style={[styles.messageBtn, { flex: 1, marginLeft: 10 }]}
-                          >
+                            <TouchableOpacity 
+                              onPress={() => {
+                                if (!currentUser?.password) {
+                                  Alert.alert("Join the Wall", "Please sign up to add friends!");
+                                  return;
+                                }
+                                handleActionFriend();
+                              }} 
+                              disabled={addingFriend || friendshipStatus?.status === 'accepted'}
+                              style={[styles.messageBtn, { flex: 1, marginLeft: 10 }]}
+                            >
                             <LinearGradient
                               colors={['#818CF8', '#C084FC']}
                               start={{ x: 0, y: 0 }}

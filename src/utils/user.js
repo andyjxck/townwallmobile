@@ -51,19 +51,24 @@ export const initUser = async () => {
     let ruser = null;
 
     if (sessionUser && sessionUser.id) {
-      // 1. Refresh user data from DB if logged in
-      const { data: userById } = await supabase
-        .from('rusers')
-        .select('*')
-        .eq('id', sessionUser.id)
-        .single();
-      
-      if (userById) {
-        ruser = userById;
-        // Update device_id to current device if it changed
-        if (ruser.device_id !== deviceId) {
-          await supabase.from('rusers').update({ device_id: deviceId }).eq('id', ruser.id);
-          ruser.device_id = deviceId;
+      // If we already have a user with a password in memory, and it's from this device, skip DB call
+      if (sessionUser.password && sessionUser.device_id === deviceId) {
+        ruser = sessionUser;
+      } else {
+        // Refresh user data from DB if logged in
+        const { data: userById } = await supabase
+          .from('rusers')
+          .select('*')
+          .eq('id', sessionUser.id)
+          .single();
+        
+        if (userById) {
+          ruser = userById;
+          // Update device_id to current device if it changed
+          if (ruser.device_id !== deviceId) {
+            await supabase.from('rusers').update({ device_id: deviceId }).eq('id', ruser.id);
+            ruser.device_id = deviceId;
+          }
         }
       }
     }

@@ -458,19 +458,24 @@ export default function Auth() {
               )}
 
 
-            <TouchableOpacity 
-              style={styles.primaryButton} 
-              onPress={handleAuth}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="#000000" />
-              ) : (
-                <Text style={styles.primaryButtonText}>
-                  {isLogin ? "Sign In" : "Create Account"}
-                </Text>
-              )}
-            </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.primaryButton} 
+                onPress={handleAuth}
+                disabled={loading}
+              >
+                {loading ? (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator color="#000000" />
+                    {!isLogin && (
+                      <Text style={styles.loadingText}>Generating recovery codes...</Text>
+                    )}
+                  </View>
+                ) : (
+                  <Text style={styles.primaryButtonText}>
+                    {isLogin ? "Sign In" : "Create Account"}
+                  </Text>
+                )}
+              </TouchableOpacity>
 
             <TouchableOpacity 
               style={styles.secondaryButton} 
@@ -691,6 +696,16 @@ const styles = StyleSheet.create({
       color: "rgba(255,255,255,0.6)",
       fontSize: 14,
       fontWeight: "500",
+    },
+    loadingContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    loadingText: {
+      color: '#000000',
+      fontSize: 14,
+      fontWeight: '600',
     }
   });
 
