@@ -155,7 +155,7 @@ export function RichTextEditor({ value, onChange, placeholder, onPollPress, minH
               </TouchableOpacity>
             </>
           )}
-        </ScrollView>
+        </View>
       </View>
 
       <View style={[styles.editorWrapper, { minHeight }]}>
