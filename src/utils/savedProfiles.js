@@ -17,14 +17,27 @@ export const saveProfile = async (profile) => {
     const profiles = await getSavedProfiles();
     const existingIndex = profiles.findIndex(p => p.username === profile.username);
     
-    const newProfile = {
-      username: profile.username,
-      password: profile.password,
-      name: profile.username, // Default to username if no name
-      emoji: profile.emoji_icon || '👤',
-      avatar_url: profile.avatar_url || null,
-      lastLogin: new Date().toISOString(),
-    };
+    let newProfile;
+    if (existingIndex > -1) {
+      // Merge with existing profile to keep password if not provided
+      newProfile = {
+        ...profiles[existingIndex],
+        ...profile,
+        name: profile.username || profiles[existingIndex].username,
+        emoji: profile.emoji_icon || profile.emoji || profiles[existingIndex].emoji || '👤',
+        avatar_url: profile.avatar_url !== undefined ? profile.avatar_url : profiles[existingIndex].avatar_url,
+        lastLogin: new Date().toISOString(),
+      };
+    } else {
+      newProfile = {
+        username: profile.username,
+        password: profile.password,
+        name: profile.username,
+        emoji: profile.emoji_icon || '👤',
+        avatar_url: profile.avatar_url || null,
+        lastLogin: new Date().toISOString(),
+      };
+    }
 
     if (existingIndex > -1) {
       profiles[existingIndex] = newProfile;

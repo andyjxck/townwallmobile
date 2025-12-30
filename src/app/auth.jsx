@@ -187,14 +187,15 @@ export default function Auth() {
                   }
                 }
 
-              await completeLogin(user, deviceId);
-              if (saveProfileEnabled) {
-                await saveProfile({
-                  username: trimmedUsername,
-                  password: trimmedPassword,
-                  emoji_icon: user.emoji_icon
-                });
-              }
+                await completeLogin(user, deviceId);
+                if (saveProfileEnabled) {
+                  await saveProfile({
+                    username: trimmedUsername,
+                    password: trimmedPassword,
+                    emoji_icon: user.emoji_icon,
+                    avatar_url: user.avatar_url
+                  });
+                }
 
       } else {
         const { data: existingUser } = await supabase
@@ -289,7 +290,8 @@ export default function Auth() {
       await saveProfile({
         username: profile.username,
         password: profile.password,
-        emoji_icon: user.emoji_icon
+        emoji_icon: user.emoji_icon,
+        avatar_url: user.avatar_url
       });
     } catch (error) {
       Alert.alert("Error", error.message);

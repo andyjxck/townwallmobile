@@ -43,6 +43,7 @@ import { ShareManager } from "../components/ShareManager";
 import { theme } from "../utils/theme";
 import { useTheme } from "@/utils/ThemeContext";
 import { sendFriendRequestNotification, sendFriendAcceptedNotification } from "../utils/notifications";
+import { getSavedProfiles, saveProfile, removeProfile } from "../utils/savedProfiles";
 import { useAuth, useAuthStore, useChatStore } from "../utils/auth";
 
 const { width } = Dimensions.get('window');
@@ -193,8 +194,9 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
         const base64 = await FileSystem.readAsStringAsync(image.uri, { encoding: "base64" });
         await supabase.storage.from('avatars').upload(fileName, decode(base64), { contentType: 'image/jpeg', upsert: true });
         const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName);
-        await supabase.from('rusers').update({ avatar_url: publicUrl, emoji_icon: null }).eq('id', user.id);
-        setShowEmojiPicker(false);
+          await supabase.from('rusers').update({ avatar_url: publicUrl, emoji_icon: null }).eq('id', user.id);
+          await saveProfile({ username: user.username, avatar_url: publicUrl, emoji_icon: null });
+          setShowEmojiPicker(false);
         loadData();
       } catch (error) { Alert.alert("Error", "Failed to upload avatar"); }
     }
@@ -256,6 +258,7 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
       await supabase.from('rusers').update({ emoji_icon: emoji, avatar_url: null }).eq('id', user.id);
+      await saveProfile({ username: user.username, emoji_icon: emoji, avatar_url: null });
       setShowEmojiPicker(false);
       loadData();
     } catch (error) { Alert.alert("Error", "Failed to update icon"); }
