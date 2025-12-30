@@ -1362,7 +1362,7 @@ export default function FloatingChat() {
         </View>
         </Modal>
 
-        {showGroupIconPicker && (
+        <Modal visible={showGroupIconPicker} transparent animationType="fade">
           <View style={styles.modalOverlay}>
             <View style={[styles.modalContent, { backgroundColor: '#0F172A' }]}>
               <Text style={[styles.modalTitle, { color: '#FFF', textAlign: 'center', marginBottom: 20 }]}>Choose Group Icon</Text>
@@ -1382,7 +1382,7 @@ export default function FloatingChat() {
               </TouchableOpacity>
             </View>
           </View>
-        )}
+        </Modal>
 
         {isOpen && (
         <Animated.View style={[styles.chatOverlay, { opacity: fadeAnim }]}>

@@ -1027,22 +1027,22 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
           </Text>
         </View>
 
-        {showEmojiPicker && (
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: theme.colors.background }]}>
-            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Choose Icon</Text>
-            <View style={styles.emojiGrid}>
-              {EMOJIS.map(emoji => (
-                <TouchableOpacity key={emoji} onPress={() => handleSelectEmoji(emoji)} style={styles.emojiItem}>
-                  <Text style={styles.emojiText}>{emoji}</Text>
-                </TouchableOpacity>
-              ))}
+        <Modal visible={showEmojiPicker} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: theme.colors.background }]}>
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Choose Icon</Text>
+              <View style={styles.emojiGrid}>
+                {EMOJIS.map(emoji => (
+                  <TouchableOpacity key={emoji} onPress={() => handleSelectEmoji(emoji)} style={styles.emojiItem}>
+                    <Text style={styles.emojiText}>{emoji}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TouchableOpacity onPress={handlePickAvatar} style={[styles.photoBtn, { backgroundColor: theme.colors.surface }]}><Camera size={20} color={theme.colors.text} /><Text style={[styles.photoBtnText, { color: theme.colors.text }]}>upload image</Text></TouchableOpacity>
+              <TouchableOpacity onPress={() => setShowEmojiPicker(false)} style={styles.closeBtn}><Text style={styles.closeBtnText}>Cancel</Text></TouchableOpacity>
             </View>
-            <TouchableOpacity onPress={handlePickAvatar} style={[styles.photoBtn, { backgroundColor: theme.colors.surface }]}><Camera size={20} color={theme.colors.text} /><Text style={[styles.photoBtnText, { color: theme.colors.text }]}>upload image</Text></TouchableOpacity>
-            <TouchableOpacity onPress={() => setShowEmojiPicker(false)} style={styles.closeBtn}><Text style={styles.closeBtnText}>Cancel</Text></TouchableOpacity>
           </View>
-        </View>
-      )}
+        </Modal>
 
         <ShareManager ref={shareRef} />
   
