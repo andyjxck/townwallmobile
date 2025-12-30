@@ -10,23 +10,26 @@ import {
   Platform,
 } from "react-native";
 import {
-  Heart,
-  Star,
-  Flag,
-  Share as ShareIcon,
-  AlertTriangle,
-  X,
-  User,
-  Send,
-  Pencil,
-  Play,
-  MessageCircle,
-  CloudOff,
-  MoreVertical,
-  Trash2,
-  MessageSquareOff,
-  EyeOff,
-} from "lucide-react-native";
+    Heart,
+    Star,
+    Flag,
+    Share as ShareIcon,
+    AlertTriangle,
+    X,
+    User,
+    Send,
+    Pencil,
+    Play,
+    MessageCircle,
+    CloudOff,
+    MoreVertical,
+    Trash2,
+    MessageSquareOff,
+    EyeOff,
+    Users,
+  } from "lucide-react-native";
+import { useChatStore } from "../utils/auth";
+
 import { supabase } from "../utils/supabase";
 import { moderateContent } from "../utils/ai";
 import { sendNotification, sendCommentNotification } from "../utils/notifications";
@@ -64,8 +67,85 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
   const [superlikers, setSuperlikers] = useState([]);
   const [showLikersModal, setShowLikersModal] = useState(false);
     const [showSuperlikersModal, setShowSuperlikersModal] = useState(false);
-  
+    
+    const [ctaLoading, setCtaLoading] = useState(false);
+
+    const handleCTA = async () => {
+      if (!user) {
+        Alert.alert("Authentication Required", "Please sign in to use this feature.");
+        return;
+      }
+      
+      setCtaLoading(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+      try {
+        if (item.cta_type === 'chat') {
+          // One-on-one chat
+          if (item.user_id === user.id) {
+            Alert.alert("Note", "This is your own post!");
+            return;
+          }
+
+          // Check if chat already exists
+          const { data: existingChats } = await supabase
+            .from('rchats')
+            .select('*')
+            .or(`and(user1_id.eq.${user.id},user2_id.eq.${item.user_id}),and(user1_id.eq.${item.user_id},user2_id.eq.${user.id})`)
+            .eq('is_group', false);
+
+          let chatId;
+          if (existingChats && existingChats.length > 0) {
+            chatId = existingChats[0].id;
+          } else {
+            const { data: newChat } = await supabase
+              .from('rchats')
+              .insert({
+                user1_id: user.id,
+                user2_id: item.user_id,
+                initiated_by: user.id,
+                status: 'pending',
+                is_group: false
+              })
+              .select()
+              .single();
+            chatId = newChat.id;
+          }
+          
+          if (chatId) {
+            useChatStore.getState().setActiveChatId(chatId);
+            useChatStore.getState().open();
+          }
+        } else if (item.cta_type === 'group' && item.cta_group_id) {
+          // Join group chat
+          const { data: membership } = await supabase
+            .from('rchat_members')
+            .select('*')
+            .eq('chat_id', item.cta_group_id)
+            .eq('user_id', user.id)
+            .single();
+
+          if (!membership) {
+            await supabase.from('rchat_members').insert({
+              chat_id: item.cta_group_id,
+              user_id: user.id,
+              is_admin: false
+            });
+          }
+
+          useChatStore.getState().setActiveChatId(item.cta_group_id);
+          useChatStore.getState().open();
+        }
+      } catch (e) {
+        console.error(e);
+        Alert.alert("Error", "Failed to process request");
+      } finally {
+        setCtaLoading(false);
+      }
+    };
+
     const fetchLikers = async (type) => {
+
 
     setLoadingLikers(true);
     try {
@@ -279,12 +359,39 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
               <Text style={[styles.bodyText, isRedactedMode && styles.greyedOutText]} numberOfLines={(isExpanded || isRedactedMode) ? undefined : 4}>
                 {item.text?.replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ')}
               </Text>
-              {item.poll_id && <PollComponent pollId={item.poll_id} />}
-            </>
-          )}
-        </TouchableOpacity>
+                {item.poll_id && <PollComponent pollId={item.poll_id} />}
+              </>
+            )}
+          </TouchableOpacity>
 
-        {!isCurrentlyBlurred && images.length > 0 && (
+          {!isCurrentlyBlurred && item.cta_type && item.cta_type !== 'none' && (
+            <TouchableOpacity 
+              onPress={handleCTA}
+              disabled={ctaLoading}
+              style={[
+                styles.ctaButton, 
+                { backgroundColor: item.cta_type === 'chat' ? theme.colors.primary : '#4ADE80' }
+              ]}
+            >
+              {ctaLoading ? (
+                <ActivityIndicator size="small" color="#000" />
+              ) : (
+                <>
+                  {item.cta_type === 'chat' ? (
+                    <MessageCircle size={18} color="#000" />
+                  ) : (
+                    <Users size={18} color="#000" />
+                  )}
+                  <Text style={styles.ctaButtonText}>
+                    {item.cta_type === 'chat' ? "Chat to me" : "Join group"}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+
+          {!isCurrentlyBlurred && images.length > 0 && (
+
           <TouchableOpacity onPress={() => setShowFullImage(true)} style={styles.mediaContainer}>
             {isVideo ? (
               <Video
@@ -582,6 +689,26 @@ const styles = StyleSheet.create({
   body: { marginBottom: 12 },
   title: { fontSize: 17, fontWeight: '700', marginBottom: 6, color: '#FFF' },
   bodyText: { fontSize: 15, color: 'rgba(255,255,255,0.8)', lineHeight: 22 },
+  ctaButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 16,
+    gap: 10,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    marginHorizontal: 15,
+  },
+  ctaButtonText: {
+    color: '#000',
+    fontSize: 15,
+    fontWeight: '800',
+  },
   mediaContainer: { height: 200, borderRadius: 12, overflow: 'hidden', marginBottom: 12 },
   media: { width: '100%', height: '100%' },
   footer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10 },

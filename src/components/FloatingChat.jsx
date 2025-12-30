@@ -96,9 +96,11 @@ export default function FloatingChat() {
   const [readReceiptsEnabled, setReadReceiptsEnabled] = useState(true);
   const [totalUnreadCount, setTotalUnreadCount] = useState(0);
   
-  const [showNewGroupModal, setShowNewGroupModal] = useState(false);
-  const [groupName, setGroupName] = useState('');
-  const [selectedUsers, setSelectedUsers] = useState([]);
+    const [showNewGroupModal, setShowNewGroupModal] = useState(false);
+    const [groupName, setGroupName] = useState('');
+    const [groupIcon, setGroupIcon] = useState('👥');
+    const [selectedUsers, setSelectedUsers] = useState([]);
+
   const [searchUsers, setSearchUsers] = useState('');
   const [userSearchResults, setUserSearchResults] = useState([]);
   const [groupMembers, setGroupMembers] = useState([]);
@@ -982,13 +984,22 @@ export default function FloatingChat() {
               </TouchableOpacity>
             </View>
             
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Group Name"
-              placeholderTextColor="rgba(255,255,255,0.3)"
-              value={groupName}
-              onChangeText={setGroupName}
-            />
+              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
+                <TextInput
+                  style={[styles.modalInput, { width: 60, textAlign: 'center', marginBottom: 0 }]}
+                  placeholder="Icon"
+                  value={groupIcon}
+                  onChangeText={setGroupIcon}
+                />
+                <TextInput
+                  style={[styles.modalInput, { flex: 1, marginBottom: 0 }]}
+                  placeholder="Group Name"
+                  placeholderTextColor="rgba(255,255,255,0.3)"
+                  value={groupName}
+                  onChangeText={setGroupName}
+                />
+              </View>
+
             
             <TextInput
               style={styles.modalInput}

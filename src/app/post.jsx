@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { X, ChevronRight, Image as ImageIcon, Shield, BarChart2, Plus, ChevronLeft, WifiOff } from "lucide-react-native";
+import { X, ChevronRight, Image as ImageIcon, Shield, BarChart2, Plus, ChevronLeft, WifiOff, MessageCircle, Users, Layout } from "lucide-react-native";
 import { getStoredUser } from "../utils/user";
 import { getDeviceId } from "../utils/deviceId";
 import { supabase } from "../utils/supabase";
@@ -54,7 +54,14 @@ export default function PostScreen() {
   const [hasPoll, setHasPoll] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
   
-    const { city_id, zone_id, feedView } = useLocationStore();
+  const [ctaType, setCtaType] = useState('none');
+  const [ctaGroupId, setCtaGroupId] = useState(null);
+  const [showGroupCreator, setShowGroupCreator] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupIcon, setNewGroupIcon] = useState("👥");
+  const [myGroups, setMyGroups] = useState([]);
+
+  const { city_id, zone_id, feedView } = useLocationStore();
 
 
   useEffect(() => {
@@ -63,7 +70,19 @@ export default function PostScreen() {
     getStoredUser().then(setUser);
     fetchData();
     if (postId) fetchPostData();
+    fetchMyGroups();
   }, [postId]);
+
+  const fetchMyGroups = async () => {
+    const storedUser = await getStoredUser();
+    if (!storedUser) return;
+    const { data } = await supabase
+      .from('rchat_members')
+      .select('chat_id, chat:rchats(*)')
+      .eq('user_id', storedUser.id)
+      .eq('chat.is_group', true);
+    setMyGroups(data?.map(d => d.chat) || []);
+  };
 
   const fetchPostData = async () => {
     setLoading(true);
@@ -176,6 +195,8 @@ const dbPostData = {
           poll_id: createdPollId,
           moderation_status: moderation.status,
           city_id: city_id,
+          cta_type: ctaType,
+          cta_group_id: ctaGroupId,
         };
 
       if (postId) await supabase.from('rposts').update(dbPostData).eq('id', postId);
@@ -224,6 +245,159 @@ const dbPostData = {
               )}
             </TouchableOpacity>
           ))}
+        </ScrollView>
+      </View>
+    );
+  }
+
+  const handleCreateGroup = async () => {
+    if (!newGroupName.trim()) {
+      Alert.alert("Error", "Please enter a group name");
+      return;
+    }
+    setLoading(true);
+    try {
+      const { data: chat, error } = await supabase
+        .from('rchats')
+        .insert({
+          is_group: true,
+          group_name: newGroupName.trim(),
+          group_icon: newGroupIcon,
+          status: 'accepted'
+        })
+        .select()
+        .single();
+
+      if (chat) {
+        await supabase.from('rchat_members').insert({
+          chat_id: chat.id,
+          user_id: user.id,
+          is_admin: true
+        });
+        setMyGroups([...myGroups, chat]);
+        setCtaGroupId(chat.id);
+        setShowGroupCreator(false);
+        setNewGroupName("");
+      }
+    } catch (e) {
+      console.error(e);
+      Alert.alert("Error", "Failed to create group");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (step === 'cta') {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top, backgroundColor: isHippie ? 'transparent' : theme.colors.background }]}>
+        <View style={[styles.overlayHeader, { borderBottomColor: theme.colors.border }]}>
+          <TouchableOpacity onPress={() => setStep('write')}>
+            <ChevronLeft size={24} color={theme.colors.text} />
+          </TouchableOpacity>
+          <Text style={[styles.overlayTitle, { color: theme.colors.text }]}>Call to Action</Text>
+          <TouchableOpacity onPress={() => setStep('write')}>
+            <Check size={24} color={theme.colors.primary} />
+          </TouchableOpacity>
+        </View>
+        <ScrollView contentContainerStyle={styles.form}>
+          <Text style={[styles.label, { color: 'rgba(255,255,255,0.5)', marginTop: 0 }]}>Select Type</Text>
+          <View style={styles.ctaTypeGrid}>
+            {[
+              { id: 'none', label: 'None', icon: X },
+              { id: 'chat', label: 'Chat to me', icon: MessageCircle },
+              { id: 'group', label: 'Join group', icon: Users },
+            ].map(type => (
+              <TouchableOpacity
+                key={type.id}
+                onPress={() => {
+                  setCtaType(type.id);
+                  if (type.id !== 'group') setCtaGroupId(null);
+                }}
+                style={[
+                  styles.ctaTypeCard,
+                  { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: theme.colors.border },
+                  ctaType === type.id && { borderColor: theme.colors.primary, backgroundColor: theme.colors.primary + '10' }
+                ]}
+              >
+                <type.icon size={24} color={ctaType === type.id ? theme.colors.primary : "rgba(255,255,255,0.5)"} />
+                <Text style={[styles.ctaTypeLabel, { color: ctaType === type.id ? theme.colors.primary : "rgba(255,255,255,0.7)" }]}>{type.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {ctaType === 'group' && (
+            <View style={{ marginTop: 24 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <Text style={[styles.label, { color: 'rgba(255,255,255,0.5)', marginTop: 0 }]}>Link a Group</Text>
+                <TouchableOpacity onPress={() => setShowGroupCreator(true)} style={styles.addGroupBtn}>
+                  <Plus size={14} color={theme.colors.primary} />
+                  <Text style={{ color: theme.colors.primary, fontSize: 13, fontWeight: '700', marginLeft: 4 }}>New Group</Text>
+                </TouchableOpacity>
+              </View>
+
+              {showGroupCreator ? (
+                <View style={[styles.groupCreator, { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: theme.colors.border }]}>
+                  <View style={styles.groupCreatorHeader}>
+                    <Text style={{ color: '#FFF', fontWeight: '700' }}>Create Group</Text>
+                    <TouchableOpacity onPress={() => setShowGroupCreator(false)}>
+                      <X size={16} color="rgba(255,255,255,0.5)" />
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.groupInputRow}>
+                    <TextInput
+                      value={newGroupIcon}
+                      onChangeText={setNewGroupIcon}
+                      style={[styles.groupIconInput, { backgroundColor: 'rgba(255,255,255,0.1)', color: '#FFF' }]}
+                      placeholder="Icon"
+                    />
+                    <TextInput
+                      value={newGroupName}
+                      onChangeText={setNewGroupName}
+                      style={[styles.groupNameInput, { backgroundColor: 'rgba(255,255,255,0.1)', color: '#FFF' }]}
+                      placeholder="Group Name"
+                      placeholderTextColor="rgba(255,255,255,0.3)"
+                    />
+                  </View>
+                  <TouchableOpacity 
+                    onPress={handleCreateGroup}
+                    disabled={loading || !newGroupName.trim()}
+                    style={[styles.groupCreateSubmit, { backgroundColor: theme.colors.primary }]}
+                  >
+                    {loading ? <ActivityIndicator size="small" color="#000" /> : <Text style={{ fontWeight: '800' }}>Create & Link</Text>}
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={styles.groupList}>
+                  {myGroups.length === 0 ? (
+                    <Text style={{ color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: 20 }}>You haven't joined any groups yet</Text>
+                  ) : (
+                    myGroups.map(group => (
+                      <TouchableOpacity
+                        key={group.id}
+                        onPress={() => setCtaGroupId(group.id)}
+                        style={[
+                          styles.groupItem,
+                          { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: theme.colors.border },
+                          ctaGroupId === group.id && { borderColor: theme.colors.primary, backgroundColor: theme.colors.primary + '10' }
+                        ]}
+                      >
+                        <Text style={styles.groupItemIcon}>{group.group_icon || '👥'}</Text>
+                        <Text style={[styles.groupItemName, { color: '#FFF' }]}>{group.group_name}</Text>
+                        {ctaGroupId === group.id && <Check size={18} color={theme.colors.primary} />}
+                      </TouchableOpacity>
+                    ))
+                  )}
+                </View>
+              )}
+            </View>
+          )}
+
+          <TouchableOpacity 
+            onPress={() => setStep('write')}
+            style={[styles.saveCtaBtn, { backgroundColor: theme.colors.primary }]}
+          >
+            <Text style={styles.saveCtaBtnText}>Apply CTA</Text>
+          </TouchableOpacity>
         </ScrollView>
       </View>
     );
@@ -389,6 +563,22 @@ const dbPostData = {
             </TouchableOpacity>
           </View>
 
+          <TouchableOpacity 
+            onPress={() => setStep('cta')} 
+            style={[styles.ctaOption, { backgroundColor: 'rgba(255,255,255,0.08)', borderColor: theme.colors.border }]}
+          >
+            <Layout size={20} color={ctaType !== 'none' ? theme.colors.primary : "rgba(255,255,255,0.5)"} />
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={[styles.ctaOptionTitle, { color: theme.colors.text }]}>
+                {ctaType === 'none' ? "Add Call to Action" : ctaType === 'chat' ? "Chat Button" : "Group Button"}
+              </Text>
+              <Text style={styles.ctaOptionDesc}>
+                {ctaType === 'none' ? "Help people get in touch" : ctaType === 'chat' ? "Adds a 'Chat to me' button" : "Adds a 'Join group' button"}
+              </Text>
+            </View>
+            <ChevronRight size={20} color="rgba(255,255,255,0.3)" />
+          </TouchableOpacity>
+
           <TextInput 
             placeholder="Give it a title..." 
             placeholderTextColor="rgba(255,255,255,0.3)"
@@ -536,6 +726,32 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center'
   },
+  ctaOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+  },
+  ctaOptionTitle: { fontSize: 16, fontWeight: '700' },
+  ctaOptionDesc: { fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 2 },
+  ctaTypeGrid: { flexDirection: 'row', gap: 12, marginTop: 8 },
+  ctaTypeCard: { flex: 1, alignItems: 'center', padding: 16, borderRadius: 16, borderWidth: 1, gap: 8 },
+  ctaTypeLabel: { fontSize: 13, fontWeight: '600' },
+  addGroupBtn: { flexDirection: 'row', alignItems: 'center' },
+  groupCreator: { padding: 16, borderRadius: 16, borderWidth: 1, gap: 12 },
+  groupCreatorHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  groupInputRow: { flexDirection: 'row', gap: 8 },
+  groupIconInput: { width: 50, height: 44, borderRadius: 12, textAlign: 'center', fontSize: 20 },
+  groupNameInput: { flex: 1, height: 44, borderRadius: 12, paddingHorizontal: 12 },
+  groupCreateSubmit: { padding: 12, borderRadius: 12, alignItems: 'center' },
+  groupList: { gap: 8 },
+  groupItem: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 12, borderWidth: 1 },
+  groupItemIcon: { fontSize: 24, marginRight: 12 },
+  groupItemName: { flex: 1, fontSize: 15, fontWeight: '600' },
+  saveCtaBtn: { marginTop: 32, padding: 18, borderRadius: 30, alignItems: 'center' },
+  saveCtaBtnText: { color: '#000', fontWeight: '800', fontSize: 16 },
   itemText: { fontSize: 17, fontWeight: '500' },
   selectedDot: {
     width: 8,
