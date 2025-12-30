@@ -64,6 +64,13 @@ export default function FloatingChat() {
   const router = useRouter();
   const { isOpen, activeChatId, open: setOpen, close: setClose, toggle: toggleChatGlobal, setActiveChatId, pendingCallUserId } = useChatStore();
 
+  const [activeChat, setActiveChat] = useState(null);
+  const activeChatRef = useRef(null);
+
+  useEffect(() => {
+    activeChatRef.current = activeChat;
+  }, [activeChat]);
+
   useEffect(() => {
     if (pendingCallUserId && user && chats.length > 0 && !activeCall) {
       const chat = chats.find(c => 
@@ -533,7 +540,13 @@ export default function FloatingChat() {
     try {
       await supabase.from('rchats').update({ status: newStatus }).eq('id', chatId);
       Haptics.notificationAsync(newStatus === 'accepted' ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Warning);
-      if (newStatus === 'rejected') setActiveChat(null);
+      
+      if (newStatus === 'rejected') {
+        setActiveChat(null);
+      } else if (newStatus === 'accepted' && activeChat?.id === chatId) {
+        setActiveChat(prev => ({ ...prev, status: 'accepted' }));
+      }
+      
       loadUserAndChats();
     } catch (error) { console.error(error); }
   };
