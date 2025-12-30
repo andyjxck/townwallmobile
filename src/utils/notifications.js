@@ -252,6 +252,35 @@ export const sendCommentNotification = async ({ commenterUsername, commenterId, 
   });
 };
 
+export const sendNewPostNotification = async ({ posterId, posterUsername, postId }) => {
+  try {
+    // Get all friends of the poster
+    const { data: friendsList } = await supabase
+      .from('friends')
+      .select('friend_id')
+      .eq('user_id', posterId)
+      .eq('status', 'accepted');
+
+    if (!friendsList || friendsList.length === 0) return { success: true, skipped: true };
+
+    const notifications = friendsList.map(f => ({
+      userId: f.friend_id,
+      title: 'New Post!',
+      message: `@${posterUsername} just shared a new post!`,
+      type: 'new_post',
+      link: `/post?id=${postId}`
+    }));
+
+    // Send notifications to all friends
+    await Promise.all(notifications.map(n => sendNotification(n)));
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error sending new post notifications:', error);
+    return { success: false, error };
+  }
+};
+
 export const sendHelpMessageNotification = async ({ senderId, senderUsername, receiverId, isFromAdmin, messageContent }) => {
   return sendNotification({
     userId: receiverId,

@@ -66,9 +66,11 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
   const [replies, setReplies] = useState([]);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [friendUsername, setFriendUsername] = useState("");
-  const [friends, setFriends] = useState([]);
-  const [addingFriend, setAddingFriend] = useState(false);
-  const [userPosts, setUserPosts] = useState([]);
+    const [friends, setFriends] = useState([]);
+    const [addingFriend, setAddingFriend] = useState(false);
+    const [friendshipStatus, setFriendshipStatus] = useState(null); // { status: 'pending'|'accepted', isRequester: boolean }
+    const [userPosts, setUserPosts] = useState([]);
+
   const [savedPosts, setSavedPosts] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
   const [activeTab, setActiveTab] = useState("posts");
@@ -141,12 +143,31 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
 
       if (!userData && viewingOwnProfile) userData = await initUser();
       
-      setUser(userData);
-      setBioText(userData?.bio || "");
-      setUsernameText(userData?.username || "");
-      setNicknameText(userData?.nickname || "");
+        setUser(userData);
+        setBioText(userData?.bio || "");
+        setUsernameText(userData?.username || "");
+        setNicknameText(userData?.nickname || "");
 
-      if (userData) {
+        if (userData) {
+          if (!viewingOwnProfile && storedUser?.id) {
+            // Check friendship status with current user
+            const { data: rel } = await supabase
+              .from('friends')
+              .select('*')
+              .or(`and(user_id.eq.${storedUser.id},friend_id.eq.${userData.id}),and(user_id.eq.${userData.id},friend_id.eq.${storedUser.id})`)
+              .single();
+            
+            if (rel) {
+              setFriendshipStatus({
+                id: rel.id,
+                status: rel.status,
+                isRequester: rel.user_id === storedUser.id
+              });
+            } else {
+              setFriendshipStatus(null);
+            }
+          }
+
         const { count: postCount } = await supabase.from('rposts').select('*', { count: 'exact', head: true }).eq('user_id', userData.id);
         const { count: reactionCount } = await supabase.from('rreactions').select('*, rposts!inner(user_id)', { count: 'exact', head: true }).eq('rposts.user_id', userData.id);
         
@@ -353,7 +374,47 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
     } catch (error) { Alert.alert("Error", "Failed to reject request"); }
   };
 
-  const handleMessageUser = async () => {
+    const handleActionFriend = async () => {
+      if (!currentUser || !user) return;
+      setAddingFriend(true);
+      try {
+        if (!friendshipStatus) {
+          // Send request
+          const { data: newRel, error } = await supabase.from('friends').insert({ 
+            user_id: currentUser.id, 
+            friend_id: user.id, 
+            status: 'pending' 
+          }).select().single();
+          
+          if (error) throw error;
+          
+          await sendFriendRequestNotification({
+            senderId: currentUser.id,
+            senderUsername: currentUser.username,
+            receiverId: user.id
+          });
+          
+          setFriendshipStatus({ id: newRel.id, status: 'pending', isRequester: true });
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } else if (friendshipStatus.status === 'pending') {
+          if (friendshipStatus.isRequester) {
+            // Cancel request
+            await supabase.from('friends').delete().eq('id', friendshipStatus.id);
+            setFriendshipStatus(null);
+          } else {
+            // Accept request
+            await handleAcceptFriend(friendshipStatus.id, user.id);
+          }
+        }
+      } catch (error) {
+        Alert.alert("Error", error.message);
+      } finally {
+        setAddingFriend(false);
+      }
+    };
+
+    const handleMessageUser = async () => {
+
     try {
       const storedUser = useAuthStore.getState().auth;
       if (!storedUser) return;
@@ -536,24 +597,53 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
                 <View style={styles.statItem}><Text style={[styles.statValue, { color: theme.colors.text }]}>{friends.length}</Text><Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Friends</Text></View>
               </View>
 
-                {!isOwnProfile && (
-                  <View style={styles.actionRow}>
-                    <TouchableOpacity 
-                      onPress={handleMessageUser} 
-                      style={styles.messageBtn}
-                    >
-                      <LinearGradient
-                        colors={[theme.colors.primary, '#4ADE80']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={styles.messageBtnGradient}
+                  {!isOwnProfile && (
+                    <View style={styles.actionRow}>
+                      <TouchableOpacity 
+                        onPress={handleMessageUser} 
+                        style={[styles.messageBtn, { flex: 1 }]}
                       >
-                        <MessageCircle size={20} color="#000" />
-                        <Text style={styles.messageBtnText}>Message</Text>
-                      </LinearGradient>
-                    </TouchableOpacity>
-                  </View>
-                )}
+                        <LinearGradient
+                          colors={[theme.colors.primary, '#4ADE80']}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 0 }}
+                          style={styles.messageBtnGradient}
+                        >
+                          <MessageCircle size={20} color="#000" />
+                          <Text style={styles.messageBtnText}>Message</Text>
+                        </LinearGradient>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity 
+                        onPress={handleActionFriend} 
+                        disabled={addingFriend || friendshipStatus?.status === 'accepted'}
+                        style={[
+                          styles.actionBtn, 
+                          { backgroundColor: theme.colors.surface, flex: 1 },
+                          friendshipStatus?.status === 'accepted' && { opacity: 0.7 }
+                        ]}
+                      >
+                        {addingFriend ? (
+                          <ActivityIndicator size="small" color={theme.colors.text} />
+                        ) : (
+                          <>
+                            {friendshipStatus?.status === 'accepted' ? (
+                              <Check size={20} color={theme.colors.success} />
+                            ) : (
+                              <UserPlus size={20} color={theme.colors.text} />
+                            )}
+                            <Text style={[styles.actionBtnText, { color: theme.colors.text }]}>
+                              {friendshipStatus ? (
+                                friendshipStatus.status === 'accepted' ? 'Friends' :
+                                friendshipStatus.isRequester ? 'Requested' : 'Accept'
+                              ) : 'Add Friend'}
+                            </Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
 
 
             <View style={styles.tabBar}>
@@ -722,8 +812,19 @@ const styles = StyleSheet.create({
       paddingVertical: 12,
       gap: 10 
     },
-    messageBtnText: { fontWeight: 'bold', fontSize: 16, color: '#000' },
-    modalOverlay: { 
+      messageBtnText: { fontWeight: 'bold', fontSize: 16, color: '#000' },
+      actionBtn: { 
+        flexDirection: 'row', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        paddingVertical: 12, 
+        borderRadius: 25, 
+        gap: 10,
+        marginLeft: 10
+      },
+      actionBtnText: { fontWeight: 'bold', fontSize: 16 },
+      modalOverlay: { 
+
       position: 'absolute', 
       top: 0, 
       left: 0, 

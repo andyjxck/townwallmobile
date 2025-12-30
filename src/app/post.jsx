@@ -25,6 +25,7 @@ import { theme } from "../utils/theme";
 import { useTheme } from "@/utils/ThemeContext";
 import { RichTextEditor } from "../components/RichTextEditor";
 import { offlineStorage, checkNetworkStatus } from "../utils/offline";
+import { sendNewPostNotification } from "../utils/notifications";
 
 export default function PostScreen() {
   const { isHippie } = useTheme();
@@ -167,7 +168,16 @@ export default function PostScreen() {
       };
 
       if (postId) await supabase.from('rposts').update(dbPostData).eq('id', postId);
-      else await supabase.from('rposts').insert(dbPostData);
+      else {
+        const { data: newPost } = await supabase.from('rposts').insert(dbPostData).select('id').single();
+        if (newPost && !isAnonymous) {
+          await sendNewPostNotification({
+            posterId: user.id,
+            posterUsername: user.username,
+            postId: newPost.id
+          });
+        }
+      }
 
       router.replace("/");
     } catch (error) { Alert.alert("Error", "Failed to post"); }
