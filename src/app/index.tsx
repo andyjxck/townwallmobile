@@ -18,8 +18,6 @@ export default function Index() {
       if (isComplete !== null || !authReady) return;
       
       try {
-        console.log("[Index] Checking onboarding state...");
-        
         // If authenticated, we skip onboarding
         if (isAuthenticated) {
           await setOnboardingComplete(true);

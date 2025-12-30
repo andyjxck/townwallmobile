@@ -13,6 +13,8 @@ Notifications.setNotificationHandler({
   }),
 });
 
+let hasLoggedDeviceWarning = false;
+
 export async function registerForPushNotificationsAsync(userId) {
   let token;
   
@@ -21,7 +23,10 @@ export async function registerForPushNotificationsAsync(userId) {
   }
 
   if (!Device.isDevice) {
-    console.log('Push notifications require a physical device');
+    if (!hasLoggedDeviceWarning) {
+      console.log('Push notifications require a physical device');
+      hasLoggedDeviceWarning = true;
+    }
     return null;
   }
 
