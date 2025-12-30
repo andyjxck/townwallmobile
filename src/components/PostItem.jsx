@@ -71,7 +71,7 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
     try {
       const { data } = await supabase
         .from('rreactions')
-        .select('user:rusers!user_id(id, username, emoji_icon, avatar_url)')
+        .select('user:rusers!user_id(id, username, emoji_icon, avatar_url, supabase_uid)')
         .eq('post_id', item.id)
         .eq('reaction_type', type);
       const users = data?.map(r => r.user).filter(Boolean) || [];
@@ -182,14 +182,22 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
                 <User size={20} color="rgba(255,255,255,0.3)" />
               </View>
             ) : (
-            <TouchableOpacity onPress={() => !item.is_anonymous && router.push(`/profile?userId=${item.user_id}`)} disabled={item.is_anonymous}>
-              {item.user?.avatar_url ? (
-                <Image source={{ uri: item.user.avatar_url }} style={styles.avatar} />
-              ) : (
-                <Text style={styles.emojiAvatar}>{item.user?.emoji_icon || "👤"}</Text>
-              )}
-            </TouchableOpacity>
-          )}
+              <TouchableOpacity 
+                onPress={() => {
+                  const isUserAnon = !item.user?.supabase_uid;
+                  if (!item.is_anonymous && !isUserAnon) {
+                    router.push(`/profile?userId=${item.user_id}`);
+                  }
+                }} 
+                disabled={item.is_anonymous || !item.user?.supabase_uid}
+              >
+                {item.user?.avatar_url ? (
+                  <Image source={{ uri: item.user.avatar_url }} style={styles.avatar} />
+                ) : (
+                  <Text style={styles.emojiAvatar}>{item.user?.emoji_icon || "👤"}</Text>
+                )}
+              </TouchableOpacity>
+            )}
 
           <View style={styles.headerInfo}>
             {isRedactedMode ? (
@@ -460,16 +468,27 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
               <ActivityIndicator size="large" color={theme.colors.primary} />
             ) : (
               <View>
-                {(showSuperlikersModal ? superlikers : likers).map((u, i) => (
-                  <TouchableOpacity key={i} style={styles.userRow} onPress={() => { setShowLikersModal(false); setShowSuperlikersModal(false); router.push(`/profile?userId=${u.id}`); }}>
-                    {u.avatar_url ? (
-                      <Image source={{ uri: u.avatar_url }} style={styles.userAvatar} />
-                    ) : (
-                      <Text style={styles.userEmoji}>{u.emoji_icon || '👤'}</Text>
-                    )}
-                    <Text style={styles.userName}>@{u.username}</Text>
-                  </TouchableOpacity>
-                ))}
+                  {(showSuperlikersModal ? superlikers : likers).map((u, i) => (
+                    <TouchableOpacity 
+                      key={i} 
+                      style={styles.userRow} 
+                      onPress={() => { 
+                        if (u.supabase_uid) {
+                          setShowLikersModal(false); 
+                          setShowSuperlikersModal(false); 
+                          router.push(`/profile?userId=${u.id}`); 
+                        }
+                      }}
+                      disabled={!u.supabase_uid}
+                    >
+                      {u.avatar_url ? (
+                        <Image source={{ uri: u.avatar_url }} style={styles.userAvatar} />
+                      ) : (
+                        <Text style={styles.userEmoji}>{u.emoji_icon || '👤'}</Text>
+                      )}
+                      <Text style={styles.userName}>@{u.username}</Text>
+                    </TouchableOpacity>
+                  ))}
                 {(showSuperlikersModal ? superlikers : likers).length === 0 && (
                   <Text style={styles.emptyText}>No reactions yet</Text>
                 )}

@@ -141,8 +141,15 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
         userData = otherUser;
       }
 
-      if (!userData && viewingOwnProfile) userData = await initUser();
-      
+        if (!userData && viewingOwnProfile) userData = await initUser();
+        
+        // Prevent viewing other anon profiles
+        if (userData && !userData.supabase_uid && !viewingOwnProfile) {
+          Alert.alert("Private Profile", "Anonymous profiles are private and cannot be visited.");
+          router.back();
+          return;
+        }
+
         setUser(userData);
         setBioText(userData?.bio || "");
         setUsernameText(userData?.username || "");
@@ -329,6 +336,10 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
 
   const handleAddFriend = async () => {
     if (!friendUsername) return;
+    if (!currentUser?.supabase_uid) {
+      Alert.alert("Join the Wall", "Please sign up to add friends!");
+      return;
+    }
     setAddingFriend(true);
     try {
       const { data: friendUser, error: findError } = await supabase.from('rusers').select('id').eq('username', friendUsername).single();
@@ -597,58 +608,70 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
                 <View style={styles.statItem}><Text style={[styles.statValue, { color: theme.colors.text }]}>{friends.length}</Text><Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Friends</Text></View>
               </View>
 
-                  {!isOwnProfile && (
-                      <View style={styles.actionRow}>
-                        <TouchableOpacity 
-                          onPress={handleMessageUser} 
-                          style={[styles.messageBtn, { flex: 1 }]}
-                        >
-                          <LinearGradient
-                            colors={[theme.colors.primary, '#4ADE80']}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 0 }}
-                            style={styles.messageBtnGradient}
+                    {!isOwnProfile && (
+                        <View style={styles.actionRow}>
+                          <TouchableOpacity 
+                            onPress={() => {
+                              if (!currentUser?.supabase_uid) {
+                                Alert.alert("Join the Wall", "Please sign up to message other users!");
+                                return;
+                              }
+                              handleMessageUser();
+                            }} 
+                            style={[styles.messageBtn, { flex: 1 }]}
                           >
-                            <MessageCircle size={20} color="#000" />
-                            <Text style={styles.messageBtnText}>Message</Text>
-                          </LinearGradient>
-                        </TouchableOpacity>
+                            <LinearGradient
+                              colors={[theme.colors.primary, '#4ADE80']}
+                              start={{ x: 0, y: 0 }}
+                              end={{ x: 1, y: 0 }}
+                              style={styles.messageBtnGradient}
+                            >
+                              <MessageCircle size={20} color="#000" />
+                              <Text style={styles.messageBtnText}>Message</Text>
+                            </LinearGradient>
+                          </TouchableOpacity>
 
-                        <TouchableOpacity 
-                          onPress={handleActionFriend} 
-                          disabled={addingFriend || friendshipStatus?.status === 'accepted'}
-                          style={[styles.messageBtn, { flex: 1, marginLeft: 10 }]}
-                        >
-                          <LinearGradient
-                            colors={['#818CF8', '#C084FC']}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 0 }}
-                            style={[
-                              styles.messageBtnGradient,
-                              friendshipStatus?.status === 'accepted' && { opacity: 0.7 }
-                            ]}
+                          <TouchableOpacity 
+                            onPress={() => {
+                              if (!currentUser?.supabase_uid) {
+                                Alert.alert("Join the Wall", "Please sign up to add friends!");
+                                return;
+                              }
+                              handleActionFriend();
+                            }} 
+                            disabled={addingFriend || friendshipStatus?.status === 'accepted'}
+                            style={[styles.messageBtn, { flex: 1, marginLeft: 10 }]}
                           >
-                            {addingFriend ? (
-                              <ActivityIndicator size="small" color="#000" />
-                            ) : (
-                              <>
-                                {friendshipStatus?.status === 'accepted' ? (
-                                  <Check size={20} color="#000" />
-                                ) : (
-                                  <UserPlus size={20} color="#000" />
-                                )}
-                                <Text style={styles.messageBtnText}>
-                                  {friendshipStatus ? (
-                                    friendshipStatus.status === 'accepted' ? 'Friends' :
-                                    friendshipStatus.isRequester ? 'Requested' : 'Accept'
-                                  ) : 'Add Friend'}
-                                </Text>
-                              </>
-                            )}
-                          </LinearGradient>
-                        </TouchableOpacity>
-                      </View>
-                  )}
+                            <LinearGradient
+                              colors={['#818CF8', '#C084FC']}
+                              start={{ x: 0, y: 0 }}
+                              end={{ x: 1, y: 0 }}
+                              style={[
+                                styles.messageBtnGradient,
+                                (addingFriend || friendshipStatus?.status === 'accepted') && { opacity: 0.7 }
+                              ]}
+                            >
+                              {addingFriend ? (
+                                <ActivityIndicator size="small" color="#000" />
+                              ) : (
+                                <>
+                                  {friendshipStatus?.status === 'accepted' ? (
+                                    <Check size={20} color="#000" />
+                                  ) : (
+                                    <UserPlus size={20} color="#000" />
+                                  )}
+                                  <Text style={styles.messageBtnText}>
+                                    {friendshipStatus ? (
+                                      friendshipStatus.status === 'accepted' ? 'Friends' :
+                                      friendshipStatus.isRequester ? 'Requested' : 'Accept'
+                                    ) : 'Add Friend'}
+                                  </Text>
+                                </>
+                              )}
+                            </LinearGradient>
+                          </TouchableOpacity>
+                        </View>
+                    )}
 
 
 
