@@ -420,19 +420,6 @@ if (isOnline) syncPendingPosts();
                   </TouchableOpacity>
                 )}
 
-                {zone_name && (
-                  <TouchableOpacity onPress={() => handleLocationSelect("zone")} style={[styles.locationOption, feedView === "zone" && { backgroundColor: theme.colors.primary + '20' }]}>
-                    <View style={styles.locationOptionLeft}>
-                      <MapPin size={22} color={feedView === "zone" ? theme.colors.primary : theme.colors.textSecondary} />
-                      <View>
-                        <Text style={[styles.locationOptionTitle, { color: theme.colors.text }]}>{zone_name}</Text>
-                        <Text style={[styles.locationOptionDesc, { color: theme.colors.textSecondary }]}>Posts from your zone only</Text>
-                      </View>
-                    </View>
-                    {feedView === "zone" && <Check size={20} color={theme.colors.primary} />}
-                  </TouchableOpacity>
-                )}
-
                 <View style={{ height: 1, backgroundColor: theme.colors.border, marginVertical: 15 }} />
 
                 <TouchableOpacity onPress={() => { setShowLocationPicker(false); router.push("/onboarding/city"); }} style={styles.locationOption}>
