@@ -3,7 +3,7 @@ import { getDeviceId } from "./deviceId";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Purchases from 'react-native-purchases';
 import { Platform } from 'react-native';
-import { useAuthStore } from "./auth";
+import { useAuthStore, authKey } from "./auth";
 
 const USER_DATA_KEY = "@redditch_user_data";
 
@@ -145,17 +145,17 @@ export const logoutUser = async () => {
     // 1. Get current user data before clearing
     const userData = await getStoredUser();
     
-    // 2. Clear Supabase Auth session first
-    await supabase.auth.signOut();
-    
+    // 2. Disassociate this device from the user in the DB FIRST
+    // We do this while still authenticated to avoid RLS issues
     if (userData && userData.id) {
-      // 3. Disassociate this device from the user in the DB
-      // This is crucial so the next initUser creates a fresh anonymous profile
       await supabase
         .from('rusers')
         .update({ device_id: null })
         .eq('id', userData.id);
     }
+
+    // 3. Clear Supabase Auth session
+    await supabase.auth.signOut();
     
     // 4. Logout from RevenueCat
     if (Platform.OS !== 'web') {
@@ -175,12 +175,18 @@ export const logoutUser = async () => {
   // 5. Clear all local storage and memory store
   try {
     await AsyncStorage.removeItem(USER_DATA_KEY);
+    // Explicitly clear multiple potential keys to be safe
+    await AsyncStorage.removeItem("@redditch_user_data");
+    await AsyncStorage.removeItem("supabase.auth.token");
+    
     if (Platform.OS === 'web') {
       localStorage.removeItem(authKey);
+      localStorage.removeItem('supabase.auth.token');
     } else {
-      const { authKey } = require('./auth/store');
       const SecureStore = require('expo-secure-store');
       await SecureStore.deleteItemAsync(authKey);
+      // Supabase default storage key for mobile
+      await SecureStore.deleteItemAsync('supabase.auth.token');
     }
   } catch (e) {
     console.error("Storage clear error:", e);
