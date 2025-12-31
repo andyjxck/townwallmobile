@@ -232,10 +232,20 @@ export default function HelpContact() {
           return;
         }
   
-        const history = messages.slice(-5).map(m => ({
+          const history = messages.slice(-10).map(m => {
+            let cleanContent = m.content;
+            try {
+              if (m.content.trim().startsWith('{') && m.content.trim().endsWith('}')) {
+                const parsed = JSON.parse(m.content);
+                if (parsed.text) cleanContent = parsed.text;
+              }
+            } catch (e) {}
+            
+            return {
               role: m.is_from_admin ? 'assistant' : 'user',
-              content: m.content
-            }));
+              content: cleanContent
+            };
+          });
   
         const aiResponse = await getAIAssistantResponse(text, history, {
           city_name,
@@ -287,35 +297,51 @@ export default function HelpContact() {
       }
     };
 
-  const renderMessageContent = (content, isMine) => {
-    const imageMatch = content.match(/\[TOWNY_IMAGE:(.+?)\]/);
-    
-    if (imageMatch) {
-      const imageUrl = imageMatch[1];
-      const textContent = content.replace(/\[TOWNY_IMAGE:.+?\]/, '').trim();
+    const renderMessageContent = (content, isMine) => {
+      let displayContent = content;
+      let displayImageUrl = null;
+
+      // Try parsing as JSON first (safety for corrupted history)
+      try {
+        if (content.trim().startsWith('{') && content.trim().endsWith('}')) {
+          const parsed = JSON.parse(content);
+          if (parsed.text) displayContent = parsed.text;
+          if (parsed.imageUrl) displayImageUrl = parsed.imageUrl;
+        }
+      } catch (e) {
+        // Not JSON, continue
+      }
+
+      const imageMatch = displayContent.match(/\[TOWNY_IMAGE:(.+?)\]/);
+      
+      if (imageMatch || displayImageUrl) {
+        const imageUrl = displayImageUrl || imageMatch[1];
+        const textContent = imageMatch 
+          ? displayContent.replace(/\[TOWNY_IMAGE:.+?\]/, '').trim()
+          : displayContent;
+        
+        return (
+          <View>
+            {textContent ? (
+              <Text style={[styles.messageText, { color: isMine ? '#000000' : '#FFFFFF' }]}>
+                {textContent}
+              </Text>
+            ) : null}
+            <Image
+              source={{ uri: imageUrl }}
+              style={styles.generatedImage}
+              contentFit="cover"
+            />
+          </View>
+        );
+      }
       
       return (
-        <View>
-          {textContent ? (
-            <Text style={[styles.messageText, { color: isMine ? '#000000' : '#FFFFFF' }]}>
-              {textContent}
-            </Text>
-          ) : null}
-          <Image
-            source={{ uri: imageUrl }}
-            style={styles.generatedImage}
-            contentFit="cover"
-          />
-        </View>
+        <Text style={[styles.messageText, { color: isMine ? '#000000' : '#FFFFFF' }]}>
+          {displayContent}
+        </Text>
       );
-    }
-    
-    return (
-      <Text style={[styles.messageText, { color: isMine ? '#000000' : '#FFFFFF' }]}>
-        {content}
-      </Text>
-    );
-  };
+    };
 
 
   return (
