@@ -24,7 +24,7 @@ import { supabase } from '../utils/supabase';
 import { getStoredUser } from '../utils/user';
 import { theme } from '../utils/theme';
 import { sendNotification, sendMessageNotification, sendCallNotification } from '../utils/notifications';
-import { useChatStore } from '../utils/auth';
+import { useChatStore, useAuthStore } from '../utils/auth';
 import * as ImagePicker from 'expo-image-picker';
 import { Video, useVideoPlayer, VideoView } from 'expo-video';
 import { Image } from 'expo-image';
@@ -64,9 +64,10 @@ import { ThemeProvider, useTheme } from "@/utils/ThemeContext";
 
 const { width, height } = Dimensions.get('window');
 
-export default function FloatingChat() {
-  const { isHippie } = useTheme();
-  const router = useRouter();
+  export default function FloatingChat() {
+    const { isHippie } = useTheme();
+    const router = useRouter();
+    const { auth: user } = useAuthStore();
     const { isOpen, activeChatId, open: setOpen, close: setClose, toggle: toggleChatGlobal, setActiveChatId, pendingCallUserId, pendingCallAction } = useChatStore();
 
     const [activeChat, setActiveChat] = useState(null);
@@ -121,7 +122,6 @@ export default function FloatingChat() {
 
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
-  const [user, setUser] = useState(null);
   const [chats, setChats] = useState([]);
   const [showChatList, setShowChatList] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -161,6 +161,36 @@ export default function FloatingChat() {
     const pulseAnim = useRef(new Animated.Value(1)).current;
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(height)).current;
+
+    useEffect(() => {
+      if (isOpen) {
+        Animated.parallel([
+          Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(slideAnim, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      } else {
+        Animated.parallel([
+          Animated.timing(fadeAnim, {
+            toValue: 0,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+          Animated.timing(slideAnim, {
+            toValue: height,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      }
+    }, [isOpen]);
 
     const flatListRef = useRef();
     const inputRef = useRef(null);
