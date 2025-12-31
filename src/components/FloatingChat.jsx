@@ -160,6 +160,44 @@ const { width, height } = Dimensions.get('window');
     const soundObjects = useRef({});
     const loadingSounds = useRef({});
     
+    const pulseAnim = useRef(new Animated.Value(1)).current;
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const slideAnim = useRef(new Animated.Value(height)).current;
+    const flatListRef = useRef(null);
+    const isSendingRef = useRef(false);
+    const inputRef = useRef(null);
+    const callSubRef = useRef(null);
+
+    useEffect(() => {
+      if (isOpen) {
+        Animated.parallel([
+          Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(slideAnim, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      } else {
+        Animated.parallel([
+          Animated.timing(fadeAnim, {
+            toValue: 0,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+          Animated.timing(slideAnim, {
+            toValue: height,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      }
+    }, [isOpen]);
+    
     const playSound = async (type) => {
       try {
         // If already loading this sound, don't start another one
