@@ -359,10 +359,18 @@ const { width, height } = Dimensions.get('window');
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
-  useEffect(() => {
-    loadUserAndChats();
-    
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+    useEffect(() => {
+      // Initialize audio mode to use speaker
+      Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        playThroughEarpieceAndroid: false,
+        staysActiveInBackground: true,
+      }).catch(err => console.error('Error initializing audio mode:', err));
+
+      loadUserAndChats();
+      
+      const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
         loadUserAndChats();
       }
@@ -487,10 +495,12 @@ const { width, height } = Dimensions.get('window');
         return;
       }
 
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: true,
+          playsInSilentModeIOS: true,
+          playThroughEarpieceAndroid: false,
+          staysActiveInBackground: true,
+        });
 
       const { recording } = await Audio.Recording.createAsync(
         Audio.RecordingOptionsPresets.HIGH_QUALITY
@@ -526,6 +536,14 @@ const { width, height } = Dimensions.get('window');
       const uri = recording.getURI();
       setRecording(null);
       
+      // Reset audio mode to playback-only (speaker)
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        playThroughEarpieceAndroid: false,
+        staysActiveInBackground: true,
+      });
+      
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       
       setIsUploading(true);
@@ -547,6 +565,15 @@ const { width, height } = Dimensions.get('window');
     try {
       await recording.stopAndUnloadAsync();
       setRecording(null);
+
+      // Reset audio mode to playback-only (speaker)
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        playThroughEarpieceAndroid: false,
+        staysActiveInBackground: true,
+      });
+
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch (err) {
       console.log('Failed to cancel recording', err);
