@@ -35,7 +35,7 @@ import { moderateContent } from "../utils/ai";
 import { sendNotification, sendCommentNotification } from "../utils/notifications";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
-import { Video } from "expo-av";
+import { VideoView, useVideoPlayer } from "expo-video";
 import { getStoredUser, isOnline } from "../utils/user";
 import { TextInput } from "react-native-gesture-handler";
 import RenderHtml from 'react-native-render-html';
@@ -43,6 +43,49 @@ import { useWindowDimensions } from 'react-native';
 import PollComponent from "./PollComponent";
 import { useRouter, useLocalSearchParams, usePathname } from "expo-router";
 import { theme } from "../utils/theme";
+
+const VideoPreview = ({ url, isExpanded, style }) => {
+  const player = useVideoPlayer(url, (player) => {
+    player.loop = true;
+    player.muted = true;
+    if (isExpanded) {
+      player.play();
+    }
+  });
+
+  useEffect(() => {
+    if (isExpanded) {
+      player.play();
+    } else {
+      player.pause();
+    }
+  }, [isExpanded, player]);
+
+  return (
+    <VideoView
+      style={style}
+      player={player}
+      contentFit="cover"
+      nativeControls={false}
+    />
+  );
+};
+
+const FullVideoPlayer = ({ url, style }) => {
+  const player = useVideoPlayer(url, (player) => {
+    player.loop = true;
+    player.play();
+  });
+
+  return (
+    <VideoView
+      style={style}
+      player={player}
+      contentFit="contain"
+      nativeControls={true}
+    />
+  );
+};
 
 export default function PostItem({ item, deviceId, onReaction, onComment, onDelete, onShare, onEdit, user, onFilterZone, onFilterTag, onModAction }) {
   if (!item) return null;
@@ -403,17 +446,13 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
 
             {!isCurrentlyBlurred && images.length > 0 && !isRedactedMode && (
               <TouchableOpacity onPress={() => setShowFullImage(true)} style={styles.sideMediaContainer}>
-                {isVideo ? (
-                  <Video
-                    source={{ uri: images[currentImageIndex] }}
-                    style={styles.sideMedia}
-                    resizeMode="cover"
-                    shouldPlay={isExpanded}
-                    isLooping
-                    isMuted
-                    useNativeControls={false}
-                  />
-                ) : (
+                  {isVideo ? (
+                    <VideoPreview
+                      url={images[currentImageIndex]}
+                      style={styles.sideMedia}
+                      isExpanded={isExpanded}
+                    />
+                  ) : (
                   <Image source={{ uri: images[currentImageIndex] }} style={styles.sideMedia} contentFit="cover" />
                 )}
               </TouchableOpacity>
