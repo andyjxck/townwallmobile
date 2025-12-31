@@ -35,8 +35,8 @@ import { useRouter } from 'expo-router';
 import { Audio } from 'expo-av';
 import { Accelerometer } from 'expo-sensors';
 import Constants from 'expo-constants';
-import { decode } from 'base64-arraybuffer';
-import * as FileSystem from 'expo-file-system';
+import { File as FileSystemNext } from 'expo-file-system/next';
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { expandImage } from '../utils/ai';
 import Markdown from 'react-native-markdown-display';
 let LiveKitRoom, useLocalParticipant, useParticipants, AudioSession, useIOSAudioManagement, useRoom;
@@ -783,31 +783,32 @@ export default function FloatingChat() {
 
     const uploadMedia = async (uri, type) => {
       try {
-        const base64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
+        const file = new FileSystemNext(uri);
+        const bytes = await file.bytes();
         const extension = type === 'video' ? 'mp4' : (type === 'audio' ? 'm4a' : 'jpg');
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${extension}`;
         const filePath = `${user.id}/${fileName}`;
 
         const { data, error } = await supabase.storage
           .from('chat_media')
-          .upload(filePath, decode(base64), {
+          .upload(filePath, bytes, {
             contentType: type === 'video' ? 'video/mp4' : (type === 'audio' ? 'audio/m4a' : 'image/jpeg'),
             cacheControl: '3600'
           });
 
-      if (error) throw error;
+        if (error) throw error;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('chat_media')
-        .getPublicUrl(filePath);
+        const { data: { publicUrl } } = supabase.storage
+          .from('chat_media')
+          .getPublicUrl(filePath);
 
-      return publicUrl;
-    } catch (error) {
-      console.error('Error uploading media:', error);
-      Alert.alert('Upload Error', 'Failed to upload media. Please try again.');
-      return null;
-    }
-  };
+        return publicUrl;
+      } catch (error) {
+        console.error('Error uploading media:', error);
+        Alert.alert('Upload Error', 'Failed to upload media. Please try again.');
+        return null;
+      }
+    };
 
   const handlePickMedia = async (type) => {
     try {
@@ -1102,32 +1103,33 @@ export default function FloatingChat() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
-  const handlePickGroupAvatar = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.5,
-    });
+    const handlePickGroupAvatar = async () => {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.5,
+      });
 
-    if (!result.canceled) {
-      try {
-        const image = result.assets[0];
-        const fileName = `group_avatar_${Date.now()}.jpg`;
-        const base64 = await FileSystem.readAsStringAsync(image.uri, { encoding: "base64" });
-        await supabase.storage.from('avatars').upload(fileName, decode(base64), { contentType: 'image/jpeg', upsert: true });
-        const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName);
-        
-        setGroupAvatarUrl(publicUrl);
-        setGroupIcon(null);
-        setShowGroupIconPicker(false);
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      } catch (error) {
-        console.error('Error uploading group avatar:', error);
-        Alert.alert('Error', 'Failed to upload avatar');
+      if (!result.canceled) {
+        try {
+          const image = result.assets[0];
+          const fileName = `group_avatar_${Date.now()}.jpg`;
+          const file = new FileSystemNext(image.uri);
+          const bytes = await file.bytes();
+          await supabase.storage.from('avatars').upload(fileName, bytes, { contentType: 'image/jpeg', upsert: true });
+          const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName);
+          
+          setGroupAvatarUrl(publicUrl);
+          setGroupIcon(null);
+          setShowGroupIconPicker(false);
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        } catch (error) {
+          console.error('Error uploading group avatar:', error);
+          Alert.alert('Error', 'Failed to upload avatar');
+        }
       }
-    }
-  };
+    };
 
   const createGroupChat = async () => {
     if (!groupName.trim() || selectedUsers.length < 2) {
@@ -1249,8 +1251,94 @@ export default function FloatingChat() {
     };
     MediaPreview.displayName = 'MediaPreview';
 
+  const FullscreenVideoPlayer = ({ url }) => {
+    const player = useVideoPlayer(url, (player) => {
+      player.loop = true;
+      player.play();
+    });
+
     return (
-      <View style={styles.container} pointerEvents="box-none">
+      <VideoView
+        style={styles.fullscreenVideo}
+        player={player}
+        allowsFullscreen
+        allowsPictureInPicture
+      />
+    );
+  };
+
+  const VideoPreview = ({ url }) => {
+    const player = useVideoPlayer(url, (player) => {
+      player.muted = true;
+      player.loop = true;
+      player.play();
+    });
+
+    return (
+      <View style={styles.videoPreviewWrapper}>
+        <VideoView
+          style={styles.mediaPreview}
+          player={player}
+          contentFit="cover"
+          nativeControls={false}
+        />
+        <View style={styles.videoOverlay}>
+          <Play size={24} color="#FFF" fill="#FFF" />
+        </View>
+      </View>
+    );
+  };
+
+  const AudioPlayer = ({ url, isMyMessage }) => {
+    const player = useAudioPlayer(url);
+    const status = useAudioPlayerStatus(player);
+    
+    const togglePlayback = () => {
+      if (status.playing) {
+        player.pause();
+      } else {
+        player.play();
+      }
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    };
+
+    const formatTime = (ms) => {
+      const totalSeconds = Math.floor(ms / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    };
+
+    return (
+      <View style={[styles.audioPlayer, { backgroundColor: isMyMessage ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)' }]}>
+        <TouchableOpacity onPress={togglePlayback} style={styles.audioPlayBtn}>
+          {status.playing ? (
+            <Pause size={20} color={isMyMessage ? "#000" : "#FFF"} fill={isMyMessage ? "#000" : "#FFF"} />
+          ) : (
+            <Play size={20} color={isMyMessage ? "#000" : "#FFF"} fill={isMyMessage ? "#000" : "#FFF"} />
+          )}
+        </TouchableOpacity>
+        
+        <Slider
+          style={styles.audioSlider}
+          minimumValue={0}
+          maximumValue={status.duration || 1}
+          value={status.currentTime || 0}
+          onSlidingComplete={(value) => player.seekTo(value)}
+          minimumTrackTintColor={isMyMessage ? "#000" : theme.colors.primary}
+          maximumTrackTintColor={isMyMessage ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.2)"}
+          thumbTintColor={isMyMessage ? "#000" : theme.colors.primary}
+        />
+        
+        <Text style={[styles.audioTime, { color: isMyMessage ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.6)' }]}>
+          {formatTime(status.currentTime || 0)}
+        </Text>
+      </View>
+    );
+  };
+
+  return (
+    <View style={styles.container} pointerEvents="box-none">
         <FullscreenMediaModal />
         {!isOpen && isVisible && hasUnread && (
 

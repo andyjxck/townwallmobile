@@ -38,8 +38,9 @@ import { getDeviceId } from "../utils/deviceId";
       } from "lucide-react-native";
   import AsyncStorage from "@react-native-async-storage/async-storage";
   import * as ImagePicker from "expo-image-picker";
-  import * as FileSystem from "expo-file-system";
-  import * as Haptics from "expo-haptics";
+import * as FileSystem from "expo-file-system";
+import { File as FileSystemNext } from "expo-file-system/next";
+import * as Haptics from "expo-haptics";
   import { decode } from "base64-arraybuffer";
   import { LinearGradient } from "expo-linear-gradient";
   import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -287,23 +288,24 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
     }
   };
 
-  const handlePickAvatar = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.5 });
-    if (!result.canceled) {
-      setLoading(true);
-      try {
-        const image = result.assets[0];
-        const fileName = `${user.id}_avatar_${Date.now()}.jpg`;
-        const base64 = await FileSystem.readAsStringAsync(image.uri, { encoding: "base64" });
-        await supabase.storage.from('avatars').upload(fileName, decode(base64), { contentType: 'image/jpeg', upsert: true });
-        const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName);
-          await supabase.from('rusers').update({ avatar_url: publicUrl, emoji_icon: null }).eq('id', user.id);
-          await saveProfile({ username: user.username, avatar_url: publicUrl, emoji_icon: null });
-          setShowEmojiPicker(false);
-        loadData();
-      } catch (error) { Alert.alert("Error", "Failed to upload avatar"); }
-    }
-  };
+    const handlePickAvatar = async () => {
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.5 });
+      if (!result.canceled) {
+        setLoading(true);
+        try {
+          const image = result.assets[0];
+          const fileName = `${user.id}_avatar_${Date.now()}.jpg`;
+          const file = new FileSystemNext(image.uri);
+          const bytes = await file.bytes();
+          await supabase.storage.from('avatars').upload(fileName, bytes, { contentType: 'image/jpeg', upsert: true });
+          const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName);
+            await supabase.from('rusers').update({ avatar_url: publicUrl, emoji_icon: null }).eq('id', user.id);
+            await saveProfile({ username: user.username, avatar_url: publicUrl, emoji_icon: null });
+            setShowEmojiPicker(false);
+          loadData();
+        } catch (error) { Alert.alert("Error", "Failed to upload avatar"); }
+      }
+    };
 
   const handleUpdateBio = async () => {
     if (bioText.length > 160) { Alert.alert("Error", "Bio too long"); return; }
