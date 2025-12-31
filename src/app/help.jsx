@@ -249,8 +249,10 @@ export default function HelpContact() {
     const handleSend = async () => {
       if (!inputText.trim() || !currentUser || isSendingRef.current) return;
       
+      let chatRestarted = false;
       if (messages.some(m => m.status === 'resolved')) {
         await purgeMessages();
+        chatRestarted = true;
       }
 
       const text = inputText.trim();
@@ -274,7 +276,12 @@ export default function HelpContact() {
         created_at: new Date().toISOString(),
         status: 'open'
       };
-      setMessages(prev => [...prev, tempMsg]);
+      
+      if (chatRestarted) {
+        setMessages([tempMsg]);
+      } else {
+        setMessages(prev => [...prev, tempMsg]);
+      }
 
       try {
         setIsTyping(true);
@@ -294,13 +301,14 @@ export default function HelpContact() {
           setMessages(prev => prev.map(m => m.id === tempId ? realMsg : m));
         }
 
-        const isOvertaken = messages.some(m => m.status === 'overtaken');
+        const isOvertaken = !chatRestarted && messages.some(m => m.status === 'overtaken');
         if (isOvertaken) {
           setIsTyping(false);
+          isSendingRef.current = false;
           return;
         }
 
-        const history = messages.slice(-10).map(m => {
+        const history = chatRestarted ? [] : messages.slice(-10).map(m => {
           let cleanContent = m.content;
           try {
             if (m.content.trim().startsWith('{') && m.content.trim().endsWith('}')) {
