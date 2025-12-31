@@ -28,49 +28,54 @@ export default function NotificationPanel({ visible, onClose }) {
   const [loading, setLoading] = useState(true);
   const wasVisible = useRef(visible);
 
-  useEffect(() => {
-    let sub;
-    if (visible) {
-      loadNotifications();
-      
-      // Real-time subscription for the notification list
-      const setupSubscription = async () => {
-        const user = await getStoredUser();
-        if (!user) return;
+    useEffect(() => {
+      let sub;
+      if (visible) {
+        handleMarkAllAsRead();
+        loadNotifications();
         
-        sub = supabase
-          .channel(`notification_list_${user.id}`)
-          .on('postgres_changes', 
-            { 
-              event: 'INSERT', 
-              schema: 'public', 
-              table: 'rnotifications',
-              filter: `user_id=eq.${user.id}`
-            }, 
-            payload => {
-              setNotifications(prev => [payload.new, ...prev]);
-            }
-          )
-          .subscribe();
-      };
+        // Real-time subscription for the notification list
+        const setupSubscription = async () => {
+          const user = await getStoredUser();
+          if (!user) return;
+          
+          sub = supabase
+            .channel(`notification_list_${user.id}`)
+            .on('postgres_changes', 
+              { 
+                event: 'INSERT', 
+                schema: 'public', 
+                table: 'rnotifications',
+                filter: `user_id=eq.${user.id}`
+              }, 
+              payload => {
+                setNotifications(prev => [payload.new, ...prev]);
+                // Automatically mark new notifications as read if panel is open
+                handleMarkAsRead(payload.new.id);
+              }
+            )
+            .subscribe();
+        };
+        
+        setupSubscription();
+      } else if (wasVisible.current && !visible) {
+        // Panel was just closed
+        handleMarkAllAsRead();
+      }
       
-      setupSubscription();
-        } else if (wasVisible.current && !visible) {
-          // Panel was just closed
-          handleMarkAllAsRead();
-        }
-    
-    wasVisible.current = visible;
+      wasVisible.current = visible;
 
-    return () => {
-      if (sub) supabase.removeChannel(sub);
-    };
-  }, [visible]);
+      return () => {
+        if (sub) supabase.removeChannel(sub);
+      };
+    }, [visible]);
 
   const loadNotifications = async () => {
     setLoading(true);
     const user = await getStoredUser();
     if (user) {
+      // Mark as read in DB before fetching to ensure we get "read" status
+      await markAllAsRead(user.id);
       const data = await fetchNotifications(user.id);
       setNotifications(data);
     }
@@ -78,10 +83,12 @@ export default function NotificationPanel({ visible, onClose }) {
   };
 
   const handleMarkAllAsRead = async () => {
+    // Optimistically update local state
+    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+    
     const user = await getStoredUser();
     if (user) {
       await markAllAsRead(user.id);
-      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
     }
   };
 
