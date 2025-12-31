@@ -50,6 +50,9 @@
         "android.permission.ACCESS_FINE_LOCATION",
         "com.google.android.gms.permission.AD_ID"
       ],
+      "blockedPermissions": [
+        "android.permission.ACTIVITY_RECOGNITION"
+      ],
       "package": "com.andysocial.townwall"
     },
         "plugins": [
