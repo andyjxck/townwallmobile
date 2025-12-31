@@ -899,13 +899,16 @@ export default function FloatingChat() {
 
       if (error) throw error;
 
-      if (data) {
-        await supabase.from('rchats').update({
-          last_message: finalMediaUrl ? `Sent a ${finalMediaType}` : text,
-          last_message_at: new Date().toISOString()
-        }).eq('id', activeChat.id);
+        if (data) {
+          const mediaPrefix = (finalMediaType === 'audio' || finalMediaType === 'image') ? 'an' : 'a';
+          const mediaMessageText = `Sent ${mediaPrefix} ${finalMediaType}`;
 
-        const notificationText = finalMediaUrl ? `Sent a ${finalMediaType}` : text;
+          await supabase.from('rchats').update({
+            last_message: finalMediaUrl ? mediaMessageText : text,
+            last_message_at: new Date().toISOString()
+          }).eq('id', activeChat.id);
+
+          const notificationText = finalMediaUrl ? mediaMessageText : text;
 
         if (activeChat.is_group) {
           const otherMembers = groupMembers.filter(m => m.user_id !== user.id);
