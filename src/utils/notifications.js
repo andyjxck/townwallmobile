@@ -41,6 +41,41 @@ export async function registerForPushNotificationsAsync(userId) {
   }
 
   try {
+    // 1. Setup channels FIRST on Android
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'default',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#22C55E',
+      });
+      
+      await Notifications.setNotificationChannelAsync('messages', {
+        name: 'Messages',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#22C55E',
+        sound: 'message.mp3',
+      });
+
+      await Notifications.setNotificationChannelAsync('calls', {
+        name: 'Calls',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#22C55E',
+        sound: 'ringtone.mp3',
+      });
+
+      await Notifications.setNotificationChannelAsync('alerts', {
+        name: 'Alerts',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#22C55E',
+        sound: 'alert.mp3',
+      });
+    }
+
+    // 2. Check/Request permissions
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
     
@@ -54,57 +89,59 @@ export async function registerForPushNotificationsAsync(userId) {
       return null;
     }
 
+    // 3. Get Project ID
     const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
     
     if (!projectId) {
-      console.log('Project ID not found for push notifications. Please configure EAS project ID.');
+      console.error('CRITICAL: EAS Project ID not found. Push tokens cannot be generated.');
       return null;
     }
 
-    token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-    console.log('Expo Push Token:', token);
+    // 4. Request token with a timeout/retry
+    let retryCount = 0;
+    const maxRetries = 2;
+    
+    while (retryCount <= maxRetries) {
+      try {
+        const tokenPromise = Notifications.getExpoPushTokenAsync({ projectId });
+        // Give it 10 seconds to respond
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Token request timed out')), 10000));
+        
+        const response = await Promise.race([tokenPromise, timeoutPromise]);
+        token = response.data;
+        if (token) break;
+      } catch (e) {
+        console.warn(`Attempt ${retryCount + 1} to get push token failed:`, e.message);
+        retryCount++;
+        if (retryCount <= maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      }
+    }
 
+    if (!token) {
+      console.error('Failed to generate Expo push token after retries');
+      return null;
+    }
+
+    console.log('Generated Expo Push Token:', token);
+
+    // 5. Update Supabase
     if (userId && token) {
-      await supabase
+      const { error: updateError } = await supabase
         .from('rusers')
         .update({ push_token: token })
         .eq('id', userId);
+        
+      if (updateError) {
+        console.error('Error saving push token to database:', updateError);
+      } else {
+        console.log('Successfully saved push token for user:', userId);
+      }
     }
 
-      if (Platform.OS === 'android') {
-        await Notifications.setNotificationChannelAsync('default', {
-          name: 'default',
-          importance: Notifications.AndroidImportance.MAX,
-          vibrationPattern: [0, 250, 250, 250],
-          lightColor: '#22C55E',
-        });
-        
-        await Notifications.setNotificationChannelAsync('messages', {
-          name: 'Messages',
-          importance: Notifications.AndroidImportance.MAX,
-          vibrationPattern: [0, 250, 250, 250],
-          lightColor: '#22C55E',
-          sound: 'message.mp3',
-        });
-
-          await Notifications.setNotificationChannelAsync('calls', {
-            name: 'Calls',
-            importance: Notifications.AndroidImportance.MAX,
-            vibrationPattern: [0, 250, 250, 250],
-            lightColor: '#22C55E',
-            sound: 'ringtone.mp3',
-          });
-
-          await Notifications.setNotificationChannelAsync('alerts', {
-            name: 'Alerts',
-            importance: Notifications.AndroidImportance.MAX,
-            vibrationPattern: [0, 250, 250, 250],
-            lightColor: '#22C55E',
-            sound: 'alert.mp3',
-          });
-        }
   } catch (error) {
-    console.error('Error registering for push notifications:', error);
+    console.error('Error in push notification registration flow:', error);
   }
 
   return token;

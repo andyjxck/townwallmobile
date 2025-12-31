@@ -158,40 +158,43 @@ export default function FloatingChat() {
     const presenceSubRef = useRef(null);
     const callSubRef = useRef(null);
 
-  const fetchCallToken = async (roomName) => {
-    try {
-      const { data, error } = await supabase.functions.invoke('livekit-token', {
-        body: { identity: user.username, roomName }
-      });
-      if (error) throw error;
-      return data.token;
-    } catch (error) {
-      console.error('Error fetching call token:', error);
-      return null;
-    }
-  };
+    const fetchCallToken = async (roomName) => {
+      try {
+        const { data, error } = await supabase.functions.invoke('livekit-token', {
+          body: { identity: user.username, roomName }
+        });
+        if (error) throw error;
+        return data.token;
+      } catch (error) {
+        console.error('Error fetching call token:', error);
+        return null;
+      }
+    };
 
-    const LiveKitRoomContent = ({ onConnected, speakerOn, muted }) => {
-      if (!useLocalParticipant || !AudioSession || !useParticipants) return null;
+    const LiveKitRoomContentMemo = memo(({ onConnected, speakerOn, muted }) => {
+      if (!useLocalParticipant || !AudioSession || !useParticipants || !useRoom) return null;
       
       const { localParticipant } = useLocalParticipant();
       const participants = useParticipants();
-      const room = useRoom ? useRoom() : null;
+      const room = useRoom();
       const hasStartedRef = useRef(false);
       const participantCountRef = useRef(0);
 
-      if (Platform.OS === 'ios' && useIOSAudioManagement && room) {
-        useIOSAudioManagement(room, true, () => ({
-          audioCategory: 'playAndRecord',
-          audioCategoryOptions: [
-            'allowBluetooth',
-            'allowBluetoothA2DP',
-            'allowAirPlay',
-            speakerOn ? 'defaultToSpeaker' : 'duckOthers',
-          ],
-          audioMode: 'voiceChat',
-        }));
-      }
+      useEffect(() => {
+        if (!room) return;
+        if (Platform.OS === 'ios' && useIOSAudioManagement) {
+          useIOSAudioManagement(room, true, () => ({
+            audioCategory: 'playAndRecord',
+            audioCategoryOptions: [
+              'allowBluetooth',
+              'allowBluetoothA2DP',
+              'allowAirPlay',
+              speakerOn ? 'defaultToSpeaker' : 'duckOthers',
+            ],
+            audioMode: 'voiceChat',
+          }));
+        }
+      }, [room, speakerOn]);
 
       useEffect(() => {
         participantCountRef.current = participants.length;
@@ -266,7 +269,7 @@ export default function FloatingChat() {
       }, [muted, localParticipant]);
 
       return null;
-    };
+    });
 
   useEffect(() => {
     let subscription = null;
@@ -1209,23 +1212,28 @@ export default function FloatingChat() {
             <View style={styles.callOverlay}>
               <BlurView intensity={100} style={StyleSheet.absoluteFill} tint="dark" />
               
-              {callToken && LiveKitRoom && (
-                  <LiveKitRoom
-                    serverUrl={process.env.EXPO_PUBLIC_LIVEKIT_URL}
-                    token={callToken}
-                    connect={true}
-                    audio={true}
-                    video={false}
-                    options={{
-                      adaptiveStream: { pixelDensity: 'screen' },
-                      dynacast: true,
-                      publishDefaults: {
-                        simulcast: false,
-                      },
-                    }}
-                  >
-                    <LiveKitRoomContent speakerOn={isSpeakerOn} muted={isMuted} />
-                  </LiveKitRoom>
+                {callToken && LiveKitRoom && process.env.EXPO_PUBLIC_LIVEKIT_URL && (
+                    <LiveKitRoom
+                      serverUrl={process.env.EXPO_PUBLIC_LIVEKIT_URL}
+                      token={callToken}
+                      connect={true}
+                      audio={true}
+                      video={false}
+                      options={{
+                        adaptiveStream: { pixelDensity: 'screen' },
+                        dynacast: true,
+                        publishDefaults: {
+                          simulcast: false,
+                        },
+                      }}
+                    >
+                      <LiveKitRoomContentMemo speakerOn={isSpeakerOn} muted={isMuted} />
+                    </LiveKitRoom>
+                  )}
+                {!process.env.EXPO_PUBLIC_LIVEKIT_URL && activeCall && (
+                  <View style={{ position: 'absolute', top: 100, width: '100%', padding: 20, backgroundColor: 'rgba(255,0,0,0.1)' }}>
+                    <Text style={{ color: '#FFF', textAlign: 'center' }}>LiveKit URL not configured. Please set EXPO_PUBLIC_LIVEKIT_URL in your .env file.</Text>
+                  </View>
                 )}
 
               {/* Background decorative elements */}
