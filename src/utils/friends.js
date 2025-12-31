@@ -44,13 +44,33 @@ export const acceptFriendRequest = async (requestId, userId, friendId, username)
       });
 
       // Auto-accept any pending chats between these two users
-      await supabase
+      const { data: existingChat } = await supabase
         .from('rchats')
-        .update({ status: 'accepted' })
+        .select('id, status')
         .or(`and(user1_id.eq.${userId},user2_id.eq.${friendId}),and(user1_id.eq.${friendId},user2_id.eq.${userId})`)
-        .eq('status', 'pending');
+        .maybeSingle();
 
-    // Also find and mark the friend_request notification as read for this user
+      if (existingChat) {
+        if (existingChat.status === 'pending') {
+          await supabase
+            .from('rchats')
+            .update({ status: 'accepted' })
+            .eq('id', existingChat.id);
+        }
+      } else {
+        // Create a new accepted chat if none exists
+        await supabase
+          .from('rchats')
+          .insert({
+            user1_id: Math.min(userId, friendId),
+            user2_id: Math.max(userId, friendId),
+            last_message: "You are now friends!",
+            status: 'accepted',
+            initiated_by: userId
+          });
+      }
+
+      // Also find and mark the friend_request notification as read for this user
     await supabase
       .from('rnotifications')
       .update({ is_read: true })
