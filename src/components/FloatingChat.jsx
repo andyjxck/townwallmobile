@@ -161,6 +161,133 @@ export default function FloatingChat() {
     const presenceSubRef = useRef(null);
     const callSubRef = useRef(null);
 
+    const playSound = async (type) => {
+      try {
+        if (soundObjects.current[type]) {
+          await soundObjects.current[type].unloadAsync();
+        }
+        const { sound } = await Audio.Sound.createAsync(
+          SOUNDS[type],
+          { shouldPlay: true, isLooping: type === 'ringing' }
+        );
+        soundObjects.current[type] = sound;
+      } catch (error) {
+        console.error('Error playing sound:', error);
+      }
+    };
+
+    const stopSound = async (type) => {
+      try {
+        if (soundObjects.current[type]) {
+          await soundObjects.current[type].stopAsync();
+          await soundObjects.current[type].unloadAsync();
+          delete soundObjects.current[type];
+        }
+      } catch (error) {
+        console.error('Error stopping sound:', error);
+      }
+    };
+
+    const startCallTimer = () => {
+      if (callTimerRef.current) clearInterval(callTimerRef.current);
+      setCallDuration(0);
+      callTimerRef.current = setInterval(() => {
+        setCallDuration(prev => prev + 1);
+      }, 1000);
+    };
+
+    useEffect(() => {
+      if (activeCall?.status === 'ringing') {
+        Animated.loop(
+          Animated.sequence([
+            Animated.timing(pulseAnim, {
+              toValue: 1.1,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+            Animated.timing(pulseAnim, {
+              toValue: 1,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+          ])
+        ).start();
+      } else {
+        pulseAnim.setValue(1);
+      }
+    }, [activeCall?.status]);
+
+    useEffect(() => {
+      if (!user) return;
+
+      const channel = supabase
+        .channel('rcalls')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'rcalls',
+          },
+          async (payload) => {
+            if (payload.new.caller_id !== user.id) {
+              const { data: participants } = await supabase
+                .from('rcall_participants')
+                .select('*')
+                .eq('call_id', payload.new.id);
+              
+              const isParticipant = payload.new.is_group_call 
+                ? (await supabase.from('rchat_members').select('*').eq('chat_id', payload.new.chat_id).eq('user_id', user.id)).data?.length > 0
+                : payload.new.caller_id !== user.id;
+
+              if (isParticipant) {
+                const { data: chat } = await supabase
+                  .from('rchats')
+                  .select(`*, user1:rusers!user1_id(id, username, emoji_icon, avatar_url), user2:rusers!user2_id(id, username, emoji_icon, avatar_url)`)
+                  .eq('id', payload.new.chat_id)
+                  .single();
+                
+                setActiveCall({ ...payload.new, chat, isOutgoing: false });
+                playSound('ringing');
+              }
+            }
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'rcalls',
+          },
+          (payload) => {
+            if (activeCall && activeCall.id === payload.new.id) {
+              if (payload.new.status === 'ended' || payload.new.status === 'declined') {
+                stopSound('ringing');
+                playSound('disconnect');
+                endCallUI();
+              } else if (payload.new.status === 'active') {
+                stopSound('ringing');
+                if (activeCall.status !== 'active') {
+                  playSound('connect');
+                  startCallTimer();
+                }
+                setActiveCall(prev => ({ ...prev, ...payload.new }));
+              }
+            }
+          }
+        )
+        .subscribe();
+
+      callSubRef.current = channel;
+
+      return () => {
+        if (callSubRef.current) {
+          supabase.removeChannel(callSubRef.current);
+        }
+      };
+    }, [user, activeCall?.id]);
+
     const endCallUI = () => {
 
       setActiveCall(null);
