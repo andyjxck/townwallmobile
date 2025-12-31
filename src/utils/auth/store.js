@@ -45,9 +45,11 @@ export const useChatStore = create((set) => ({
   isOpen: false,
   activeChatId: null,
   pendingCallUserId: null,
+  pendingCallAction: null, // 'accept' or 'decline'
   open: (chatId = null) => set({ isOpen: true, activeChatId: chatId }),
-  close: () => set({ isOpen: false, activeChatId: null, pendingCallUserId: null }),
+  close: () => set({ isOpen: false, activeChatId: null, pendingCallUserId: null, pendingCallAction: null }),
   toggle: () => set((state) => ({ isOpen: !state.isOpen })),
   setActiveChatId: (id) => set({ activeChatId: id }),
   setPendingCallUserId: (userId) => set({ pendingCallUserId: userId, isOpen: true }),
+  setPendingCallAction: (action) => set({ pendingCallAction: action, isOpen: true }),
 }));

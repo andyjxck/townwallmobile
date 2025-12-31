@@ -40,8 +40,29 @@ export async function registerForPushNotificationsAsync(userId) {
     return null;
   }
 
-  try {
-    // 1. Setup channels FIRST on Android
+    try {
+      // 0. Register notification categories
+      if (Platform.OS !== 'web') {
+        await Notifications.setNotificationCategoryAsync('call', [
+          {
+            identifier: 'accept',
+            buttonTitle: 'Accept',
+            options: {
+              opensAppToForeground: true,
+            },
+          },
+          {
+            identifier: 'decline',
+            buttonTitle: 'Decline',
+            options: {
+              isDestructive: true,
+              opensAppToForeground: false,
+            },
+          },
+        ]);
+      }
+
+      // 1. Setup channels FIRST on Android
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('default', {
         name: 'default',
@@ -404,10 +425,12 @@ export const sendHelpMessageNotification = async ({ senderId, senderUsername, re
 
 export const fetchNotifications = async (userId) => {
   try {
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const { data, error } = await supabase
       .from('rnotifications')
       .select('*')
       .eq('user_id', userId)
+      .gt('created_at', twentyFourHoursAgo)
       .order('created_at', { ascending: false });
 
     if (error) throw error;

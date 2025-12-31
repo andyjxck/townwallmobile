@@ -55,10 +55,10 @@ export default function NotificationPanel({ visible, onClose }) {
       };
       
       setupSubscription();
-      } else if (wasVisible.current && !visible) {
-        // Panel was just closed
-        // No longer marking all as read automatically
-      }
+        } else if (wasVisible.current && !visible) {
+          // Panel was just closed
+          handleMarkAllAsRead();
+        }
     
     wasVisible.current = visible;
 

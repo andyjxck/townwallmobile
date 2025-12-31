@@ -259,12 +259,21 @@ export default function RootLayout() {
           }
         });
 
-          responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
-            const data = response.notification.request.content.data as any;
-            if (data?.type === 'call' && data?.callId) {
-              const { useChatStore } = require('@/utils/auth');
-              useChatStore.getState().open();
-            } else if (data?.link === '/chat') {
+            responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+              const data = response.notification.request.content.data as any;
+              const actionIdentifier = response.actionIdentifier;
+              
+              if (data?.type === 'call' && data?.callId) {
+                const { useChatStore } = require('@/utils/auth');
+                
+                if (actionIdentifier === 'accept') {
+                  useChatStore.getState().setPendingCallAction('accept');
+                } else if (actionIdentifier === 'decline') {
+                  useChatStore.getState().setPendingCallAction('decline');
+                } else {
+                  useChatStore.getState().open();
+                }
+              } else if (data?.link === '/chat') {
               const { useChatStore } = require('@/utils/auth');
               if (data.chatId) {
                 useChatStore.getState().setActiveChatId(data.chatId);

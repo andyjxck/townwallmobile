@@ -72,17 +72,29 @@ const { width, height } = Dimensions.get('window');
 export default function FloatingChat() {
   const { isHippie } = useTheme();
   const router = useRouter();
-  const { isOpen, activeChatId, open: setOpen, close: setClose, toggle: toggleChatGlobal, setActiveChatId, pendingCallUserId } = useChatStore();
+    const { isOpen, activeChatId, open: setOpen, close: setClose, toggle: toggleChatGlobal, setActiveChatId, pendingCallUserId, pendingCallAction } = useChatStore();
 
-  const [activeChat, setActiveChat] = useState(null);
-  const activeChatRef = useRef(null);
+    const [activeChat, setActiveChat] = useState(null);
+    const activeChatRef = useRef(null);
 
-  useEffect(() => {
-    activeChatRef.current = activeChat;
-  }, [activeChat]);
+    useEffect(() => {
+      activeChatRef.current = activeChat;
+    }, [activeChat]);
 
-  useEffect(() => {
-    if (pendingCallUserId && user && chats.length > 0 && !activeCall) {
+    useEffect(() => {
+      if (pendingCallAction && activeCall && activeCall.status === 'ringing' && !activeCall.isOutgoing) {
+        if (pendingCallAction === 'accept') {
+          answerCall();
+        } else if (pendingCallAction === 'decline') {
+          declineCall();
+        }
+        // Clear action
+        useChatStore.setState({ pendingCallAction: null });
+      }
+    }, [pendingCallAction, activeCall]);
+
+    useEffect(() => {
+      if (pendingCallUserId && user && chats.length > 0 && !activeCall) {
       const chat = chats.find(c => 
         !c.is_group && (c.user1_id === pendingCallUserId || c.user2_id === pendingCallUserId)
       );
