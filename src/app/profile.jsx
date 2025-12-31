@@ -256,8 +256,20 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
         setFriends(friendsList);
         const friendIds = viewingOwnProfile ? friendsList.map(f => f.id) : [];
 
-        const { data: feedPosts } = await supabase.from('rposts').select(`id, title, text, created_at, user_id, zone_id, tag_id, image_url, image_urls, media_type, cta_type, cta_group_id, is_anonymous, moderation_status, is_deleted, user:rusers!user_id (username, emoji_icon, avatar_url), zone:rzones!zone_id (name), tag:rtags!tag_id (name), poll_id, reactions:rreactions (reaction_type, device_id)`).in('user_id', viewingOwnProfile ? [userData.id, ...friendIds] : [userData.id]).eq('is_deleted', false).order('created_at', { ascending: false });
-        setUserPosts(feedPosts || []);
+        let feedPosts = [];
+          if (viewingOwnProfile) {
+            const { data: ownPosts } = await supabase.from('rposts').select(`id, title, text, created_at, user_id, zone_id, tag_id, image_url, image_urls, media_type, cta_type, cta_group_id, is_anonymous, moderation_status, is_deleted, user:rusers!user_id (username, emoji_icon, avatar_url), zone:rzones!zone_id (name), tag:rtags!tag_id (name), poll_id, reactions:rreactions (reaction_type, device_id)`).eq('user_id', userData.id).eq('is_deleted', false).in('moderation_status', ['approved', 'held']).order('created_at', { ascending: false });
+            
+            const { data: friendPosts } = friendIds.length > 0 
+              ? await supabase.from('rposts').select(`id, title, text, created_at, user_id, zone_id, tag_id, image_url, image_urls, media_type, cta_type, cta_group_id, is_anonymous, moderation_status, is_deleted, user:rusers!user_id (username, emoji_icon, avatar_url), zone:rzones!zone_id (name), tag:rtags!tag_id (name), poll_id, reactions:rreactions (reaction_type, device_id)`).in('user_id', friendIds).eq('is_deleted', false).eq('moderation_status', 'approved').order('created_at', { ascending: false })
+              : { data: [] };
+            
+            feedPosts = [...(ownPosts || []), ...(friendPosts || [])].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+          } else {
+            const { data: posts } = await supabase.from('rposts').select(`id, title, text, created_at, user_id, zone_id, tag_id, image_url, image_urls, media_type, cta_type, cta_group_id, is_anonymous, moderation_status, is_deleted, user:rusers!user_id (username, emoji_icon, avatar_url), zone:rzones!zone_id (name), tag:rtags!tag_id (name), poll_id, reactions:rreactions (reaction_type, device_id)`).eq('user_id', userData.id).eq('is_deleted', false).eq('moderation_status', 'approved').order('created_at', { ascending: false });
+            feedPosts = posts || [];
+          }
+          setUserPosts(feedPosts);
 
         if (viewingOwnProfile) {
           const { data: userPostIds } = await supabase.from('rposts').select('id').eq('user_id', userData.id);

@@ -255,7 +255,8 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
     const isModOrAdmin = !!(user?.is_admin || user?.is_moderator);
     const isOwner = user?.id === item.user_id;
     const isBlurredByMod = !!(item.is_blurred && item.blur_reason);
-  const isRedactedMode = !!(shouldBlur || isBlurredByMod);
+    const isHeldForModeration = item.moderation_status === 'held';
+  const isRedactedMode = !!(shouldBlur || isBlurredByMod || isHeldForModeration);
   const isRevealed = !!((shouldBlur && revealed) || (isBlurredByMod && blurRevealed));
   const isCurrentlyBlurred = !!(isRedactedMode && !isRevealed);
 
@@ -368,22 +369,28 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
               style={[styles.body, { flex: 1 }]}
             >
               {isCurrentlyBlurred ? (
-                <View style={styles.blurredContentWrapper}>
-                  {isBlurredByMod ? (
-                    <View style={styles.modBlurOverlay}>
-                      <EyeOff size={18} color="#FFF" />
-                      <Text style={styles.blurTextContent}>Post blurred: {item.blur_reason}</Text>
-                      <Text style={styles.tapToRevealText}>Tap to reveal</Text>
-                    </View>
-                  ) : (
-                    <View style={styles.communityBlurOverlay}>
-                      <AlertTriangle size={18} color={theme.colors.error} />
-                      <Text style={[styles.blurText, { color: theme.colors.error }]}>Reported Content</Text>
-                      <Text style={styles.tapToRevealText}>Tap to reveal</Text>
-                    </View>
-                  )}
-                </View>
-              ) : (
+                  <View style={styles.blurredContentWrapper}>
+                    {isHeldForModeration ? (
+                      <View style={styles.modBlurOverlay}>
+                        <EyeOff size={18} color="#F59E0B" />
+                        <Text style={[styles.blurTextContent, { color: '#F59E0B' }]}>Pending Moderation</Text>
+                        <Text style={styles.tapToRevealText}>This post is under review</Text>
+                      </View>
+                    ) : isBlurredByMod ? (
+                      <View style={styles.modBlurOverlay}>
+                        <EyeOff size={18} color="#FFF" />
+                        <Text style={styles.blurTextContent}>Post blurred: {item.blur_reason}</Text>
+                        <Text style={styles.tapToRevealText}>Tap to reveal</Text>
+                      </View>
+                    ) : (
+                      <View style={styles.communityBlurOverlay}>
+                        <AlertTriangle size={18} color={theme.colors.error} />
+                        <Text style={[styles.blurText, { color: theme.colors.error }]}>Reported Content</Text>
+                        <Text style={styles.tapToRevealText}>Tap to reveal</Text>
+                      </View>
+                    )}
+                  </View>
+                ) : (
                 <>
                   {item.title && <Text style={[styles.title, isRedactedMode && styles.greyedOutText]}>{item.title}</Text>}
                   <Text style={[styles.bodyText, isRedactedMode && styles.greyedOutText]} numberOfLines={(isExpanded || isRedactedMode) ? undefined : 4}>

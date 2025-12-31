@@ -48,6 +48,7 @@ export default function ModerationAdmin() {
     const [pollModalItem, setPollModalItem] = useState(null);
     const [pollQuestion, setPollQuestion] = useState('');
     const [pollOptions, setPollOptions] = useState(['Yes', 'No', 'Maybe later']);
+    const [overrideMode, setOverrideMode] = useState(null);
 
   const TABS = [
       { id: 'talent', label: 'TALENT', icon: Star },
@@ -176,14 +177,14 @@ export default function ModerationAdmin() {
           .order('created_at', { ascending: false });
         if (error) throw error;
         result = news;
-        } else if (activeTab === 'reports') {
-          const { data: reports, error } = await supabase
-            .from('rmoderation_logs')
-            .select(`*, target:rusers!rmoderation_logs_target_id_fkey(username)`)
-            .eq('action', 'report')
-            .order('created_at', { ascending: false });
-          if (error) throw error;
-          result = reports;
+} else if (activeTab === 'reports') {
+            const { data: reports, error } = await supabase
+              .from('rmoderation_logs')
+              .select(`*`)
+              .eq('action', 'report')
+              .order('created_at', { ascending: false });
+            if (error) throw error;
+            result = reports;
         } else if (activeTab === 'logs' && isSuperAdmin) {
         const { data: logsData, error } = await supabase
           .from('rmoderation_logs')
@@ -347,6 +348,43 @@ export default function ModerationAdmin() {
   }
 };
 
+const handleOverridePost = async () => {
+    if (!overrideReason.trim()) {
+      Alert.alert("Reason Required", "Please provide a reason for overriding.");
+      return;
+    }
+
+    try {
+      const user = await getStoredUser();
+      const { error } = await supabase
+        .from('rposts')
+        .update({ 
+          moderation_status: 'approved',
+          is_blurred: false
+        })
+        .eq('id', overrideItem.id);
+      
+      if (error) throw error;
+
+      await supabase.from('rmoderation_logs').insert({
+        moderator_id: user.id,
+        target_id: overrideItem.id,
+        target_type: 'post',
+        action: 'override_approve',
+        reason: `Override: ${overrideReason.trim()}`
+      });
+
+      setData(prev => prev.filter(p => p.id !== overrideItem.id));
+      setOverrideItem(null);
+      setOverrideReason('');
+      setOverrideMode(null);
+      Alert.alert("Success", "Post has been approved and posted.");
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Error", "Failed to approve post.");
+    }
+  };
+
 const handleOverrideDelete = async () => {
   if (!overrideReason.trim()) {
     Alert.alert("Reason Required", "Please provide a reason for overriding.");
@@ -375,11 +413,12 @@ const handleOverrideDelete = async () => {
       reason: `Override: ${overrideReason.trim()}`
     });
 
-    setData(prev => prev.filter(p => p.id !== overrideItem.id));
-    setOverrideItem(null);
-    setOverrideReason('');
-    Alert.alert("Success", "Post has been deleted.");
-  } catch (error) {
+      setData(prev => prev.filter(p => p.id !== overrideItem.id));
+      setOverrideItem(null);
+      setOverrideReason('');
+      setOverrideMode(null);
+      Alert.alert("Success", "Post has been deleted.");
+    } catch (error) {
     console.error(error);
     Alert.alert("Error", "Failed to delete post.");
   }
@@ -581,29 +620,57 @@ const handleOverrideDelete = async () => {
         </View>
 
         <View style={styles.actionRow}>
-          {activeTab !== 'ai' && (
-            <TouchableOpacity style={[styles.actionButton, styles.approveButton]} onPress={() => handleAction(item.id, 'approve')}>
-              <CheckCircle size={18} color="#000000" />
-              <Text style={styles.actionText}>APPROVE</Text>
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity style={[styles.actionButton, styles.rejectButton]} onPress={() => handleAction(item.id, 'reject')}>
-            <XCircle size={18} color="#FFFFFF" />
-            <Text style={[styles.actionText, { color: '#FFFFFF' }]}>REJECT</Text>
-          </TouchableOpacity>
-          {activeTab === 'ai' && (
-            <TouchableOpacity 
-              style={[styles.actionButton, { backgroundColor: '#F59E0B' }]} 
-              onPress={() => {
-                setOverrideItem(item);
-                setOverrideReason('');
-              }}
-            >
-              <Trash2 size={18} color="#000" />
-              <Text style={[styles.actionText, { color: '#000' }]}>OVERRIDE</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+            {activeTab === 'ai' && aiFilter === 'held' && (
+              <>
+                <TouchableOpacity style={[styles.actionButton, styles.rejectButton]} onPress={() => handleAction(item.id, 'reject')}>
+                  <XCircle size={18} color="#FFFFFF" />
+                  <Text style={[styles.actionText, { color: '#FFFFFF' }]}>REJECT</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.actionButton, styles.approveButton]} onPress={() => handleAction(item.id, 'approve')}>
+                  <CheckCircle size={18} color="#000000" />
+                  <Text style={styles.actionText}>APPROVE</Text>
+                </TouchableOpacity>
+              </>
+            )}
+            {activeTab === 'ai' && aiFilter === 'approved' && (
+              <TouchableOpacity 
+                style={[styles.actionButton, { backgroundColor: '#F59E0B', flex: 1 }]} 
+                onPress={() => {
+                  setOverrideItem(item);
+                  setOverrideReason('');
+                  setOverrideMode('delete');
+                }}
+              >
+                <Trash2 size={18} color="#000" />
+                <Text style={[styles.actionText, { color: '#000' }]}>OVERRIDE - DELETE POST</Text>
+              </TouchableOpacity>
+            )}
+            {activeTab === 'ai' && aiFilter === 'rejected' && (
+              <TouchableOpacity 
+                style={[styles.actionButton, { backgroundColor: '#4ADE80', flex: 1 }]} 
+                onPress={() => {
+                  setOverrideItem(item);
+                  setOverrideReason('');
+                  setOverrideMode('post');
+                }}
+              >
+                <CheckCircle size={18} color="#000" />
+                <Text style={[styles.actionText, { color: '#000' }]}>OVERRIDE - POST IT</Text>
+              </TouchableOpacity>
+            )}
+            {activeTab !== 'ai' && (
+              <>
+                <TouchableOpacity style={[styles.actionButton, styles.approveButton]} onPress={() => handleAction(item.id, 'approve')}>
+                  <CheckCircle size={18} color="#000000" />
+                  <Text style={styles.actionText}>APPROVE</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.actionButton, styles.rejectButton]} onPress={() => handleAction(item.id, 'reject')}>
+                  <XCircle size={18} color="#FFFFFF" />
+                  <Text style={[styles.actionText, { color: '#FFFFFF' }]}>REJECT</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
       </View>
     );
   };
@@ -695,43 +762,51 @@ const handleOverrideDelete = async () => {
         )}
 
         <Modal
-          visible={!!overrideItem}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={() => setOverrideItem(null)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>OVERRIDE & DELETE</Text>
-              <Text style={styles.modalSubtitle}>Please provide a reason for deleting this post.</Text>
-              
-              <TextInput
-                style={styles.modalInput}
-                placeholder="Reason for deletion..."
-                placeholderTextColor="rgba(255,255,255,0.3)"
-                value={overrideReason}
-                onChangeText={setOverrideReason}
-                multiline
-                numberOfLines={4}
-              />
+            visible={!!overrideItem}
+            transparent={true}
+            animationType="fade"
+            onRequestClose={() => { setOverrideItem(null); setOverrideMode(null); }}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>
+                  {overrideMode === 'delete' ? 'OVERRIDE & DELETE' : 'OVERRIDE & POST'}
+                </Text>
+                <Text style={styles.modalSubtitle}>
+                  {overrideMode === 'delete' 
+                    ? 'Please provide a reason for deleting this approved post.' 
+                    : 'Please provide a reason for posting this rejected content.'}
+                </Text>
+                
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder={overrideMode === 'delete' ? "Reason for deletion..." : "Reason for approving..."}
+                  placeholderTextColor="rgba(255,255,255,0.3)"
+                  value={overrideReason}
+                  onChangeText={setOverrideReason}
+                  multiline
+                  numberOfLines={4}
+                />
 
-              <View style={styles.modalButtons}>
-                <TouchableOpacity 
-                  style={[styles.modalButton, styles.cancelButton]} 
-                  onPress={() => setOverrideItem(null)}
-                >
-                  <Text style={styles.cancelButtonText}>CANCEL</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.modalButton, styles.confirmButton]} 
-                  onPress={handleOverrideDelete}
-                >
-                  <Text style={styles.confirmButtonText}>DELETE POST</Text>
-                </TouchableOpacity>
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity 
+                    style={[styles.modalButton, styles.cancelButton]} 
+                    onPress={() => { setOverrideItem(null); setOverrideMode(null); }}
+                  >
+                    <Text style={styles.cancelButtonText}>CANCEL</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.modalButton, overrideMode === 'delete' ? styles.confirmButton : { backgroundColor: '#4ADE80' }]} 
+                    onPress={overrideMode === 'delete' ? handleOverrideDelete : handleOverridePost}
+                  >
+                    <Text style={[styles.confirmButtonText, overrideMode === 'post' && { color: '#000' }]}>
+                      {overrideMode === 'delete' ? 'DELETE POST' : 'POST IT'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
-          </View>
-          </Modal>
+            </Modal>
 
           <Modal
             visible={!!pollModalItem}
