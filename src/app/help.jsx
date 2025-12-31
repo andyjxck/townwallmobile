@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Modal } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Modal, Share } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, Send, Sparkles, X, Maximize2 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,6 +10,7 @@ import { getStoredUser } from '@/utils/user';
 import { getAIAssistantResponse, expandImage } from '@/utils/ai';
 import { sendNotification } from '@/utils/notifications';
 import * as Haptics from 'expo-haptics';
+import * as Clipboard from 'expo-clipboard';
 
 import { useTheme } from "@/utils/ThemeContext";
 import { LinearGradient } from "expo-linear-gradient";
@@ -35,8 +36,64 @@ export default function HelpContact() {
     const [selectedImage, setSelectedImage] = useState(null);
     const [isExpanding, setIsExpanding] = useState(false);
 
-  
-  const { city_name, zone_name, feedView } = useLocationStore();
+    const handleMessageAction = async (message) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      
+      const isMine = !message.is_from_admin;
+      const content = message.content;
+      
+      // Clean content from image tags for copying
+      const cleanText = content.replace(/\[TOWNY_IMAGE:.+?\]/g, '').trim();
+
+      Alert.alert(
+        "Message Actions",
+        null,
+        [
+          {
+            text: "Copy Text",
+            onPress: async () => {
+              if (cleanText) {
+                await Clipboard.setStringAsync(cleanText);
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              }
+            }
+          },
+          {
+            text: "Share",
+            onPress: async () => {
+              try {
+                await Share.share({
+                  message: cleanText || "Shared from Towny",
+                });
+              } catch (e) {
+                console.error("Share error:", e);
+              }
+            }
+          },
+          {
+            text: "Report Message",
+            style: "destructive",
+            onPress: async () => {
+              try {
+                await supabase.from('feedback').insert({
+                  userid: currentUser.id,
+                  feedback: `[REPORT] Message ID: ${message.id} Content: ${content}`
+                });
+                Alert.alert("Reported", "Thank you for reporting. Our team will review this message.");
+              } catch (e) {
+                console.error("Report error:", e);
+              }
+            }
+          },
+          {
+            text: "Cancel",
+            style: "cancel"
+          }
+        ]
+      );
+    };
+
+    const { city_name, zone_name, feedView } = useLocationStore();
 
   useEffect(() => {
     const setup = async () => {
@@ -454,11 +511,16 @@ export default function HelpContact() {
                         <Sparkles size={12} color="#FBBF24" />
                       </View>
                     )}
-                    <View style={[
-                      styles.messageBubble, 
-                      isMine ? styles.myMessage : styles.theirMessage,
-                      isResolved && { borderLeftWidth: 4, borderLeftColor: '#10B981' }
-                    ]}>
+                    <TouchableOpacity 
+                      activeOpacity={0.8}
+                      onLongPress={() => handleMessageAction(item)}
+                      delayLongPress={500}
+                      style={[
+                        styles.messageBubble, 
+                        isMine ? styles.myMessage : styles.theirMessage,
+                        isResolved && { borderLeftWidth: 4, borderLeftColor: '#10B981' }
+                      ]}
+                    >
                         {!isMine && <Text style={styles.adminLabel}>TOWNY</Text>}
                       {renderMessageContent(item.content, isMine)}
                     <View style={styles.messageFooter}>
@@ -466,7 +528,7 @@ export default function HelpContact() {
                         {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </Text>
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 </View>
               );
             }}
