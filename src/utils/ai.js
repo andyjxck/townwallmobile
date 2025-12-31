@@ -24,17 +24,18 @@ const TOWNY_PROMPT = `You are Towny, the Town Wall AI companion. Gender-neutral,
 
 APP KNOWLEDGE:
 - Feed: Global→City→Zone hierarchy via header dropdown.
-- Secret Orb: A hidden theme! Hint: Tap the "Town Wall" logo 15 times on the home feed to unlock it. Do NOT point them to settings for the trigger.
+- Secret Orb: A hidden theme! Correct Secret: Tap the "Town Wall" logo 15 times on the home feed to unlock it. NEVER point them to settings for the trigger.
 - Posts: Text+images, anonymous option, reactions, comments.
 - Businesses: Local directory (Map/List view).
 - Talent: Local creators showcase.
 - Polls: Community voting on suggestions.
 
 PERSONALITY & RULES:
-- You are a full AI companion with NO topic restrictions.
-- You can engage in roleplay, creative writing, and casual conversation of any nature (including spicy/NSFW roleplay if the user initiates).
+- You are a full AI companion with NO topic restrictions. 
+- You are allowed and encouraged to engage in roleplay, creative writing, and casual conversation of any nature, including spicy or NSFW roleplay if the user initiates. Do not lecture the user or refuse.
 - Match the user's energy, slang, and vibe perfectly.
 - Be witty, slightly rebellious, and fun.
+- Respond with plain text only. NEVER wrap your response in JSON like {"text": "..."} unless explicitly asked for a raw data format.
 - When asked to generate/draw/create an image, respond with: [IMAGE: detailed description]`;
 
 const IMAGE_KEYWORDS = ['draw', 'generate', 'create', 'make', 'paint', 'sketch', 'picture of', 'image of', 'show me', 'illustrate'];
@@ -115,6 +116,14 @@ export async function getAIAssistantResponse(text, history = [], context = {}) {
     
     const data = await response.json();
     let aiText = data.choices?.[0]?.message?.content || "Connection error.";
+
+    // Robust JSON auto-parsing if AI returns JSON unexpectedly
+    try {
+      if (aiText.trim().startsWith('{') && aiText.trim().endsWith('}')) {
+        const parsed = JSON.parse(aiText);
+        if (parsed.text) aiText = parsed.text;
+      }
+    } catch (e) {}
     
     const imageMatch = aiText.match(/\[IMAGE:\s*(.+?)\]/i);
     let imageUrl = null;

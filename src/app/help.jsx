@@ -24,8 +24,9 @@ export default function HelpContact() {
     const subRef = useRef(null);
     const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [currentUser, setCurrentUser] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [isTyping, setIsTyping] = useState(false);
+    const [currentUser, setCurrentUser] = useState(null);
   const [showRating, setShowRating] = useState(false);
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
@@ -209,83 +210,95 @@ export default function HelpContact() {
       };
       setMessages(prev => [...prev, tempMsg]);
   
-      try {
-        const { data: realMsg, error } = await supabase
-          .from('rhelp_messages')
-          .insert({
-            sender_id: currentUser.id,
-            content: text,
-            is_from_admin: false
-          })
-          .select()
-          .single();
-  
-        if (error) throw error;
-  
-        if (realMsg) {
-          setMessages(prev => prev.map(m => m.id === tempId ? realMsg : m));
-        }
-  
-        const isOvertaken = messages.some(m => m.status === 'overtaken');
-        if (isOvertaken) {
-          console.log("Chat overtaken by agent. AI suppressed.");
-          return;
-        }
-  
-          const history = messages.slice(-10).map(m => {
-            let cleanContent = m.content;
-            try {
-              if (m.content.trim().startsWith('{') && m.content.trim().endsWith('}')) {
-                const parsed = JSON.parse(m.content);
-                if (parsed.text) cleanContent = parsed.text;
-              }
-            } catch (e) {}
-            
-            return {
-              role: m.is_from_admin ? 'assistant' : 'user',
-              content: cleanContent
-            };
-          });
-  
-        const aiResponse = await getAIAssistantResponse(text, history, {
-          city_name,
-          zone_name,
-          feedView,
-          username: currentUser?.username
-        });
-
-        let messageContent = typeof aiResponse === 'string' ? aiResponse : aiResponse.text;
-        const imageUrl = typeof aiResponse === 'object' ? aiResponse.imageUrl : null;
-        
-        if (imageUrl) {
-          messageContent = messageContent + `\n[TOWNY_IMAGE:${imageUrl}]`;
-        }
-
-        await supabase
-          .from('rhelp_messages')
-          .insert({
-            receiver_id: currentUser.id,
-            content: messageContent,
-            is_from_admin: true
-          });
-              
-              const { sendHelpMessageNotification } = require('@/utils/notifications');
-              await sendHelpMessageNotification({
-                senderId: 'assistant',
-                senderUsername: 'Towny',
-                receiverId: currentUser.id,
-                isFromAdmin: true,
-                messageContent: typeof aiResponse === 'string' ? aiResponse : aiResponse.text
-              });
+        try {
+          setIsTyping(true);
+          const { data: realMsg, error } = await supabase
+            .from('rhelp_messages')
+            .insert({
+              sender_id: currentUser.id,
+              content: text,
+              is_from_admin: false
+            })
+            .select()
+            .single();
     
-          } catch (error) {
-            console.error("Error in handleSend:", error);
-            setInputText(text);
-            setMessages(prev => prev.filter(m => m.id !== tempId));
-            Alert.alert("Error", "Message could not be sent.");
-          } finally {
-            isSendingRef.current = false;
+          if (error) throw error;
+    
+          if (realMsg) {
+            setMessages(prev => prev.map(m => m.id === tempId ? realMsg : m));
           }
+    
+          const isOvertaken = messages.some(m => m.status === 'overtaken');
+          if (isOvertaken) {
+            console.log("Chat overtaken by agent. AI suppressed.");
+            setIsTyping(false);
+            return;
+          }
+    
+            const history = messages.slice(-10).map(m => {
+              let cleanContent = m.content;
+              try {
+                if (m.content.trim().startsWith('{') && m.content.trim().endsWith('}')) {
+                  const parsed = JSON.parse(m.content);
+                  if (parsed.text) cleanContent = parsed.text;
+                }
+              } catch (e) {}
+              
+              return {
+                role: m.is_from_admin ? 'assistant' : 'user',
+                content: cleanContent
+              };
+            });
+    
+          const aiResponse = await getAIAssistantResponse(text, history, {
+            city_name,
+            zone_name,
+            feedView,
+            username: currentUser?.username
+          });
+  
+          let messageContent = typeof aiResponse === 'string' ? aiResponse : aiResponse.text;
+          
+          // Double check JSON in the UI side just in case
+          try {
+            if (messageContent.trim().startsWith('{') && messageContent.trim().endsWith('}')) {
+              const parsed = JSON.parse(messageContent);
+              if (parsed.text) messageContent = parsed.text;
+            }
+          } catch (e) {}
+
+          const imageUrl = typeof aiResponse === 'object' ? aiResponse.imageUrl : null;
+          
+          if (imageUrl) {
+            messageContent = messageContent + `\n[TOWNY_IMAGE:${imageUrl}]`;
+          }
+
+          await supabase
+            .from('rhelp_messages')
+            .insert({
+              receiver_id: currentUser.id,
+              content: messageContent,
+              is_from_admin: true
+            });
+                
+                const { sendHelpMessageNotification } = require('@/utils/notifications');
+                await sendHelpMessageNotification({
+                  senderId: 'assistant',
+                  senderUsername: 'Towny',
+                  receiverId: currentUser.id,
+                  isFromAdmin: true,
+                  messageContent: typeof aiResponse === 'string' ? aiResponse : aiResponse.text
+                });
+      
+            } catch (error) {
+              console.error("Error in handleSend:", error);
+              setInputText(text);
+              setMessages(prev => prev.filter(m => m.id !== tempId));
+              Alert.alert("Error", "Message could not be sent.");
+            } finally {
+              isSendingRef.current = false;
+              setIsTyping(false);
+            }
         };
 
     const handleKeyPress = (e) => {
@@ -413,53 +426,65 @@ export default function HelpContact() {
               );
             }}
           ListFooterComponent={
-            showRating ? (
-              <View style={styles.inChatRatingContainer}>
-                <View style={styles.ratingCard}>
-                  <Text style={styles.ratingTitle}>HOW WAS TOWNY?</Text>
-                  
-                  <View style={styles.starsContainer}>
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <TouchableOpacity 
-                        key={star} 
-                        onPress={() => {
-                          setRating(star);
-                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                        }}
-                        style={styles.starButton}
-                      >
-                        <Text style={[styles.starText, rating >= star && styles.starActive]}>
-                          {rating >= star ? '★' : '☆'}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
+            <View>
+              {isTyping && (
+                <View style={[styles.messageWrapper, styles.theirMessageWrapper]}>
+                  <View style={styles.assistantAvatar}>
+                    <Sparkles size={12} color="#FBBF24" />
                   </View>
-
-                  <TextInput
-                    style={styles.ratingInput}
-                    placeholder="Leave a comment (optional)..."
-                    placeholderTextColor="rgba(255,255,255,0.3)"
-                    value={comment}
-                    onChangeText={setComment}
-                    multiline
-                  />
-
-                  <View style={styles.ratingButtons}>
-                    <TouchableOpacity 
-                      style={[styles.submitButton, rating === 0 && { opacity: 0.5 }]} 
-                      onPress={submitReview}
-                      disabled={rating === 0 || isSubmitting}
-                    >
-                      {isSubmitting ? (
-                        <ActivityIndicator size="small" color="#000000" />
-                      ) : (
-                        <Text style={styles.submitButtonText}>SUBMIT REVIEW</Text>
-                      )}
-                    </TouchableOpacity>
+                  <View style={[styles.messageBubble, styles.theirMessage, { width: 60, alignItems: 'center' }]}>
+                    <ActivityIndicator size="small" color="#FBBF24" />
                   </View>
                 </View>
-              </View>
-            ) : null
+              )}
+              {showRating && (
+                <View style={styles.inChatRatingContainer}>
+                  <View style={styles.ratingCard}>
+                    <Text style={styles.ratingTitle}>HOW WAS TOWNY?</Text>
+                    
+                    <View style={styles.starsContainer}>
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <TouchableOpacity 
+                          key={star} 
+                          onPress={() => {
+                            setRating(star);
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                          }}
+                          style={styles.starButton}
+                        >
+                          <Text style={[styles.starText, rating >= star && styles.starActive]}>
+                            {rating >= star ? '★' : '☆'}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+
+                    <TextInput
+                      style={styles.ratingInput}
+                      placeholder="Leave a comment (optional)..."
+                      placeholderTextColor="rgba(255,255,255,0.3)"
+                      value={comment}
+                      onChangeText={setComment}
+                      multiline
+                    />
+
+                    <View style={styles.ratingButtons}>
+                      <TouchableOpacity 
+                        style={[styles.submitButton, rating === 0 && { opacity: 0.5 }]} 
+                        onPress={submitReview}
+                        disabled={rating === 0 || isSubmitting}
+                      >
+                        {isSubmitting ? (
+                          <ActivityIndicator size="small" color="#000000" />
+                        ) : (
+                          <Text style={styles.submitButtonText}>SUBMIT REVIEW</Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              )}
+            </View>
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
