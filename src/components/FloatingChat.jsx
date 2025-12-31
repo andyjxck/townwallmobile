@@ -39,7 +39,7 @@ import { File as FileSystemNext } from 'expo-file-system/next';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { expandImage } from '../utils/ai';
 import Markdown from 'react-native-markdown-display';
-import { JitsiMeetView } from '@jitsi/react-native-sdk';
+import { JitsiMeeting } from '@jitsi/react-native-sdk';
 
 const isExpoGo = Constants.appOwnership === "expo";
 
@@ -143,7 +143,6 @@ export default function FloatingChat() {
   const [pendingMedia, setPendingMedia] = useState(null);
   
     const [activeCall, setActiveCall] = useState(null);
-    const [callToken, setCallToken] = useState(null);
     const [isMuted, setIsMuted] = useState(false);
     const [isSpeakerOn, setIsSpeakerOn] = useState(false);
     const [isNear, setIsNear] = useState(false);
@@ -939,34 +938,27 @@ export default function FloatingChat() {
         </View>
       )}
 
-        {activeCall && (
-          <Modal visible={true} animationType="fade" transparent>
-            <View style={styles.callOverlay}>
-              <BlurView intensity={100} style={StyleSheet.absoluteFill} tint="dark" />
-              
-                {callToken && LiveKitRoom && process.env.EXPO_PUBLIC_LIVEKIT_URL && (
-                    <LiveKitRoom
-                      serverUrl={process.env.EXPO_PUBLIC_LIVEKIT_URL}
-                      token={callToken}
-                      connect={true}
-                      audio={true}
-                      video={false}
-                      options={{
-                        adaptiveStream: { pixelDensity: 'screen' },
-                        dynacast: true,
-                        publishDefaults: {
-                          simulcast: false,
-                        },
-                      }}
-                    >
-                      <LiveKitRoomContentMemo speakerOn={isSpeakerOn} muted={isMuted} />
-                    </LiveKitRoom>
+          {activeCall && (
+            <Modal visible={true} animationType="fade" transparent>
+              <View style={styles.callOverlay}>
+                <BlurView intensity={100} style={StyleSheet.absoluteFill} tint="dark" />
+                
+                  {activeCall.status === 'active' && (
+                    <View style={StyleSheet.absoluteFill}>
+                      <JitsiMeeting
+                        room={activeCall.id}
+                        serverURL={'https://meet.jit.si'}
+                        config={{
+                          audioOnly: true,
+                          startWithAudioMuted: false,
+                          startWithVideoMuted: true,
+                        }}
+                        onConferenceTerminated={endCall}
+                        style={{ flex: 1 }}
+                      />
+                    </View>
                   )}
-                {!process.env.EXPO_PUBLIC_LIVEKIT_URL && activeCall && (
-                  <View style={{ position: 'absolute', top: 100, width: '100%', padding: 20, backgroundColor: 'rgba(255,0,0,0.1)' }}>
-                    <Text style={{ color: '#FFF', textAlign: 'center' }}>LiveKit URL not configured. Please set EXPO_PUBLIC_LIVEKIT_URL in your .env file.</Text>
-                  </View>
-                )}
+
 
               {/* Background decorative elements */}
             <View style={[styles.callBgCircle, { top: -100, left: -50, backgroundColor: theme.colors.primary + '20' }]} />
