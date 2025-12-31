@@ -39,9 +39,17 @@ import { File as FileSystemNext } from 'expo-file-system/next';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { expandImage } from '../utils/ai';
 import Markdown from 'react-native-markdown-display';
-import { JitsiMeeting } from '@jitsi/react-native-sdk';
 
 const isExpoGo = Constants.appOwnership === "expo";
+
+let JitsiMeeting = null;
+if (!isExpoGo && Platform.OS !== 'web') {
+  try {
+    JitsiMeeting = require('@jitsi/react-native-sdk').JitsiMeeting;
+  } catch (e) {
+    console.warn('Jitsi SDK not available:', e.message);
+  }
+}
 
 const SOUNDS = {
   ringing: require('../../assets/sounds/ringtone.mp3'),
@@ -1070,21 +1078,41 @@ export default function FloatingChat() {
               <View style={styles.callOverlay}>
                 <BlurView intensity={100} style={StyleSheet.absoluteFill} tint="dark" />
                 
-                  {activeCall.status === 'active' && (
-                    <View style={StyleSheet.absoluteFill}>
-                      <JitsiMeeting
-                        room={activeCall.id}
-                        serverURL={'https://meet.jit.si'}
-                        config={{
-                          audioOnly: true,
-                          startWithAudioMuted: false,
-                          startWithVideoMuted: true,
-                        }}
-                        onConferenceTerminated={endCall}
-                        style={{ flex: 1 }}
-                      />
-                    </View>
-                  )}
+                    {activeCall.status === 'active' && JitsiMeeting && (
+                      <View style={StyleSheet.absoluteFill}>
+                        <JitsiMeeting
+                          room={activeCall.id}
+                          serverURL={'https://meet.jit.si'}
+                          config={{
+                            audioOnly: true,
+                            startWithAudioMuted: false,
+                            startWithVideoMuted: true,
+                          }}
+                          onConferenceTerminated={endCall}
+                          style={{ flex: 1 }}
+                        />
+                      </View>
+                    )}
+                    {activeCall.status === 'active' && !JitsiMeeting && (
+                      <View style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', padding: 40 }]}>
+                        <View style={{ backgroundColor: 'rgba(255,255,255,0.1)', padding: 24, borderRadius: 24, alignItems: 'center' }}>
+                          <PhoneOffIcon size={48} color={theme.colors.primary} style={{ marginBottom: 16 }} />
+                          <Text style={{ color: '#FFF', fontSize: 18, fontWeight: 'bold', textAlign: 'center', marginBottom: 8 }}>
+                            Call Unavailable
+                          </Text>
+                          <Text style={{ color: 'rgba(255,255,255,0.6)', textAlign: 'center', fontSize: 14 }}>
+                            Voice calls are not supported in Expo Go. Please use a development build.
+                          </Text>
+                          <TouchableOpacity 
+                            onPress={endCall}
+                            style={{ marginTop: 24, backgroundColor: theme.colors.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 }}
+                          >
+                            <Text style={{ color: '#000', fontWeight: 'bold' }}>Close</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    )}
+
 
 
               {/* Background decorative elements */}
