@@ -368,7 +368,9 @@ export default function ModerationAdmin() {
       });
       if (error) throw error;
       
+      try {
         // Notify the user
+        const { sendHelpMessageNotification } = require('@/utils/notifications');
         await sendHelpMessageNotification({
           senderId: admin.id,
           senderUsername: 'Admin',
@@ -376,16 +378,54 @@ export default function ModerationAdmin() {
           isFromAdmin: true,
           messageContent: replyText.trim()
         });
+      } catch (notifError) {
+        console.warn("Notification failed:", notifError);
+      }
       
       setReplyText('');
-    setExpandedChatId(null);
-    Alert.alert("Success", "Reply sent.");
-    fetchData();
-  } catch (error) {
-    console.error(error);
-    Alert.alert("Error", "Reply failed.");
-  }
-};
+      setExpandedChatId(null);
+      Alert.alert("Success", "Reply sent.");
+      fetchData();
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Error", "Reply failed.");
+    }
+  };
+
+  const handleResolve = async (userId) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    try {
+      const admin = await getStoredUser();
+      const { error } = await supabase.from('rhelp_messages').insert({
+        sender_id: admin.id,
+        receiver_id: userId,
+        content: "This chat has been resolved. Please rate your experience 1-5 / Leave a comment.",
+        is_from_admin: true,
+        status: 'resolved'
+      });
+      if (error) throw error;
+      
+      try {
+        const { sendHelpMessageNotification } = require('@/utils/notifications');
+        await sendHelpMessageNotification({
+          senderId: admin.id,
+          senderUsername: 'Admin',
+          receiverId: userId,
+          isFromAdmin: true,
+          messageContent: "Your support chat has been resolved."
+        });
+      } catch (notifError) {
+        console.warn("Notification failed:", notifError);
+      }
+
+      setExpandedChatId(null);
+      Alert.alert("Resolved", "The chat has been marked as resolved.");
+      fetchData();
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Error", "Failed to resolve chat.");
+    }
+  };
 
   const handleOverridePost = async () => {
       if (!overrideReason.trim()) {
@@ -627,18 +667,28 @@ export default function ModerationAdmin() {
                 ))}
 
                 {item.is_overtaken ? (
-                  <View style={styles.replyContainer}>
-                    <TextInput
-                      style={styles.replyInput}
-                      placeholder="Type your response as an agent..."
-                      placeholderTextColor="rgba(255,255,255,0.3)"
-                      value={replyText}
-                      onChangeText={setReplyText}
-                      multiline
-                    />
-                    <TouchableOpacity style={styles.sendButtonSmall} onPress={() => handleReply(item.display_user_id)}>
-                      <Send size={18} color="#000" />
+                  <View>
+                    <TouchableOpacity 
+                      style={[styles.overtakeButton, { backgroundColor: '#10B981', marginBottom: 10 }]} 
+                      onPress={() => handleResolve(item.display_user_id)}
+                    >
+                      <CheckCircle size={18} color="#000" />
+                      <Text style={styles.overtakeButtonText}>RESOLVE CHAT</Text>
                     </TouchableOpacity>
+                    
+                    <View style={styles.replyContainer}>
+                      <TextInput
+                        style={styles.replyInput}
+                        placeholder="Type your response as an agent..."
+                        placeholderTextColor="rgba(255,255,255,0.3)"
+                        value={replyText}
+                        onChangeText={setReplyText}
+                        multiline
+                      />
+                      <TouchableOpacity style={styles.sendButtonSmall} onPress={() => handleReply(item.display_user_id)}>
+                        <Send size={18} color="#000" />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 ) : (
                   <TouchableOpacity style={styles.overtakeButton} onPress={() => handleOvertake(item.display_user_id)}>

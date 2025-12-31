@@ -341,14 +341,18 @@ export default function HelpContact() {
         setIsTyping(false);
         isSendingRef.current = false;
 
-        const { sendHelpMessageNotification } = require('@/utils/notifications');
-        await sendHelpMessageNotification({
-          senderId: 'assistant',
-          senderUsername: 'Towny',
-          receiverId: currentUser.id,
-          isFromAdmin: true,
-          messageContent: messageContent
-        });
+        try {
+          const { sendHelpMessageNotification } = require('@/utils/notifications');
+          await sendHelpMessageNotification({
+            senderId: 'assistant',
+            senderUsername: 'Towny',
+            receiverId: currentUser.id,
+            isFromAdmin: true,
+            messageContent: messageContent
+          });
+        } catch (notifError) {
+          console.warn("Notification failed:", notifError);
+        }
 
           // Background image generation if requested
           if (imagePrompt && aiMsg) {
