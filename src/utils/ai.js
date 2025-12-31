@@ -281,22 +281,28 @@ export async function getAIAssistantResponse(text, history = [], context = {}) {
       contextLine = `\n\nUser context: ${context.city_name}${context.zone_name ? `, ${context.zone_name}` : ''}`;
     }
     
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        temperature: 0.9,
-        messages: [
-          { role: 'system', content: TOWNY_PROMPT + contextLine },
-          ...cleanHistory,
-          { role: 'user', content: text }
-        ]
-      })
-    });
-    
-    const data = await response.json();
-    let aiText = data.choices?.[0]?.message?.content || "Connection error.";
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          temperature: 0.9,
+          messages: [
+            { role: 'system', content: TOWNY_PROMPT + contextLine },
+            ...cleanHistory,
+            { role: 'user', content: text }
+          ]
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.error) {
+        console.error('OpenAI API Error:', data.error);
+        return { text: `Towny is having a moment: ${data.error.message || 'Unknown error'}`, imagePrompt: null };
+      }
+
+      let aiText = data.choices?.[0]?.message?.content || "Connection error.";
 
     // Robust JSON auto-parsing if AI returns JSON unexpectedly
     try {

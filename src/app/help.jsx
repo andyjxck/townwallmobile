@@ -156,19 +156,23 @@ export default function HelpContact() {
           }
         }
       )
-      .on('postgres_changes',
-        {
-          event: 'UPDATE',
-          table: 'rhelp_messages'
-        },
-        payload => {
-          const newMsg = payload.new;
-          if (Number(newMsg.receiver_id) === Number(currentUser.id) && newMsg.status === 'resolved') {
-            setShowRating(true);
-            initChat();
+        .on('postgres_changes',
+          {
+            event: 'UPDATE',
+            table: 'rhelp_messages'
+          },
+          payload => {
+            const newMsg = payload.new;
+            if (Number(newMsg.sender_id) === Number(currentUser.id) || Number(newMsg.receiver_id) === Number(currentUser.id)) {
+              setMessages(prev => prev.map(m => m.id === newMsg.id ? newMsg : m));
+              
+              if (Number(newMsg.receiver_id) === Number(currentUser.id) && newMsg.status === 'resolved') {
+                setShowRating(true);
+                initChat();
+              }
+            }
           }
-        }
-      )
+        )
       .subscribe();
 
     subRef.current = subscription;
