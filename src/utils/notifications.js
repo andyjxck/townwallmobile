@@ -284,6 +284,7 @@ export async function sendPushNotification(expoPushToken, title, body, data = {}
           link: '/chat',
         },
         priority: 'high',
+        interruptionLevel: 'active',
         channelId: 'calls',
         categoryId: 'call',
         _displayInForeground: true,

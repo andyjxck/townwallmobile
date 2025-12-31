@@ -157,60 +157,34 @@ const { width, height } = Dimensions.get('window');
     const [isNear, setIsNear] = useState(false);
     const [callDuration, setCallDuration] = useState(0);
   const callTimerRef = useRef(null);
-  const soundObjects = useRef({});
-  
-    const pulseAnim = useRef(new Animated.Value(1)).current;
-    const fadeAnim = useRef(new Animated.Value(0)).current;
-    const slideAnim = useRef(new Animated.Value(height)).current;
-
-    useEffect(() => {
-      if (isOpen) {
-        Animated.parallel([
-          Animated.timing(fadeAnim, {
-            toValue: 1,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-          Animated.timing(slideAnim, {
-            toValue: 0,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-        ]).start();
-      } else {
-        Animated.parallel([
-          Animated.timing(fadeAnim, {
-            toValue: 0,
-            duration: 250,
-            useNativeDriver: true,
-          }),
-          Animated.timing(slideAnim, {
-            toValue: height,
-            duration: 250,
-            useNativeDriver: true,
-          }),
-        ]).start();
-      }
-    }, [isOpen]);
-
-    const flatListRef = useRef();
-    const inputRef = useRef(null);
-    const isSendingRef = useRef(false);
-    const chatSubRef = useRef(null);
-    const presenceSubRef = useRef(null);
-    const callSubRef = useRef(null);
-
+    const soundObjects = useRef({});
+    const loadingSounds = useRef({});
+    
     const playSound = async (type) => {
       try {
+        // If already loading this sound, don't start another one
+        if (loadingSounds.current[type]) return;
+
+        // If sound already exists, stop and unload it first
         if (soundObjects.current[type]) {
-          await soundObjects.current[type].unloadAsync();
+          try {
+            await soundObjects.current[type].stopAsync();
+            await soundObjects.current[type].unloadAsync();
+          } catch (e) {
+            console.warn(`Error cleaning up sound ${type} before replay:`, e);
+          }
+          delete soundObjects.current[type];
         }
+
+        loadingSounds.current[type] = true;
         const { sound } = await Audio.Sound.createAsync(
           SOUNDS[type],
           { shouldPlay: true, isLooping: type === 'ringing' }
         );
         soundObjects.current[type] = sound;
+        delete loadingSounds.current[type];
       } catch (error) {
+        delete loadingSounds.current[type];
         console.error('Error playing sound:', error);
       }
     };
@@ -218,14 +192,25 @@ const { width, height } = Dimensions.get('window');
     const stopSound = async (type) => {
       try {
         if (soundObjects.current[type]) {
-          await soundObjects.current[type].stopAsync();
-          await soundObjects.current[type].unloadAsync();
-          delete soundObjects.current[type];
+          const sound = soundObjects.current[type];
+          delete soundObjects.current[type]; // Delete reference first to prevent race conditions
+          await sound.stopAsync();
+          await sound.unloadAsync();
         }
       } catch (error) {
         console.error('Error stopping sound:', error);
       }
     };
+
+    // Stop all sounds on unmount
+    useEffect(() => {
+      return () => {
+        const types = Object.keys(soundObjects.current);
+        types.forEach(type => {
+          stopSound(type).catch(err => console.warn(`Error stopping sound ${type} on unmount:`, err));
+        });
+      };
+    }, []);
 
     const startCallTimer = () => {
       if (callTimerRef.current) clearInterval(callTimerRef.current);
@@ -327,16 +312,16 @@ const { width, height } = Dimensions.get('window');
       };
     }, [user, activeCall?.id]);
 
-    const endCallUI = () => {
-
-      setActiveCall(null);
-      setIsMuted(false);
-      setCallDuration(0);
-      if (callTimerRef.current) {
-        clearInterval(callTimerRef.current);
-        callTimerRef.current = null;
-      }
-    };
+      const endCallUI = () => {
+        stopSound('ringing');
+        setActiveCall(null);
+        setIsMuted(false);
+        setCallDuration(0);
+        if (callTimerRef.current) {
+          clearInterval(callTimerRef.current);
+          callTimerRef.current = null;
+        }
+      };
 
 
   const formatCallDuration = (seconds) => {

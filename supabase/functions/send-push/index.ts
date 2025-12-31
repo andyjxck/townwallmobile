@@ -90,6 +90,7 @@ serve(async (req) => {
         sound: sound,
         channelId: channelId,
         priority: 'high',
+        interruptionLevel: type === 'call' ? 'active' : 'active',
       }),
     })
 
