@@ -149,6 +149,7 @@ const { width, height } = Dimensions.get('window');
   const [userSearchResults, setUserSearchResults] = useState([]);
   const [groupMembers, setGroupMembers] = useState([]);
   const [pendingMedia, setPendingMedia] = useState(null);
+  const [activeAudioUrl, setActiveAudioUrl] = useState(null);
   
     const [activeCall, setActiveCall] = useState(null);
     const [isMuted, setIsMuted] = useState(false);
@@ -1070,11 +1071,24 @@ const { width, height } = Dimensions.get('window');
   const AudioPlayer = ({ url, isMyMessage }) => {
     const player = useAudioPlayer(url);
     const status = useAudioPlayerStatus(player);
+
+    useEffect(() => {
+      if (activeAudioUrl && activeAudioUrl !== url && status.playing) {
+        player.pause();
+      }
+    }, [activeAudioUrl, status.playing]);
+
+    useEffect(() => {
+      if (status.finished && activeAudioUrl === url) {
+        setActiveAudioUrl(null);
+      }
+    }, [status.finished]);
     
     const togglePlayback = () => {
       if (status.playing) {
         player.pause();
       } else {
+        setActiveAudioUrl(url);
         player.play();
       }
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
