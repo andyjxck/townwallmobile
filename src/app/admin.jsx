@@ -227,24 +227,28 @@ export default function ModerationAdmin() {
         { 
           text: "Restore", 
           onPress: async () => {
-            try {
-              const { error } = await supabase
-                .from('rposts')
-                .update({ is_deleted: false, deletion_reason: null, deleted_by: null })
-                .eq('id', log.target_id);
-              
-              if (error) throw error;
-              
-              const admin = await getStoredUser();
-              await supabase.from('rmoderation_logs').insert({
-                moderator_id: admin.id,
-                target_id: log.target_id,
-                target_type: 'post',
-                action: 'restore_post',
-                reason: 'Restored by super admin'
-              });
+    try {
+      const admin = await getStoredUser();
+      const { error } = await supabase
+        .from('rposts')
+        .update({ is_deleted: false, deletion_reason: null, deleted_by: null })
+        .eq('id', log.target_id);
+      
+      if (error) throw error;
+      
+      try {
+        await supabase.from('rmoderation_logs').insert({
+          moderator_id: admin.id,
+          target_id: log.target_id,
+          target_type: 'post',
+          action: 'restore_post',
+          reason: 'Restored by super admin'
+        });
+      } catch (logError) {
+        console.warn("Moderation log failed:", logError);
+      }
 
-              Alert.alert("Success", "Post has been restored.");
+      Alert.alert("Success", "Post has been restored.");
               fetchData();
             } catch (error) {
               console.error(error);
@@ -349,7 +353,49 @@ export default function ModerationAdmin() {
   }
 };
 
-const handleOverridePost = async () => {
+  const handleOverridePost = async () => {
+      if (!overrideReason.trim()) {
+        Alert.alert("Reason Required", "Please provide a reason for overriding.");
+        return;
+      }
+
+      try {
+        const user = await getStoredUser();
+        const { error } = await supabase
+          .from('rposts')
+          .update({ 
+            moderation_status: 'approved',
+            is_blurred: false,
+            is_deleted: false
+          })
+          .eq('id', overrideItem.id);
+        
+        if (error) throw error;
+
+        try {
+          await supabase.from('rmoderation_logs').insert({
+            moderator_id: user.id,
+            target_id: overrideItem.id,
+            target_type: 'post',
+            action: 'override_approve',
+            reason: `Override: ${overrideReason.trim()}`
+          });
+        } catch (logError) {
+          console.warn("Moderation log failed:", logError);
+        }
+
+        setData(prev => prev.filter(p => p.id !== overrideItem.id));
+        setOverrideItem(null);
+        setOverrideReason('');
+        setOverrideMode(null);
+        Alert.alert("Success", "Post has been approved and posted.");
+      } catch (error) {
+        console.error(error);
+        Alert.alert("Error", "Failed to approve post.");
+      }
+    };
+
+  const handleOverrideDelete = async () => {
     if (!overrideReason.trim()) {
       Alert.alert("Reason Required", "Please provide a reason for overriding.");
       return;
@@ -360,71 +406,36 @@ const handleOverridePost = async () => {
       const { error } = await supabase
         .from('rposts')
         .update({ 
-          moderation_status: 'approved',
-          is_blurred: false,
-          is_deleted: false
+          is_deleted: true, 
+          deletion_reason: overrideReason.trim(), 
+          moderation_status: 'rejected' 
         })
         .eq('id', overrideItem.id);
       
       if (error) throw error;
 
-      await supabase.from('rmoderation_logs').insert({
-        moderator_id: user.id,
-        target_id: overrideItem.id,
-        target_type: 'post',
-        action: 'override_approve',
-        reason: `Override: ${overrideReason.trim()}`
-      });
+      try {
+        await supabase.from('rmoderation_logs').insert({
+          moderator_id: user.id,
+          target_id: overrideItem.id,
+          target_type: 'post',
+          action: 'delete_post',
+          reason: `Override: ${overrideReason.trim()}`
+        });
+      } catch (logError) {
+        console.warn("Moderation log failed:", logError);
+      }
 
-      setData(prev => prev.filter(p => p.id !== overrideItem.id));
-      setOverrideItem(null);
-      setOverrideReason('');
-      setOverrideMode(null);
-      Alert.alert("Success", "Post has been approved and posted.");
-    } catch (error) {
+        setData(prev => prev.filter(p => p.id !== overrideItem.id));
+        setOverrideItem(null);
+        setOverrideReason('');
+        setOverrideMode(null);
+        Alert.alert("Success", "Post has been deleted.");
+      } catch (error) {
       console.error(error);
-      Alert.alert("Error", "Failed to approve post.");
+      Alert.alert("Error", "Failed to delete post.");
     }
   };
-
-const handleOverrideDelete = async () => {
-  if (!overrideReason.trim()) {
-    Alert.alert("Reason Required", "Please provide a reason for overriding.");
-    return;
-  }
-
-  try {
-    const user = await getStoredUser();
-    const { error } = await supabase
-      .from('rposts')
-      .update({ 
-        is_deleted: true, 
-        deletion_reason: overrideReason.trim(), 
-        deleted_by: user.id,
-        moderation_status: 'rejected' 
-      })
-      .eq('id', overrideItem.id);
-    
-    if (error) throw error;
-
-    await supabase.from('rmoderation_logs').insert({
-      moderator_id: user.id,
-      target_id: overrideItem.id,
-      target_type: 'post',
-      action: 'delete_post',
-      reason: `Override: ${overrideReason.trim()}`
-    });
-
-      setData(prev => prev.filter(p => p.id !== overrideItem.id));
-      setOverrideItem(null);
-      setOverrideReason('');
-      setOverrideMode(null);
-      Alert.alert("Success", "Post has been deleted.");
-    } catch (error) {
-    console.error(error);
-    Alert.alert("Error", "Failed to delete post.");
-  }
-};
 
   const handleCreatePollFromSuggestion = async () => {
     if (!pollQuestion.trim() || pollOptions.some(o => !o.trim())) {
