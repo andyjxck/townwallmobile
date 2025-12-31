@@ -18,7 +18,7 @@ import {
   ScrollView,
   Alert
 } from 'react-native';
-import { MessageCircle, X, Send, ChevronLeft, MoreHorizontal, User, Users, Check, CheckCheck, Settings, Plus, UserPlus, Mic, MicOff, Phone as PhoneIcon, PhoneOff as PhoneOffIcon, PhoneIncoming, PhoneOutgoing, Phone, Volume2, VolumeX, Image as ImageIcon, Video as VideoIcon, Film, Play, Maximize2, Camera } from 'lucide-react-native';
+import { MessageCircle, X, Send, ChevronLeft, MoreHorizontal, User, Users, Check, CheckCheck, Settings, Plus, UserPlus, Mic, MicOff, Phone as PhoneIcon, PhoneOff as PhoneOffIcon, PhoneIncoming, PhoneOutgoing, Phone, Volume2, VolumeX, Image as ImageIcon, Video as VideoIcon, Film, Play, Maximize2, Camera, Sparkles } from 'lucide-react-native';
 import { supabase } from '../utils/supabase';
 import { getStoredUser } from '../utils/user';
 import { theme } from '../utils/theme';
@@ -36,6 +36,7 @@ import { Accelerometer } from 'expo-sensors';
 import Constants from 'expo-constants';
 import { decode } from 'base64-arraybuffer';
 import * as FileSystem from 'expo-file-system';
+import { expandImage } from '../utils/ai';
 let LiveKitRoom, useLocalParticipant, useParticipants, AudioSession, useIOSAudioManagement, useRoom;
 
 const isExpoGo = Constants.appOwnership === "expo";
@@ -129,6 +130,7 @@ export default function FloatingChat() {
     const [showGroupIconPicker, setShowGroupIconPicker] = useState(false);
     const [selectedUsers, setSelectedUsers] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isExpanding, setIsExpanding] = useState(false);
   const [fullscreenMedia, setFullscreenMedia] = useState(null);
 
   const [searchUsers, setSearchUsers] = useState('');
@@ -734,6 +736,29 @@ export default function FloatingChat() {
     }
   };
 
+    const handleExpandImage = async () => {
+    if (!fullscreenMedia || fullscreenMedia.type !== 'image' || isExpanding) return;
+    
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setIsExpanding(true);
+    
+    try {
+      const expandedUrl = await expandImage(fullscreenMedia.url);
+      if (expandedUrl) {
+        await handleSendMessage("I expanded this for you!", expandedUrl, 'image');
+        setFullscreenMedia(null);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        Alert.alert('Error', 'Failed to expand image.');
+      }
+    } catch (error) {
+      console.error('Expansion error:', error);
+      Alert.alert('Error', 'An error occurred during expansion.');
+    } finally {
+      setIsExpanding(false);
+    }
+  };
+
   const handleSendMessage = async (textOverride = null, mediaUrl = null, mediaType = null) => {
     const text = textOverride !== null ? textOverride : inputText.trim();
     if (!text && !mediaUrl || !activeChat || isSendingRef.current) return;
@@ -1059,43 +1084,62 @@ export default function FloatingChat() {
 
   const hasUnread = totalUnreadCount > 0;
 
-    const FullscreenMediaModal = () => {
-      if (!fullscreenMedia) return null;
-      
-      const player = fullscreenMedia.type === 'video' ? useVideoPlayer(fullscreenMedia.url, (player) => {
-        player.loop = true;
-        player.play();
-      }) : null;
+      const FullscreenMediaModal = () => {
+        if (!fullscreenMedia) return null;
+        
+        const player = fullscreenMedia.type === 'video' ? useVideoPlayer(fullscreenMedia.url, (player) => {
+          player.loop = true;
+          player.play();
+        }) : null;
 
-      return (
-        <Modal visible={true} transparent animationType="fade">
-          <BlurView intensity={100} tint="dark" style={StyleSheet.absoluteFill}>
-            <TouchableOpacity 
-              style={styles.fullscreenClose} 
-              onPress={() => setFullscreenMedia(null)}
-            >
-              <X size={32} color="#FFF" />
-            </TouchableOpacity>
-            
-            <View style={styles.fullscreenContent}>
-              {fullscreenMedia.type === 'video' ? (
-                <VideoView 
-                  player={player} 
-                  style={styles.fullscreenVideo} 
-                  contentFit="contain"
-                />
-              ) : (
-                <Image 
-                  source={{ uri: fullscreenMedia.url }} 
-                  style={styles.fullscreenImage} 
-                  contentFit="contain"
-                />
-              )}
-            </View>
-          </BlurView>
-        </Modal>
-      );
-    };
+        return (
+          <Modal visible={true} transparent animationType="fade">
+            <BlurView intensity={100} tint="dark" style={StyleSheet.absoluteFill}>
+              <View style={styles.fullscreenHeader}>
+                <TouchableOpacity 
+                  style={styles.fullscreenIconBtn} 
+                  onPress={() => setFullscreenMedia(null)}
+                >
+                  <X size={28} color="#FFF" />
+                </TouchableOpacity>
+
+                {fullscreenMedia.type === 'image' && (
+                  <TouchableOpacity 
+                    style={[styles.aiExpandBtn, isExpanding && styles.aiExpandBtnDisabled]} 
+                    onPress={handleExpandImage}
+                    disabled={isExpanding}
+                  >
+                    {isExpanding ? (
+                      <ActivityIndicator size="small" color="#000" />
+                    ) : (
+                      <>
+                        <Sparkles size={18} color="#000" />
+                        <Text style={styles.aiExpandText}>AI Expand</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                )}
+              </View>
+              
+              <View style={styles.fullscreenContent}>
+                {fullscreenMedia.type === 'video' ? (
+                  <VideoView 
+                    player={player} 
+                    style={styles.fullscreenVideo} 
+                    contentFit="contain"
+                  />
+                ) : (
+                  <Image 
+                    source={{ uri: fullscreenMedia.url }} 
+                    style={styles.fullscreenImage} 
+                    contentFit="contain"
+                  />
+                )}
+              </View>
+            </BlurView>
+          </Modal>
+        );
+      };
 
     const MediaPreview = ({ url, type, isMyMessage }) => {
       const player = type === 'video' ? useVideoPlayer(url, (player) => {
@@ -2118,14 +2162,44 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  fullscreenClose: {
-    position: 'absolute',
-    top: 60,
-    right: 20,
-    zIndex: 10,
-    padding: 10,
-  },
-  fullscreenContent: {
+    fullscreenHeader: {
+      position: 'absolute',
+      top: Platform.OS === 'ios' ? 60 : 40,
+      left: 0,
+      right: 0,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      zIndex: 10,
+    },
+    fullscreenIconBtn: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    aiExpandBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.colors.primary,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 20,
+      gap: 6,
+    },
+    aiExpandBtnDisabled: {
+      opacity: 0.7,
+      backgroundColor: 'rgba(255,255,255,0.2)',
+    },
+    aiExpandText: {
+      color: '#000',
+      fontSize: 14,
+      fontWeight: 'bold',
+    },
+    fullscreenContent: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
