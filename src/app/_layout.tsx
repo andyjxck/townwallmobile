@@ -322,9 +322,14 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (isReady) {
-      const timer = setTimeout(() => {
-        SplashScreen.hideAsync().catch(() => {});
-      }, 100);
+      const hideSplash = async () => {
+        try {
+          await SplashScreen.hideAsync();
+        } catch (e) {
+          // Ignore "No native splash screen registered" error on iOS
+        }
+      };
+      const timer = setTimeout(hideSplash, 100);
       return () => clearTimeout(timer);
     }
   }, [isReady]);
