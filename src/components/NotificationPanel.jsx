@@ -6,9 +6,10 @@ import {
   TouchableOpacity, 
   FlatList, 
   Modal, 
-  ActivityIndicator 
+  ActivityIndicator,
+  Platform
 } from 'react-native';
-  import { X, Bell, CheckCircle, MessageSquare, Shield, Info, UserPlus, Check, X as XIcon } from 'lucide-react-native';
+  import { X, Bell, CheckCircle, MessageSquare, Shield, Info, UserPlus, Check, X as XIcon, Trash2 } from 'lucide-react-native';
   import { useSafeAreaInsets } from 'react-native-safe-area-context';
   import { fetchNotifications, markAsRead, markAllAsRead } from '@/utils/notifications';
   import { getStoredUser } from '@/utils/user';
@@ -16,6 +17,8 @@ import {
   import { useTheme } from "@/utils/ThemeContext";
   import { acceptFriendRequest, rejectFriendRequest } from '@/utils/friends';
   import * as Haptics from 'expo-haptics';
+  import { BlurView } from 'expo-blur';
+  import HippieBackground from '@/components/HippieBackground';
 
 
 export default function NotificationPanel({ visible, onClose }) {
@@ -121,233 +124,323 @@ export default function NotificationPanel({ visible, onClose }) {
     }
   };
 
-  const renderItem = ({ item }) => {
-    let Icon = Info;
-    let iconColor = "#60A5FA";
+    const renderItem = ({ item }) => {
+      let Icon = Info;
+      let iconColor = isHippie ? "#93C5FD" : "#60A5FA";
 
-    if (item.type === 'help_chat') {
-      Icon = MessageSquare;
-      iconColor = "#FBBF24";
-    } else if (item.type === 'moderation') {
-      Icon = Shield;
-      iconColor = item.title.includes('Approved') ? "#4ADE80" : "#EF4444";
-    } else if (item.type === 'friend_request') {
-      Icon = UserPlus;
-      iconColor = "#A78BFA";
-    }
+      if (item.type === 'help_chat') {
+        Icon = MessageSquare;
+        iconColor = isHippie ? "#FDE047" : "#FBBF24";
+      } else if (item.type === 'moderation') {
+        Icon = Shield;
+        iconColor = item.title.includes('Approved') ? (isHippie ? "#86EFAC" : "#4ADE80") : (isHippie ? "#FCA5A5" : "#EF4444");
+      } else if (item.type === 'friend_request') {
+        Icon = UserPlus;
+        iconColor = isHippie ? "#C4B5FD" : "#A78BFA";
+      }
 
-    const isFriendRequest = item.type === 'friend_request' && !item.is_read;
+      const isFriendRequest = item.type === 'friend_request' && !item.is_read;
 
-    return (
-      <View style={[styles.notificationItem, !item.is_read && styles.unreadItem, { flexDirection: 'column', alignItems: 'stretch' }]}>
-        <TouchableOpacity 
-          style={{ flexDirection: 'row', alignItems: 'center' }}
-          onPress={() => handleMarkAsRead(item.id)}
-        >
-          <View style={[styles.iconBox, { backgroundColor: `${iconColor}20` }]}>
-            <Icon size={18} color={iconColor} />
+      const ItemWrapper = isHippie ? (({ children }) => (
+        <BlurView intensity={20} tint="light" style={styles.hippieItemWrapper}>
+          {children}
+        </BlurView>
+      )) : View;
+
+      return (
+        <View style={[styles.notificationItem, !item.is_read && styles.unreadItem, isHippie && styles.hippieItem, { flexDirection: 'column', alignItems: 'stretch' }]}>
+          <TouchableOpacity 
+            style={{ flexDirection: 'row', alignItems: 'center' }}
+            onPress={() => handleMarkAsRead(item.id)}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.iconBox, { backgroundColor: isHippie ? 'rgba(255,255,255,0.1)' : `${iconColor}20` }]}>
+              <Icon size={18} color={iconColor} />
+            </View>
+            <View style={styles.contentBox}>
+              <Text style={[styles.title, isHippie && styles.hippieTitle]}>{item.title}</Text>
+              <Text style={[styles.message, isHippie && styles.hippieMessage]} numberOfLines={2}>{item.message}</Text>
+              <Text style={[styles.time, isHippie && styles.hippieTime]}>{new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+            </View>
+            {!item.is_read && <View style={[styles.unreadDot, isHippie && { backgroundColor: '#FDE047' }]} />}
+          </TouchableOpacity>
+          
+          {isFriendRequest && (
+            <View style={styles.actionButtons}>
+              <TouchableOpacity 
+                style={[styles.actionBtn, styles.acceptBtn, isHippie && { backgroundColor: '#FDE047' }]} 
+                onPress={() => onAcceptFriend(item)}
+              >
+                <Check size={16} color={isHippie ? "#000" : "#000"} />
+                <Text style={[styles.actionBtnText, isHippie && { color: '#000' }]}>Accept</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.actionBtn, styles.declineBtn, isHippie && { borderColor: 'rgba(255,255,255,0.3)', backgroundColor: 'rgba(255,255,255,0.1)' }]} 
+                onPress={() => onRejectFriend(item)}
+              >
+                <XIcon size={16} color={isHippie ? "#FFF" : "#FFF"} />
+                <Text style={[styles.actionBtnText, { color: '#FFF' }]}>Decline</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      );
+    };
+
+    const MainContent = () => (
+      <View style={[styles.container, { paddingTop: insets.top + 20 }]}>
+        <View style={styles.header}>
+          <View style={styles.headerTitleRow}>
+            <View style={[styles.bellIconContainer, isHippie && styles.hippieBellContainer]}>
+              <Bell size={24} color={isHippie ? "#FDE047" : "#FBBF24"} />
+            </View>
+            <View>
+              <Text style={[styles.headerTitle, isHippie && styles.hippieHeaderTitle]}>NOTIFICATIONS</Text>
+              <TouchableOpacity onPress={handleMarkAllAsRead} activeOpacity={0.6}>
+                <Text style={[styles.markAllText, isHippie && styles.hippieMarkAllText]}>Mark all as read</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-          <View style={styles.contentBox}>
-            <Text style={styles.title}>{item.title}</Text>
-            <Text style={styles.message}>{item.message}</Text>
-            <Text style={styles.time}>{new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+          <TouchableOpacity onPress={onClose} style={styles.closeButton} activeOpacity={0.6}>
+            <BlurView intensity={isHippie ? 40 : 0} tint="dark" style={styles.closeIconWrapper}>
+              <X size={24} color="#FFFFFF" />
+            </BlurView>
+          </TouchableOpacity>
+        </View>
+
+        {loading ? (
+          <View style={styles.centered}>
+            <ActivityIndicator color={isHippie ? "#FDE047" : "#FFFFFF"} />
           </View>
-          {!item.is_read && <View style={styles.unreadDot} />}
-        </TouchableOpacity>
-        
-        {isFriendRequest && (
-          <View style={styles.actionButtons}>
-            <TouchableOpacity 
-              style={[styles.actionBtn, styles.acceptBtn]} 
-              onPress={() => onAcceptFriend(item)}
-            >
-              <Check size={16} color="#000" />
-              <Text style={styles.actionBtnText}>Accept</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.actionBtn, styles.declineBtn]} 
-              onPress={() => onRejectFriend(item)}
-            >
-              <XIcon size={16} color="#FFF" />
-              <Text style={[styles.actionBtnText, { color: '#FFF' }]}>Decline</Text>
-            </TouchableOpacity>
-          </View>
+        ) : (
+          <FlatList
+            data={notifications}
+            keyExtractor={(item) => item.id}
+            renderItem={renderItem}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <View style={[styles.emptyIconContainer, isHippie && { backgroundColor: 'rgba(255,255,255,0.05)' }]}>
+                  <Bell size={48} color={isHippie ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.05)"} />
+                </View>
+                <Text style={[styles.emptyText, isHippie && styles.hippieEmptyText]}>All caught up!</Text>
+                <Text style={styles.emptySubtext}>We'll let you know when something happens.</Text>
+              </View>
+            }
+          />
         )}
       </View>
     );
-  };
 
-  return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={onClose}
-    >
-    <View style={[styles.overlay, isHippie && { backgroundColor: '#0F172A' }]}>
-      <View style={[styles.container, { paddingTop: insets.top + 20 }]}>
-
-            <View style={styles.header}>
-              <View style={styles.headerTitleRow}>
-                <Bell size={24} color="#FBBF24" />
-                <View>
-                  <Text style={styles.headerTitle}>NOTIFICATIONS</Text>
-                  <TouchableOpacity onPress={handleMarkAllAsRead}>
-                    <Text style={{ color: '#FBBF24', fontSize: 12, fontWeight: 'bold', marginTop: 2 }}>Mark all as read</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                <X size={28} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
-
-          {loading ? (
-            <View style={styles.centered}>
-              <ActivityIndicator color="#FFFFFF" />
-            </View>
+    return (
+      <Modal
+        visible={visible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={onClose}
+      >
+        <View style={[styles.overlay, isHippie && { backgroundColor: 'transparent' }]}>
+          {isHippie ? (
+            <HippieBackground>
+              <MainContent />
+            </HippieBackground>
           ) : (
-            <FlatList
-              data={notifications}
-              keyExtractor={(item) => item.id}
-              renderItem={renderItem}
-              contentContainerStyle={styles.listContent}
-              ListEmptyComponent={
-                <View style={styles.emptyContainer}>
-                  <Bell size={48} color="rgba(255,255,255,0.05)" />
-                  <Text style={styles.emptyText}>All caught up!</Text>
-                </View>
-              }
-            />
+            <MainContent />
           )}
         </View>
-      </View>
-    </Modal>
-  );
-}
+      </Modal>
+    );
+  }
 
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: '#000000',
-  },
-  container: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 30,
-  },
-  headerTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  headerTitle: {
-    color: '#FFFFFF',
-    fontSize: 22,
-    fontWeight: '900',
-    letterSpacing: 2,
-  },
-  closeButton: {
-    padding: 5,
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  listContent: {
-    paddingBottom: 40,
-    gap: 12,
-  },
-  notificationItem: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-    alignItems: 'center',
-  },
-  unreadItem: {
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderColor: 'rgba(251, 191, 36, 0.2)',
-  },
-  iconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
-  },
-  contentBox: {
-    flex: 1,
-  },
-  title: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '700',
-    marginBottom: 2,
-  },
-  message: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 13,
-    lineHeight: 18,
-    marginBottom: 4,
-  },
-  time: {
-    color: 'rgba(255,255,255,0.3)',
-    fontSize: 11,
-    fontWeight: '600',
-  },
+  const styles = StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: '#000000',
+    },
+    container: {
+      flex: 1,
+      paddingHorizontal: 20,
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 30,
+    },
+    headerTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 15,
+    },
+    bellIconContainer: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: 'rgba(251, 191, 36, 0.1)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    hippieBellContainer: {
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    },
+    headerTitle: {
+      color: '#FFFFFF',
+      fontSize: 22,
+      fontWeight: '900',
+      letterSpacing: 1,
+    },
+    hippieHeaderTitle: {
+      letterSpacing: 3,
+      fontWeight: '800',
+    },
+    markAllText: {
+      color: '#FBBF24',
+      fontSize: 12,
+      fontWeight: 'bold',
+      marginTop: 2,
+    },
+    hippieMarkAllText: {
+      color: '#FDE047',
+      opacity: 0.8,
+    },
+    closeButton: {
+      borderRadius: 20,
+      overflow: 'hidden',
+    },
+    closeIconWrapper: {
+      width: 40,
+      height: 40,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: 'rgba(255,255,255,0.1)',
+    },
+    centered: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    listContent: {
+      paddingBottom: 40,
+      gap: 16,
+    },
+    notificationItem: {
+      backgroundColor: 'rgba(255,255,255,0.03)',
+      borderRadius: 20,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.05)',
+    },
+    hippieItem: {
+      backgroundColor: 'rgba(255,255,255,0.06)',
+      borderWidth: 0,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.1,
+      shadowRadius: 10,
+    },
+    unreadItem: {
+      backgroundColor: 'rgba(255,255,255,0.07)',
+      borderColor: 'rgba(251, 191, 36, 0.2)',
+    },
+    iconBox: {
+      width: 44,
+      height: 44,
+      borderRadius: 14,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 14,
+    },
+    contentBox: {
+      flex: 1,
+    },
+    title: {
+      color: '#FFFFFF',
+      fontSize: 16,
+      fontWeight: '700',
+      marginBottom: 3,
+    },
+    hippieTitle: {
+      fontWeight: '800',
+    },
+    message: {
+      color: 'rgba(255,255,255,0.6)',
+      fontSize: 14,
+      lineHeight: 19,
+      marginBottom: 6,
+    },
+    hippieMessage: {
+      color: 'rgba(255,255,255,0.8)',
+    },
+    time: {
+      color: 'rgba(255,255,255,0.3)',
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    hippieTime: {
+      color: 'rgba(255,255,255,0.5)',
+    },
     unreadDot: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
+      width: 10,
+      height: 10,
+      borderRadius: 5,
       backgroundColor: '#FBBF24',
       marginLeft: 10,
     },
     actionButtons: {
       flexDirection: 'row',
-      marginTop: 12,
+      marginTop: 15,
       gap: 10,
-      paddingLeft: 54, // iconBox width + margin
+      paddingLeft: 58,
     },
     actionBtn: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      borderRadius: 10,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderRadius: 12,
     },
     acceptBtn: {
       backgroundColor: '#4ADE80',
     },
     declineBtn: {
-      backgroundColor: 'rgba(239, 68, 68, 0.2)',
+      backgroundColor: 'transparent',
       borderWidth: 1,
-      borderColor: '#EF4444',
+      borderColor: 'rgba(255,255,255,0.1)',
     },
     actionBtnText: {
-      fontSize: 12,
+      fontSize: 13,
       fontWeight: 'bold',
       color: '#000',
     },
     emptyContainer: {
+      paddingVertical: 120,
+      alignItems: 'center',
+      gap: 20,
+    },
+    emptyIconContainer: {
+      width: 100,
+      height: 100,
+      borderRadius: 50,
+      backgroundColor: 'rgba(255,255,255,0.02)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 10,
+    },
+    emptyText: {
+      color: '#FFFFFF',
+      fontSize: 20,
+      fontWeight: '800',
+    },
+    hippieEmptyText: {
+      letterSpacing: 2,
+    },
+    emptySubtext: {
+      color: 'rgba(255,255,255,0.3)',
+      fontSize: 14,
+      textAlign: 'center',
+      paddingHorizontal: 40,
+    },
+  });
 
-    paddingVertical: 100,
-    alignItems: 'center',
-    gap: 15,
-  },
-  emptyText: {
-    color: 'rgba(255,255,255,0.2)',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-});
