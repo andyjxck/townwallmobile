@@ -67,7 +67,7 @@ const { width, height } = Dimensions.get('window');
   export default function FloatingChat() {
     const { isHippie } = useTheme();
     const router = useRouter();
-    const { auth: user } = useAuthStore();
+    const { auth: user, setAuth } = useAuthStore();
     const { isOpen, activeChatId, open: setOpen, close: setClose, toggle: toggleChatGlobal, setActiveChatId, pendingCallUserId, pendingCallAction } = useChatStore();
 
     const [activeChat, setActiveChat] = useState(null);
@@ -375,7 +375,7 @@ const { width, height } = Dimensions.get('window');
 
   const loadUserAndChats = async () => {
     const storedUser = await getStoredUser();
-    setUser(storedUser);
+    setAuth(storedUser);
     if (!storedUser) return;
 
     const { data: regularChats } = await supabase
