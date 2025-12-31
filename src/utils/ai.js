@@ -1,4 +1,6 @@
 
+import { supabase } from './supabase';
+
 export async function moderateContent(text) {
   const apiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
   if (!apiKey || !text?.trim()) return { status: 'approved', reason: '' };
@@ -83,7 +85,7 @@ export async function generateImage(prompt) {
   // Prefer Cloudflare if keys are present
   if (cfToken && cfAccountId) {
     try {
-      const response = await fetch(
+      let response = await fetch(
         `https://api.cloudflare.com/client/v4/accounts/${cfAccountId}/ai/run/@cf/black-forest-labs/flux-1-schnell`,
         {
           method: 'POST',
@@ -95,18 +97,47 @@ export async function generateImage(prompt) {
         }
       );
 
+      // If Flux fails, try Stable Diffusion as fallback
+      if (!response.ok) {
+        console.warn('Flux failed, trying Stable Diffusion...');
+        response = await fetch(
+          `https://api.cloudflare.com/client/v4/accounts/${cfAccountId}/ai/run/@cf/stabilityai/stable-diffusion-xl-base-1.0`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${cfToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ prompt }),
+          }
+        );
+      }
+
       if (response.ok) {
-        const blob = await response.blob();
-        // In a real app, we might want to upload this to a storage provider (like Supabase or Uploadcare)
-        // to get a permanent URL. For now, we'll try to convert to base64 or similar, 
-        // but typically the UI expects a URL.
-        // Since we are in a mobile app, we can use a FileReader to get base64.
-        return new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
+        const buffer = await response.arrayBuffer();
+        const fileName = `towny-${Date.now()}.png`;
+        const { data, error } = await supabase.storage
+          .from('chat_media')
+          .upload(fileName, buffer, {
+            contentType: 'image/png',
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (error) {
+          console.error('Supabase upload error:', error);
+          // Fallback to base64 if upload fails but we have the buffer
+          const base64 = btoa(
+            new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+          );
+          return `data:image/png;base64,${base64}`;
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('chat_media')
+          .getPublicUrl(fileName);
+
+        return publicUrl;
       }
       console.error('Cloudflare AI error:', response.status);
     } catch (err) {
