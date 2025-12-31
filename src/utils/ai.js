@@ -83,75 +83,16 @@ function stripRefusal(text) {
   return cleaned;
 }
 
-export async function generateImage(prompt) {
-  const falKey = process.env.EXPO_PUBLIC_FAL_KEY;
-  const cfToken = process.env.EXPO_PUBLIC_CLOUDFLARE_API_TOKEN;
-  const cfAccountId = process.env.EXPO_PUBLIC_CLOUDFLARE_ACCOUNT_ID;
-
-  // PRIORITY 1: Fal.ai (More permissive, allows safety_checker: false)
-  if (falKey) {
-    try {
-      const response = await fetch('https://queue.fal.run/fal-ai/flux/schnell', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Key ${falKey}`
-        },
-        body: JSON.stringify({
-          prompt: prompt,
-          image_size: 'square_hd',
-          num_images: 1,
-          enable_safety_checker: false // Disable safety checker for Towny
-        })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.request_id) {
-          let attempts = 0;
-          while (attempts < 15) {
-            const pollResponse = await fetch(`https://queue.fal.run/fal-ai/flux/schnell/requests/${data.request_id}`, {
-              headers: { 'Authorization': `Key ${falKey}` }
-            });
-
-            if (pollResponse.ok) {
-              const pollData = await pollResponse.json();
-              if (pollData.status === 'COMPLETED' && pollData.images?.[0]?.url) {
-                return pollData.images[0].url;
-              }
-              if (pollData.status === 'ERROR') break;
-            }
-            await new Promise(r => setTimeout(r, 1000));
-            attempts++;
-          }
-        } else if (data.images?.[0]?.url) {
-          return data.images[0].url;
-        }
-      }
-    } catch (err) {
-      console.error('Fal-ai image generation error:', err);
-    }
-  }
-
-  // PRIORITY 2: Cloudflare (Flux)
-  if (cfToken && cfAccountId) {
-    try {
-      let response = await fetch(
-        `https://api.cloudflare.com/client/v4/accounts/${cfAccountId}/ai/run/@cf/black-forest-labs/flux-1-schnell`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${cfToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ prompt }),
-        }
-      );
-
-      // Fallback to SD if Flux fails
-      if (!response.ok) {
-        response = await fetch(
-          `https://api.cloudflare.com/client/v4/accounts/${cfAccountId}/ai/run/@cf/stabilityai/stable-diffusion-xl-base-1.0`,
+  export async function generateImage(prompt) {
+    const falKey = process.env.EXPO_PUBLIC_FAL_KEY;
+    const cfToken = process.env.EXPO_PUBLIC_CLOUDFLARE_API_TOKEN;
+    const cfAccountId = process.env.EXPO_PUBLIC_CLOUDFLARE_ACCOUNT_ID;
+  
+    // PRIORITY 1: Cloudflare AI (Often less restrictive or uses own quota)
+    if (cfToken && cfAccountId) {
+      try {
+        let response = await fetch(
+          `https://api.cloudflare.com/client/v4/accounts/${cfAccountId}/ai/run/@cf/black-forest-labs/flux-1-schnell`,
           {
             method: 'POST',
             headers: {
@@ -161,35 +102,95 @@ export async function generateImage(prompt) {
             body: JSON.stringify({ prompt }),
           }
         );
-      }
-
-      if (response.ok) {
-        const buffer = await response.arrayBuffer();
-        const fileName = `towny-${Date.now()}.png`;
-        const { data, error } = await supabase.storage
-          .from('chat_media')
-          .upload(fileName, buffer, {
-            contentType: 'image/png',
-            cacheControl: '3600',
-            upsert: false
-          });
-
-        if (error) {
-          console.error('Supabase upload error:', error);
-          const base64 = btoa(new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), ''));
-          return `data:image/png;base64,${base64}`;
+  
+        // Fallback to SD if Flux fails
+        if (!response.ok) {
+          response = await fetch(
+            `https://api.cloudflare.com/client/v4/accounts/${cfAccountId}/ai/run/@cf/stabilityai/stable-diffusion-xl-base-1.0`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${cfToken}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ prompt }),
+            }
+          );
         }
-
-        const { data: { publicUrl } } = supabase.storage.from('chat_media').getPublicUrl(fileName);
-        return publicUrl;
+  
+        if (response.ok) {
+          const buffer = await response.arrayBuffer();
+          const fileName = `towny-${Date.now()}.png`;
+          const { data, error } = await supabase.storage
+            .from('chat_media')
+            .upload(fileName, buffer, {
+              contentType: 'image/png',
+              cacheControl: '3600',
+              upsert: false
+            });
+  
+          if (error) {
+            console.error('Supabase upload error:', error);
+            const base64 = btoa(new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), ''));
+            return `data:image/png;base64,${base64}`;
+          }
+  
+          const { data: { publicUrl } } = supabase.storage.from('chat_media').getPublicUrl(fileName);
+          return publicUrl;
+        }
+      } catch (err) {
+        console.error('Cloudflare AI error:', err);
       }
-    } catch (err) {
-      console.error('Cloudflare AI error:', err);
     }
+  
+    // PRIORITY 2: Fal.ai (Fallback)
+    if (falKey) {
+      try {
+        const response = await fetch('https://queue.fal.run/fal-ai/flux/schnell', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Key ${falKey}`
+          },
+          body: JSON.stringify({
+            prompt: prompt,
+            image_size: 'square_hd',
+            num_images: 1,
+            enable_safety_checker: false // Disable safety checker for Towny
+          })
+        });
+  
+        if (response.ok) {
+          const data = await response.json();
+          if (data.request_id) {
+            let attempts = 0;
+            while (attempts < 15) {
+              const pollResponse = await fetch(`https://queue.fal.run/fal-ai/flux/schnell/requests/${data.request_id}`, {
+                headers: { 'Authorization': `Key ${falKey}` }
+              });
+  
+              if (pollResponse.ok) {
+                const pollData = await pollResponse.json();
+                if (pollData.status === 'COMPLETED' && pollData.images?.[0]?.url) {
+                  return pollData.images[0].url;
+                }
+                if (pollData.status === 'ERROR') break;
+              }
+              await new Promise(r => setTimeout(r, 1000));
+              attempts++;
+            }
+          } else if (data.images?.[0]?.url) {
+            return data.images[0].url;
+          }
+        }
+      } catch (err) {
+        console.error('Fal-ai image generation error:', err);
+      }
+    }
+  
+    return null;
   }
 
-  return null;
-}
 
 export async function expandImage(imageUrl) {
   const apiKey = process.env.EXPO_PUBLIC_FAL_KEY;
