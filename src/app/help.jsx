@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Modal, Share } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, Send, Sparkles, X, Maximize2 } from 'lucide-react-native';
+import { ChevronLeft, Send, Sparkles, X, Maximize2, Image as ImageIcon } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { BlurView } from 'expo-blur';
 import { supabase } from '@/utils/supabase';
 import { getStoredUser } from '@/utils/user';
-import { getAIAssistantResponse, expandImage } from '@/utils/ai';
+import { getAIAssistantResponse, generateImage, expandImage } from '@/utils/ai';
 import { sendNotification } from '@/utils/notifications';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
+import Markdown from 'react-native-markdown-display';
 
 import { useTheme } from "@/utils/ThemeContext";
 import { LinearGradient } from "expo-linear-gradient";
@@ -241,25 +242,25 @@ export default function HelpContact() {
     }
   };
 
-          const handleSend = async () => {
-            if (!inputText.trim() || !currentUser || isSendingRef.current) return;
-            
-            if (messages.some(m => m.status === 'resolved')) {
-              await purgeMessages();
-            }
+    const handleSend = async () => {
+      if (!inputText.trim() || !currentUser || isSendingRef.current) return;
       
-            const text = inputText.trim();
-            isSendingRef.current = true;
-            setInputText('');
-            if (inputRef.current) {
-              inputRef.current.clear();
-              if (Platform.OS !== 'web') {
-                inputRef.current.setNativeProps({ text: '' });
-              }
-            }
-            
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  
+      if (messages.some(m => m.status === 'resolved')) {
+        await purgeMessages();
+      }
+
+      const text = inputText.trim();
+      isSendingRef.current = true;
+      setInputText('');
+      if (inputRef.current) {
+        inputRef.current.clear();
+        if (Platform.OS !== 'web') {
+          inputRef.current.setNativeProps({ text: '' });
+        }
+      }
+      
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
       const tempId = Date.now();
       const tempMsg = {
         id: tempId,
@@ -270,97 +271,104 @@ export default function HelpContact() {
         status: 'open'
       };
       setMessages(prev => [...prev, tempMsg]);
-  
-        try {
-          setIsTyping(true);
-          const { data: realMsg, error } = await supabase
-            .from('rhelp_messages')
-            .insert({
-              sender_id: currentUser.id,
-              content: text,
-              is_from_admin: false
-            })
-            .select()
-            .single();
-    
-          if (error) throw error;
-    
-          if (realMsg) {
-            setMessages(prev => prev.map(m => m.id === tempId ? realMsg : m));
-          }
-    
-          const isOvertaken = messages.some(m => m.status === 'overtaken');
-          if (isOvertaken) {
-            console.log("Chat overtaken by agent. AI suppressed.");
-            setIsTyping(false);
-            return;
-          }
-    
-            const history = messages.slice(-10).map(m => {
-              let cleanContent = m.content;
-              try {
-                if (m.content.trim().startsWith('{') && m.content.trim().endsWith('}')) {
-                  const parsed = JSON.parse(m.content);
-                  if (parsed.text) cleanContent = parsed.text;
-                }
-              } catch (e) {}
-              
-              return {
-                role: m.is_from_admin ? 'assistant' : 'user',
-                content: cleanContent
-              };
-            });
-    
-          const aiResponse = await getAIAssistantResponse(text, history, {
-            city_name,
-            zone_name,
-            feedView,
-            username: currentUser?.username
-          });
-  
-          let messageContent = typeof aiResponse === 'string' ? aiResponse : aiResponse.text;
-          
-          // Double check JSON in the UI side just in case
+
+      try {
+        setIsTyping(true);
+        const { data: realMsg, error } = await supabase
+          .from('rhelp_messages')
+          .insert({
+            sender_id: currentUser.id,
+            content: text,
+            is_from_admin: false
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        if (realMsg) {
+          setMessages(prev => prev.map(m => m.id === tempId ? realMsg : m));
+        }
+
+        const isOvertaken = messages.some(m => m.status === 'overtaken');
+        if (isOvertaken) {
+          setIsTyping(false);
+          return;
+        }
+
+        const history = messages.slice(-10).map(m => {
+          let cleanContent = m.content;
           try {
-            if (messageContent.trim().startsWith('{') && messageContent.trim().endsWith('}')) {
-              const parsed = JSON.parse(messageContent);
-              if (parsed.text) messageContent = parsed.text;
+            if (m.content.trim().startsWith('{') && m.content.trim().endsWith('}')) {
+              const parsed = JSON.parse(m.content);
+              if (parsed.text) cleanContent = parsed.text;
             }
           } catch (e) {}
-
-          const imageUrl = typeof aiResponse === 'object' ? aiResponse.imageUrl : null;
           
-          if (imageUrl) {
-            messageContent = messageContent + `\n[TOWNY_IMAGE:${imageUrl}]`;
-          }
+          return {
+            role: m.is_from_admin ? 'assistant' : 'user',
+            content: cleanContent
+          };
+        });
 
-          await supabase
-            .from('rhelp_messages')
-            .insert({
-              receiver_id: currentUser.id,
-              content: messageContent,
-              is_from_admin: true
-            });
-                
-                const { sendHelpMessageNotification } = require('@/utils/notifications');
-                await sendHelpMessageNotification({
-                  senderId: 'assistant',
-                  senderUsername: 'Towny',
-                  receiverId: currentUser.id,
-                  isFromAdmin: true,
-                  messageContent: typeof aiResponse === 'string' ? aiResponse : aiResponse.text
-                });
-      
-            } catch (error) {
-              console.error("Error in handleSend:", error);
-              setInputText(text);
-              setMessages(prev => prev.filter(m => m.id !== tempId));
-              Alert.alert("Error", "Message could not be sent.");
-            } finally {
-              isSendingRef.current = false;
-              setIsTyping(false);
+        const aiResponse = await getAIAssistantResponse(text, history, {
+          city_name,
+          zone_name,
+          feedView,
+          username: currentUser?.username
+        });
+
+        let messageContent = aiResponse.text;
+        const imagePrompt = aiResponse.imagePrompt;
+
+        // Insert text response immediately
+        const { data: aiMsg, error: aiError } = await supabase
+          .from('rhelp_messages')
+          .insert({
+            receiver_id: currentUser.id,
+            content: messageContent,
+            is_from_admin: true
+          })
+          .select()
+          .single();
+
+        if (aiError) throw aiError;
+
+        setIsTyping(false);
+        isSendingRef.current = false;
+
+        const { sendHelpMessageNotification } = require('@/utils/notifications');
+        await sendHelpMessageNotification({
+          senderId: 'assistant',
+          senderUsername: 'Towny',
+          receiverId: currentUser.id,
+          isFromAdmin: true,
+          messageContent: messageContent
+        });
+
+        // Background image generation if requested
+        if (imagePrompt && aiMsg) {
+          generateImage(imagePrompt).then(async (imageUrl) => {
+            if (imageUrl) {
+              const updatedContent = `${messageContent}\n[TOWNY_IMAGE:${imageUrl}]`;
+              await supabase
+                .from('rhelp_messages')
+                .update({ content: updatedContent })
+                .eq('id', aiMsg.id);
             }
-        };
+          }).catch(err => console.error("BG Image gen error:", err));
+        }
+
+      } catch (error) {
+        console.error("Error in handleSend:", error);
+        setInputText(text);
+        setMessages(prev => prev.filter(m => m.id !== tempId));
+        Alert.alert("Error", "Message could not be sent.");
+        isSendingRef.current = false;
+        setIsTyping(false);
+      }
+    };
+
 
     const handleExpandImage = async () => {
       if (!selectedImage || isExpanding) return;
@@ -403,59 +411,80 @@ export default function HelpContact() {
       }
     };
 
-      const renderMessageContent = (content, isMine) => {
-        let displayContent = content;
-        let displayImageUrl = null;
-  
-        // Try parsing as JSON first (safety for corrupted history)
-        try {
-          if (content.trim().startsWith('{') && content.trim().endsWith('}')) {
-            const parsed = JSON.parse(content);
-            if (parsed.text) displayContent = parsed.text;
-            if (parsed.imageUrl) displayImageUrl = parsed.imageUrl;
+        const renderMessageContent = (content, isMine) => {
+          let displayContent = content;
+          let displayImageUrl = null;
+    
+          // Try parsing as JSON first (safety for corrupted history)
+          try {
+            if (content.trim().startsWith('{') && content.trim().endsWith('}')) {
+              const parsed = JSON.parse(content);
+              if (parsed.text) displayContent = parsed.text;
+              if (parsed.imageUrl) displayImageUrl = parsed.imageUrl;
+            }
+          } catch (e) {
+            // Not JSON, continue
           }
-        } catch (e) {
-          // Not JSON, continue
-        }
-  
-        const imageMatch = displayContent.match(/\[TOWNY_IMAGE:(.+?)\]/);
-        
-        if (imageMatch || displayImageUrl) {
-          const imageUrl = displayImageUrl || imageMatch[1];
+    
+          const imageMatch = displayContent.match(/\[TOWNY_IMAGE:(.+?)\]/);
           const textContent = imageMatch 
             ? displayContent.replace(/\[TOWNY_IMAGE:.+?\]/, '').trim()
             : displayContent;
+
+          const markdownStyles = {
+            body: {
+              color: isMine ? '#000000' : '#FFFFFF',
+              fontSize: 16,
+              lineHeight: 24,
+              fontWeight: '500',
+            },
+            strong: {
+              fontWeight: 'bold',
+            },
+            em: {
+              fontStyle: 'italic',
+            },
+            paragraph: {
+              marginTop: 0,
+              marginBottom: 0,
+            }
+          };
+          
+          if (imageMatch || displayImageUrl) {
+            const imageUrl = displayImageUrl || imageMatch[1];
+            
+            return (
+              <View>
+                {textContent ? (
+                  <Markdown style={markdownStyles}>
+                    {textContent}
+                  </Markdown>
+                ) : null}
+                <TouchableOpacity 
+                  activeOpacity={0.9} 
+                  onPress={() => {
+                    setSelectedImage(imageUrl);
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  }}
+                  style={{ marginTop: textContent ? 12 : 0 }}
+                >
+                  <Image
+                    source={{ uri: imageUrl }}
+                    style={styles.generatedImage}
+                    contentFit="cover"
+                  />
+                </TouchableOpacity>
+              </View>
+            );
+          }
           
           return (
-            <View>
-              {textContent ? (
-                <Text style={[styles.messageText, { color: isMine ? '#000000' : '#FFFFFF' }]}>
-                  {textContent}
-                </Text>
-              ) : null}
-              <TouchableOpacity 
-                activeOpacity={0.9} 
-                onPress={() => {
-                  setSelectedImage(imageUrl);
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                }}
-              >
-                <Image
-                  source={{ uri: imageUrl }}
-                  style={styles.generatedImage}
-                  contentFit="cover"
-                />
-              </TouchableOpacity>
-            </View>
+            <Markdown style={markdownStyles}>
+              {displayContent}
+            </Markdown>
           );
-        }
-        
-        return (
-          <Text style={[styles.messageText, { color: isMine ? '#000000' : '#FFFFFF' }]}>
-            {displayContent}
-          </Text>
-        );
-      };
+        };
+
 
 
 

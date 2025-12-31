@@ -309,23 +309,19 @@ export async function getAIAssistantResponse(text, history = [], context = {}) {
     aiText = stripRefusal(aiText);
     
     const imageMatch = aiText.match(/\[IMAGE:\s*(.+?)\]/i);
-    let imageUrl = null;
+    let imagePrompt = null;
     
     if (imageMatch || shouldGenerateImage(text)) {
-      const imagePrompt = imageMatch ? imageMatch[1] : text;
-      imageUrl = await generateImage(imagePrompt);
+      imagePrompt = imageMatch ? imageMatch[1] : text;
       
       if (imageMatch) {
         aiText = aiText.replace(/\[IMAGE:\s*.+?\]/i, '').trim();
       }
-      if (!aiText && imageUrl) {
-        aiText = "Here's what I created for you!";
-      }
     }
     
-    return { text: aiText, imageUrl };
+    return { text: aiText, imagePrompt };
   } catch (err) {
     console.error('getAIAssistantResponse error:', err);
-    return { text: "Error connecting to Towny.", imageUrl: null };
+    return { text: "Error connecting to Towny.", imagePrompt: null };
   }
 }

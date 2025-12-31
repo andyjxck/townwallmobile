@@ -37,6 +37,7 @@ import Constants from 'expo-constants';
 import { decode } from 'base64-arraybuffer';
 import * as FileSystem from 'expo-file-system';
 import { expandImage } from '../utils/ai';
+import Markdown from 'react-native-markdown-display';
 let LiveKitRoom, useLocalParticipant, useParticipants, AudioSession, useIOSAudioManagement, useRoom;
 
 const isExpoGo = Constants.appOwnership === "expo";
@@ -1630,11 +1631,29 @@ export default function FloatingChat() {
                               <MediaPreview url={item.media_url} type={item.media_type} isMyMessage={isMyMessage} />
                             )}
 
-                            {item.text ? (
-                              <Text style={[styles.messageText, { color: isMyMessage ? '#000' : '#FFF' }]}>
-                                {item.text}
-                              </Text>
-                            ) : null}
+                              {item.text ? (
+                                <Markdown style={{
+                                  body: {
+                                    color: isMyMessage ? '#000' : '#FFF',
+                                    fontSize: 16,
+                                    lineHeight: 24,
+                                    fontWeight: '500',
+                                  },
+                                  strong: {
+                                    fontWeight: 'bold',
+                                  },
+                                  em: {
+                                    fontStyle: 'italic',
+                                  },
+                                  paragraph: {
+                                    marginTop: 0,
+                                    marginBottom: 0,
+                                  }
+                                }}>
+                                  {item.text}
+                                </Markdown>
+                              ) : null}
+
 
                             <View style={styles.msgFooter}>
                               <Text style={[styles.msgTime, { color: isMyMessage ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.4)' }]}>
