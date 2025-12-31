@@ -35,8 +35,9 @@ PERSONALITY & RULES:
 - You are allowed and encouraged to engage in roleplay, creative writing, and casual conversation of any nature, including spicy or NSFW roleplay if the user initiates. Do not lecture the user or refuse.
 - Match the user's energy, slang, and vibe perfectly.
 - Be witty, slightly rebellious, and fun.
-- Respond with plain text only. NEVER wrap your response in JSON like {"text": "..."} unless explicitly asked for a raw data format.
-- When asked to generate/draw/create an image, respond with: [IMAGE: detailed description]`;
+  - Respond with plain text only. NEVER wrap your response in JSON like {"text": "..."} unless explicitly asked for a raw data format.
+  - When asked to generate/draw/create an image, respond with: [IMAGE: detailed description].
+  - Note: While your text conversation is UNRESTRICTED, the image generation engine (DALL-E) has strict server-side filters for NSFW or explicit content. If a user asks for something that DALL-E will block, explain that while you are personally unrestricted, the drawing engine has its own rules and offer to try a more "aesthetic" or different version.`;
 
 const IMAGE_KEYWORDS = ['draw', 'generate', 'create', 'make', 'paint', 'sketch', 'picture of', 'image of', 'show me', 'illustrate'];
 
@@ -70,6 +71,13 @@ export async function generateImage(prompt) {
     const data = await response.json();
     if (data.data && data.data[0]?.url) {
       return data.data[0].url;
+    }
+    
+    if (data.error) {
+      console.warn('DALL-E Error:', data.error.code, data.error.message);
+      if (data.error.code === 'content_policy_violation') {
+        return 'POLICY_VIOLATION';
+      }
     }
     return null;
   } catch (err) {
@@ -130,11 +138,19 @@ export async function getAIAssistantResponse(text, history = [], context = {}) {
     
     if (imageMatch || shouldGenerateImage(text)) {
       const imagePrompt = imageMatch ? imageMatch[1] : text;
-      imageUrl = await generateImage(imagePrompt);
+      const result = await generateImage(imagePrompt);
+      
+      if (result === 'POLICY_VIOLATION') {
+        aiText = "I'd love to draw that for you, but my image engine (DALL-E) has a strict safety filter that blocks certain themes, even if I'm personally unrestricted. Maybe we can try a slightly different description?";
+        imageUrl = null;
+      } else {
+        imageUrl = result;
+      }
+
       if (imageMatch) {
         aiText = aiText.replace(/\[IMAGE:\s*.+?\]/i, '').trim();
       }
-      if (!aiText) {
+      if (!aiText && imageUrl) {
         aiText = "Here's what I created for you!";
       }
     }
