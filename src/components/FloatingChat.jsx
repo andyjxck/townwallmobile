@@ -329,6 +329,20 @@ export default function FloatingChat() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
+  useEffect(() => {
+    loadUserAndChats();
+    
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+        loadUserAndChats();
+      }
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
   const loadUserAndChats = async () => {
     const storedUser = await getStoredUser();
     setUser(storedUser);
@@ -1047,18 +1061,19 @@ export default function FloatingChat() {
   return (
     <View style={styles.container} pointerEvents="box-none">
         <FullscreenMediaModal />
-        {!isOpen && isVisible && hasUnread && (
-
-        <View style={styles.fixedBubbleContainer}>
-          <View style={styles.bubbleContainer}>
-            <TouchableOpacity onPress={toggleChat} activeOpacity={0.8}>
-              <View style={[styles.bubble, styles.bubbleUnread]}>
-                <MessageCircle color="#FFF" size={28} />
-                <View style={styles.bubbleBadge}>
-                  <Text style={styles.bubbleBadgeText}>{totalUnreadCount > 99 ? '99+' : totalUnreadCount}</Text>
+        {!isOpen && isVisible && (
+          <View style={styles.fixedBubbleContainer}>
+            <View style={styles.bubbleContainer}>
+              <TouchableOpacity onPress={toggleChat} activeOpacity={0.8}>
+                <View style={[styles.bubble, hasUnread && styles.bubbleUnread]}>
+                  <MessageCircle color={hasUnread ? "#FFF" : "#000"} size={28} />
+                  {hasUnread && (
+                    <View style={styles.bubbleBadge}>
+                      <Text style={styles.bubbleBadgeText}>{totalUnreadCount > 99 ? '99+' : totalUnreadCount}</Text>
+                    </View>
+                  )}
                 </View>
-              </View>
-            </TouchableOpacity>
+              </TouchableOpacity>
             
             <TouchableOpacity 
               onPress={() => {
