@@ -77,9 +77,46 @@ function stripRefusal(text) {
 }
 
 export async function generateImage(prompt) {
+  const cfToken = process.env.EXPO_PUBLIC_CLOUDFLARE_API_TOKEN;
+  const cfAccountId = process.env.EXPO_PUBLIC_CLOUDFLARE_ACCOUNT_ID;
+
+  // Prefer Cloudflare if keys are present
+  if (cfToken && cfAccountId) {
+    try {
+      const response = await fetch(
+        `https://api.cloudflare.com/client/v4/accounts/${cfAccountId}/ai/run/@cf/black-forest-labs/flux-1-schnell`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${cfToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ prompt }),
+        }
+      );
+
+      if (response.ok) {
+        const blob = await response.blob();
+        // In a real app, we might want to upload this to a storage provider (like Supabase or Uploadcare)
+        // to get a permanent URL. For now, we'll try to convert to base64 or similar, 
+        // but typically the UI expects a URL.
+        // Since we are in a mobile app, we can use a FileReader to get base64.
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      }
+      console.error('Cloudflare AI error:', response.status);
+    } catch (err) {
+      console.error('Cloudflare AI generation error:', err);
+    }
+  }
 
   const apiKey = process.env.EXPO_PUBLIC_FAL_KEY;
   if (!apiKey) return null;
+
 
 try {
 const response = await fetch('https://queue.fal.run/fal-ai/flux/schnell', {
