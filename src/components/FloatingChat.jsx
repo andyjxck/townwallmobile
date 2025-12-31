@@ -154,6 +154,7 @@ export default function FloatingChat() {
   const [searchUsers, setSearchUsers] = useState('');
   const [userSearchResults, setUserSearchResults] = useState([]);
   const [groupMembers, setGroupMembers] = useState([]);
+  const [pendingMedia, setPendingMedia] = useState(null);
   
     const [activeCall, setActiveCall] = useState(null);
     const [callToken, setCallToken] = useState(null);
@@ -819,16 +820,10 @@ export default function FloatingChat() {
       });
 
       if (!result.canceled) {
-        setIsUploading(true);
-        const mediaUrl = await uploadMedia(result.assets[0].uri, type);
-        if (mediaUrl) {
-          await handleSendMessage(null, mediaUrl, type);
-        }
-        setIsUploading(false);
+        setPendingMedia({ uri: result.assets[0].uri, type });
       }
     } catch (error) {
       console.error('Error picking media:', error);
-      setIsUploading(false);
     }
   };
 
@@ -857,10 +852,23 @@ export default function FloatingChat() {
 
   const handleSendMessage = async (textOverride = null, mediaUrl = null, mediaType = null) => {
     const text = textOverride !== null ? textOverride : inputText.trim();
-    if (!text && !mediaUrl || !activeChat || isSendingRef.current) return;
+    
+    let finalMediaUrl = mediaUrl;
+    let finalMediaType = mediaType;
+
+    // If we have pending media and no explicit media was passed
+    if (!finalMediaUrl && pendingMedia) {
+      setIsUploading(true);
+      finalMediaUrl = await uploadMedia(pendingMedia.uri, pendingMedia.type);
+      finalMediaType = pendingMedia.type;
+      setPendingMedia(null);
+      setIsUploading(false);
+    }
+
+    if (!text && !finalMediaUrl || !activeChat || isSendingRef.current) return;
     
     // Clear immediately to prevent double-send and show responsiveness
-    if (!mediaUrl) {
+    if (!mediaUrl && !pendingMedia) {
       isSendingRef.current = true;
       setInputText('');
       if (inputRef.current) {
@@ -870,6 +878,10 @@ export default function FloatingChat() {
           inputRef.current.setNativeProps({ text: '' });
         }
       }
+    } else if (pendingMedia) {
+      // Clear input if sending with media
+      setInputText('');
+      if (inputRef.current) inputRef.current.clear();
     }
     
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -881,19 +893,19 @@ export default function FloatingChat() {
           chat_id: activeChat.id,
           sender_id: user.id,
           text: text || '',
-          media_url: mediaUrl,
-          media_type: mediaType
+          media_url: finalMediaUrl,
+          media_type: finalMediaType
         }).select().single();
 
       if (error) throw error;
 
       if (data) {
         await supabase.from('rchats').update({
-          last_message: mediaUrl ? `Sent a ${mediaType}` : text,
+          last_message: finalMediaUrl ? `Sent a ${finalMediaType}` : text,
           last_message_at: new Date().toISOString()
         }).eq('id', activeChat.id);
 
-        const notificationText = mediaUrl ? `Sent a ${mediaType}` : text;
+        const notificationText = finalMediaUrl ? `Sent a ${finalMediaType}` : text;
 
         if (activeChat.is_group) {
           const otherMembers = groupMembers.filter(m => m.user_id !== user.id);
@@ -1194,23 +1206,6 @@ export default function FloatingChat() {
                   >
                     <X size={28} color="#FFF" />
                   </TouchableOpacity>
-
-                  {fullscreenMedia.type === 'image' && (
-                    <TouchableOpacity 
-                      style={[styles.aiExpandBtn, isExpanding && styles.aiExpandBtnDisabled]} 
-                      onPress={handleExpandImage}
-                      disabled={isExpanding}
-                    >
-                      {isExpanding ? (
-                        <ActivityIndicator size="small" color="#000" />
-                      ) : (
-                        <>
-                          <Sparkles size={18} color="#000" />
-                          <Text style={styles.aiExpandText}>AI Expand</Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
-                  )}
                 </View>
                 
                 <View style={styles.fullscreenContent}>
@@ -1866,9 +1861,23 @@ export default function FloatingChat() {
                   )}
                   </>
                 )}
-                    {(!activeChat || activeChat.status === 'accepted' || activeChat.initiated_by === user?.id || activeChat.is_group) && (
-                      <View style={styles.inputContainer}>
-                        {isUploading && (
+                      {(!activeChat || activeChat.status === 'accepted' || activeChat.initiated_by === user?.id || activeChat.is_group) && (
+                        <View style={styles.inputContainer}>
+                          {pendingMedia && (
+                            <View style={styles.pendingMediaContainer}>
+                              <Image source={{ uri: pendingMedia.uri }} style={styles.pendingMediaPreview} contentFit="cover" />
+                              <TouchableOpacity 
+                                style={styles.removePendingMedia} 
+                                onPress={() => setPendingMedia(null)}
+                              >
+                                <X size={14} color="#FFF" />
+                              </TouchableOpacity>
+                              <View style={styles.pendingMediaType}>
+                                {pendingMedia.type === 'video' ? <VideoIcon size={12} color="#FFF" /> : <ImageIcon size={12} color="#FFF" />}
+                              </View>
+                            </View>
+                          )}
+                          {isUploading && (
                           <View style={styles.uploadingIndicator}>
                             <ActivityIndicator size="small" color={theme.colors.primary} />
                             <Text style={styles.uploadingText}>Uploading...</Text>
@@ -2352,10 +2361,48 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  mediaMessage: {
-    padding: 6,
-    borderRadius: 22,
-  },
+    mediaMessage: {
+      padding: 0,
+      borderRadius: 22,
+      backgroundColor: 'transparent',
+      overflow: 'hidden',
+    },
+    pendingMediaContainer: {
+      position: 'relative',
+      width: 80,
+      height: 80,
+      borderRadius: 12,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.2)',
+      overflow: 'hidden',
+    },
+    pendingMediaPreview: {
+      width: '100%',
+      height: '100%',
+    },
+    removePendingMedia: {
+      position: 'absolute',
+      top: 4,
+      right: 4,
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    pendingMediaType: {
+      position: 'absolute',
+      bottom: 4,
+      right: 4,
+      width: 18,
+      height: 18,
+      borderRadius: 9,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
   mediaPreviewContainer: {
     width: width * 0.6,
     height: width * 0.6,
