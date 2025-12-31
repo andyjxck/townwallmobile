@@ -1,4 +1,3 @@
-import * as fal from "@fal-ai/serverless-client";
 
 export async function moderateContent(text) {
   const apiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
@@ -51,28 +50,28 @@ function shouldGenerateImage(text) {
      lower.includes('show me'));
 }
 
+
 export async function generateImage(prompt) {
-  const apiKey = process.env.EXPO_PUBLIC_FAL_KEY;
-  if (!apiKey) return null;
-
+  const apiKey = process.env.EXPO_PUBLIC_POLLINATIONS_API_KEY;
   try {
-    fal.config({
-      credentials: apiKey,
+    const baseUrl = "https://image.pollinations.ai/prompt/";
+    const params = new URLSearchParams({
+      nologo: "true",
+      private: "true",
+      enhance: "false",
+      seed: Math.floor(Math.random() * 1000000).toString(),
+      width: "1024",
+      height: "1024",
+      model: "flux"
     });
-
-    const result = await fal.subscribe("fal-ai/flux-pro/v1.1", {
-      input: {
-        prompt: prompt,
-      },
-      logs: false,
-    });
-
-    if (result.images && result.images[0]?.url) {
-      return result.images[0].url;
+    
+    if (apiKey) {
+      params.append("token", apiKey);
     }
-    return null;
+
+    return `${baseUrl}${encodeURIComponent(prompt)}?${params.toString()}`;
   } catch (err) {
-    console.error('Fal.ai image generation error:', err);
+    console.error('Pollinations.ai image generation error:', err);
     return null;
   }
 }
