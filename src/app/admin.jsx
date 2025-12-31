@@ -49,8 +49,10 @@ export default function ModerationAdmin() {
     const [pollQuestion, setPollQuestion] = useState('');
     const [pollOptions, setPollOptions] = useState(['Yes', 'No', 'Maybe later']);
     const [overrideMode, setOverrideMode] = useState(null);
+    const [repairing, setRepairing] = useState(false);
 
-  const TABS = [
+    const TABS = [
+
       { id: 'talent', label: 'TALENT', icon: Star },
       { id: 'help', label: 'HELP CHATS', icon: MessageSquare },
       { id: 'votes', label: 'VOTES', icon: CheckCircle },
@@ -61,9 +63,11 @@ export default function ModerationAdmin() {
     ];
 
   if (isSuperAdmin) {
-    TABS.push({ id: 'logs', label: 'ADMIN LOGS', icon: Shield });
-    TABS.push({ id: 'analytics', label: 'ANALYTICS', icon: BarChart2 });
-  }
+      TABS.push({ id: 'logs', label: 'ADMIN LOGS', icon: Shield });
+      TABS.push({ id: 'analytics', label: 'ANALYTICS', icon: BarChart2 });
+      TABS.push({ id: 'repair', label: 'REPAIR DB', icon: RefreshCw });
+    }
+
 
   useEffect(() => {
     checkAdminStatus();
@@ -103,6 +107,27 @@ export default function ModerationAdmin() {
     } catch (error) {
       console.error(error);
       setLoading(false);
+    }
+  };
+
+  const handleRepairDatabase = async (auto = false) => {
+    if (repairing) return;
+    setRepairing(true);
+    try {
+      const { error } = await supabase.rpc('repair_database_schema');
+      if (error) throw error;
+      
+      if (!auto) {
+        Alert.alert("Success", "Database schema has been repaired. All necessary tables have been verified.");
+        fetchData();
+      }
+      return true;
+    } catch (error) {
+      console.error("Repair failed:", error);
+      if (!auto) Alert.alert("Error", "Failed to repair database. Please try again.");
+      return false;
+    } finally {
+      setRepairing(false);
     }
   };
 
@@ -192,29 +217,38 @@ export default function ModerationAdmin() {
           .order('created_at', { ascending: false });
         if (error) throw error;
         result = logsData;
-      } else if (activeTab === 'analytics' && isSuperAdmin) {
-        const [users, posts, reactions, comments] = await Promise.all([
-          supabase.from('rusers').select('id', { count: 'exact', head: true }),
-          supabase.from('rposts').select('id', { count: 'exact', head: true }),
-          supabase.from('rreactions').select('id', { count: 'exact', head: true }),
-          supabase.from('rcomments').select('id', { count: 'exact', head: true })
-        ]);
-        setAnalytics({
-          users: users.count,
-          posts: posts.count,
-          reactions: reactions.count,
-          comments: comments.count
-        });
-        result = [];
+        } else if (activeTab === 'analytics' && isSuperAdmin) {
+          const [users, posts, reactions, comments] = await Promise.all([
+            supabase.from('rusers').select('id', { count: 'exact', head: true }),
+            supabase.from('rposts').select('id', { count: 'exact', head: true }),
+            supabase.from('rreactions').select('id', { count: 'exact', head: true }),
+            supabase.from('rcomments').select('id', { count: 'exact', head: true })
+          ]);
+          setAnalytics({
+            users: users.count,
+            posts: posts.count,
+            reactions: reactions.count,
+            comments: comments.count
+          });
+          result = [];
+        } else if (activeTab === 'repair') {
+          result = [];
+        }
+        setData(result || []);
+      } catch (error) {
+        console.error(error);
+        if (error.code === '42P01') {
+          // Table missing
+          const repaired = await handleRepairDatabase(true);
+          if (repaired) fetchData();
+        } else {
+          Alert.alert("Error", "Failed to fetch data.");
+        }
+      } finally {
+        setLoading(false);
       }
-      setData(result || []);
-    } catch (error) {
-      console.error(error);
-      Alert.alert("Error", "Failed to fetch data.");
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+
 
   const handleRestorePost = async (log) => {
     if (log.target_type !== 'post') return;
@@ -391,7 +425,12 @@ export default function ModerationAdmin() {
         Alert.alert("Success", "Post has been approved and posted.");
       } catch (error) {
         console.error(error);
-        Alert.alert("Error", "Failed to approve post.");
+        if (error.code === '42P01') {
+          const repaired = await handleRepairDatabase(true);
+          if (repaired) handleOverridePost();
+        } else {
+          Alert.alert("Error", "Failed to approve post.");
+        }
       }
     };
 
@@ -430,12 +469,18 @@ export default function ModerationAdmin() {
         setOverrideItem(null);
         setOverrideReason('');
         setOverrideMode(null);
-        Alert.alert("Success", "Post has been deleted.");
-      } catch (error) {
-      console.error(error);
-      Alert.alert("Error", "Failed to delete post.");
-    }
-  };
+          Alert.alert("Success", "Post has been deleted.");
+        } catch (error) {
+        console.error(error);
+        if (error.code === '42P01') {
+          const repaired = await handleRepairDatabase(true);
+          if (repaired) handleOverrideDelete();
+        } else {
+          Alert.alert("Error", "Failed to delete post.");
+        }
+      }
+    };
+
 
   const handleCreatePollFromSuggestion = async () => {
     if (!pollQuestion.trim() || pollOptions.some(o => !o.trim())) {
@@ -757,6 +802,30 @@ export default function ModerationAdmin() {
               <View style={styles.statCard}><Text style={styles.statValue}>{analytics.comments}</Text><Text style={styles.statLabel}>COMMENTS</Text></View>
             </View>
           </ScrollView>
+        ) : activeTab === 'repair' ? (
+          <View style={styles.repairContainer}>
+            <View style={styles.repairIconContainer}>
+              <RefreshCw size={64} color="#4ADE80" />
+            </View>
+            <Text style={styles.repairTitle}>DATABASE REPAIR</Text>
+            <Text style={styles.repairDesc}>
+              This will verify and recreate any missing database tables (rposts, rusers, rmoderation_logs, etc.) while preserving existing data.
+            </Text>
+            <TouchableOpacity 
+              style={[styles.repairButton, repairing && { opacity: 0.5 }]} 
+              onPress={() => handleRepairDatabase()}
+              disabled={repairing}
+            >
+              {repairing ? (
+                <ActivityIndicator color="#000" />
+              ) : (
+                <>
+                  <RefreshCw size={20} color="#000" />
+                  <Text style={styles.repairButtonText}>RUN REPAIR SCRIPT</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
         ) : loading ? (
           <View style={styles.centered}><ActivityIndicator color="#FFFFFF" /></View>
         ) : (
@@ -946,5 +1015,12 @@ const styles = StyleSheet.create({
     cancelButton: { backgroundColor: 'rgba(255,255,255,0.05)' },
     confirmButton: { backgroundColor: '#EF4444' },
     cancelButtonText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900', letterSpacing: 1 },
-    confirmButtonText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900', letterSpacing: 1 }
-  });
+      confirmButtonText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900', letterSpacing: 1 },
+      repairContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
+      repairIconContainer: { width: 120, height: 120, borderRadius: 60, backgroundColor: 'rgba(74, 222, 128, 0.1)', alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
+      repairTitle: { color: '#FFFFFF', fontSize: 24, fontWeight: '900', letterSpacing: 2, marginBottom: 16 },
+      repairDesc: { color: 'rgba(255,255,255,0.5)', fontSize: 14, textAlign: 'center', lineHeight: 22, marginBottom: 32 },
+      repairButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#4ADE80', paddingHorizontal: 32, paddingVertical: 18, borderRadius: 40, gap: 12 },
+      repairButtonText: { color: '#000', fontSize: 14, fontWeight: '900', letterSpacing: 1 }
+    });
+
