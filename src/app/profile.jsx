@@ -409,7 +409,7 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
     const target = targetUser || (friendUsername ? { username: friendUsername } : null);
     if (!target) return;
 
-    if (!currentUser?.supabase_uid) {
+    if (!currentUser?.password && !currentUser?.supabase_uid) {
       Alert.alert("Join the Wall", "Please sign up to add friends!");
       return;
     }
@@ -861,7 +861,7 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
                         <View style={styles.actionRow}>
                           <TouchableOpacity 
                             onPress={() => {
-                              if (!currentUser?.password) {
+                              if (!currentUser?.password && !currentUser?.supabase_uid) {
                                 Alert.alert("Join the Wall", "Please sign up to message other users!");
                                 return;
                               }
@@ -882,7 +882,7 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
 
                             <TouchableOpacity 
                               onPress={() => {
-                                if (!currentUser?.password) {
+                                if (!currentUser?.password && !currentUser?.supabase_uid) {
                                   Alert.alert("Join the Wall", "Please sign up to add friends!");
                                   return;
                                 }
