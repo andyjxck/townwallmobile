@@ -18,7 +18,8 @@ import {
   ScrollView,
   Alert
 } from 'react-native';
-import { MessageCircle, X, Send, ChevronLeft, MoreHorizontal, User, Users, Check, CheckCheck, Settings, Plus, UserPlus, Mic, MicOff, Phone as PhoneIcon, PhoneOff as PhoneOffIcon, PhoneIncoming, PhoneOutgoing, Phone, Volume2, VolumeX, Image as ImageIcon, Video as VideoIcon, Film, Play, Maximize2, Camera, Sparkles } from 'lucide-react-native';
+import { MessageCircle, X, Send, ChevronLeft, MoreHorizontal, User, Users, Check, CheckCheck, Settings, Plus, UserPlus, Mic, MicOff, Phone as PhoneIcon, PhoneOff as PhoneOffIcon, PhoneIncoming, PhoneOutgoing, Phone, Volume2, VolumeX, Image as ImageIcon, Video as VideoIcon, Film, Play, Maximize2, Camera, Sparkles, Trash2, Square, Pause } from 'lucide-react-native';
+import Slider from '@react-native-community/slider';
 import { supabase } from '../utils/supabase';
 import { getStoredUser } from '../utils/user';
 import { theme } from '../utils/theme';
@@ -145,6 +146,10 @@ export default function FloatingChat() {
   const [isUploading, setIsUploading] = useState(false);
   const [isExpanding, setIsExpanding] = useState(false);
   const [fullscreenMedia, setFullscreenMedia] = useState(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const [recording, setRecording] = useState(null);
+  const recordingTimerRef = useRef(null);
 
   const [searchUsers, setSearchUsers] = useState('');
   const [userSearchResults, setUserSearchResults] = useState([]);
@@ -702,19 +707,93 @@ export default function FloatingChat() {
     setTimeout(() => flatListRef.current?.scrollToEnd(), 100);
   };
 
-  const uploadMedia = async (uri, type) => {
+  const startRecording = async () => {
     try {
-      const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
-      const extension = type === 'video' ? 'mp4' : 'jpg';
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${extension}`;
-      const filePath = `${user.id}/${fileName}`;
+      const permission = await Audio.requestPermissionsAsync();
+      if (permission.status !== 'granted') {
+        Alert.alert('Permission denied', 'Please allow microphone access to record voice messages.');
+        return;
+      }
 
-      const { data, error } = await supabase.storage
-        .from('chat_media')
-        .upload(filePath, decode(base64), {
-          contentType: type === 'video' ? 'video/mp4' : 'image/jpeg',
-          cacheControl: '3600'
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      const { recording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
+      setRecording(recording);
+      setIsRecording(true);
+      setRecordingDuration(0);
+      
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingDuration(prev => {
+          if (prev >= 150) { // 2.5 minutes
+            stopRecording();
+            return prev;
+          }
+          return prev + 1;
         });
+      }, 1000);
+      
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch (err) {
+      console.error('Failed to start recording', err);
+    }
+  };
+
+  const stopRecording = async () => {
+    setIsRecording(false);
+    clearInterval(recordingTimerRef.current);
+    
+    if (!recording) return;
+
+    try {
+      await recording.stopAndUnloadAsync();
+      const uri = recording.getURI();
+      setRecording(null);
+      
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      
+      setIsUploading(true);
+      const audioUrl = await uploadMedia(uri, 'audio');
+      if (audioUrl) {
+        await handleSendMessage(null, audioUrl, 'audio');
+      }
+      setIsUploading(false);
+    } catch (err) {
+      console.error('Failed to stop recording', err);
+      setIsUploading(false);
+    }
+  };
+
+  const cancelRecording = async () => {
+    setIsRecording(false);
+    clearInterval(recordingTimerRef.current);
+    if (!recording) return;
+    try {
+      await recording.stopAndUnloadAsync();
+      setRecording(null);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch (err) {
+      console.log('Failed to cancel recording', err);
+    }
+  };
+
+    const uploadMedia = async (uri, type) => {
+      try {
+        const base64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
+        const extension = type === 'video' ? 'mp4' : (type === 'audio' ? 'm4a' : 'jpg');
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${extension}`;
+        const filePath = `${user.id}/${fileName}`;
+
+        const { data, error } = await supabase.storage
+          .from('chat_media')
+          .upload(filePath, decode(base64), {
+            contentType: type === 'video' ? 'video/mp4' : (type === 'audio' ? 'audio/m4a' : 'image/jpeg'),
+            cacheControl: '3600'
+          });
 
       if (error) throw error;
 
@@ -1100,69 +1179,59 @@ export default function FloatingChat() {
 
   const hasUnread = totalUnreadCount > 0;
 
-      const FullscreenMediaModal = () => {
-        if (!fullscreenMedia) return null;
-        
-        const player = fullscreenMedia.type === 'video' ? useVideoPlayer(fullscreenMedia.url, (player) => {
-          player.loop = true;
-          player.play();
-        }) : null;
-
-        return (
-          <Modal visible={true} transparent animationType="fade">
-            <BlurView intensity={100} tint="dark" style={StyleSheet.absoluteFill}>
-              <View style={styles.fullscreenHeader}>
-                <TouchableOpacity 
-                  style={styles.fullscreenIconBtn} 
-                  onPress={() => setFullscreenMedia(null)}
-                >
-                  <X size={28} color="#FFF" />
-                </TouchableOpacity>
-
-                {fullscreenMedia.type === 'image' && (
+        const FullscreenMediaModal = () => {
+          if (!fullscreenMedia) return null;
+          
+          return (
+            <Modal visible={true} transparent animationType="fade">
+              <BlurView intensity={100} tint="dark" style={StyleSheet.absoluteFill}>
+                <View style={styles.fullscreenHeader}>
                   <TouchableOpacity 
-                    style={[styles.aiExpandBtn, isExpanding && styles.aiExpandBtnDisabled]} 
-                    onPress={handleExpandImage}
-                    disabled={isExpanding}
+                    style={styles.fullscreenIconBtn} 
+                    onPress={() => setFullscreenMedia(null)}
                   >
-                    {isExpanding ? (
-                      <ActivityIndicator size="small" color="#000" />
-                    ) : (
-                      <>
-                        <Sparkles size={18} color="#000" />
-                        <Text style={styles.aiExpandText}>AI Expand</Text>
-                      </>
-                    )}
+                    <X size={28} color="#FFF" />
                   </TouchableOpacity>
-                )}
-              </View>
-              
-              <View style={styles.fullscreenContent}>
-                {fullscreenMedia.type === 'video' ? (
-                  <VideoView 
-                    player={player} 
-                    style={styles.fullscreenVideo} 
-                    contentFit="contain"
-                  />
-                ) : (
-                  <Image 
-                    source={{ uri: fullscreenMedia.url }} 
-                    style={styles.fullscreenImage} 
-                    contentFit="contain"
-                  />
-                )}
-              </View>
-            </BlurView>
-          </Modal>
-        );
-      };
+
+                  {fullscreenMedia.type === 'image' && (
+                    <TouchableOpacity 
+                      style={[styles.aiExpandBtn, isExpanding && styles.aiExpandBtnDisabled]} 
+                      onPress={handleExpandImage}
+                      disabled={isExpanding}
+                    >
+                      {isExpanding ? (
+                        <ActivityIndicator size="small" color="#000" />
+                      ) : (
+                        <>
+                          <Sparkles size={18} color="#000" />
+                          <Text style={styles.aiExpandText}>AI Expand</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  )}
+                </View>
+                
+                <View style={styles.fullscreenContent}>
+                  {fullscreenMedia.type === 'video' ? (
+                    <FullscreenVideoPlayer url={fullscreenMedia.url} />
+                  ) : (
+                    <Image 
+                      source={{ uri: fullscreenMedia.url }} 
+                      style={styles.fullscreenImage} 
+                      contentFit="contain"
+                    />
+                  )}
+                </View>
+              </BlurView>
+            </Modal>
+          );
+        };
+        FullscreenMediaModal.displayName = 'FullscreenMediaModal';
 
     const MediaPreview = ({ url, type, isMyMessage }) => {
-      const player = type === 'video' ? useVideoPlayer(url, (player) => {
-        player.muted = true;
-        player.loop = true;
-        player.play();
-      }) : null;
+      if (type === 'audio') {
+        return <AudioPlayer url={url} isMyMessage={isMyMessage} />;
+      }
 
       return (
         <TouchableOpacity 
@@ -1171,24 +1240,160 @@ export default function FloatingChat() {
           activeOpacity={0.9}
         >
           {type === 'video' ? (
-            <View style={styles.videoPreviewWrapper}>
-              <VideoView 
-                player={player} 
-                style={styles.mediaPreview} 
-                contentFit="cover"
-                allowsFullscreen={false}
-                allowsPictureInPicture={false}
-              />
-              <View style={styles.videoOverlay}>
-                <Play size={24} color="#FFF" fill="#FFF" />
-              </View>
-            </View>
+            <VideoPreview url={url} isMyMessage={isMyMessage} />
           ) : (
             <Image source={{ uri: url }} style={styles.mediaPreview} contentFit="cover" />
           )}
         </TouchableOpacity>
       );
     };
+
+    const VideoPreview = ({ url, isMyMessage }) => {
+      const player = useVideoPlayer(url, (player) => {
+        player.muted = true;
+        player.loop = true;
+        player.play();
+      });
+
+      return (
+        <View style={styles.videoPreviewWrapper}>
+          <VideoView 
+            player={player} 
+            style={styles.mediaPreview} 
+            contentFit="cover"
+            allowsFullscreen={false}
+            allowsPictureInPicture={false}
+          />
+          <View style={styles.videoOverlay}>
+            <Play size={24} color="#FFF" fill="#FFF" />
+          </View>
+        </View>
+      );
+    };
+    VideoPreview.displayName = 'VideoPreview';
+
+    const FullscreenVideoPlayer = ({ url }) => {
+      const player = useVideoPlayer(url, (player) => {
+        player.loop = true;
+        player.play();
+      });
+
+      return (
+        <VideoView 
+          player={player} 
+          style={styles.fullscreenVideo} 
+          contentFit="contain"
+        />
+      );
+    };
+    FullscreenVideoPlayer.displayName = 'FullscreenVideoPlayer';
+
+    const AudioPlayer = ({ url, isMyMessage }) => {
+      const [sound, setSound] = useState(null);
+      const [isPlaying, setIsPlaying] = useState(false);
+      const [position, setPosition] = useState(0);
+      const [duration, setDuration] = useState(0);
+
+      useEffect(() => {
+        return sound ? () => { sound.unloadAsync(); } : undefined;
+      }, [sound]);
+
+      const onPlaybackStatusUpdate = (status) => {
+        if (status.isLoaded) {
+          setPosition(status.positionMillis);
+          setDuration(status.durationMillis);
+          setIsPlaying(status.isPlaying);
+          if (status.didJustFinish) {
+            setPosition(0);
+            setIsPlaying(false);
+          }
+        }
+      };
+
+      const playPause = async () => {
+        try {
+          if (sound === null) {
+            const { sound: newSound } = await Audio.Sound.createAsync(
+              { uri: url },
+              { shouldPlay: true },
+              onPlaybackStatusUpdate
+            );
+            setSound(newSound);
+          } else {
+            if (isPlaying) {
+              await sound.pauseAsync();
+            } else {
+              if (position >= duration) {
+                await sound.setPositionAsync(0);
+              }
+              await sound.playAsync();
+            }
+          }
+        } catch (error) {
+          console.error('Error playing audio', error);
+        }
+      };
+
+      const onSliderValueChange = async (value) => {
+        if (sound) {
+          await sound.setPositionAsync(value);
+        }
+      };
+
+      const formatTime = (millis) => {
+        const totalSeconds = millis / 1000;
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = Math.floor(totalSeconds % 60);
+        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+      };
+
+      return (
+        <View style={[styles.audioPlayer, { backgroundColor: isMyMessage ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.1)' }]}>
+          <TouchableOpacity onPress={playPause} style={styles.audioPlayBtn}>
+            {isPlaying ? (
+              <Pause size={20} color={isMyMessage ? '#000' : '#FFF'} fill={isMyMessage ? '#000' : '#FFF'} />
+            ) : (
+              <Play size={20} color={isMyMessage ? '#000' : '#FFF'} fill={isMyMessage ? '#000' : '#FFF'} />
+            )}
+          </TouchableOpacity>
+          <Slider
+            style={styles.audioSlider}
+            minimumValue={0}
+            maximumValue={duration || 1}
+            value={position}
+            onSlidingComplete={onSliderValueChange}
+            minimumTrackTintColor={isMyMessage ? '#000' : theme.colors.primary}
+            maximumTrackTintColor={isMyMessage ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.2)'}
+            thumbTintColor={isMyMessage ? '#000' : theme.colors.primary}
+          />
+          <Text style={[styles.audioTime, { color: isMyMessage ? '#000' : '#FFF' }]}>
+            {formatTime(isPlaying ? position : (duration || 0))}
+          </Text>
+        </View>
+      );
+    };
+    AudioPlayer.displayName = 'AudioPlayer';
+
+    const MediaPreview = ({ url, type, isMyMessage }) => {
+      if (type === 'audio') {
+        return <AudioPlayer url={url} isMyMessage={isMyMessage} />;
+      }
+
+      return (
+        <TouchableOpacity 
+          style={styles.mediaPreviewContainer}
+          onPress={() => setFullscreenMedia({ url, type })}
+          activeOpacity={0.9}
+        >
+          {type === 'video' ? (
+            <VideoPreview url={url} isMyMessage={isMyMessage} />
+          ) : (
+            <Image source={{ uri: url }} style={styles.mediaPreview} contentFit="cover" />
+          )}
+        </TouchableOpacity>
+      );
+    };
+    MediaPreview.displayName = 'MediaPreview';
 
     return (
       <View style={styles.container} pointerEvents="box-none">
@@ -1548,7 +1753,7 @@ export default function FloatingChat() {
                 <View style={styles.settingRow}>
                   <View>
                     <Text style={styles.settingLabel}>Read Receipts</Text>
-                    <Text style={styles.settingDesc}>Allow others to see when you've read their messages</Text>
+                      <Text style={styles.settingDesc}>Allow others to see when you&apos;ve read their messages</Text>
                   </View>
                   <Switch 
                     value={readReceiptsEnabled}
@@ -1719,61 +1924,95 @@ export default function FloatingChat() {
                   )}
                   </>
                 )}
-                  {(!activeChat || activeChat.status === 'accepted' || activeChat.initiated_by === user?.id || activeChat.is_group) && (
-                    <View style={styles.inputContainer}>
-                      {isUploading && (
-                        <View style={styles.uploadingIndicator}>
-                          <ActivityIndicator size="small" color={theme.colors.primary} />
-                          <Text style={styles.uploadingText}>Uploading media...</Text>
-                        </View>
-                      )}
-                      <View style={styles.inputWrapper}>
-                        <View style={styles.attachmentButtons}>
-                          <TouchableOpacity 
-                            onPress={() => handlePickMedia('image')} 
-                            style={styles.attachBtn}
-                            disabled={isUploading}
-                          >
-                            <ImageIcon size={20} color="rgba(255,255,255,0.6)" />
-                          </TouchableOpacity>
-                          <TouchableOpacity 
-                            onPress={() => handlePickMedia('video')} 
-                            style={styles.attachBtn}
-                            disabled={isUploading}
-                          >
-                            <VideoIcon size={20} color="rgba(255,255,255,0.6)" />
-                          </TouchableOpacity>
-                        </View>
-
-                        <TextInput
-                          ref={inputRef}
-                          style={styles.input}
-                          placeholder={activeChat?.status === 'pending' && !activeChat?.is_group ? "Waiting for approval..." : "Type a message..."}
-                          value={inputText}
-                          onChangeText={setInputText}
-                          onKeyPress={handleKeyPress}
-                          onSubmitEditing={() => handleSendMessage()}
-                          placeholderTextColor="rgba(255,255,255,0.3)"
-                          multiline
-                          blurOnSubmit={false}
-                          editable={!isUploading && (activeChat?.status === 'accepted' || activeChat?.initiated_by === user?.id || activeChat?.is_group)}
-                        />
-
-                      <TouchableOpacity 
-                        onPress={handleSendMessage} 
-                        style={[styles.sendBtn, (!inputText.trim() || (activeChat?.status === 'pending' && activeChat?.initiated_by === user?.id && !activeChat?.is_group)) && { opacity: 0.5 }]}
-                        disabled={!inputText.trim() || (activeChat?.status === 'pending' && activeChat?.initiated_by === user?.id && !activeChat?.is_group)}
-                      >
-                        <LinearGradient
-                          colors={[theme.colors.primary, '#4ADE80']}
-                          style={styles.sendIconBg}
-                        >
-                          <Send size={18} color="#000" />
-                        </LinearGradient>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                )}
+                    {(!activeChat || activeChat.status === 'accepted' || activeChat.initiated_by === user?.id || activeChat.is_group) && (
+                      <View style={styles.inputContainer}>
+                        {isUploading && (
+                          <View style={styles.uploadingIndicator}>
+                            <ActivityIndicator size="small" color={theme.colors.primary} />
+                            <Text style={styles.uploadingText}>Uploading...</Text>
+                          </View>
+                        )}
+                        
+                        {isRecording ? (
+                          <View style={styles.recordingContainer}>
+                            <View style={styles.recordingInfo}>
+                              <Animated.View style={[styles.recordingDot, { opacity: pulseAnim }]} />
+                              <Text style={styles.recordingTime}>{formatCallDuration(recordingDuration)}</Text>
+                            </View>
+                            <View style={styles.recordingActions}>
+                              <TouchableOpacity onPress={cancelRecording} style={styles.cancelRecordingBtn}>
+                                <Trash2 size={20} color="#EF4444" />
+                              </TouchableOpacity>
+                              <TouchableOpacity onPress={stopRecording} style={styles.stopRecordingBtn}>
+                                <LinearGradient
+                                  colors={[theme.colors.primary, '#4ADE80']}
+                                  style={styles.sendIconBg}
+                                >
+                                  <Send size={18} color="#000" />
+                                </LinearGradient>
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        ) : (
+                          <View style={styles.inputWrapper}>
+                            <View style={styles.attachmentButtons}>
+                              <TouchableOpacity 
+                                onPress={() => handlePickMedia('image')} 
+                                style={styles.attachBtn}
+                                disabled={isUploading}
+                              >
+                                <ImageIcon size={20} color="rgba(255,255,255,0.6)" />
+                              </TouchableOpacity>
+                              <TouchableOpacity 
+                                onPress={() => handlePickMedia('video')} 
+                                style={styles.attachBtn}
+                                disabled={isUploading}
+                              >
+                                <VideoIcon size={20} color="rgba(255,255,255,0.6)" />
+                              </TouchableOpacity>
+                            </View>
+  
+                            <TextInput
+                              ref={inputRef}
+                              style={styles.input}
+                              placeholder={activeChat?.status === 'pending' && !activeChat?.is_group ? "Waiting for approval..." : "Type a message..."}
+                              value={inputText}
+                              onChangeText={setInputText}
+                              onKeyPress={handleKeyPress}
+                              onSubmitEditing={() => handleSendMessage()}
+                              placeholderTextColor="rgba(255,255,255,0.3)"
+                              multiline
+                              blurOnSubmit={false}
+                              editable={!isUploading && (activeChat?.status === 'accepted' || activeChat?.initiated_by === user?.id || activeChat?.is_group)}
+                            />
+  
+                            {inputText.trim() ? (
+                              <TouchableOpacity 
+                                onPress={() => handleSendMessage()} 
+                                style={styles.sendBtn}
+                              >
+                                <LinearGradient
+                                  colors={[theme.colors.primary, '#4ADE80']}
+                                  style={styles.sendIconBg}
+                                >
+                                  <Send size={18} color="#000" />
+                                </LinearGradient>
+                              </TouchableOpacity>
+                            ) : (
+                              <TouchableOpacity 
+                                onPress={startRecording} 
+                                style={styles.sendBtn}
+                                disabled={isUploading || (activeChat?.status === 'pending' && activeChat?.initiated_by === user?.id && !activeChat?.is_group)}
+                              >
+                                <View style={[styles.sendIconBg, { backgroundColor: 'rgba(255,255,255,0.1)' }]}>
+                                  <Mic size={18} color="#FFF" />
+                                </View>
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                        )}
+                      </View>
+                    )}
               </KeyboardAvoidingView>
             )}
           </Animated.View>
@@ -2540,5 +2779,69 @@ const styles = StyleSheet.create({
     photoBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, padding: 15, borderRadius: 10, marginBottom: 10 },
     photoBtnText: { fontWeight: 'bold' },
     closeBtn: { padding: 15, alignItems: 'center' },
-    closeBtnText: { color: '#ef4444', fontWeight: 'bold' },
-  });
+      closeBtnText: { color: '#ef4444', fontWeight: 'bold' },
+      audioPlayer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 10,
+        borderRadius: 16,
+        width: width * 0.65,
+        marginBottom: 4,
+      },
+      audioPlayBtn: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: 'rgba(0,0,0,0.1)',
+        justifyContent: 'center',
+        alignItems: 'center',
+      },
+      audioSlider: {
+        flex: 1,
+        height: 40,
+        marginHorizontal: 8,
+      },
+      audioTime: {
+        fontSize: 12,
+        fontWeight: '600',
+        minWidth: 35,
+      },
+      recordingContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: 'rgba(0,0,0,0.2)',
+        borderRadius: 24,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        height: 52,
+      },
+      recordingInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+      },
+      recordingDot: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        backgroundColor: '#EF4444',
+      },
+      recordingTime: {
+        color: '#FFF',
+        fontSize: 16,
+        fontWeight: '700',
+        fontVariant: ['tabular-nums'],
+      },
+      recordingActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 16,
+      },
+      cancelRecordingBtn: {
+        padding: 4,
+      },
+      stopRecordingBtn: {
+        padding: 0,
+      },
+    });
