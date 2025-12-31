@@ -81,90 +81,114 @@ export async function generateImage(prompt) {
   const apiKey = process.env.EXPO_PUBLIC_FAL_KEY;
   if (!apiKey) return null;
 
-  try {
-    const response = await fetch('https://queue.fal.run/fal-ai/flux/schnell', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Key ${apiKey}`
-      },
-      body: JSON.stringify({
-        prompt: prompt,
-        image_size: 'square_hd',
-        num_images: 1,
-        enable_safety_checker: false
-      })
-    });
+try {
+const response = await fetch('https://queue.fal.run/fal-ai/flux/schnell', {
+method: 'POST',
+headers: {
+'Content-Type': 'application/json',
+'Authorization': `Key ${apiKey}`
+},
+body: JSON.stringify({
+prompt: prompt,
+image_size: 'square_hd',
+num_images: 1,
+enable_safety_checker: false
+})
+});
 
-    const data = await response.json();
-    
-    // Fal.ai returns a request_id for queued tasks
-    if (data.request_id) {
-      // Poll for result
-      let attempts = 0;
-      while (attempts < 15) {
-        const pollResponse = await fetch(`https://queue.fal.run/fal-ai/flux/schnell/requests/${data.request_id}`, {
-          headers: { 'Authorization': `Key ${apiKey}` }
-        });
-        const pollData = await pollResponse.json();
-        if (pollData.status === 'COMPLETED' && pollData.images?.[0]?.url) {
-          return pollData.images[0].url;
-        }
-        if (pollData.status === 'ERROR') throw new Error(pollData.error || 'Fal-ai error');
-        await new Promise(r => setTimeout(r, 1000));
-        attempts++;
-      }
-    }
-    
-    return data.images?.[0]?.url || null;
-  } catch (err) {
-    console.error('Fal-ai image generation error:', err);
-    return null;
-  }
+if (!response.ok) {
+const errorText = await response.text();
+console.error('Fal-ai generateImage error response:', response.status, errorText);
+throw new Error(`HTTP error! status: ${response.status}`);
+}
+
+const data = await response.json();
+
+// Fal.ai returns a request_id for queued tasks
+if (data.request_id) {
+// Poll for result
+let attempts = 0;
+while (attempts < 15) {
+const pollResponse = await fetch(`https://queue.fal.run/fal-ai/flux/schnell/requests/${data.request_id}`, {
+headers: { 'Authorization': `Key ${apiKey}` }
+});
+
+if (!pollResponse.ok) {
+console.error('Fal-ai poll error:', pollResponse.status);
+break; 
+}
+
+const pollData = await pollResponse.json();
+if (pollData.status === 'COMPLETED' && pollData.images?.[0]?.url) {
+return pollData.images[0].url;
+}
+if (pollData.status === 'ERROR') throw new Error(pollData.error || 'Fal-ai error');
+await new Promise(r => setTimeout(r, 1000));
+attempts++;
+}
+}
+
+return data.images?.[0]?.url || null;
+} catch (err) {
+console.error('Fal-ai image generation error:', err);
+return null;
+}
 }
 
 export async function expandImage(imageUrl) {
-  const apiKey = process.env.EXPO_PUBLIC_FAL_KEY;
-  if (!apiKey || !imageUrl) return null;
+const apiKey = process.env.EXPO_PUBLIC_FAL_KEY;
+if (!apiKey || !imageUrl) return null;
 
-  try {
-    const response = await fetch('https://queue.fal.run/fal-ai/image-apps-v2/outpaint', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Key ${apiKey}`
-      },
-      body: JSON.stringify({
-        image_url: imageUrl,
-        direction: 'center', // Uniform expansion on all sides
-        num_images: 1,
-        enable_safety_checker: false
-      })
-    });
+try {
+const response = await fetch('https://queue.fal.run/fal-ai/image-apps-v2/outpaint', {
+method: 'POST',
+headers: {
+'Content-Type': 'application/json',
+'Authorization': `Key ${apiKey}`
+},
+body: JSON.stringify({
+image_url: imageUrl,
+direction: 'center', // Uniform expansion on all sides
+num_images: 1,
+enable_safety_checker: false
+})
+});
 
-    const data = await response.json();
-    
-    if (data.request_id) {
-      let attempts = 0;
-      while (attempts < 20) {
-        const pollResponse = await fetch(`https://queue.fal.run/fal-ai/image-apps-v2/outpaint/requests/${data.request_id}`, {
-          headers: { 'Authorization': `Key ${apiKey}` }
-        });
-        const pollData = await pollResponse.json();
-        if (pollData.status === 'COMPLETED' && pollData.images?.[0]?.url) {
-          return pollData.images[0].url;
-        }
-        if (pollData.status === 'ERROR') throw new Error(pollData.error || 'Fal-ai outpaint error');
-        await new Promise(r => setTimeout(r, 1000));
-        attempts++;
-      }
-    }
-    
-    return data.images?.[0]?.url || null;
-  } catch (err) {
-    console.error('Fal-ai image expansion error:', err);
-    return null;
-  }
+if (!response.ok) {
+const errorText = await response.text();
+console.error('Fal-ai expandImage error response:', response.status, errorText);
+throw new Error(`HTTP error! status: ${response.status}`);
+}
+
+const data = await response.json();
+
+if (data.request_id) {
+let attempts = 0;
+while (attempts < 20) {
+const pollResponse = await fetch(`https://queue.fal.run/fal-ai/image-apps-v2/outpaint/requests/${data.request_id}`, {
+headers: { 'Authorization': `Key ${apiKey}` }
+});
+
+if (!pollResponse.ok) {
+console.error('Fal-ai poll error:', pollResponse.status);
+break;
+}
+
+const pollData = await pollResponse.json();
+if (pollData.status === 'COMPLETED' && pollData.images?.[0]?.url) {
+return pollData.images[0].url;
+}
+if (pollData.status === 'ERROR') throw new Error(pollData.error || 'Fal-ai outpaint error');
+await new Promise(r => setTimeout(r, 1000));
+attempts++;
+}
+}
+
+return data.images?.[0]?.url || null;
+} catch (err) {
+console.error('Fal-ai image expansion error:', err);
+return null;
+}
 }
 
 export async function getAIAssistantResponse(text, history = [], context = {}) {
