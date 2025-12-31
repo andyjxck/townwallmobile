@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, Send, MessageSquare } from 'lucide-react-native';
+import { ChevronLeft, Send, Sparkles } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Image } from 'expo-image';
 import { supabase } from '@/utils/supabase';
 import { getStoredUser } from '@/utils/user';
 import { getAIAssistantResponse } from '@/utils/ai';
@@ -11,6 +12,7 @@ import * as Haptics from 'expo-haptics';
 
 import { useTheme } from "@/utils/ThemeContext";
 import { LinearGradient } from "expo-linear-gradient";
+import { useLocationStore } from '@/utils/locationStore';
 
 export default function HelpContact() {
   const { isHippie } = useTheme();
@@ -28,6 +30,8 @@ export default function HelpContact() {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const { city_name, zone_name, feedView } = useLocationStore();
 
   useEffect(() => {
     const setup = async () => {
@@ -51,7 +55,6 @@ export default function HelpContact() {
     
     initChat();
     
-    // Subscribe to new messages for this user
     if (subRef.current) supabase.removeChannel(subRef.current);
     
     const subscription = supabase
@@ -124,7 +127,6 @@ export default function HelpContact() {
       if (error) throw error;
       setMessages(data || []);
       
-      // Check if already resolved
       if (data?.some(m => m.status === 'resolved' || m.content.includes("Please rate 1-5"))) {
         setShowRating(true);
       }
@@ -180,7 +182,6 @@ export default function HelpContact() {
           const handleSend = async () => {
             if (!inputText.trim() || !currentUser || isSendingRef.current) return;
             
-            // If there's a resolved status, purge before sending new
             if (messages.some(m => m.status === 'resolved')) {
               await purgeMessages();
             }
@@ -197,7 +198,6 @@ export default function HelpContact() {
             
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   
-      // Optimistic update
       const tempId = Date.now();
       const tempMsg = {
         id: tempId,
@@ -222,12 +222,10 @@ export default function HelpContact() {
   
         if (error) throw error;
   
-        // Update optimistic message with real one
         if (realMsg) {
           setMessages(prev => prev.map(m => m.id === tempId ? realMsg : m));
         }
   
-        // AI Assistant Response
         const isOvertaken = messages.some(m => m.status === 'overtaken');
         if (isOvertaken) {
           console.log("Chat overtaken by agent. AI suppressed.");
@@ -239,30 +237,40 @@ export default function HelpContact() {
               content: m.content
             }));
   
-              const aiResponse = await getAIAssistantResponse(text, history);
-  
-              await supabase
-                .from('rhelp_messages')
-                .insert({
-                  receiver_id: currentUser.id,
-                  content: aiResponse,
-                  is_from_admin: true
-                });
+        const aiResponse = await getAIAssistantResponse(text, history, {
+          city_name,
+          zone_name,
+          feedView,
+          username: currentUser?.username
+        });
+
+        let messageContent = typeof aiResponse === 'string' ? aiResponse : aiResponse.text;
+        const imageUrl = typeof aiResponse === 'object' ? aiResponse.imageUrl : null;
+        
+        if (imageUrl) {
+          messageContent = messageContent + `\n[TOWNY_IMAGE:${imageUrl}]`;
+        }
+
+        await supabase
+          .from('rhelp_messages')
+          .insert({
+            receiver_id: currentUser.id,
+            content: messageContent,
+            is_from_admin: true
+          });
               
-              // Notify user of assistant response
               const { sendHelpMessageNotification } = require('@/utils/notifications');
               await sendHelpMessageNotification({
                 senderId: 'assistant',
-                senderUsername: 'Town Wall Assistant',
+                senderUsername: 'Towny',
                 receiverId: currentUser.id,
                 isFromAdmin: true,
-                messageContent: aiResponse
+                messageContent: typeof aiResponse === 'string' ? aiResponse : aiResponse.text
               });
     
           } catch (error) {
             console.error("Error in handleSend:", error);
-            setInputText(text); // Restore text on error
-            // Remove optimistic message on error
+            setInputText(text);
             setMessages(prev => prev.filter(m => m.id !== tempId));
             Alert.alert("Error", "Message could not be sent.");
           } finally {
@@ -279,6 +287,36 @@ export default function HelpContact() {
       }
     };
 
+  const renderMessageContent = (content, isMine) => {
+    const imageMatch = content.match(/\[TOWNY_IMAGE:(.+?)\]/);
+    
+    if (imageMatch) {
+      const imageUrl = imageMatch[1];
+      const textContent = content.replace(/\[TOWNY_IMAGE:.+?\]/, '').trim();
+      
+      return (
+        <View>
+          {textContent ? (
+            <Text style={[styles.messageText, { color: isMine ? '#000000' : '#FFFFFF' }]}>
+              {textContent}
+            </Text>
+          ) : null}
+          <Image
+            source={{ uri: imageUrl }}
+            style={styles.generatedImage}
+            contentFit="cover"
+          />
+        </View>
+      );
+    }
+    
+    return (
+      <Text style={[styles.messageText, { color: isMine ? '#000000' : '#FFFFFF' }]}>
+        {content}
+      </Text>
+    );
+  };
+
 
   return (
     <View style={[styles.container, isHippie && { backgroundColor: 'transparent' }]}>
@@ -294,7 +332,8 @@ export default function HelpContact() {
             <ChevronLeft color="#FFFFFF" size={28} />
           </TouchableOpacity>
           <View style={styles.headerTitleContainer}>
-            <Text style={styles.headerTitle}>HELP & SUPPORT</Text>
+            <Sparkles size={18} color="#FBBF24" />
+            <Text style={styles.headerTitle}>TOWNY</Text>
           </View>
           <TouchableOpacity 
             onPress={async () => {
@@ -320,10 +359,6 @@ export default function HelpContact() {
             renderItem={({ item }) => {
               const isMine = !item.is_from_admin;
               const isResolved = item.status === 'resolved';
-              
-              // Clean up markdown-style bolding for cleaner display if needed, 
-              // or ensure the styling handles it well.
-              const formattedContent = item.content.replace(/\*\*/g, '');
 
               return (
                 <View style={[
@@ -332,7 +367,7 @@ export default function HelpContact() {
                 ]}>
                     {!isMine && (
                       <View style={styles.assistantAvatar}>
-                        <MessageSquare size={12} color="#FFF" />
+                        <Sparkles size={12} color="#FBBF24" />
                       </View>
                     )}
                     <View style={[
@@ -340,10 +375,8 @@ export default function HelpContact() {
                       isMine ? styles.myMessage : styles.theirMessage,
                       isResolved && { borderLeftWidth: 4, borderLeftColor: '#10B981' }
                     ]}>
-                        {!isMine && <Text style={styles.adminLabel}>TOWN WALL ASSISTANT</Text>}
-                      <Text style={[styles.messageText, { color: isMine ? '#000000' : '#FFFFFF' }]}>
-                        {item.content}
-                      </Text>
+                        {!isMine && <Text style={styles.adminLabel}>TOWNY</Text>}
+                      {renderMessageContent(item.content, isMine)}
                     <View style={styles.messageFooter}>
                       <Text style={[styles.messageTime, { color: isMine ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.3)' }]}>
                         {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -357,7 +390,7 @@ export default function HelpContact() {
             showRating ? (
               <View style={styles.inChatRatingContainer}>
                 <View style={styles.ratingCard}>
-                  <Text style={styles.ratingTitle}>HOW WAS OUR SUPPORT?</Text>
+                  <Text style={styles.ratingTitle}>HOW WAS TOWNY?</Text>
                   
                   <View style={styles.starsContainer}>
                     {[1, 2, 3, 4, 5].map((star) => (
@@ -404,7 +437,9 @@ export default function HelpContact() {
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>Send a message to start a conversation with our team.</Text>
+              <Sparkles size={48} color="rgba(255,255,255,0.2)" />
+              <Text style={styles.emptyTitle}>Hey! I'm Towny</Text>
+              <Text style={styles.emptyText}>Chat with me about anything - ask questions, roleplay, get creative, or just hang out. I can even generate images for you!</Text>
             </View>
           }
         />
@@ -417,7 +452,7 @@ export default function HelpContact() {
                 <TextInput
                   ref={inputRef}
                   style={styles.input}
-                  placeholder="Type a message..."
+                  placeholder="Talk to Towny..."
                   placeholderTextColor="rgba(255,255,255,0.3)"
                   value={inputText}
                   onChangeText={setInputText}
@@ -494,12 +529,12 @@ export default function HelpContact() {
       width: 32,
       height: 32,
       borderRadius: 16,
-      backgroundColor: 'rgba(255,255,255,0.15)',
+      backgroundColor: 'rgba(251,191,36,0.2)',
       justifyContent: 'center',
       alignItems: 'center',
       marginBottom: 4,
       borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.1)',
+      borderColor: 'rgba(251,191,36,0.3)',
     },
     messageBubble: {
       maxWidth: '85%',
@@ -536,10 +571,16 @@ export default function HelpContact() {
     adminLabel: {
       fontSize: 9,
       fontWeight: '900',
-      color: 'rgba(255,255,255,0.4)',
+      color: '#FBBF24',
       letterSpacing: 1.5,
       marginBottom: 8,
       textTransform: 'uppercase',
+    },
+    generatedImage: {
+      width: '100%',
+      height: 250,
+      borderRadius: 16,
+      marginTop: 12,
     },
     inChatRatingContainer: {
       padding: 20,
@@ -619,7 +660,7 @@ export default function HelpContact() {
       maxHeight: 120,
     },
     sendButton: {
-      backgroundColor: '#FFFFFF',
+      backgroundColor: '#FBBF24',
       width: 44,
       height: 44,
       borderRadius: 22,
@@ -627,13 +668,20 @@ export default function HelpContact() {
       alignItems: 'center',
     },
     emptyContainer: {
-      paddingVertical: 120,
+      paddingVertical: 100,
       alignItems: 'center',
     },
+    emptyTitle: {
+      color: '#FFFFFF',
+      fontSize: 24,
+      fontWeight: '700',
+      marginTop: 20,
+      marginBottom: 10,
+    },
     emptyText: {
-      color: 'rgba(255,255,255,0.3)',
+      color: 'rgba(255,255,255,0.5)',
       textAlign: 'center',
-      paddingHorizontal: 50,
+      paddingHorizontal: 40,
       fontSize: 15,
       lineHeight: 22,
     },
