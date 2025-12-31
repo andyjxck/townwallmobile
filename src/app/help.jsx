@@ -338,23 +338,10 @@ export default function HelpContact() {
 
         if (aiError) throw aiError;
 
-        setIsTyping(false);
-        isSendingRef.current = false;
+          setIsTyping(false);
+          isSendingRef.current = false;
 
-        try {
-          const { sendHelpMessageNotification } = require('@/utils/notifications');
-          await sendHelpMessageNotification({
-            senderId: 'assistant',
-            senderUsername: 'Towny',
-            receiverId: currentUser.id,
-            isFromAdmin: true,
-            messageContent: messageContent
-          });
-        } catch (notifError) {
-          console.warn("Notification failed:", notifError);
-        }
-
-          // Background image generation if requested
+            // Background image generation if requested
           if (imagePrompt && aiMsg) {
             generateImage(imagePrompt).then(async (imageUrl) => {
               if (imageUrl) {
