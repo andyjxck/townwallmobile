@@ -90,7 +90,10 @@ export async function registerForPushNotificationsAsync(userId) {
     }
 
     // 3. Get Project ID
-    const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
+    const projectId = 
+      Constants.expoConfig?.extra?.eas?.projectId ?? 
+      Constants.easConfig?.projectId ??
+      '3d185e44-e9e3-4196-9dc9-a45a2fdff729';
     
     if (!projectId) {
       console.error('CRITICAL: EAS Project ID not found. Push tokens cannot be generated.');
@@ -99,22 +102,27 @@ export async function registerForPushNotificationsAsync(userId) {
 
     // 4. Request token with a timeout/retry
     let retryCount = 0;
-    const maxRetries = 2;
+    const maxRetries = 3;
     
     while (retryCount <= maxRetries) {
       try {
+        console.log(`Attempt ${retryCount + 1} to get push token with projectId:`, projectId);
         const tokenPromise = Notifications.getExpoPushTokenAsync({ projectId });
-        // Give it 10 seconds to respond
-        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Token request timed out')), 10000));
+        // Give it 15 seconds to respond
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Token request timed out')), 15000));
         
         const response = await Promise.race([tokenPromise, timeoutPromise]);
         token = response.data;
-        if (token) break;
+        if (token) {
+          console.log('Successfully generated token:', token);
+          break;
+        }
       } catch (e) {
         console.warn(`Attempt ${retryCount + 1} to get push token failed:`, e.message);
         retryCount++;
         if (retryCount <= maxRetries) {
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          // Exponential backoff
+          await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
         }
       }
     }
