@@ -308,6 +308,7 @@ export async function getAIAssistantResponse(text, history = [], context = {}) {
       if (imageMatch) {
         aiText = aiText.replace(/\[IMAGE:\s*.+?\]/i, '').trim();
       }
+      aiText += "\n\nit might take a minute for the image to appear!";
     }
     
     return { text: aiText, imagePrompt };
