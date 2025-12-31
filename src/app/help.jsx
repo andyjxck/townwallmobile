@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, Send, Sparkles } from 'lucide-react-native';
+import { ChevronLeft, Send, Sparkles, X, Maximize2 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
+import { BlurView } from 'expo-blur';
 import { supabase } from '@/utils/supabase';
 import { getStoredUser } from '@/utils/user';
-import { getAIAssistantResponse } from '@/utils/ai';
+import { getAIAssistantResponse, expandImage } from '@/utils/ai';
 import { sendNotification } from '@/utils/notifications';
 import * as Haptics from 'expo-haptics';
 
@@ -30,7 +31,10 @@ export default function HelpContact() {
   const [showRating, setShowRating] = useState(false);
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [selectedImage, setSelectedImage] = useState(null);
+    const [isExpanding, setIsExpanding] = useState(false);
+
   
   const { city_name, zone_name, feedView } = useLocationStore();
 
@@ -301,6 +305,38 @@ export default function HelpContact() {
             }
         };
 
+    const handleExpandImage = async () => {
+      if (!selectedImage || isExpanding) return;
+      
+      setIsExpanding(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      
+      try {
+        const expandedUrl = await expandImage(selectedImage);
+        if (expandedUrl) {
+          setSelectedImage(null);
+          const messageContent = `I've expanded that image for you!\n[TOWNY_IMAGE:${expandedUrl}]`;
+          
+          await supabase
+            .from('rhelp_messages')
+            .insert({
+              receiver_id: currentUser.id,
+              content: messageContent,
+              is_from_admin: true
+            });
+            
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } else {
+          Alert.alert("Expansion Failed", "Towny couldn't expand this image right now.");
+        }
+      } catch (error) {
+        console.error("Expansion error:", error);
+        Alert.alert("Error", "Something went wrong while expanding the image.");
+      } finally {
+        setIsExpanding(false);
+      }
+    };
+
     const handleKeyPress = (e) => {
       if (e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
         if (Platform.OS === 'web') {
@@ -310,51 +346,60 @@ export default function HelpContact() {
       }
     };
 
-    const renderMessageContent = (content, isMine) => {
-      let displayContent = content;
-      let displayImageUrl = null;
-
-      // Try parsing as JSON first (safety for corrupted history)
-      try {
-        if (content.trim().startsWith('{') && content.trim().endsWith('}')) {
-          const parsed = JSON.parse(content);
-          if (parsed.text) displayContent = parsed.text;
-          if (parsed.imageUrl) displayImageUrl = parsed.imageUrl;
+      const renderMessageContent = (content, isMine) => {
+        let displayContent = content;
+        let displayImageUrl = null;
+  
+        // Try parsing as JSON first (safety for corrupted history)
+        try {
+          if (content.trim().startsWith('{') && content.trim().endsWith('}')) {
+            const parsed = JSON.parse(content);
+            if (parsed.text) displayContent = parsed.text;
+            if (parsed.imageUrl) displayImageUrl = parsed.imageUrl;
+          }
+        } catch (e) {
+          // Not JSON, continue
         }
-      } catch (e) {
-        // Not JSON, continue
-      }
-
-      const imageMatch = displayContent.match(/\[TOWNY_IMAGE:(.+?)\]/);
-      
-      if (imageMatch || displayImageUrl) {
-        const imageUrl = displayImageUrl || imageMatch[1];
-        const textContent = imageMatch 
-          ? displayContent.replace(/\[TOWNY_IMAGE:.+?\]/, '').trim()
-          : displayContent;
+  
+        const imageMatch = displayContent.match(/\[TOWNY_IMAGE:(.+?)\]/);
+        
+        if (imageMatch || displayImageUrl) {
+          const imageUrl = displayImageUrl || imageMatch[1];
+          const textContent = imageMatch 
+            ? displayContent.replace(/\[TOWNY_IMAGE:.+?\]/, '').trim()
+            : displayContent;
+          
+          return (
+            <View>
+              {textContent ? (
+                <Text style={[styles.messageText, { color: isMine ? '#000000' : '#FFFFFF' }]}>
+                  {textContent}
+                </Text>
+              ) : null}
+              <TouchableOpacity 
+                activeOpacity={0.9} 
+                onPress={() => {
+                  setSelectedImage(imageUrl);
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                }}
+              >
+                <Image
+                  source={{ uri: imageUrl }}
+                  style={styles.generatedImage}
+                  contentFit="cover"
+                />
+              </TouchableOpacity>
+            </View>
+          );
+        }
         
         return (
-          <View>
-            {textContent ? (
-              <Text style={[styles.messageText, { color: isMine ? '#000000' : '#FFFFFF' }]}>
-                {textContent}
-              </Text>
-            ) : null}
-            <Image
-              source={{ uri: imageUrl }}
-              style={styles.generatedImage}
-              contentFit="cover"
-            />
-          </View>
+          <Text style={[styles.messageText, { color: isMine ? '#000000' : '#FFFFFF' }]}>
+            {displayContent}
+          </Text>
         );
-      }
-      
-      return (
-        <Text style={[styles.messageText, { color: isMine ? '#000000' : '#FFFFFF' }]}>
-          {displayContent}
-        </Text>
-      );
-    };
+      };
+
 
 
   return (
@@ -521,6 +566,53 @@ export default function HelpContact() {
           </View>
         </KeyboardAvoidingView>
       </View>
+
+      <Modal
+        visible={!!selectedImage}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setSelectedImage(null)}
+      >
+        <BlurView intensity={100} tint="dark" style={StyleSheet.absoluteFill}>
+          <TouchableOpacity 
+            style={styles.modalCloseOverlay}
+            activeOpacity={1}
+            onPress={() => setSelectedImage(null)}
+          >
+            <View style={styles.modalContent}>
+              <TouchableOpacity 
+                style={styles.modalCloseButton}
+                onPress={() => setSelectedImage(null)}
+              >
+                <X color="#FFFFFF" size={24} />
+              </TouchableOpacity>
+              
+              <Image 
+                source={{ uri: selectedImage }}
+                style={styles.modalImage}
+                contentFit="contain"
+              />
+              
+              <View style={styles.modalActions}>
+                <TouchableOpacity 
+                  style={[styles.expandButton, isExpanding && styles.expandButtonDisabled]}
+                  onPress={handleExpandImage}
+                  disabled={isExpanding}
+                >
+                  {isExpanding ? (
+                    <ActivityIndicator color="#000000" size="small" />
+                  ) : (
+                    <>
+                      <Maximize2 size={20} color="#000000" />
+                      <Text style={styles.expandButtonText}>AI EXPAND</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </BlurView>
+      </Modal>
     </View>
   );
 }
@@ -729,11 +821,64 @@ export default function HelpContact() {
       marginTop: 20,
       marginBottom: 10,
     },
-    emptyText: {
-      color: 'rgba(255,255,255,0.5)',
-      textAlign: 'center',
-      paddingHorizontal: 40,
-      fontSize: 15,
-      lineHeight: 22,
-    },
-  });
+      emptyText: {
+        color: 'rgba(255,255,255,0.5)',
+        textAlign: 'center',
+        paddingHorizontal: 40,
+        fontSize: 15,
+        lineHeight: 22,
+      },
+      modalCloseOverlay: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.8)',
+      },
+      modalContent: {
+        width: '90%',
+        height: '80%',
+        justifyContent: 'center',
+        alignItems: 'center',
+      },
+      modalCloseButton: {
+        position: 'absolute',
+        top: 0,
+        right: 0,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 10,
+      },
+      modalImage: {
+        width: '100%',
+        height: '70%',
+        borderRadius: 20,
+      },
+      modalActions: {
+        marginTop: 30,
+        width: '100%',
+        alignItems: 'center',
+      },
+      expandButton: {
+        backgroundColor: '#FBBF24',
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 25,
+        paddingVertical: 15,
+        borderRadius: 30,
+        gap: 10,
+      },
+      expandButtonDisabled: {
+        opacity: 0.7,
+      },
+      expandButtonText: {
+        color: '#000000',
+        fontSize: 14,
+        fontWeight: '900',
+        letterSpacing: 2,
+      },
+    });
+
