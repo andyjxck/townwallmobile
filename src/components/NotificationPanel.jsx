@@ -84,7 +84,9 @@ export default function NotificationPanel({ visible, onClose }) {
 
   const handleMarkAllAsRead = async () => {
     // Optimistically update local state
-    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+    setNotifications(prev => prev.map(n => 
+      n.type === 'friend_request' ? n : { ...n, is_read: true }
+    ));
     
     const user = await getStoredUser();
     if (user) {

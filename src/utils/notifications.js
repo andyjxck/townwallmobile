@@ -462,7 +462,8 @@ export const markAllAsRead = async (userId) => {
       .from('rnotifications')
       .update({ is_read: true })
       .eq('user_id', userId)
-      .eq('is_read', false);
+      .eq('is_read', false)
+      .neq('type', 'friend_request');
 
     if (error) throw error;
     return { success: true };
