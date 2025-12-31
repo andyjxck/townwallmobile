@@ -350,18 +350,25 @@ export default function HelpContact() {
           messageContent: messageContent
         });
 
-        // Background image generation if requested
-        if (imagePrompt && aiMsg) {
-          generateImage(imagePrompt).then(async (imageUrl) => {
-            if (imageUrl) {
-              const updatedContent = `${messageContent}\n[TOWNY_IMAGE:${imageUrl}]`;
-              await supabase
-                .from('rhelp_messages')
-                .update({ content: updatedContent })
-                .eq('id', aiMsg.id);
-            }
-          }).catch(err => console.error("BG Image gen error:", err));
-        }
+          // Background image generation if requested
+          if (imagePrompt && aiMsg) {
+            generateImage(imagePrompt).then(async (imageUrl) => {
+              if (imageUrl) {
+                const updatedContent = `${messageContent}\n[TOWNY_IMAGE:${imageUrl}]`;
+                const { error: updateError } = await supabase
+                  .from('rhelp_messages')
+                  .update({ content: updatedContent })
+                  .eq('id', aiMsg.id);
+                
+                if (!updateError) {
+                  // Manually update local state to ensure immediate UI refresh
+                  setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: updatedContent } : m));
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                }
+              }
+            }).catch(err => console.error("BG Image gen error:", err));
+          }
+
 
       } catch (error) {
         console.error("Error in handleSend:", error);

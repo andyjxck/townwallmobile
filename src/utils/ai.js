@@ -264,8 +264,11 @@ export async function getAIAssistantResponse(text, history = [], context = {}) {
   if (!apiKey) return { text: "Towny is offline.", imageUrl: null };
   
   try {
-    // Clean history of JSON strings for safety
-    const cleanHistory = (history || []).map(m => {
+    // Clean history and apply safety limits to prevent TPM errors
+    const MAX_HISTORY = 10;
+    const MAX_LEN = 1000;
+    
+    const cleanHistory = (history || []).slice(-MAX_HISTORY).map(m => {
       let content = m.content;
       try {
         if (typeof content === 'string' && content.trim().startsWith('{') && content.trim().endsWith('}')) {
@@ -273,6 +276,12 @@ export async function getAIAssistantResponse(text, history = [], context = {}) {
           if (parsed.text) content = parsed.text;
         }
       } catch (e) {}
+      
+      // Truncate long messages in history
+      if (typeof content === 'string' && content.length > MAX_LEN) {
+        content = content.substring(0, MAX_LEN) + '... [truncated]';
+      }
+      
       return { role: m.role, content };
     });
 
@@ -280,6 +289,9 @@ export async function getAIAssistantResponse(text, history = [], context = {}) {
     if (context.city_name && context.city_name !== 'Global') {
       contextLine = `\n\nUser context: ${context.city_name}${context.zone_name ? `, ${context.zone_name}` : ''}`;
     }
+    
+    // Also truncate current input if extreme
+    const currentInput = text?.length > 2000 ? text.substring(0, 2000) + '... [truncated]' : text;
     
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -290,7 +302,7 @@ export async function getAIAssistantResponse(text, history = [], context = {}) {
           messages: [
             { role: 'system', content: TOWNY_PROMPT + contextLine },
             ...cleanHistory,
-            { role: 'user', content: text }
+            { role: 'user', content: currentInput }
           ]
         })
       });
@@ -299,6 +311,9 @@ export async function getAIAssistantResponse(text, history = [], context = {}) {
       
       if (data.error) {
         console.error('OpenAI API Error:', data.error);
+        if (data.error.code === 'rate_limit_exceeded') {
+          return { text: "Towny is a bit overwhelmed right now (Rate Limit). Please wait a minute and try again!", imagePrompt: null };
+        }
         return { text: `Towny is having a moment: ${data.error.message || 'Unknown error'}`, imagePrompt: null };
       }
 
