@@ -176,17 +176,13 @@ export default function PostScreen() {
     
     const online = await checkNetworkStatus();
     
-    try {
-      let moderation = { status: 'approved' };
-      if (online) {
-        moderation = await moderateContent(`${title}\n${text}`);
-        if (moderation.status === 'rejected') {
-          Alert.alert("Rejected", moderation.reason);
-          setLoading(false); return;
+      try {
+        let moderation = { status: 'approved', reason: '' };
+        if (online) {
+          moderation = await moderateContent(`${title}\n${text}`);
         }
-      }
 
-const postData = {
+        const postData = {
           title: title.trim(),
           text: text.trim(),
           zone_id: selectedZone?.id,
@@ -195,38 +191,42 @@ const postData = {
           user_id: user?.id,
           is_anonymous: isAnonymous,
           moderation_status: moderation.status,
+          moderation_reason: moderation.reason,
+          is_deleted: moderation.status === 'rejected',
           localMedia: media,
           city_id: city_id,
         };
 
-      if (!online) {
-        await offlineStorage.savePendingPost(postData);
-        Alert.alert(
-          "Saved Offline",
-          "Your post has been saved and will be uploaded when you're back online.",
-          [{ text: "OK", onPress: () => router.replace("/") }]
-        );
-        return;
-      }
+        if (!online) {
+          await offlineStorage.savePendingPost(postData);
+          Alert.alert(
+            "Saved Offline",
+            "Your post has been saved and will be uploaded when you're back online.",
+            [{ text: "OK", onPress: () => router.replace("/") }]
+          );
+          return;
+        }
 
-      let createdPollId = null;
-      if (hasPoll) {
-        const { data: poll } = await supabase.from('rpolls').insert({ question: pollQuestion.trim(), is_active: true }).select().single();
-        createdPollId = poll.id;
-        await supabase.from('rpoll_options').insert(pollOptions.filter(o => o.trim()).map(o => ({ poll_id: poll.id, option_text: o.trim() })));
-      }
+        let createdPollId = null;
+        if (hasPoll && moderation.status !== 'rejected') {
+          const { data: poll } = await supabase.from('rpolls').insert({ question: pollQuestion.trim(), is_active: true }).select().single();
+          createdPollId = poll.id;
+          await supabase.from('rpoll_options').insert(pollOptions.filter(o => o.trim()).map(o => ({ poll_id: poll.id, option_text: o.trim() })));
+        }
 
-      const imageUrls = [];
-      for (const item of media) {
-        if (item.fromRemote) { imageUrls.push(item.uri); continue; }
-        const fileExt = item.uri.split('.').pop();
-        const fileName = `${Math.random()}.${fileExt}`;
-        const arrayBuffer = await (await fetch(item.uri)).arrayBuffer();
-        await supabase.storage.from('posts').upload(fileName, arrayBuffer);
-        imageUrls.push(supabase.storage.from('posts').getPublicUrl(fileName).data.publicUrl);
-      }
+        const imageUrls = [];
+        // Skip media upload if rejected? 
+        // Actually, if we want admin to see it, we need the media.
+        for (const item of media) {
+          if (item.fromRemote) { imageUrls.push(item.uri); continue; }
+          const fileExt = item.uri.split('.').pop();
+          const fileName = `${Math.random()}.${fileExt}`;
+          const arrayBuffer = await (await fetch(item.uri)).arrayBuffer();
+          await supabase.storage.from('posts').upload(fileName, arrayBuffer);
+          imageUrls.push(supabase.storage.from('posts').getPublicUrl(fileName).data.publicUrl);
+        }
 
-const dbPostData = {
+        const dbPostData = {
           title: title.trim(),
           text: text.trim(),
           zone_id: selectedZone?.id,
@@ -238,27 +238,36 @@ const dbPostData = {
           image_urls: imageUrls,
           poll_id: createdPollId,
           moderation_status: moderation.status,
+          moderation_reason: moderation.reason,
+          is_deleted: moderation.status === 'rejected',
           city_id: city_id,
           cta_type: ctaType,
           cta_group_id: ctaGroupId,
         };
 
-      if (postId) await supabase.from('rposts').update(dbPostData).eq('id', postId);
-      else {
-        const { data: newPost } = await supabase.from('rposts').insert(dbPostData).select('id').single();
-        if (newPost && !isAnonymous) {
-          await sendNewPostNotification({
-            posterId: user.id,
-            posterUsername: user.username,
-            postId: newPost.id
-          });
+        if (postId) await supabase.from('rposts').update(dbPostData).eq('id', postId);
+        else {
+          const { data: newPost } = await supabase.from('rposts').insert(dbPostData).select('id').single();
+          if (newPost && !isAnonymous && moderation.status === 'approved') {
+            await sendNewPostNotification({
+              posterId: user.id,
+              posterUsername: user.username,
+              postId: newPost.id
+            });
+          }
         }
-      }
 
-      router.replace("/");
-    } catch (error) { Alert.alert("Error", "Failed to post"); }
-    finally { setLoading(false); }
-  };
+        if (moderation.status === 'rejected') {
+          Alert.alert("Rejected", moderation.reason);
+        }
+
+        router.replace("/");
+      } catch (error) { 
+        console.error(error);
+        Alert.alert("Error", "Failed to post"); 
+      }
+      finally { setLoading(false); }
+    };
 
   if (step === 'zone' || step === 'tag') {
     const content = (

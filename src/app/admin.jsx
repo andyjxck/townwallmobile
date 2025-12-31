@@ -281,7 +281,8 @@ export default function ModerationAdmin() {
         table = 'rposts';
         updateData = { 
           moderation_status: action === 'approve' ? 'approved' : 'rejected',
-          is_blurred: action === 'reject'
+          is_blurred: action === 'reject',
+          is_deleted: action === 'reject'
         };
       }
 
@@ -360,7 +361,8 @@ const handleOverridePost = async () => {
         .from('rposts')
         .update({ 
           moderation_status: 'approved',
-          is_blurred: false
+          is_blurred: false,
+          is_deleted: false
         })
         .eq('id', overrideItem.id);
       
