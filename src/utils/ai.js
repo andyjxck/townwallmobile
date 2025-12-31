@@ -52,26 +52,47 @@ function shouldGenerateImage(text) {
 
 
 export async function generateImage(prompt) {
-  const apiKey = process.env.EXPO_PUBLIC_POLLINATIONS_API_KEY;
-  try {
-    const baseUrl = "https://image.pollinations.ai/prompt/";
-    const params = new URLSearchParams({
-      nologo: "true",
-      private: "true",
-      enhance: "false",
-      seed: Math.floor(Math.random() * 1000000).toString(),
-      width: "1024",
-      height: "1024",
-      model: "flux"
-    });
-    
-    if (apiKey) {
-      params.append("token", apiKey);
-    }
+  const apiKey = process.env.EXPO_PUBLIC_FAL_KEY;
+  if (!apiKey) return null;
 
-    return `${baseUrl}${encodeURIComponent(prompt)}?${params.toString()}`;
+  try {
+    const response = await fetch('https://queue.fal.run/fal-ai/flux/schnell', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Key ${apiKey}`
+      },
+      body: JSON.stringify({
+        prompt: prompt,
+        image_size: 'square_hd',
+        num_images: 1,
+        enable_safety_checker: false
+      })
+    });
+
+    const data = await response.json();
+    
+    // Fal.ai returns a request_id for queued tasks
+    if (data.request_id) {
+      // Poll for result
+      let attempts = 0;
+      while (attempts < 15) {
+        const pollResponse = await fetch(`https://queue.fal.run/fal-ai/flux/schnell/requests/${data.request_id}`, {
+          headers: { 'Authorization': `Key ${apiKey}` }
+        });
+        const pollData = await pollResponse.json();
+        if (pollData.status === 'COMPLETED' && pollData.images?.[0]?.url) {
+          return pollData.images[0].url;
+        }
+        if (pollData.status === 'ERROR') throw new Error(pollData.error || 'Fal-ai error');
+        await new Promise(r => setTimeout(r, 1000));
+        attempts++;
+      }
+    }
+    
+    return data.images?.[0]?.url || null;
   } catch (err) {
-    console.error('Pollinations.ai image generation error:', err);
+    console.error('Fal-ai image generation error:', err);
     return null;
   }
 }
@@ -144,4 +165,3 @@ export async function getAIAssistantResponse(text, history = [], context = {}) {
     return { text: "Error connecting to Towny.", imageUrl: null };
   }
 }
-
