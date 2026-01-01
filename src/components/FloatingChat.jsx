@@ -50,6 +50,19 @@ import {
 
 const AGORA_APP_ID = process.env.EXPO_PUBLIC_AGORA_APP_ID;
 
+// Helper for generating numeric UID from string hash
+if (!String.prototype.hashCode) {
+  String.prototype.hashCode = function() {
+    let hash = 0;
+    for (let i = 0; i < this.length; i++) {
+      const char = this.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    return Math.abs(hash);
+  };
+}
+
 const isExpoGo = Constants.appOwnership === "expo";
 
         // Clear action
@@ -828,6 +841,12 @@ const isExpoGo = Constants.appOwnership === "expo";
 
     const setupAgora = async () => {
       try {
+        const permission = await Audio.requestPermissionsAsync();
+        if (permission.status !== 'granted') {
+          Alert.alert('Permission Denied', 'Microphone access is required for calls.');
+          return;
+        }
+
         if (!agoraEngine.current) {
           agoraEngine.current = createAgoraRtcEngine();
           agoraEngine.current.initialize({
@@ -885,21 +904,12 @@ const isExpoGo = Constants.appOwnership === "expo";
       try {
         if (agoraEngine.current) {
           await agoraEngine.current.leaveChannel();
+          await agoraEngine.current.release();
+          agoraEngine.current = null;
         }
       } catch (e) {
         console.error('Agora leave error:', e);
       }
-    };
-
-    // Helper for generating numeric UID from string hash
-    String.prototype.hashCode = function() {
-      let hash = 0;
-      for (let i = 0; i < this.length; i++) {
-        const char = this.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash; // Convert to 32bit integer
-      }
-      return Math.abs(hash);
     };
 
     const answerCall = async () => {
