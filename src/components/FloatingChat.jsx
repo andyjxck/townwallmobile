@@ -40,50 +40,18 @@ import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { expandImage } from '../utils/ai';
 import Markdown from 'react-native-markdown-display';
 
+import { 
+  createAgoraRtcEngine,
+  ChannelProfileType,
+  ClientRoleType,
+  RtcConnection,
+  IRtcEngineEventHandler,
+} from 'react-native-agora';
+
+const AGORA_APP_ID = process.env.EXPO_PUBLIC_AGORA_APP_ID;
+
 const isExpoGo = Constants.appOwnership === "expo";
 
-let JitsiMeeting = null;
-if (!isExpoGo && Platform.OS !== 'web') {
-  try {
-    JitsiMeeting = require('@jitsi/react-native-sdk').JitsiMeeting;
-  } catch (e) {
-    console.warn('Jitsi SDK not available:', e.message);
-  }
-}
-
-const SOUNDS = {
-  ringing: require('../../assets/sounds/ringtone.mp3'),
-  connect: require('../../assets/sounds/alert.mp3'),
-  disconnect: require('../../assets/sounds/alert.mp3'),
-  mute: require('../../assets/sounds/alert.mp3'),
-};
-
-const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", "🐵", "🦄", "🐲", "🤖", "👻", "👾", "👽", "💩"];
-
-import { ThemeProvider, useTheme } from "@/utils/ThemeContext";
-
-const { width, height } = Dimensions.get('window');
-
-  export default function FloatingChat() {
-    const { isHippie } = useTheme();
-    const router = useRouter();
-    const { auth: user, setAuth } = useAuthStore();
-    const { isOpen, activeChatId, open: setOpen, close: setClose, toggle: toggleChatGlobal, setActiveChatId, pendingCallUserId, pendingCallAction } = useChatStore();
-
-    const [activeChat, setActiveChat] = useState(null);
-    const activeChatRef = useRef(null);
-
-    useEffect(() => {
-      activeChatRef.current = activeChat;
-    }, [activeChat]);
-
-    useEffect(() => {
-      if (pendingCallAction && activeCall && activeCall.status === 'ringing' && !activeCall.isOutgoing) {
-        if (pendingCallAction === 'accept') {
-          answerCall();
-        } else if (pendingCallAction === 'decline') {
-          declineCall();
-        }
         // Clear action
         useChatStore.setState({ pendingCallAction: null });
       }
@@ -846,6 +814,79 @@ const { width, height } = Dimensions.get('window');
     }
   };
 
+    const agoraEngine = useRef(null);
+    const [isJoined, setIsJoined] = useState(false);
+    const [remoteUsers, setRemoteUsers] = useState([]);
+
+    useEffect(() => {
+      if (activeCall?.status === 'active' && AGORA_APP_ID) {
+        setupAgora();
+      } else if (!activeCall && isJoined) {
+        leaveAgora();
+      }
+    }, [activeCall?.status]);
+
+    const setupAgora = async () => {
+      try {
+        if (!agoraEngine.current) {
+          agoraEngine.current = createAgoraRtcEngine();
+          agoraEngine.current.initialize({
+            appId: AGORA_APP_ID,
+            channelProfile: ChannelProfileType.ChannelProfileCommunication,
+          });
+
+          agoraEngine.current.registerEventHandler({
+            onJoinChannelSuccess: (connection, elapsed) => {
+              console.log('Successfully joined channel:', connection.channelId);
+              setIsJoined(true);
+            },
+            onUserJoined: (connection, remoteUid) => {
+              console.log('Remote user joined:', remoteUid);
+              setRemoteUsers(prev => [...prev, remoteUid]);
+            },
+            onUserOffline: (connection, remoteUid) => {
+              console.log('Remote user offline:', remoteUid);
+              setRemoteUsers(prev => prev.filter(id => id !== remoteUid));
+            },
+            onLeaveChannel: (connection, stats) => {
+              console.log('Left channel');
+              setIsJoined(false);
+              setRemoteUsers([]);
+            },
+          });
+        }
+
+        await agoraEngine.current.enableAudio();
+        await agoraEngine.current.setClientRole(ClientRoleType.ClientRoleBroadcaster);
+        
+        const token = process.env.EXPO_PUBLIC_AGORA_TOKEN || '';
+        await agoraEngine.current.joinChannel(token, activeCall.id, user.id.hashCode() % 1000000, {});
+      } catch (e) {
+        console.error('Agora setup error:', e);
+      }
+    };
+
+    const leaveAgora = async () => {
+      try {
+        if (agoraEngine.current) {
+          await agoraEngine.current.leaveChannel();
+        }
+      } catch (e) {
+        console.error('Agora leave error:', e);
+      }
+    };
+
+    // Helper for generating numeric UID from string hash
+    String.prototype.hashCode = function() {
+      let hash = 0;
+      for (let i = 0; i < this.length; i++) {
+        const char = this.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32bit integer
+      }
+      return Math.abs(hash);
+    };
+
     const answerCall = async () => {
       if (!activeCall) return;
       
@@ -1187,30 +1228,15 @@ const { width, height } = Dimensions.get('window');
               <View style={styles.callOverlay}>
                 <BlurView intensity={100} style={StyleSheet.absoluteFill} tint="dark" />
                 
-                    {activeCall.status === 'active' && JitsiMeeting && (
-                      <View style={StyleSheet.absoluteFill}>
-                        <JitsiMeeting
-                          room={activeCall.id}
-                          serverURL={'https://meet.jit.si'}
-                          config={{
-                            audioOnly: true,
-                            startWithAudioMuted: false,
-                            startWithVideoMuted: true,
-                          }}
-                          onConferenceTerminated={endCall}
-                          style={{ flex: 1 }}
-                        />
-                      </View>
-                    )}
-                    {activeCall.status === 'active' && !JitsiMeeting && (
-                      <View style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', padding: 40 }]}>
+                    {activeCall.status === 'active' && !AGORA_APP_ID && (
+                      <View style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', padding: 40, zIndex: 100 }]}>
                         <View style={{ backgroundColor: 'rgba(255,255,255,0.1)', padding: 24, borderRadius: 24, alignItems: 'center' }}>
                           <PhoneOffIcon size={48} color={theme.colors.primary} style={{ marginBottom: 16 }} />
                           <Text style={{ color: '#FFF', fontSize: 18, fontWeight: 'bold', textAlign: 'center', marginBottom: 8 }}>
-                            Call Unavailable
+                            Agora Not Configured
                           </Text>
                           <Text style={{ color: 'rgba(255,255,255,0.6)', textAlign: 'center', fontSize: 14 }}>
-                            Voice calls are not supported in Expo Go. Please use a development build.
+                            Please add EXPO_PUBLIC_AGORA_APP_ID to your environment variables.
                           </Text>
                           <TouchableOpacity 
                             onPress={endCall}
