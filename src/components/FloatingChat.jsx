@@ -859,8 +859,23 @@ const isExpoGo = Constants.appOwnership === "expo";
         await agoraEngine.current.enableAudio();
         await agoraEngine.current.setClientRole(ClientRoleType.ClientRoleBroadcaster);
         
-        const token = process.env.EXPO_PUBLIC_AGORA_TOKEN || '';
-        await agoraEngine.current.joinChannel(token, activeCall.id, user.id.hashCode() % 1000000, {});
+        // Fetch token from Supabase Edge Function
+        const uid = user.id.hashCode() % 1000000;
+        const { data, error } = await supabase.functions.invoke('agora-token', {
+          body: {
+            channelName: activeCall.id,
+            uid: uid,
+            role: 'publisher'
+          }
+        });
+
+        if (error) {
+          console.error('Error fetching Agora token:', error);
+          Alert.alert('Call Error', 'Failed to initialize secure call connection.');
+          return;
+        }
+
+        await agoraEngine.current.joinChannel(data.token, activeCall.id, uid, {});
       } catch (e) {
         console.error('Agora setup error:', e);
       }
