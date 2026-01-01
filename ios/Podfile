@@ -1,3 +1,4 @@
+require 'fileutils'
 require File.join(File.dirname(`node --print "require.resolve('expo/package.json')"`), "scripts/autolinking")
 require File.join(File.dirname(`node --print "require.resolve('react-native/package.json')"`), "scripts/react_native_pods")
 
@@ -19,7 +20,21 @@ target 'TownWall' do
     installer.pod_targets.each do |pod|
       if pod.name == 'AgoraRtm' || pod.name == 'AgoraRtmKit'
         puts "Fixing Agora conflict for #{pod.name}: removing aosl.xcframework"
-        pod.spec_consumer.instance_variable_get(:@spec).attributes_hash['vendored_frameworks'].reject! { |f| f.include?('aosl.xcframework') } rescue nil
+        
+        # 1. Remove from spec to prevent CocoaPods from linking it twice
+        begin
+          pod.spec_consumer.instance_variable_get(:@spec).attributes_hash['vendored_frameworks'].reject! { |f| f.include?('aosl.xcframework') }
+        rescue => e
+          puts "Could not remove from spec: #{e.message}"
+        end
+
+        # 2. Physically remove the framework folder as recommended by official Agora docs
+        rtm_pod_path = File.join(installer.sandbox.root, pod.name)
+        aosl_xcframework_path = File.join(rtm_pod_path, 'aosl.xcframework')
+        if File.exist?(aosl_xcframework_path)
+          puts "Deleting aosl.xcframework from #{aosl_xcframework_path}"
+          FileUtils.rm_rf(aosl_xcframework_path)
+        end
       end
     end
   end
