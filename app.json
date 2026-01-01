@@ -55,9 +55,10 @@
       ],
       "package": "com.andysocial.townwall"
     },
-        "plugins": [
-          "./plugins/withNonModularHeaders",
-          "@config-plugins/react-native-webrtc",
+          "plugins": [
+            "./plugins/withAgoraFix",
+            "./plugins/withNonModularHeaders",
+            "@config-plugins/react-native-webrtc",
 
         [
           "expo-camera",
