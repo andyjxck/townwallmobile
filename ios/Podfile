@@ -41,15 +41,22 @@ target 'TownWall' do
     :privacy_file_aggregation_enabled => podfile_properties['apple.privacyManifestAggregationEnabled'] != 'false',
   )
 
-  post_install do |installer|
-    # Agora Conflict Fix: aosl.xcframework
-    installer.pods_project.targets.each do |target|
-      if target.name == 'AgoraRtm' || target.name == 'AgoraRtmKit'
-        target.build_configurations.each do |config|
-          config.build_settings['EXCLUDED_SOURCE_FILE_NAMES'] = 'aosl.xcframework'
+  pre_install do |installer|
+    # Fix Agora aosl.xcframework conflict between AgoraRtm and AgoraInfra_iOS
+    installer.pod_targets.each do |pod|
+      if pod.name == 'AgoraRtm'
+        def pod.build_settings_for_spec(spec, configuration: nil, target: nil)
+          settings = super
+          settings.define_singleton_method(:framework_search_paths_to_import) do
+            super().reject { |path| path.include?('aosl.xcframework') }
+          end
+          settings
         end
       end
     end
+  end
+
+  post_install do |installer|
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |config|
         config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'

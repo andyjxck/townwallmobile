@@ -11,9 +11,9 @@
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
-		D28E2AF109D345AF8CCE6B69 /* alert.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 83643CD1386349E3B14ABC34 /* alert.mp3 */; };
-		78B63745FEA24674B706F259 /* message.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = A454D9BABFB64767BAD11FF3 /* message.mp3 */; };
-		3D18687B7EB6471E81CAEF1A /* ringtone.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 7E67226019B140CCBE47F0C3 /* ringtone.mp3 */; };
+		76224691BE224243AC5850A3 /* alert.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 144C9B83594149749139C80A /* alert.mp3 */; };
+		9420059605FB4E60A3381D05 /* message.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = C718868606134B6EB6E5C081 /* message.mp3 */; };
+		0A15CD47736D43ECB65A9ABD /* ringtone.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 028139278BF94B57A627E9DB /* ringtone.mp3 */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -25,9 +25,9 @@
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = TownWall/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* TownWall-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "TownWall-Bridging-Header.h"; path = "TownWall/TownWall-Bridging-Header.h"; sourceTree = "<group>"; };
-		83643CD1386349E3B14ABC34 /* alert.mp3 */ = {isa = PBXFileReference; name = "alert.mp3"; path = "TownWall/alert.mp3"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
-		A454D9BABFB64767BAD11FF3 /* message.mp3 */ = {isa = PBXFileReference; name = "message.mp3"; path = "TownWall/message.mp3"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
-		7E67226019B140CCBE47F0C3 /* ringtone.mp3 */ = {isa = PBXFileReference; name = "ringtone.mp3"; path = "TownWall/ringtone.mp3"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		144C9B83594149749139C80A /* alert.mp3 */ = {isa = PBXFileReference; name = "alert.mp3"; path = "TownWall/alert.mp3"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		C718868606134B6EB6E5C081 /* message.mp3 */ = {isa = PBXFileReference; name = "message.mp3"; path = "TownWall/message.mp3"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		028139278BF94B57A627E9DB /* ringtone.mp3 */ = {isa = PBXFileReference; name = "ringtone.mp3"; path = "TownWall/ringtone.mp3"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -50,9 +50,9 @@
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
-				83643CD1386349E3B14ABC34 /* alert.mp3 */,
-				A454D9BABFB64767BAD11FF3 /* message.mp3 */,
-				7E67226019B140CCBE47F0C3 /* ringtone.mp3 */,
+				144C9B83594149749139C80A /* alert.mp3 */,
+				C718868606134B6EB6E5C081 /* message.mp3 */,
+				028139278BF94B57A627E9DB /* ringtone.mp3 */,
 			);
 			name = TownWall;
 			sourceTree = "<group>";
@@ -164,9 +164,9 @@
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
-				D28E2AF109D345AF8CCE6B69 /* alert.mp3 in Resources */,
-				78B63745FEA24674B706F259 /* message.mp3 in Resources */,
-				3D18687B7EB6471E81CAEF1A /* ringtone.mp3 in Resources */,
+				76224691BE224243AC5850A3 /* alert.mp3 in Resources */,
+				9420059605FB4E60A3381D05 /* message.mp3 in Resources */,
+				0A15CD47736D43ECB65A9ABD /* ringtone.mp3 in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
