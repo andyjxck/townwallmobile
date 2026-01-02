@@ -208,36 +208,35 @@ export async function sendPushNotification(expoPushToken, title, body, data = {}
   }
 }
 
-      export const sendNotification = async ({ userId, title, message, type, link, metadata }) => {
-        try {
-          // For reactions and shares, we want to be very strict to prevent spamming.
-          // We only ever send the FIRST notification for these types per specific content/link.
-          const isStrictType = ['reaction', 'share'].includes(type);
-          
-          let query = supabase
-            .from('rnotifications')
-            .select('id')
-            .eq('user_id', userId)
-            .eq('type', type);
+        export const sendNotification = async ({ userId, title, message, type, link, metadata }) => {
+          try {
+            // For reactions and shares, use a time-based window to prevent rapid spam
+            // but still allow multiple different users to trigger notifications
+            const isInteractionType = ['reaction', 'share'].includes(type);
+            
+            let query = supabase
+              .from('rnotifications')
+              .select('id')
+              .eq('user_id', userId)
+              .eq('type', type);
   
-          if (isStrictType) {
-            // For reactions/shares, check if THIS specific notification (based on link/post) already exists
-            if (link) query = query.eq('link', link);
-            // If it's a reaction, we also want to avoid spamming the same user even if the message varies slightly
-            // but usually the message is unique per reactor anyway.
-            // To be safe, we check if ANY notification of this type for this content already exists.
-          } else {
-            // For others, use a 1-minute window
-            const timeWindow = new Date(Date.now() - 60000).toISOString();
-            query = query.eq('title', title).eq('message', message).gt('created_at', timeWindow);
-          }
-      
-          const { data: existing } = await query.limit(1);
-      
-          if (existing && existing.length > 0) {
-            console.log(`Skipping duplicate notification (type: ${type})`);
-            return { success: true, skipped: true };
-          }
+            if (isInteractionType) {
+              // For reactions/shares, check if same message was sent recently (5 min window)
+              // This allows different users to trigger notifications while preventing spam
+              const timeWindow = new Date(Date.now() - 300000).toISOString();
+              query = query.eq('message', message).gt('created_at', timeWindow);
+            } else {
+              // For others, use a 1-minute window
+              const timeWindow = new Date(Date.now() - 60000).toISOString();
+              query = query.eq('title', title).eq('message', message).gt('created_at', timeWindow);
+            }
+        
+            const { data: existing } = await query.limit(1);
+        
+            if (existing && existing.length > 0) {
+              console.log(`Skipping duplicate notification (type: ${type})`);
+              return { success: true, skipped: true };
+            }
     
         const { data: newNotification, error } = await supabase
           .from('rnotifications')

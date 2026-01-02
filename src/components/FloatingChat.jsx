@@ -585,7 +585,7 @@ const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
     setLoading(true);
     const { data } = await supabase
       .from('rmessages')
-      .select('*, sender:rusers(id, username, emoji_icon, avatar_url)')
+      .select('*, sender:rusers(id, username, emoji_icon, avatar_url), is_system')
       .eq('chat_id', chatId)
       .order('created_at', { ascending: true });
     setMessages(data || []);
@@ -1173,6 +1173,18 @@ agoraEngine.current = null;
           is_admin: userId === user.id
         }))
       );
+
+      await supabase.from('rmessages').insert({
+        chat_id: chat.id,
+        sender_id: user.id,
+        text: `${user.username || 'Someone'} created the group`,
+        is_system: true
+      });
+
+      await supabase.from('rchats').update({
+        last_message: `${user.username || 'Someone'} created the group`,
+        last_message_at: new Date().toISOString()
+      }).eq('id', chat.id);
 
       setShowNewGroupModal(false);
       setGroupName('');
@@ -1823,14 +1835,23 @@ agoraEngine.current = null;
                   </View>
                 ) : (
                   <>
-                    <FlatList
-                      ref={flatListRef}
-                      data={messages}
-                      keyExtractor={item => item.id}
-                      renderItem={({ item }) => {
-                        const isMyMessage = item.sender_id === user?.id;
-                        return (
-                          <View style={[styles.messageBubble, isMyMessage ? styles.myMessage : styles.theirMessage, item.media_url && styles.mediaMessage]}>
+                      <FlatList
+                        ref={flatListRef}
+                        data={messages}
+                        keyExtractor={item => item.id}
+                        renderItem={({ item }) => {
+                          const isMyMessage = item.sender_id === user?.id;
+                          
+                          if (item.is_system) {
+                            return (
+                              <View style={styles.systemMessageContainer}>
+                                <Text style={styles.systemMessageText}>{item.text}</Text>
+                              </View>
+                            );
+                          }
+                          
+                          return (
+                            <View style={[styles.messageBubble, isMyMessage ? styles.myMessage : styles.theirMessage, item.media_url && styles.mediaMessage]}>
                             {activeChat?.is_group && !isMyMessage && (
                               <Text style={styles.senderName}>@{item.sender?.username}</Text>
                             )}
@@ -2281,6 +2302,20 @@ const styles = StyleSheet.create({
   },
   messagesList: {
     flex: 1,
+  },
+  systemMessageContainer: {
+    alignSelf: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    marginVertical: 10,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 16,
+  },
+  systemMessageText: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 12,
+    fontWeight: '500',
+    textAlign: 'center',
   },
   messageBubble: {
     padding: 12,

@@ -207,25 +207,37 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
           useChatStore.getState().setActiveChatId(chatId);
           useChatStore.getState().open();
         }
-      } else if (item.cta_type === 'group' && item.cta_group_id) {
-        const { data: membership } = await supabase
-          .from('rchat_members')
-          .select('*')
-          .eq('chat_id', item.cta_group_id)
-          .eq('user_id', user.id)
-          .single();
+        } else if (item.cta_type === 'group' && item.cta_group_id) {
+          const { data: membership } = await supabase
+            .from('rchat_members')
+            .select('*')
+            .eq('chat_id', item.cta_group_id)
+            .eq('user_id', user.id)
+            .single();
 
-        if (!membership) {
-          await supabase.from('rchat_members').insert({
-            chat_id: item.cta_group_id,
-            user_id: user.id,
-            is_admin: false
-          });
+          if (!membership) {
+            await supabase.from('rchat_members').insert({
+              chat_id: item.cta_group_id,
+              user_id: user.id,
+              is_admin: false
+            });
+
+            await supabase.from('rmessages').insert({
+              chat_id: item.cta_group_id,
+              sender_id: user.id,
+              text: `${user.username || 'Someone'} has joined the group`,
+              is_system: true
+            });
+
+            await supabase.from('rchats').update({
+              last_message: `${user.username || 'Someone'} has joined`,
+              last_message_at: new Date().toISOString()
+            }).eq('id', item.cta_group_id);
+          }
+
+          useChatStore.getState().setActiveChatId(item.cta_group_id);
+          useChatStore.getState().open();
         }
-
-        useChatStore.getState().setActiveChatId(item.cta_group_id);
-        useChatStore.getState().open();
-      }
     } catch (e) {
       console.error(e);
       Alert.alert("Error", "Failed to process request");
