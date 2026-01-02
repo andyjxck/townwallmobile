@@ -19,7 +19,7 @@ import { ErrorBoundaryWrapper } from "../../__create/SharedErrorBoundary";
 import * as Notifications from "expo-notifications";
 import { registerForPushNotificationsAsync } from "@/utils/notifications";
 import FloatingChat from "@/components/FloatingChat";
-import { InAppNotification, useInAppNotification } from "@/components/InAppNotification";
+import { InAppNotification, useInAppNotification } from "@/components/NotificationPanel";
 // Jitsi Meet globals are handled by the SDK
 
 const isExpoGo = Constants.appOwnership === "expo";
