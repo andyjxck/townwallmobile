@@ -19,6 +19,7 @@ import { ErrorBoundaryWrapper } from "../../__create/SharedErrorBoundary";
 import * as Notifications from "expo-notifications";
 import { registerForPushNotificationsAsync } from "@/utils/notifications";
 import FloatingChat from "@/components/FloatingChat";
+import { InAppNotification, useInAppNotification } from "@/components/InAppNotification";
 // Jitsi Meet globals are handled by the SDK
 
 const isExpoGo = Constants.appOwnership === "expo";
@@ -393,6 +394,7 @@ export default function RootLayout() {
 <Toaster />
                     <LayoutWithTheme />
                     <FloatingChat />
+                    <InAppNotification />
               </ThemeWrapper>
           </ErrorBoundaryWrapper>
         </GestureHandlerRootView>
