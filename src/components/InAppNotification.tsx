@@ -5,6 +5,7 @@ import { X, Bell, Heart, MessageCircle, UserPlus, AtSign } from 'lucide-react-na
 import * as Haptics from 'expo-haptics';
 import { create } from 'zustand';
 import { router } from 'expo-router';
+import { useChatStore } from '@/utils/auth';
 
 interface NotificationData {
   title: string;
@@ -78,6 +79,7 @@ const getIconColor = (type?: string) => {
 export function InAppNotification() {
   const insets = useSafeAreaInsets();
   const { visible, notification, hide } = useInAppNotification();
+  const chatStore = useChatStore();
   const translateY = useRef(new Animated.Value(-150)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
@@ -132,43 +134,42 @@ export function InAppNotification() {
 
     hideNotification();
 
-    setTimeout(() => {
-      if (link) {
-        router.push(link as any);
-        return;
-      }
+      setTimeout(() => {
+        if (link) {
+          router.push(link as any);
+          return;
+        }
 
-      switch (type) {
-        case 'like':
-        case 'post_like':
-        case 'comment':
-        case 'reply':
-        case 'mention':
-          if (post_id) {
-            router.push(`/(root)/post/${post_id}` as any);
-          }
-          break;
-        case 'comment_like':
-          if (post_id) {
-            router.push(`/(root)/post/${post_id}` as any);
-          }
-          break;
-        case 'follow':
-        case 'follow_request':
-          if (user_id) {
-            router.push(`/(root)/profile/${user_id}` as any);
-          }
-          break;
+        switch (type) {
+          case 'like':
+          case 'post_like':
+          case 'comment':
+          case 'reply':
+          case 'mention':
+            if (post_id) {
+              router.push({ pathname: '/post', params: { id: post_id } } as any);
+            }
+            break;
+          case 'comment_like':
+            if (post_id) {
+              router.push({ pathname: '/post', params: { id: post_id } } as any);
+            }
+            break;
+          case 'follow':
+          case 'follow_request':
+            if (user_id) {
+              router.push({ pathname: '/profile', params: { id: user_id } } as any);
+            }
+            break;
         case 'message':
         case 'dm':
           if (conversation_id) {
-            router.push(`/(root)/messages/${conversation_id}` as any);
+            chatStore.open(conversation_id);
           } else if (sender_id) {
-            router.push(`/(root)/messages/${sender_id}` as any);
+            chatStore.open(sender_id);
           }
           break;
         default:
-          router.push('/(root)/(tabs)/notifications' as any);
           break;
       }
     }, 250);
