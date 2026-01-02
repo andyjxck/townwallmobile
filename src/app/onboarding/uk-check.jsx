@@ -3,34 +3,25 @@ import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { Globe } from "lucide-react-native";
+import { Globe, MapPin } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import { useTheme } from "@/utils/ThemeContext";
 import { LinearGradient } from "expo-linear-gradient";
-import { useLocationStore } from "@/utils/locationStore";
-import { setOnboardingComplete } from "@/utils/onboarding";
+import { useChatStore } from "@/utils/auth";
 
-export default function UKCheckScreen() {
+export default function UkCheckScreen() {
   const { isHippie } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { setFeedView, setCity } = useLocationStore();
 
   const handleYes = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     router.push("/onboarding/city");
   };
 
-  const handleNo = async () => {
+  const handleNo = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setFeedView("global");
-    setCity({
-      id: 321,
-      name: "Global",
-      source: "manual",
-    });
-    await setOnboardingComplete(true);
-    router.replace("/");
+    router.push("/auth?global=true");
   };
 
   return (
@@ -44,29 +35,31 @@ export default function UKCheckScreen() {
       <StatusBar style="light" />
 
       <View
-        style={{ flex: 1, paddingTop: insets.top + 60, paddingHorizontal: 24, justifyContent: 'center' }}
+        style={{ flex: 1, paddingTop: insets.top + 80, paddingHorizontal: 24 }}
       >
-        <View style={{ alignItems: 'center', marginBottom: 60 }}>
+        <View style={{ alignItems: "center", marginBottom: 60 }}>
           <View
             style={{
               width: 100,
               height: 100,
               borderRadius: 50,
-              backgroundColor: "rgba(74, 222, 128, 0.1)",
+              backgroundColor: "rgba(255,255,255,0.06)",
               justifyContent: "center",
               alignItems: "center",
               marginBottom: 32,
             }}
           >
-            <Globe size={50} color="#4ADE80" />
+            <Text style={{ fontSize: 56 }}>🇬🇧</Text>
           </View>
+
           <Text
             style={{
               color: "#FFFFFF",
               fontSize: 32,
-              fontWeight: "800",
-              textAlign: "center",
+              fontWeight: "900",
+              letterSpacing: -1,
               marginBottom: 16,
+              textAlign: "center",
             }}
           >
             Are you from the UK?
@@ -75,11 +68,13 @@ export default function UKCheckScreen() {
             style={{
               color: "rgba(255,255,255,0.5)",
               fontSize: 16,
-              textAlign: "center",
+              fontWeight: "500",
               lineHeight: 24,
+              textAlign: "center",
+              maxWidth: 280,
             }}
           >
-            Town Wall currently has local communities in the UK
+            Town Wall is currently focused on UK communities
           </Text>
         </View>
 
@@ -87,12 +82,16 @@ export default function UKCheckScreen() {
           <TouchableOpacity
             onPress={handleYes}
             style={{
-              backgroundColor: "#4ADE80",
-              paddingVertical: 18,
+              backgroundColor: "#FFFFFF",
+              paddingVertical: 20,
               borderRadius: 16,
               alignItems: "center",
+              flexDirection: "row",
+              justifyContent: "center",
+              gap: 12,
             }}
           >
+            <MapPin size={22} color="#000000" />
             <Text
               style={{
                 color: "#000000",
@@ -100,21 +99,25 @@ export default function UKCheckScreen() {
                 fontWeight: "700",
               }}
             >
-              Yes
+              Yes, I'm in the UK
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             onPress={handleNo}
             style={{
-              backgroundColor: "rgba(255,255,255,0.1)",
-              paddingVertical: 18,
+              backgroundColor: "rgba(255,255,255,0.06)",
+              paddingVertical: 20,
               borderRadius: 16,
               alignItems: "center",
+              flexDirection: "row",
+              justifyContent: "center",
+              gap: 12,
               borderWidth: 1,
-              borderColor: "rgba(255,255,255,0.2)",
+              borderColor: "rgba(255,255,255,0.1)",
             }}
           >
+            <Globe size={22} color="#FFFFFF" />
             <Text
               style={{
                 color: "#FFFFFF",
@@ -122,25 +125,26 @@ export default function UKCheckScreen() {
                 fontWeight: "700",
               }}
             >
-              No
+              No, join Global Chat
             </Text>
           </TouchableOpacity>
         </View>
 
-        <Text
-          style={{
-            color: "rgba(255,255,255,0.4)",
-            fontSize: 14,
-            textAlign: "center",
-            marginTop: 40,
-            lineHeight: 20,
-          }}
-        >
-          If you're not from the UK, you'll join our Global Chat to connect with people worldwide
-        </Text>
-      </View>
+        <View style={{ flex: 1 }} />
 
-      <View style={{ paddingBottom: insets.bottom + 24 }} />
+        <View style={{ paddingBottom: insets.bottom + 24, alignItems: "center" }}>
+          <Text
+            style={{
+              color: "rgba(255,255,255,0.4)",
+              fontSize: 13,
+              textAlign: "center",
+              lineHeight: 20,
+            }}
+          >
+            Non-UK users can still connect with{"\n"}the global community
+          </Text>
+        </View>
+      </View>
     </View>
   );
 }

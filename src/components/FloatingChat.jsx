@@ -562,6 +562,8 @@ const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
     } catch (error) { console.error(error); }
   };
 
+  const messageChannelRef = useRef(null);
+
   useEffect(() => {
     if (activeChat?.id) {
       loadMessages(activeChat.id);
@@ -570,8 +572,50 @@ const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
       if (activeChat.is_group) {
         loadGroupMembers(activeChat.id);
       }
+
+      if (messageChannelRef.current) {
+        supabase.removeChannel(messageChannelRef.current);
+      }
+
+      const channel = supabase
+        .channel(`chat-messages-${activeChat.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'rmessages',
+            filter: `chat_id=eq.${activeChat.id}`,
+          },
+          async (payload) => {
+            const newMsg = payload.new;
+            if (newMsg.sender_id !== user?.id) {
+              const { data: msgWithSender } = await supabase
+                .from('rmessages')
+                .select('*, sender:rusers(id, username, emoji_icon, avatar_url), is_system')
+                .eq('id', newMsg.id)
+                .single();
+              
+              if (msgWithSender) {
+                setMessages(prev => [...prev, msgWithSender]);
+                setTimeout(() => flatListRef.current?.scrollToEnd(), 100);
+                markAllAsRead(activeChat.id);
+              }
+            }
+          }
+        )
+        .subscribe();
+
+      messageChannelRef.current = channel;
     }
-  }, [activeChat?.id]);
+
+    return () => {
+      if (messageChannelRef.current) {
+        supabase.removeChannel(messageChannelRef.current);
+        messageChannelRef.current = null;
+      }
+    };
+  }, [activeChat?.id, user?.id]);
 
   const loadGroupMembers = async (chatId) => {
     const { data } = await supabase
@@ -660,11 +704,27 @@ const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
   const loadMessages = async (chatId) => {
     if (!chatId) return;
     setLoading(true);
-    const { data } = await supabase
+    
+    let query = supabase
       .from('rmessages')
       .select('*, sender:rusers(id, username, emoji_icon, avatar_url), is_system')
       .eq('chat_id', chatId)
       .order('created_at', { ascending: true });
+    
+    if (activeChat?.is_group && user?.id) {
+      const { data: memberData } = await supabase
+        .from('rchat_members')
+        .select('created_at')
+        .eq('chat_id', chatId)
+        .eq('user_id', user.id)
+        .single();
+      
+      if (memberData?.created_at) {
+        query = query.gte('created_at', memberData.created_at);
+      }
+    }
+    
+    const { data } = await query;
     setMessages(data || []);
     setLoading(false);
     setTimeout(() => flatListRef.current?.scrollToEnd(), 100);
@@ -885,19 +945,21 @@ const stopRecording = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     try {
-      const { data, error } = await supabase
-        .from('rmessages')
-        .insert({
-          chat_id: activeChat.id,
-          sender_id: user.id,
-          text: text || '',
-          media_url: finalMediaUrl,
-          media_type: finalMediaType
-        }).select().single();
+        const { data, error } = await supabase
+          .from('rmessages')
+          .insert({
+            chat_id: activeChat.id,
+            sender_id: user.id,
+            text: text || '',
+            media_url: finalMediaUrl,
+            media_type: finalMediaType
+          }).select('*, sender:rusers(id, username, emoji_icon, avatar_url), is_system').single();
 
-      if (error) throw error;
+        if (error) throw error;
 
-        if (data) {
+          if (data) {
+            setMessages(prev => [...prev, data]);
+            setTimeout(() => flatListRef.current?.scrollToEnd(), 100);
           const mediaPrefix = (finalMediaType === 'audio' || finalMediaType === 'image') ? 'an' : 'a';
           const mediaMessageText = `Sent ${mediaPrefix} ${finalMediaType}`;
 
@@ -1236,7 +1298,8 @@ agoraEngine.current = null;
         is_group: true,
         group_name: groupName.trim(),
         group_icon: groupAvatarUrl || groupIcon || '👥',
-        status: 'accepted'
+        status: 'accepted',
+        owner_id: user.id
       })
       .select()
       .single();
@@ -1247,7 +1310,8 @@ agoraEngine.current = null;
         members.map((userId, index) => ({
           chat_id: chat.id,
           user_id: userId,
-          is_admin: userId === user.id
+          is_admin: userId === user.id,
+          is_owner: userId === user.id
         }))
       );
 
@@ -1751,38 +1815,131 @@ agoraEngine.current = null;
                     <Text style={styles.groupInfoCount}>{groupMembers.length} members</Text>
                   </View>
 
-                  <Text style={styles.sectionTitle}>Members</Text>
-                  <ScrollView style={styles.membersList}>
-                    {groupMembers.map((member) => (
-                      <TouchableOpacity 
-                        key={member.id} 
-                        style={styles.memberItem}
-                        onPress={() => {
-                          if (member.user?.username) {
-                            setShowGroupInfo(false);
-                            setClose();
-                            router.push(`/profile?username=${member.user.username}`);
-                          }
-                        }}
-                      >
-                        {member.user?.avatar_url ? (
-                          <Image source={{ uri: member.user.avatar_url }} style={styles.memberAvatar} />
-                        ) : (
-                          <View style={styles.memberEmojiBg}>
-                            <Text style={styles.memberEmoji}>{member.user?.emoji_icon || '👤'}</Text>
+                    <Text style={styles.sectionTitle}>Members</Text>
+                    <ScrollView style={styles.membersList}>
+                      {groupMembers.map((member) => {
+                        const isOwner = activeChat?.owner_id === member.user_id || member.is_owner;
+                        const currentUserIsOwner = activeChat?.owner_id === user?.id || groupMembers.find(m => m.user_id === user?.id)?.is_owner;
+                        const currentUserIsAdmin = groupMembers.find(m => m.user_id === user?.id)?.is_admin;
+                        const canManage = currentUserIsOwner && member.user_id !== user?.id;
+                        
+                        return (
+                        <TouchableOpacity 
+                          key={member.id} 
+                          style={styles.memberItem}
+                          onPress={() => {
+                            if (member.user?.username) {
+                              setShowGroupInfo(false);
+                              setClose();
+                              router.push(`/profile?username=${member.user.username}`);
+                            }
+                          }}
+                          onLongPress={() => {
+                            if (canManage) {
+                              Alert.alert(
+                                `Manage @${member.user?.username}`,
+                                'Choose an action',
+                                [
+                                  { text: 'Cancel', style: 'cancel' },
+                                  { 
+                                    text: member.is_admin ? 'Demote from Admin' : 'Promote to Admin', 
+                                    onPress: async () => {
+                                      await supabase.from('rchat_members').update({ is_admin: !member.is_admin }).eq('id', member.id);
+                                      loadGroupMembers(activeChat.id);
+                                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                                    }
+                                  },
+                                  { 
+                                    text: 'Kick from Group', 
+                                    style: 'destructive',
+                                    onPress: async () => {
+                                      await supabase.from('rchat_members').delete().eq('id', member.id);
+                                      await supabase.from('rmessages').insert({
+                                        chat_id: activeChat.id,
+                                        sender_id: user.id,
+                                        text: `${member.user?.username || 'Someone'} was removed from the group`,
+                                        is_system: true
+                                      });
+                                      loadGroupMembers(activeChat.id);
+                                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                                    }
+                                  },
+                                ]
+                              );
+                            }
+                          }}
+                        >
+                          {member.user?.avatar_url ? (
+                            <Image source={{ uri: member.user.avatar_url }} style={styles.memberAvatar} />
+                          ) : (
+                            <View style={styles.memberEmojiBg}>
+                              <Text style={styles.memberEmoji}>{member.user?.emoji_icon || '👤'}</Text>
+                            </View>
+                          )}
+                          <View style={styles.memberInfo}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                              <Text style={styles.memberName}>@{member.user?.username}</Text>
+                              {isOwner && <View style={styles.ownerBadge}><Text style={styles.ownerBadgeText}>Owner</Text></View>}
+                              {member.is_admin && !isOwner && <Text style={styles.adminBadge}>Admin</Text>}
+                            </View>
                           </View>
-                        )}
-                        <View style={styles.memberInfo}>
-                          <Text style={styles.memberName}>@{member.user?.username}</Text>
-                          {member.is_admin && <Text style={styles.adminBadge}>Admin</Text>}
-                        </View>
-                        {member.user_id === user?.id && <Text style={styles.youBadge}>You</Text>}
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
+                          {member.user_id === user?.id && <Text style={styles.youBadge}>You</Text>}
+                        </TouchableOpacity>
+                      );
+                      })}
+                    </ScrollView>
 
                   <View style={styles.groupActions}>
-                    <TouchableOpacity style={styles.groupActionBtn} onPress={handleLeaveGroup}>
+                      {(activeChat?.owner_id === user?.id || groupMembers.find(m => m.user_id === user?.id)?.is_owner) && (
+                        <>
+                          <TouchableOpacity style={styles.groupActionBtn} onPress={() => {
+                            Alert.prompt(
+                              'Change Group Name',
+                              'Enter new group name',
+                              async (newName) => {
+                                if (newName && newName.trim()) {
+                                  await supabase.from('rchats').update({ group_name: newName.trim() }).eq('id', activeChat.id);
+                                  setActiveChat(prev => ({ ...prev, group_name: newName.trim() }));
+                                  loadUserAndChats();
+                                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                                }
+                              },
+                              'plain-text',
+                              activeChat?.group_name
+                            );
+                          }}>
+                            <Settings size={20} color={theme.colors.primary} />
+                            <Text style={[styles.groupActionText, { color: theme.colors.primary }]}>Change Group Name</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity style={styles.groupActionBtn} onPress={() => {
+                            Alert.alert(
+                              'Close Group',
+                              'This will permanently delete the group and all messages. Are you sure?',
+                              [
+                                { text: 'Cancel', style: 'cancel' },
+                                {
+                                  text: 'Delete Group',
+                                  style: 'destructive',
+                                  onPress: async () => {
+                                    await supabase.from('rmessages').delete().eq('chat_id', activeChat.id);
+                                    await supabase.from('rchat_members').delete().eq('chat_id', activeChat.id);
+                                    await supabase.from('rchats').delete().eq('id', activeChat.id);
+                                    setShowGroupInfo(false);
+                                    setActiveChat(null);
+                                    setShowChatList(true);
+                                    loadUserAndChats();
+                                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                                  }
+                                }
+                              ]
+                            );
+                          }}>
+                            <Trash2 size={20} color="#EF4444" />
+                            <Text style={[styles.groupActionText, { color: '#EF4444' }]}>Delete Group</Text>
+                          </TouchableOpacity>
+                        </>
+                      )}
+                      <TouchableOpacity style={styles.groupActionBtn} onPress={handleLeaveGroup}>
                       <LogOut size={20} color="#EF4444" />
                       <Text style={[styles.groupActionText, { color: '#EF4444' }]}>Leave Group</Text>
                     </TouchableOpacity>
@@ -3143,6 +3300,17 @@ const styles = StyleSheet.create({
       fontSize: 12,
       fontWeight: '700',
       marginTop: 2,
+    },
+    ownerBadge: {
+      backgroundColor: '#F59E0B',
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: 10,
+    },
+    ownerBadgeText: {
+      color: '#000',
+      fontSize: 10,
+      fontWeight: '700',
     },
     youBadge: {
       color: 'rgba(255,255,255,0.4)',
