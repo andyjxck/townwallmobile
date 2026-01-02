@@ -87,7 +87,7 @@ const FullVideoPlayer = ({ url, style }) => {
   );
 };
 
-export default function PostItem({ item, deviceId, onReaction, onComment, onDelete, onShare, onEdit, user, onFilterZone, onFilterTag, onModAction }) {
+export default function PostItem({ item, deviceId, onReaction, onComment, onDelete, onShare, onEdit, user, onFilterZone, onFilterTag, onModAction, isHighlighted }) {
   if (!item) return null;
   const { width } = useWindowDimensions();
   const router = useRouter();
@@ -332,7 +332,11 @@ export default function PostItem({ item, deviceId, onReaction, onComment, onDele
   };
 
   return (
-    <View style={[styles.container, isCurrentlyBlurred && { paddingBottom: 10, marginBottom: 10 }]}>
+    <View style={[
+      styles.container, 
+      isCurrentlyBlurred && { paddingBottom: 10, marginBottom: 10 },
+      isHighlighted && styles.highlightedContainer
+    ]}>
       {item.isPending && (
         <View style={styles.pendingBanner}>
           <CloudOff size={14} color="#92400E" />
@@ -1101,6 +1105,12 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 16,
     fontWeight: '600',
+  },
+  highlightedContainer: {
+    borderWidth: 2,
+    borderColor: theme.colors.primary,
+    borderRadius: 16,
+    backgroundColor: 'rgba(168, 216, 78, 0.08)',
   },
 });
 

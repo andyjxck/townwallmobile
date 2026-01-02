@@ -46,7 +46,7 @@ import { supabase } from "../utils/supabase";
 import * as Haptics from "expo-haptics";
 import { theme } from "../utils/theme";
 import { getStoredUser } from "../utils/user";
-import { useAuthStore, useChatStore } from "../utils/auth";
+import { useAuthStore, useChatStore, useFeedHighlightStore } from "../utils/auth";
 import { useTheme } from "../utils/ThemeContext";
 import NotificationPanel from "./NotificationPanel";
 import { ShareManager } from "./ShareManager";
@@ -84,6 +84,8 @@ export default function UniversalFeed() {
   
     const { city_id, city_name, zone_id, zone_name, feedView, setFeedView, savedCity } = useLocationStore();
     const [showLocationPicker, setShowLocationPicker] = useState(false);
+    const flatListRef = useRef(null);
+    const { highlightedPostId, clearHighlight } = useFeedHighlightStore();
 
   
     const postsWithAds = useMemo(() => {
@@ -128,6 +130,41 @@ return () => {
         unsubscribeNetwork();
       };
     }, [selectedZone, sortBy, city_id, feedView]);
+
+  useEffect(() => {
+    if (!highlightedPostId) return;
+    
+    const fetchHighlightedPost = async () => {
+      try {
+        const { data: highlightedPost } = await supabase
+          .from("rposts")
+          .select(`id, title, text, created_at, user_id, zone_id, tag_id, image_url, image_urls, is_anonymous, moderation_status, is_deleted, is_blurred, blur_reason, comments_disabled, city_id, cta_type, cta_group_id, user:rusers (username, emoji_icon, avatar_url, last_seen), zone:rzones (name), tag:rtags (name), poll_id, reactions:rreactions (reaction_type, device_id)`)
+          .eq("id", highlightedPostId)
+          .single();
+        
+        if (highlightedPost) {
+          setPosts(prevPosts => {
+            const filtered = prevPosts.filter(p => p.id !== highlightedPostId);
+            return [{ ...highlightedPost, isHighlighted: true }, ...filtered];
+          });
+          
+          setTimeout(() => {
+            flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+          }, 100);
+          
+          setTimeout(() => {
+            setPosts(prevPosts => prevPosts.map(p => ({ ...p, isHighlighted: false })));
+            clearHighlight();
+          }, 3000);
+        }
+      } catch (err) {
+        console.error('Error fetching highlighted post:', err);
+        clearHighlight();
+      }
+    };
+    
+    fetchHighlightedPost();
+  }, [highlightedPostId]);
 
   const loadPendingPosts = async () => {
     const pending = await offlineStorage.getPendingPosts();
@@ -372,6 +409,7 @@ if (isOnline) syncPendingPosts();
         )}
 
         <FlatList
+          ref={flatListRef}
           data={postsWithAds}
             renderItem={({ item, index }) => {
               return (
@@ -388,6 +426,7 @@ if (isOnline) syncPendingPosts();
                     onFilterZone={(zoneId) => setSelectedZone(zoneId)}
                     onFilterTag={() => {}}
                     onModAction={handleModAction}
+                    isHighlighted={item.isHighlighted}
                   />
                 </View>
               );

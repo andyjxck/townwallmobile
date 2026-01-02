@@ -5,7 +5,7 @@ import { X, Bell, Heart, MessageCircle, UserPlus, AtSign } from 'lucide-react-na
 import * as Haptics from 'expo-haptics';
 import { create } from 'zustand';
 import { router } from 'expo-router';
-import { useChatStore } from '@/utils/auth';
+import { useChatStore, useFeedHighlightStore } from '@/utils/auth';
 
 interface NotificationData {
   title: string;
@@ -146,13 +146,10 @@ export function InAppNotification() {
           case 'comment':
           case 'reply':
           case 'mention':
-            if (post_id) {
-              router.push({ pathname: '/post', params: { id: post_id } } as any);
-            }
-            break;
           case 'comment_like':
             if (post_id) {
-              router.push({ pathname: '/post', params: { id: post_id } } as any);
+              useFeedHighlightStore.getState().setHighlightedPost(post_id);
+              router.replace('/');
             }
             break;
           case 'follow':

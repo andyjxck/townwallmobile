@@ -53,3 +53,12 @@ export const useChatStore = create((set) => ({
   setPendingCallUserId: (userId) => set({ pendingCallUserId: userId, isOpen: true }),
   setPendingCallAction: (action) => set({ pendingCallAction: action, isOpen: true }),
 }));
+
+/**
+ * This store manages highlighted post in feed (from notification clicks).
+ */
+export const useFeedHighlightStore = create((set) => ({
+  highlightedPostId: null,
+  setHighlightedPost: (postId) => set({ highlightedPostId: postId }),
+  clearHighlight: () => set({ highlightedPostId: null }),
+}));
