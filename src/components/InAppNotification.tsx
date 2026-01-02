@@ -4,8 +4,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X, Bell, Heart, MessageCircle, UserPlus, AtSign } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { create } from 'zustand';
-import { router } from 'expo-router';
-import { useChatStore, useFeedHighlightStore } from '@/utils/auth';
 
 interface NotificationData {
   title: string;
@@ -79,7 +77,6 @@ const getIconColor = (type?: string) => {
 export function InAppNotification() {
   const insets = useSafeAreaInsets();
   const { visible, notification, hide } = useInAppNotification();
-  const chatStore = useChatStore();
   const translateY = useRef(new Animated.Value(-150)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
@@ -124,54 +121,6 @@ export function InAppNotification() {
     });
   };
 
-  const handlePress = () => {
-    if (!notification?.data) {
-      hideNotification();
-      return;
-    }
-
-    const { type, link, post_id, comment_id, user_id, conversation_id, sender_id } = notification.data;
-
-    hideNotification();
-
-      setTimeout(() => {
-        if (link) {
-          router.push(link as any);
-          return;
-        }
-
-        switch (type) {
-          case 'like':
-          case 'post_like':
-          case 'comment':
-          case 'reply':
-          case 'mention':
-          case 'comment_like':
-            if (post_id) {
-              useFeedHighlightStore.getState().setHighlightedPost(post_id);
-              router.replace('/');
-            }
-            break;
-          case 'follow':
-          case 'follow_request':
-            if (user_id) {
-              router.push({ pathname: '/profile', params: { id: user_id } } as any);
-            }
-            break;
-        case 'message':
-        case 'dm':
-          if (conversation_id) {
-            chatStore.open(conversation_id);
-          } else if (sender_id) {
-            chatStore.open(sender_id);
-          }
-          break;
-        default:
-          break;
-      }
-    }, 250);
-  };
-
   if (!visible || !notification) return null;
 
   const IconComponent = getNotificationIcon(notification.data?.type);
@@ -188,11 +137,7 @@ export function InAppNotification() {
         },
       ]}
     >
-      <TouchableOpacity 
-        style={styles.content} 
-        onPress={handlePress}
-        activeOpacity={0.9}
-      >
+      <View style={styles.content}>
         <View style={[styles.iconContainer, { backgroundColor: `${iconColor}30` }]}>
           <IconComponent size={20} color={iconColor} />
         </View>
@@ -205,16 +150,13 @@ export function InAppNotification() {
           </Text>
         </View>
         <TouchableOpacity 
-          onPress={(e) => {
-            e.stopPropagation();
-            hideNotification();
-          }} 
+          onPress={hideNotification} 
           style={styles.closeButton}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <X size={18} color="rgba(255,255,255,0.6)" />
         </TouchableOpacity>
-      </TouchableOpacity>
+      </View>
     </Animated.View>
   );
 }
