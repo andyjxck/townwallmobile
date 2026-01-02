@@ -18,12 +18,17 @@ target 'TownWall' do
   pre_install do |installer|
     # Fix Agora aosl.xcframework conflict between AgoraRtm and AgoraInfra_iOS
     installer.pod_targets.each do |pod|
-      if pod.name == 'AgoraRtm' || pod.name == 'AgoraRtmKit'
+      if pod.name == 'AgoraRtm' || pod.name == 'AgoraRtmKit' || pod.name == 'agora-react-native-rtm'
         puts "Fixing Agora conflict for #{pod.name}: removing aosl.xcframework"
         
         # 1. Remove from spec to prevent CocoaPods from linking it twice
         begin
-          pod.spec_consumer.instance_variable_get(:@spec).attributes_hash['vendored_frameworks'].reject! { |f| f.include?('aosl.xcframework') }
+          if pod.respond_to?(:spec_consumer)
+            spec = pod.spec_consumer.instance_variable_get(:@spec)
+            if spec && spec.attributes_hash['vendored_frameworks']
+              spec.attributes_hash['vendored_frameworks'].reject! { |f| f.include?('aosl.xcframework') }
+            end
+          end
         rescue => e
           puts "Could not remove from spec: #{e.message}"
         end

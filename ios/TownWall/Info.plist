@@ -78,8 +78,6 @@
     <string>Allow $(PRODUCT_NAME) to access your location to show nearby businesses and talent.</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your microphone for audio calls in chat.</string>
-    <key>NSMotionUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your device motion</string>
     <key>NSPhotoLibraryUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your photos</string>
     <key>NSRemindersFullAccessUsageDescription</key>
