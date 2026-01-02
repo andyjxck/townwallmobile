@@ -96,7 +96,7 @@ PODS:
     - ExpoModulesCore
   - EXNotifications (0.32.15):
     - ExpoModulesCore
-  - Expo (54.0.1):
+  - Expo (54.0.30):
     - ExpoModulesCore
     - hermes-engine
     - RCTRequired
@@ -180,7 +180,7 @@ PODS:
     - ExpoModulesCore
   - ExpoLocation (19.0.8):
     - ExpoModulesCore
-  - ExpoModulesCore (3.0.15):
+  - ExpoModulesCore (3.0.29):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -3199,7 +3199,7 @@ SPEC CHECKSUMS:
   EXJSONUtils: 1d3e4590438c3ee593684186007028a14b3686cd
   EXManifests: a8d97683e5c7a3b026ffbd58559c64dc655b747b
   EXNotifications: 983f04ad4ad879b181179e326bf220541e478386
-  Expo: 18672f2f6ca87eea0972e3a4cf3fa84193e66233
+  Expo: 1f4ad94ec8871303ed391aa21ff93e9cc69ac3f7
   ExpoAdapterGoogleSignIn: 3400db1f94651c59f123494ff66562e102922733
   ExpoAsset: f867e55ceb428aab99e1e8c082b5aee7c159ea18
   ExpoAudio: a05a68b4a0bed05b3f255fd60ff4405b4e7e009a
@@ -3223,7 +3223,7 @@ SPEC CHECKSUMS:
   ExpoLinearGradient: 809102bdb979f590083af49f7fa4805cd931bd58
   ExpoLinking: 8f0aaf69aa56f832913030503b6263dc6f647f37
   ExpoLocation: d5b61cb4970fa982e39ca94246a206a0c3b812ca
-  ExpoModulesCore: ecb96f70bf2a80d31e87ce0a2ac980563c0df6e5
+  ExpoModulesCore: 031cf9b42fab2e84dcf34087dbd12ae666c100e0
   ExpoNetwork: ee1fb67b0de59ab7f36794caf8242955dd8ae046
   ExpoSecureStore: d32f751874a2ceb5aaeebeb3578e165c1ba2b24a
   ExpoSensors: 8f9fe9a9ffd36ca9c2f0fe40dafc0a063f844420
@@ -3357,6 +3357,6 @@ SPEC CHECKSUMS:
   Yoga: 2c1f55d9d91a1cec2fb8cc6dd27da33199ffdb52
   ZXingObjC: 8898711ab495761b2dbbdec76d90164a6d7e14c5
 
-PODFILE CHECKSUM: 866b42635685f94b0e8ecbeac931d1dc017cb8cf
+PODFILE CHECKSUM: ba6572a6e7d4607fb4433813e54bb12f2ad46816
 
 COCOAPODS: 1.16.2

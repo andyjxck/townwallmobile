@@ -11,27 +11,27 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.andysocial.townwall",
-        "infoPlist": {
-          "ITSAppUsesNonExemptEncryption": false,
-          "LSApplicationQueriesSchemes": [
-            "tel",
-            "telprompt",
-            "mailto",
-            "itms-apps",
-            "https",
-            "http"
-          ],
-          "NSCameraUsageDescription": "Allow $(PRODUCT_NAME) to access your camera to take photos for your business listing or profile.",
-          "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to access your microphone for audio calls in chat.",
-          "NSLocationWhenInUseUsageDescription": "Allow $(PRODUCT_NAME) to access your location to show nearby businesses and talent.",
-          "NSLocationAlwaysAndWhenInUseUsageDescription": "Allow $(PRODUCT_NAME) to access your location to show nearby businesses and talent.",
-          "NSContactsUsageDescription": "Allow $(PRODUCT_NAME) to access your contacts to help you find friends.",
-          "NSCalendarsUsageDescription": "Allow $(PRODUCT_NAME) to access your calendar to save local events.",
-          "UIBackgroundModes": [
-            "audio",
-            "remote-notification"
-          ]
-        }
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "LSApplicationQueriesSchemes": [
+          "tel",
+          "telprompt",
+          "mailto",
+          "itms-apps",
+          "https",
+          "http"
+        ],
+        "NSCameraUsageDescription": "Allow $(PRODUCT_NAME) to access your camera to take photos for your business listing or profile.",
+        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to access your microphone for audio calls in chat.",
+        "NSLocationWhenInUseUsageDescription": "Allow $(PRODUCT_NAME) to access your location to show nearby businesses and talent.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Allow $(PRODUCT_NAME) to access your location to show nearby businesses and talent.",
+        "NSContactsUsageDescription": "Allow $(PRODUCT_NAME) to access your contacts to help you find friends.",
+        "NSCalendarsUsageDescription": "Allow $(PRODUCT_NAME) to access your calendar to save local events.",
+        "UIBackgroundModes": [
+          "audio",
+          "remote-notification"
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -55,13 +55,12 @@
       ],
       "package": "com.andysocial.townwall"
     },
-          "plugins": [
-            "./plugins/withAgoraFix",
-            "./plugins/withNonModularHeaders",
-            "@config-plugins/react-native-webrtc",
-
-        [
-          "expo-camera",
+    "plugins": [
+      "./plugins/withAgoraFix",
+      "./plugins/withNonModularHeaders",
+      "@config-plugins/react-native-webrtc",
+      [
+        "expo-camera",
         {
           "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera"
         }
@@ -118,29 +117,30 @@
       "expo-web-browser",
       [
         "expo-notifications",
-          {
-            "icon": "./assets/images/icon.png",
-            "color": "#ffffff",
-            "sounds": [
-              "./assets/sounds/alert.mp3",
-              "./assets/sounds/message.mp3",
-              "./assets/sounds/ringtone.mp3"
-            ]
-          }
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#ffffff",
+          "sounds": [
+            "./assets/sounds/alert.mp3",
+            "./assets/sounds/message.mp3",
+            "./assets/sounds/ringtone.mp3"
+          ]
+        }
       ],
-        [
-            "react-native-google-mobile-ads",
-            {
-              "androidAppId": "ca-app-pub-1505977777207758~8575965688",
-              "iosAppId": "ca-app-pub-1505977777207758~6195707754"
-            }
-          ],
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-1505977777207758~8575965688",
+          "iosAppId": "ca-app-pub-1505977777207758~6195707754"
+        }
+      ],
       [
         "expo-tracking-transparency",
         {
           "userTrackingUsageDescription": "This identifier will be used to deliver personalized ads to you."
         }
-      ]
+      ],
+      "expo-asset"
     ],
     "web": {
       "bundler": "metro",

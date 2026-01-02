@@ -73,16 +73,15 @@ if (!String.prototype.hashCode) {
 const isExpoGo = Constants.appOwnership === "expo";
 export default function FloatingChat() {
     const {
-  user,
   isOpen,
-  setOpen,
-  setClose,
-  activeChat,
-  setActiveChat,
+  open: setOpen,
+  close: setClose,
   activeChatId,
   setActiveChatId,
   pendingCallUserId,
 } = useChatStore();
+const { auth: user } = useAuthStore();
+const [activeChat, setActiveChat] = useState(null);
 const presenceChannelRef = useRef(null);
 const { setAuth } = useAuthStore();
 const router = useRouter();
