@@ -262,7 +262,7 @@ export default function SettingsScreen() {
 
               <View style={styles.section}>
                 <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>LOCATION</Text>
-                <TouchableOpacity onPress={() => router.push("/onboarding/city")} style={[styles.item, { borderBottomColor: theme.colors.border }]}>
+                <TouchableOpacity onPress={() => router.push("/onboarding/uk-check")} style={[styles.item, { borderBottomColor: theme.colors.border }]}>
                   <View style={styles.itemLeft}>
                     <MapPin size={20} color={theme.colors.textSecondary} />
                     <View>
