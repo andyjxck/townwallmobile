@@ -47,13 +47,15 @@ const SOUNDS = {
 };
 const EMOJIS = ['👥','🔥','🚀','🎮','🎵','📸','🎥','💬','✨','🧠','💡','🫶'];
 
-import {
-  createAgoraRtcEngine,
-  ChannelProfileType,
-  ClientRoleType,
-  RtcConnection,
-  IRtcEngineEventHandler,
-} from 'react-native-agora';
+const isExpoGo = Constants.appOwnership === 'expo';
+
+let createAgoraRtcEngine, ChannelProfileType, ClientRoleType;
+if (!isExpoGo) {
+  const agora = require('react-native-agora');
+  createAgoraRtcEngine = agora.createAgoraRtcEngine;
+  ChannelProfileType = agora.ChannelProfileType;
+  ClientRoleType = agora.ClientRoleType;
+}
 
 const AGORA_APP_ID = process.env.EXPO_PUBLIC_AGORA_APP_ID;
 
@@ -70,7 +72,6 @@ if (!String.prototype.hashCode) {
   };
 }
 
-const isExpoGo = Constants.appOwnership === "expo";
 export default function FloatingChat() {
     const {
   isOpen,
@@ -949,7 +950,7 @@ const stopRecording = async () => {
     const [remoteUsers, setRemoteUsers] = useState([]);
 
     useEffect(() => {
-      if (activeCall?.status === 'active' && AGORA_APP_ID) {
+      if (activeCall?.status === 'active' && AGORA_APP_ID && !isExpoGo) {
         setupAgora();
       } else if (!activeCall && isJoined) {
         leaveAgora();
@@ -957,6 +958,10 @@ const stopRecording = async () => {
     }, [activeCall?.status]);
 
     const setupAgora = async () => {
+      if (isExpoGo) {
+        console.log('Agora is not supported in Expo Go');
+        return;
+      }
       try {
         const permission = await Audio.requestPermissionsAsync();
         if (permission.status !== 'granted') {
@@ -1019,6 +1024,7 @@ await agoraEngine.current.joinChannel(data.token, activeCall.id, uid, {});
     };
 
     const leaveAgora = async () => {
+      if (isExpoGo) return;
       try {
         if (agoraEngine.current) {
        await agoraEngine.current.disableAudio();
@@ -1374,11 +1380,31 @@ agoraEngine.current = null;
       )}
 
           {activeCall && (
-            <Modal visible={true} animationType="fade" transparent>
-              <View style={styles.callOverlay}>
-                <BlurView intensity={100} style={StyleSheet.absoluteFill} tint="dark" />
-                
-                    {activeCall.status === 'active' && !AGORA_APP_ID && (
+              <Modal visible={true} animationType="fade" transparent>
+                <View style={styles.callOverlay}>
+                  <BlurView intensity={100} style={StyleSheet.absoluteFill} tint="dark" />
+                  
+                      {activeCall.status === 'active' && isExpoGo && (
+                        <View style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', padding: 40, zIndex: 100 }]}>
+                          <View style={{ backgroundColor: 'rgba(255,255,255,0.1)', padding: 24, borderRadius: 24, alignItems: 'center' }}>
+                            <PhoneOffIcon size={48} color={theme.colors.primary} style={{ marginBottom: 16 }} />
+                            <Text style={{ color: '#FFF', fontSize: 18, fontWeight: 'bold', textAlign: 'center', marginBottom: 8 }}>
+                              Not Supported in Expo Go
+                            </Text>
+                            <Text style={{ color: 'rgba(255,255,255,0.6)', textAlign: 'center', fontSize: 14 }}>
+                              Voice calls require a native build. Please use a development or production build.
+                            </Text>
+                            <TouchableOpacity 
+                              onPress={endCall}
+                              style={{ marginTop: 24, backgroundColor: theme.colors.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 }}
+                            >
+                              <Text style={{ color: '#000', fontWeight: 'bold' }}>Close</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      )}
+
+                      {activeCall.status === 'active' && !isExpoGo && !AGORA_APP_ID && (
                       <View style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', padding: 40, zIndex: 100 }]}>
                         <View style={{ backgroundColor: 'rgba(255,255,255,0.1)', padding: 24, borderRadius: 24, alignItems: 'center' }}>
                           <PhoneOffIcon size={48} color={theme.colors.primary} style={{ marginBottom: 16 }} />
