@@ -39,8 +39,15 @@ import { File as FileSystemNext } from 'expo-file-system/next';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { expandImage } from '../utils/ai';
 import Markdown from 'react-native-markdown-display';
+const { width, height } = Dimensions.get('window');
+const SOUNDS = {
+  ringing: require('../../assets/sounds/alert.mp3'),
+  connect: require('../../assets/sounds/message.mp3'),
+  disconnect: require('../../assets/sounds/ringtone.mp3'),
+};
+const EMOJIS = ['👥','🔥','🚀','🎮','🎵','📸','🎥','💬','✨','🧠','💡','🫶'];
 
-import { 
+import {
   createAgoraRtcEngine,
   ChannelProfileType,
   ClientRoleType,
@@ -64,43 +71,21 @@ if (!String.prototype.hashCode) {
 }
 
 const isExpoGo = Constants.appOwnership === "expo";
-
-        // Clear action
-        useChatStore.setState({ pendingCallAction: null });
-      }
-    }, [pendingCallAction, activeCall]);
-
-    useEffect(() => {
-      if (pendingCallUserId && user && chats.length > 0 && !activeCall) {
-      const chat = chats.find(c => 
-        !c.is_group && (c.user1_id === pendingCallUserId || c.user2_id === pendingCallUserId)
-      );
-      if (chat) {
-        if (activeChatId !== chat.id) {
-          setActiveChatId(chat.id);
-        } else {
-          // Chat already active, trigger call
-          startCall();
-          // Clear pending call so it doesn't trigger again
-          useChatStore.setState({ pendingCallUserId: null });
-        }
-      }
-    }
-  }, [pendingCallUserId, user, chats, activeChatId, activeCall]);
-
-  useEffect(() => {
-    if (activeChatId) {
-      const chat = chats.find(c => c.id === activeChatId);
-      if (chat) {
-        setActiveChat(chat);
-        setShowChatList(false);
-      }
-    } else if (isOpen && !activeChat && !showSettings) {
-      // If we're open but have no active chat, show the list
-      setShowChatList(true);
-    }
-  }, [activeChatId, chats, isOpen]);
-
+export default function FloatingChat() {
+    const {
+  user,
+  isOpen,
+  setOpen,
+  setClose,
+  activeChat,
+  setActiveChat,
+  activeChatId,
+  setActiveChatId,
+  pendingCallUserId,
+} = useChatStore();
+const presenceChannelRef = useRef(null);
+const { setAuth } = useAuthStore();
+const router = useRouter();
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [chats, setChats] = useState([]);
@@ -126,6 +111,7 @@ const isExpoGo = Constants.appOwnership === "expo";
   const [recording, setRecording] = useState(null);
   const recordingTimerRef = useRef(null);
 
+
   const [searchUsers, setSearchUsers] = useState('');
   const [userSearchResults, setUserSearchResults] = useState([]);
   const [groupMembers, setGroupMembers] = useState([]);
@@ -149,6 +135,107 @@ const isExpoGo = Constants.appOwnership === "expo";
     const inputRef = useRef(null);
     const callSubRef = useRef(null);
 
+    useEffect(() => {
+      if (pendingCallUserId && user && chats.length > 0 && !activeCall) {
+      const chat = chats.find(c => 
+        !c.is_group && (c.user1_id === pendingCallUserId || c.user2_id === pendingCallUserId)
+      );
+      if (chat) {
+        if (activeChatId !== chat.id) {
+          setActiveChatId(chat.id);
+        } else {
+          // Chat already active, trigger call
+          startCall();
+          // Clear pending call so it doesn't trigger again
+          useChatStore.setState({ pendingCallUserId: null });
+        }
+      }
+    }
+  }, [pendingCallUserId, user, chats, activeChatId, activeCall]);
+useEffect(() => {
+  if (!user) return;
+
+  const channel = supabase.channel(`online-users:${Constants.expoConfig?.slug || 'app'}`, {
+  config: {
+    presence: {
+      key: user.id,
+    },
+  },
+});
+
+
+  // Store ref so we can clean up on logout too
+  presenceChannelRef.current = channel;
+
+  channel
+    .on('presence', { event: 'sync' }, () => {
+      const state = channel.presenceState();
+      const onlineMap = {};
+
+      Object.keys(state).forEach((userId) => {
+        onlineMap[userId] = true;
+      });
+
+      setOnlineUsers(onlineMap);
+    })
+    .on('presence', { event: 'join' }, ({ key }) => {
+      setOnlineUsers((prev) => ({
+        ...prev,
+        [key]: true,
+      }));
+    })
+    .on('presence', { event: 'leave' }, ({ key }) => {
+      setOnlineUsers((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+    })
+    .subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        try {
+          await channel.track({
+            user_id: user.id,
+            online_at: new Date().toISOString(),
+          });
+        } catch (e) {
+          console.warn('Presence track failed:', e);
+        }
+      }
+    });
+
+  return () => {
+    // Safe cleanup — prevents ghost users
+    if (channel && channel.state === 'joined') {
+      try {
+        channel.untrack();
+      } catch (e) {
+        // already untracked or channel closing
+      }
+    }
+
+    supabase.removeChannel(channel);
+
+    if (presenceChannelRef.current === channel) {
+      presenceChannelRef.current = null;
+    }
+  };
+}, [user]);
+
+  useEffect(() => {
+    if (activeChatId) {
+      const chat = chats.find(c => c.id === activeChatId);
+      if (chat) {
+        setActiveChat(chat);
+        setShowChatList(false);
+      }
+    } else if (isOpen && !activeChat && !showSettings) {
+      // If we're open but have no active chat, show the list
+      setShowChatList(true);
+    }
+  }, [activeChatId, chats, isOpen]);
+
+  
     useEffect(() => {
       if (isOpen) {
         Animated.parallel([
@@ -375,11 +462,25 @@ const isExpoGo = Constants.appOwnership === "expo";
 
       loadUserAndChats();
       
-      const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
-        loadUserAndChats();
-      }
-    });
+const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
+  if (event === 'SIGNED_OUT') {
+    if (presenceChannelRef.current) {
+      try {
+        presenceChannelRef.current.untrack();
+      } catch (e) {}
+
+      supabase.removeChannel(presenceChannelRef.current);
+      presenceChannelRef.current = null;
+    }
+
+    setOnlineUsers({});
+  }
+
+  if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+    loadUserAndChats();
+  }
+});
+
 
     return () => {
       authListener.subscription.unsubscribe();
@@ -499,7 +600,8 @@ const isExpoGo = Constants.appOwnership === "expo";
         Alert.alert('Permission denied', 'Please allow microphone access to record voice messages.');
         return;
       }
-
+   // Guard FIRST — prevents double recording
+if (isRecording || recordingTimerRef.current) return;
         await Audio.setAudioModeAsync({
           allowsRecordingIOS: true,
           playsInSilentModeIOS: true,
@@ -507,22 +609,26 @@ const isExpoGo = Constants.appOwnership === "expo";
           staysActiveInBackground: true,
         });
 
-      const { recording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
-      );
-      setRecording(recording);
-      setIsRecording(true);
-      setRecordingDuration(0);
-      
-      recordingTimerRef.current = setInterval(() => {
-        setRecordingDuration(prev => {
-          if (prev >= 150) { // 2.5 minutes
-            stopRecording();
-            return prev;
-          }
-          return prev + 1;
-        });
-      }, 1000);
+ 
+
+const { recording } = await Audio.Recording.createAsync(
+  Audio.RecordingOptionsPresets.HIGH_QUALITY
+);
+
+setRecording(recording);
+setIsRecording(true);
+setRecordingDuration(0);
+
+
+recordingTimerRef.current = setInterval(() => {
+  setRecordingDuration(prev => {
+    if (prev >= 150) {
+      stopRecording();
+      return prev;
+    }
+    return prev + 1;
+  });
+}, 1000);
       
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch (err) {
@@ -530,60 +636,72 @@ const isExpoGo = Constants.appOwnership === "expo";
     }
   };
 
-  const stopRecording = async () => {
-    setIsRecording(false);
+const stopRecording = async () => {
+  setIsRecording(false);
+
+  if (recordingTimerRef.current) {
     clearInterval(recordingTimerRef.current);
-    
-    if (!recording) return;
+    recordingTimerRef.current = null;
+  }
 
-    try {
-      await recording.stopAndUnloadAsync();
-      const uri = recording.getURI();
-      setRecording(null);
-      
-      // Reset audio mode to playback-only (speaker)
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: true,
-        playThroughEarpieceAndroid: false,
-        staysActiveInBackground: true,
-      });
-      
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      
-      setIsUploading(true);
-      const audioUrl = await uploadMedia(uri, 'audio');
-      if (audioUrl) {
-        await handleSendMessage(null, audioUrl, 'audio');
-      }
-      setIsUploading(false);
-    } catch (err) {
-      console.error('Failed to stop recording', err);
-      setIsUploading(false);
+  if (!recording) return;
+
+  try {
+    await recording.stopAndUnloadAsync();
+    const uri = recording.getURI();
+    setRecording(null);
+
+    // Reset audio mode to playback-only (speaker)
+    await Audio.setAudioModeAsync({
+      allowsRecordingIOS: false,
+      playsInSilentModeIOS: true,
+      playThroughEarpieceAndroid: false,
+      staysActiveInBackground: true,
+    });
+
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+    setIsUploading(true);
+    const audioUrl = await uploadMedia(uri, 'audio');
+    if (audioUrl) {
+      await handleSendMessage(null, audioUrl, 'audio');
     }
-  };
+  } catch (err) {
+    console.error('Failed to stop recording', err);
+  } finally {
+    setIsUploading(false);
+  }
+};
 
-  const cancelRecording = async () => {
-    setIsRecording(false);
+
+ const cancelRecording = async () => {
+  setIsRecording(false);
+
+  if (recordingTimerRef.current) {
     clearInterval(recordingTimerRef.current);
-    if (!recording) return;
-    try {
-      await recording.stopAndUnloadAsync();
-      setRecording(null);
+    recordingTimerRef.current = null;
+  }
 
-      // Reset audio mode to playback-only (speaker)
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: true,
-        playThroughEarpieceAndroid: false,
-        staysActiveInBackground: true,
-      });
+  if (!recording) return;
 
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } catch (err) {
-      console.log('Failed to cancel recording', err);
-    }
-  };
+  try {
+    await recording.stopAndUnloadAsync();
+    setRecording(null);
+
+    // Reset audio mode to playback-only (speaker)
+    await Audio.setAudioModeAsync({
+      allowsRecordingIOS: false,
+      playsInSilentModeIOS: true,
+      playThroughEarpieceAndroid: false,
+      staysActiveInBackground: true,
+    });
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  } catch (err) {
+    console.error('Failed to cancel recording', err);
+  }
+};
+
 
     const uploadMedia = async (uri, type) => {
       try {
@@ -894,7 +1012,8 @@ const isExpoGo = Constants.appOwnership === "expo";
           return;
         }
 
-        await agoraEngine.current.joinChannel(data.token, activeCall.id, uid, {});
+if (!activeCall?.id) return;
+await agoraEngine.current.joinChannel(data.token, activeCall.id, uid, {});
       } catch (e) {
         console.error('Agora setup error:', e);
       }
@@ -903,9 +1022,11 @@ const isExpoGo = Constants.appOwnership === "expo";
     const leaveAgora = async () => {
       try {
         if (agoraEngine.current) {
-          await agoraEngine.current.leaveChannel();
-          await agoraEngine.current.release();
-          agoraEngine.current = null;
+       await agoraEngine.current.disableAudio();
+await agoraEngine.current.leaveChannel();
+await agoraEngine.current.release();
+agoraEngine.current = null;
+
         }
       } catch (e) {
         console.error('Agora leave error:', e);
@@ -954,16 +1075,21 @@ const isExpoGo = Constants.appOwnership === "expo";
       left_at: new Date().toISOString()
     }).eq('call_id', activeCall.id).eq('user_id', user.id);
     
-    playSound('disconnect');
     endCallUI();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   };
 
   const toggleMute = () => {
-    setIsMuted(!isMuted);
-    playSound('mute');
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  };
+  const next = !isMuted;
+  setIsMuted(next);
+
+ if (agoraEngine.current && isJoined) {
+  agoraEngine.current.muteLocalAudioStream(next);
+}
+
+
+  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+};
 
   const searchForUsers = async (query) => {
     if (!query.trim()) {
@@ -1340,10 +1466,20 @@ const isExpoGo = Constants.appOwnership === "expo";
                         <Text style={styles.callBtnLabel}>{isMuted ? 'Unmute' : 'Mute'}</Text>
                       </TouchableOpacity>
                       
-                      <TouchableOpacity onPress={() => {
-                        setIsSpeakerOn(!isSpeakerOn);
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      }} style={styles.callBtn}>
+                      <TouchableOpacity onPress={async () => {
+  const next = !isSpeakerOn;
+  setIsSpeakerOn(next);
+
+  await Audio.setAudioModeAsync({
+    allowsRecordingIOS: false,
+    playsInSilentModeIOS: true,
+    playThroughEarpieceAndroid: !next,
+    staysActiveInBackground: true,
+  });
+
+  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+}}
+ style={styles.callBtn}>
                         <View style={[styles.iconCircle, isSpeakerOn && { backgroundColor: theme.colors.primary }]}>
                           <Volume2 size={24} color={isSpeakerOn ? "#000" : "#FFF"} />
                         </View>
