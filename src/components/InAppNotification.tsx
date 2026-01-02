@@ -1,9 +1,10 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, Animated, StyleSheet, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { X, Bell } from 'lucide-react-native';
+import { X, Bell, Heart, MessageCircle, UserPlus, AtSign } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { create } from 'zustand';
+import { router } from 'expo-router';
 
 interface NotificationData {
   title: string;
@@ -29,6 +30,50 @@ export const useInAppNotification = create<InAppNotificationStore>((set) => ({
 }));
 
 const { width } = Dimensions.get('window');
+
+const getNotificationIcon = (type?: string) => {
+  switch (type) {
+    case 'like':
+    case 'post_like':
+    case 'comment_like':
+      return Heart;
+    case 'comment':
+    case 'reply':
+      return MessageCircle;
+    case 'follow':
+    case 'follow_request':
+      return UserPlus;
+    case 'mention':
+      return AtSign;
+    case 'message':
+    case 'dm':
+      return MessageCircle;
+    default:
+      return Bell;
+  }
+};
+
+const getIconColor = (type?: string) => {
+  switch (type) {
+    case 'like':
+    case 'post_like':
+    case 'comment_like':
+      return '#ef4444';
+    case 'comment':
+    case 'reply':
+      return '#3b82f6';
+    case 'follow':
+    case 'follow_request':
+      return '#22c55e';
+    case 'mention':
+      return '#f59e0b';
+    case 'message':
+    case 'dm':
+      return '#8b5cf6';
+    default:
+      return '#6366f1';
+  }
+};
 
 export function InAppNotification() {
   const insets = useSafeAreaInsets();
@@ -77,7 +122,62 @@ export function InAppNotification() {
     });
   };
 
+  const handlePress = () => {
+    if (!notification?.data) {
+      hideNotification();
+      return;
+    }
+
+    const { type, link, post_id, comment_id, user_id, conversation_id, sender_id } = notification.data;
+
+    hideNotification();
+
+    setTimeout(() => {
+      if (link) {
+        router.push(link as any);
+        return;
+      }
+
+      switch (type) {
+        case 'like':
+        case 'post_like':
+        case 'comment':
+        case 'reply':
+        case 'mention':
+          if (post_id) {
+            router.push(`/(root)/post/${post_id}` as any);
+          }
+          break;
+        case 'comment_like':
+          if (post_id) {
+            router.push(`/(root)/post/${post_id}` as any);
+          }
+          break;
+        case 'follow':
+        case 'follow_request':
+          if (user_id) {
+            router.push(`/(root)/profile/${user_id}` as any);
+          }
+          break;
+        case 'message':
+        case 'dm':
+          if (conversation_id) {
+            router.push(`/(root)/messages/${conversation_id}` as any);
+          } else if (sender_id) {
+            router.push(`/(root)/messages/${sender_id}` as any);
+          }
+          break;
+        default:
+          router.push('/(root)/(tabs)/notifications' as any);
+          break;
+      }
+    }, 250);
+  };
+
   if (!visible || !notification) return null;
+
+  const IconComponent = getNotificationIcon(notification.data?.type);
+  const iconColor = getIconColor(notification.data?.type);
 
   return (
     <Animated.View
@@ -90,9 +190,13 @@ export function InAppNotification() {
         },
       ]}
     >
-      <View style={styles.content}>
-        <View style={styles.iconContainer}>
-          <Bell size={20} color="#fff" />
+      <TouchableOpacity 
+        style={styles.content} 
+        onPress={handlePress}
+        activeOpacity={0.9}
+      >
+        <View style={[styles.iconContainer, { backgroundColor: `${iconColor}30` }]}>
+          <IconComponent size={20} color={iconColor} />
         </View>
         <View style={styles.textContainer}>
           <Text style={styles.title} numberOfLines={1}>
@@ -102,10 +206,17 @@ export function InAppNotification() {
             {notification.body}
           </Text>
         </View>
-        <TouchableOpacity onPress={hideNotification} style={styles.closeButton}>
+        <TouchableOpacity 
+          onPress={(e) => {
+            e.stopPropagation();
+            hideNotification();
+          }} 
+          style={styles.closeButton}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
           <X size={18} color="rgba(255,255,255,0.6)" />
         </TouchableOpacity>
-      </View>
+      </TouchableOpacity>
     </Animated.View>
   );
 }
@@ -135,7 +246,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(99, 102, 241, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
