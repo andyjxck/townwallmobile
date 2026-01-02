@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/utils/ThemeContext';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
-import { X, MessageCircle, Heart, UserPlus, Bell } from 'lucide-react-native';
+import { X, MessageCircle, Heart, UserPlus, Bell, MessageSquare, Share2, Users } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { create } from 'zustand';
 
@@ -114,11 +114,21 @@ export function InAppNotification() {
     switch (type) {
       case 'message':
       case 'chat':
+      case 'help_message':
         return <MessageCircle {...iconProps} />;
+      case 'reaction':
       case 'like':
         return <Heart {...iconProps} fill={theme.colors.primary} />;
+      case 'friend_request':
+      case 'friend_accepted':
       case 'follow':
         return <UserPlus {...iconProps} />;
+      case 'comment':
+        return <MessageSquare {...iconProps} />;
+      case 'share':
+        return <Share2 {...iconProps} />;
+      case 'new_post':
+        return <Users {...iconProps} />;
       case 'call':
         return <MessageCircle {...iconProps} />;
       default:

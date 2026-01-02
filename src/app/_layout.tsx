@@ -292,6 +292,46 @@ export default function RootLayout() {
     }, [isReady, auth]);
 
   const lastLastSeenUserId = useRef<string | null>(null);
+  const realtimeNotificationSub = useRef<any>(null);
+
+  useEffect(() => {
+    if (isReady && auth?.id) {
+      if (realtimeNotificationSub.current) {
+        supabase.removeChannel(realtimeNotificationSub.current);
+      }
+      
+      realtimeNotificationSub.current = supabase
+        .channel(`in_app_notifications:${auth.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'rnotifications',
+            filter: `user_id=eq.${auth.id}`,
+          },
+          (payload: any) => {
+            const notification = payload.new;
+            useInAppNotification.getState().show({
+              title: notification.title || 'New Notification',
+              body: notification.message,
+              data: {
+                type: notification.type,
+                link: notification.link,
+                ...notification.metadata,
+              },
+            });
+          }
+        )
+        .subscribe();
+
+      return () => {
+        if (realtimeNotificationSub.current) {
+          supabase.removeChannel(realtimeNotificationSub.current);
+        }
+      };
+    }
+  }, [isReady, auth?.id]);
 
   useEffect(() => {
     if (isReady && auth?.id) {
