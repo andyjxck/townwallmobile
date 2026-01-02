@@ -7,12 +7,13 @@ import { Globe, MapPin } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import { useTheme } from "@/utils/ThemeContext";
 import { LinearGradient } from "expo-linear-gradient";
-import { useChatStore } from "@/utils/auth";
+import { useChatStore, useAuthStore } from "@/utils/auth";
 
 export default function UkCheckScreen() {
   const { isHippie } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const auth = useAuthStore((state) => state.auth);
 
   const handleYes = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -21,7 +22,11 @@ export default function UkCheckScreen() {
 
   const handleNo = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push("/auth?global=true");
+    if (auth) {
+      router.push("/onboarding/city?global=true");
+    } else {
+      router.push("/auth?global=true");
+    }
   };
 
   return (
