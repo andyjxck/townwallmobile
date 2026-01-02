@@ -19,6 +19,7 @@ import { ErrorBoundaryWrapper } from "../../__create/SharedErrorBoundary";
 import * as Notifications from "expo-notifications";
 import { registerForPushNotificationsAsync } from "@/utils/notifications";
 import FloatingChat from "@/components/FloatingChat";
+import { InAppNotification, useInAppNotification } from "@/components/InAppNotification";
 // Jitsi Meet globals are handled by the SDK
 
 const isExpoGo = Constants.appOwnership === "expo";
@@ -237,13 +238,22 @@ export default function RootLayout() {
         registerForPushNotificationsAsync(auth.id);
 
         notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
-          console.log('Notification received:', notification);
-          const data = notification.request.content.data as any;
-          if (data?.type === 'call' && data?.callId) {
-            const { useChatStore } = require('@/utils/auth');
-            useChatStore.getState().open();
-          }
-        });
+            console.log('Notification received:', notification);
+            const content = notification.request.content;
+            const data = content.data as any;
+            
+            useInAppNotification.getState().show({
+              title: content.title || 'New Notification',
+              body: content.body,
+              avatar: data?.avatar,
+              data: data,
+            });
+            
+            if (data?.type === 'call' && data?.callId) {
+              const { useChatStore } = require('@/utils/auth');
+              useChatStore.getState().open();
+            }
+          });
 
             responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
               const data = response.notification.request.content.data as any;
@@ -341,9 +351,10 @@ export default function RootLayout() {
             <ThemeWrapper>
                 <SandboxHandler />
                 <GlobalErrorReporter />
-                  <Toaster />
-                  <LayoutWithTheme />
-                  <FloatingChat />
+<Toaster />
+                    <LayoutWithTheme />
+                    <FloatingChat />
+                    <InAppNotification />
               </ThemeWrapper>
           </ErrorBoundaryWrapper>
         </GestureHandlerRootView>
