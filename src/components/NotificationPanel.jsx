@@ -19,6 +19,23 @@ import {
   import * as Haptics from 'expo-haptics';
   import { BlurView } from 'expo-blur';
   import HippieBackground from '@/components/HippieBackground';
+  import { Audio } from 'expo-av';
+
+const alertSound = require('../../assets/sounds/alert.mp3');
+
+const playAlertSound = async () => {
+  try {
+    const { sound } = await Audio.Sound.createAsync(alertSound);
+    await sound.playAsync();
+    sound.setOnPlaybackStatusUpdate((status) => {
+      if (status.didJustFinish) {
+        sound.unloadAsync();
+      }
+    });
+  } catch (error) {
+    console.log('Error playing alert sound:', error);
+  }
+};
 
 
 export default function NotificationPanel({ visible, onClose }) {
@@ -49,10 +66,12 @@ export default function NotificationPanel({ visible, onClose }) {
                 filter: `user_id=eq.${user.id}`
               }, 
               payload => {
-                setNotifications(prev => [payload.new, ...prev]);
-                // Automatically mark new notifications as read if panel is open
-                handleMarkAsRead(payload.new.id);
-              }
+                  setNotifications(prev => [payload.new, ...prev]);
+                  // Play alert sound when notification is received
+                  playAlertSound();
+                  // Automatically mark new notifications as read if panel is open
+                  handleMarkAsRead(payload.new.id);
+                }
             )
             .subscribe();
         };

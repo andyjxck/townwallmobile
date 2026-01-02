@@ -41,9 +41,9 @@ import { expandImage } from '../utils/ai';
 import Markdown from 'react-native-markdown-display';
 const { width, height } = Dimensions.get('window');
 const SOUNDS = {
-  ringing: require('../../assets/sounds/alert.mp3'),
-  connect: require('../../assets/sounds/message.mp3'),
-  disconnect: require('../../assets/sounds/ringtone.mp3'),
+  ringing: require('../../assets/sounds/ringtone.mp3'),
+  connect: require('../../assets/sounds/alert.mp3'),
+  disconnect: require('../../assets/sounds/alert.mp3'),
 };
 const EMOJIS = ['👥','🔥','🚀','🎮','🎵','📸','🎥','💬','✨','🧠','💡','🫶'];
 
