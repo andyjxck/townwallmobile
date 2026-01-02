@@ -412,7 +412,7 @@ if (isOnline) syncPendingPosts();
                     <Globe size={22} color={feedView === "global" ? theme.colors.primary : theme.colors.textSecondary} />
                     <View>
                       <Text style={[styles.locationOptionTitle, { color: theme.colors.text }]}>Global</Text>
-                      <Text style={[styles.locationOptionDesc, { color: theme.colors.textSecondary }]}>Posts from everywhere</Text>
+                      <Text style={[styles.locationOptionDesc, { color: theme.colors.textSecondary }]}>Global Chat</Text>
                     </View>
                   </View>
                   {feedView === "global" && <Check size={20} color={theme.colors.primary} />}
