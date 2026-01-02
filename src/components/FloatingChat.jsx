@@ -18,7 +18,7 @@ import {
   ScrollView,
   Alert
 } from 'react-native';
-import { MessageCircle, X, Send, ChevronLeft, MoreHorizontal, User, Users, Check, CheckCheck, Settings, Plus, UserPlus, Mic, MicOff, Phone as PhoneIcon, PhoneOff as PhoneOffIcon, PhoneIncoming, PhoneOutgoing, Phone, Volume2, VolumeX, Image as ImageIcon, Video as VideoIcon, Film, Play, Maximize2, Camera, Sparkles, Trash2, Square, Pause } from 'lucide-react-native';
+import { MessageCircle, X, Send, ChevronLeft, MoreHorizontal, User, Users, Check, CheckCheck, Settings, Plus, UserPlus, Mic, MicOff, Phone as PhoneIcon, PhoneOff as PhoneOffIcon, PhoneIncoming, PhoneOutgoing, Phone, Volume2, VolumeX, Image as ImageIcon, Video as VideoIcon, Film, Play, Maximize2, Camera, Sparkles, Trash2, Square, Pause, LogOut, Flag } from 'lucide-react-native';
 import Slider from '@react-native-community/slider';
 import { supabase } from '../utils/supabase';
 import { getStoredUser } from '../utils/user';
@@ -117,6 +117,7 @@ const router = useRouter();
   const [groupMembers, setGroupMembers] = useState([]);
   const [pendingMedia, setPendingMedia] = useState(null);
   const [activeAudioUrl, setActiveAudioUrl] = useState(null);
+  const [showGroupInfo, setShowGroupInfo] = useState(false);
   
     const [activeCall, setActiveCall] = useState(null);
     const [isMuted, setIsMuted] = useState(false);
@@ -578,6 +579,82 @@ const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
       .select('*, user:rusers(*)')
       .eq('chat_id', chatId);
     setGroupMembers(data || []);
+  };
+
+  const handleLeaveGroup = async () => {
+    if (!activeChat?.is_group || !user) return;
+    
+    Alert.alert(
+      'Leave Group',
+      `Are you sure you want to leave "${activeChat.group_name}"?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Leave',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await supabase
+                .from('rchat_members')
+                .delete()
+                .eq('chat_id', activeChat.id)
+                .eq('user_id', user.id);
+
+              await supabase.from('rmessages').insert({
+                chat_id: activeChat.id,
+                sender_id: user.id,
+                text: `${user.username || 'Someone'} left the group`,
+                is_system: true
+              });
+
+              await supabase.from('rchats').update({
+                last_message: `${user.username || 'Someone'} left the group`,
+                last_message_at: new Date().toISOString()
+              }).eq('id', activeChat.id);
+
+              setShowGroupInfo(false);
+              setActiveChat(null);
+              setShowChatList(true);
+              loadUserAndChats();
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            } catch (error) {
+              console.error('Error leaving group:', error);
+              Alert.alert('Error', 'Failed to leave group');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleReportChat = async () => {
+    Alert.alert(
+      'Report Chat',
+      'Are you sure you want to report this chat for inappropriate content?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Report',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await supabase.from('rreports').insert({
+                reporter_id: user.id,
+                chat_id: activeChat.id,
+                report_type: 'chat',
+                reason: 'User reported via chat'
+              });
+              setShowGroupInfo(false);
+              Alert.alert('Reported', 'Thank you for your report. We will review it shortly.');
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            } catch (error) {
+              console.error('Error reporting chat:', error);
+              Alert.alert('Error', 'Failed to submit report');
+            }
+          }
+        }
+      ]
+    );
   };
 
   const loadMessages = async (chatId) => {
@@ -1645,12 +1722,83 @@ agoraEngine.current = null;
                   </View>
                 </View>
               </Modal>
+              </View>
+            </View>
+          </Modal>
+
+
+        <Modal visible={showGroupInfo} animationType="slide" transparent>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Group Info</Text>
+                <TouchableOpacity onPress={() => setShowGroupInfo(false)}>
+                  <X size={24} color="#FFF" />
+                </TouchableOpacity>
+              </View>
+
+              {activeChat?.is_group && (
+                <>
+                  <View style={styles.groupInfoHeader}>
+                    <View style={styles.groupInfoIcon}>
+                      {activeChat.group_icon?.startsWith('http') ? (
+                        <Image source={{ uri: activeChat.group_icon }} style={styles.groupInfoAvatar} />
+                      ) : (
+                        <Text style={styles.groupInfoEmoji}>{activeChat.group_icon || '👥'}</Text>
+                      )}
+                    </View>
+                    <Text style={styles.groupInfoName}>{activeChat.group_name}</Text>
+                    <Text style={styles.groupInfoCount}>{groupMembers.length} members</Text>
+                  </View>
+
+                  <Text style={styles.sectionTitle}>Members</Text>
+                  <ScrollView style={styles.membersList}>
+                    {groupMembers.map((member) => (
+                      <TouchableOpacity 
+                        key={member.id} 
+                        style={styles.memberItem}
+                        onPress={() => {
+                          if (member.user?.username) {
+                            setShowGroupInfo(false);
+                            setClose();
+                            router.push(`/profile?username=${member.user.username}`);
+                          }
+                        }}
+                      >
+                        {member.user?.avatar_url ? (
+                          <Image source={{ uri: member.user.avatar_url }} style={styles.memberAvatar} />
+                        ) : (
+                          <View style={styles.memberEmojiBg}>
+                            <Text style={styles.memberEmoji}>{member.user?.emoji_icon || '👤'}</Text>
+                          </View>
+                        )}
+                        <View style={styles.memberInfo}>
+                          <Text style={styles.memberName}>@{member.user?.username}</Text>
+                          {member.is_admin && <Text style={styles.adminBadge}>Admin</Text>}
+                        </View>
+                        {member.user_id === user?.id && <Text style={styles.youBadge}>You</Text>}
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+
+                  <View style={styles.groupActions}>
+                    <TouchableOpacity style={styles.groupActionBtn} onPress={handleLeaveGroup}>
+                      <LogOut size={20} color="#EF4444" />
+                      <Text style={[styles.groupActionText, { color: '#EF4444' }]}>Leave Group</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.groupActionBtn} onPress={handleReportChat}>
+                      <Flag size={20} color="#F59E0B" />
+                      <Text style={[styles.groupActionText, { color: '#F59E0B' }]}>Report Chat</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
             </View>
           </View>
         </Modal>
 
 
-        {isOpen && (
+          {isOpen && (
         <Animated.View style={[styles.chatOverlay, { opacity: fadeAnim }]}>
           <TouchableOpacity 
             style={StyleSheet.absoluteFill} 
@@ -1686,20 +1834,20 @@ agoraEngine.current = null;
                   <TouchableOpacity onPress={() => setShowChatList(true)} style={styles.iconBtn}>
                     <ChevronLeft size={24} color="#FFF" />
                   </TouchableOpacity>
-                    {activeChat?.is_group ? (
-                      <View style={styles.headerUserInfo}>
-                        <View style={styles.headerEmojiBg}>
-                          {activeChat.group_icon?.startsWith('http') ? (
-                            <Image source={{ uri: activeChat.group_icon }} style={styles.headerAvatar} />
-                          ) : (
-                            <Text style={styles.headerEmoji}>{activeChat.group_icon || '👥'}</Text>
-                          )}
-                        </View>
-                        <View>
-                          <Text style={styles.headerTitle}>{activeChat.group_name}</Text>
-                          <Text style={styles.onlineStatusText}>{groupMembers.length} members</Text>
-                        </View>
-                      </View>
+    {activeChat?.is_group ? (
+                        <TouchableOpacity style={styles.headerUserInfo} onPress={() => setShowGroupInfo(true)}>
+                          <View style={styles.headerEmojiBg}>
+                            {activeChat.group_icon?.startsWith('http') ? (
+                              <Image source={{ uri: activeChat.group_icon }} style={styles.headerAvatar} />
+                            ) : (
+                              <Text style={styles.headerEmoji}>{activeChat.group_icon || '👥'}</Text>
+                            )}
+                          </View>
+                          <View>
+                            <Text style={styles.headerTitle}>{activeChat.group_name}</Text>
+                            <Text style={styles.onlineStatusText}>{groupMembers.length} members</Text>
+                          </View>
+                        </TouchableOpacity>
                   ) : (
                     <TouchableOpacity 
                       style={styles.headerUserInfo}
@@ -2908,10 +3056,115 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: 16,
       },
-      cancelRecordingBtn: {
-        padding: 4,
-      },
-      stopRecordingBtn: {
-        padding: 0,
-      },
-    });
+    cancelRecordingBtn: {
+      padding: 4,
+    },
+    stopRecordingBtn: {
+      padding: 0,
+    },
+    groupInfoHeader: {
+      alignItems: 'center',
+      marginBottom: 24,
+    },
+    groupInfoIcon: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: 'rgba(255,255,255,0.1)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 12,
+      overflow: 'hidden',
+    },
+    groupInfoAvatar: {
+      width: 80,
+      height: 80,
+    },
+    groupInfoEmoji: {
+      fontSize: 40,
+    },
+    groupInfoName: {
+      color: '#FFF',
+      fontSize: 22,
+      fontWeight: '800',
+      marginBottom: 4,
+    },
+    groupInfoCount: {
+      color: 'rgba(255,255,255,0.5)',
+      fontSize: 14,
+    },
+    sectionTitle: {
+      color: 'rgba(255,255,255,0.5)',
+      fontSize: 13,
+      fontWeight: '600',
+      textTransform: 'uppercase',
+      marginBottom: 12,
+      letterSpacing: 1,
+    },
+    membersList: {
+      maxHeight: 250,
+      marginBottom: 20,
+    },
+    memberItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 12,
+      borderRadius: 12,
+      marginBottom: 4,
+      backgroundColor: 'rgba(255,255,255,0.03)',
+    },
+    memberAvatar: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+    },
+    memberEmojiBg: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: 'rgba(255,255,255,0.1)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    memberEmoji: {
+      fontSize: 22,
+    },
+    memberInfo: {
+      flex: 1,
+      marginLeft: 12,
+    },
+    memberName: {
+      color: '#FFF',
+      fontSize: 15,
+      fontWeight: '600',
+    },
+    adminBadge: {
+      color: theme.colors.primary,
+      fontSize: 12,
+      fontWeight: '700',
+      marginTop: 2,
+    },
+    youBadge: {
+      color: 'rgba(255,255,255,0.4)',
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    groupActions: {
+      borderTopWidth: 1,
+      borderTopColor: 'rgba(255,255,255,0.1)',
+      paddingTop: 16,
+      gap: 8,
+    },
+    groupActionBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      padding: 14,
+      borderRadius: 12,
+      backgroundColor: 'rgba(255,255,255,0.03)',
+    },
+    groupActionText: {
+      fontSize: 15,
+      fontWeight: '600',
+    },
+  });
