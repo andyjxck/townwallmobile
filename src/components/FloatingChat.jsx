@@ -566,7 +566,7 @@ const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
 
   useEffect(() => {
     if (activeChat?.id) {
-      loadMessages(activeChat.id);
+      loadMessages(activeChat.id, activeChat.is_group);
       markAllAsRead(activeChat.id);
       
       if (activeChat.is_group) {
@@ -701,7 +701,7 @@ const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
     );
   };
 
-  const loadMessages = async (chatId) => {
+  const loadMessages = async (chatId, isGroup = false) => {
     if (!chatId) return;
     setLoading(true);
     
@@ -711,7 +711,7 @@ const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
       .eq('chat_id', chatId)
       .order('created_at', { ascending: true });
     
-    if (activeChat?.is_group && user?.id) {
+    if (isGroup && user?.id) {
       const { data: memberData } = await supabase
         .from('rchat_members')
         .select('created_at')
@@ -724,7 +724,10 @@ const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
       }
     }
     
-    const { data } = await query;
+    const { data, error } = await query;
+    if (error) {
+      console.error('Error loading messages:', error);
+    }
     setMessages(data || []);
     setLoading(false);
     setTimeout(() => flatListRef.current?.scrollToEnd(), 100);
