@@ -1299,6 +1299,19 @@ agoraEngine.current = null;
       ended_at: new Date().toISOString()
     }).eq('id', activeCall.id);
     
+    // Send system message
+    await supabase.from('rmessages').insert({
+      chat_id: activeCall.chat_id,
+      sender_id: user.id,
+      text: 'Missed call',
+      is_system: true
+    });
+
+    await supabase.from('rchats').update({
+      last_message: 'Missed call',
+      last_message_at: new Date().toISOString()
+    }).eq('id', activeCall.chat_id);
+
     stopSound('ringing');
     playSound('disconnect');
     endCallUI();
@@ -1308,6 +1321,9 @@ agoraEngine.current = null;
   const endCall = async () => {
     if (!activeCall) return;
     
+    const wasActive = activeCall.status === 'active';
+    const durationText = formatCallDuration(callDuration);
+    
     await supabase.from('rcalls').update({ 
       status: 'ended',
       ended_at: new Date().toISOString()
@@ -1316,6 +1332,19 @@ agoraEngine.current = null;
     await supabase.from('rcall_participants').update({
       left_at: new Date().toISOString()
     }).eq('call_id', activeCall.id).eq('user_id', user.id);
+
+    // Send system message
+    await supabase.from('rmessages').insert({
+      chat_id: activeCall.chat_id,
+      sender_id: user.id,
+      text: wasActive ? `Voice call ${durationText}` : 'Missed call',
+      is_system: true
+    });
+
+    await supabase.from('rchats').update({
+      last_message: wasActive ? `Voice call ${durationText}` : 'Missed call',
+      last_message_at: new Date().toISOString()
+    }).eq('id', activeCall.chat_id);
     
     endCallUI();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -2328,13 +2357,15 @@ agoraEngine.current = null;
                         data={messages}
                         keyExtractor={item => item.id}
                             renderItem={({ item }) => {
-                              if (item.is_system) {
-                                return (
-                                  <View style={styles.systemMessageContainer}>
-                                    <Text style={styles.systemMessageText}>{item.text}</Text>
-                                  </View>
-                                );
-                              }
+                                if (item.is_system) {
+                                  return (
+                                    <View style={styles.systemMessageContainer}>
+                                      <View style={styles.systemMessageLine} />
+                                      <Text style={styles.systemMessageText}>{item.text}</Text>
+                                      <View style={styles.systemMessageLine} />
+                                    </View>
+                                  );
+                                }
 
                               const isMyMessage = item.sender_id === user?.id;
                             
@@ -2817,20 +2848,27 @@ const styles = StyleSheet.create({
   messagesList: {
     flex: 1,
   },
-  systemMessageContainer: {
-    alignSelf: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    marginVertical: 10,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 16,
-  },
-  systemMessageText: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 12,
-    fontWeight: '500',
-    textAlign: 'center',
-  },
+    systemMessageContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'stretch',
+      paddingHorizontal: 20,
+      marginVertical: 16,
+    },
+    systemMessageLine: {
+      flex: 1,
+      height: 1,
+      backgroundColor: 'rgba(255,255,255,0.1)',
+    },
+    systemMessageText: {
+      color: 'rgba(255,255,255,0.4)',
+      fontSize: 11,
+      fontWeight: '700',
+      textAlign: 'center',
+      marginHorizontal: 12,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
   messageBubble: {
     padding: 12,
     paddingHorizontal: 16,
