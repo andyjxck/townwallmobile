@@ -121,6 +121,7 @@ const router = useRouter();
   const [pendingMedia, setPendingMedia] = useState(null);
   const [activeAudioUrl, setActiveAudioUrl] = useState(null);
   const [showGroupInfo, setShowGroupInfo] = useState(false);
+  const [showMediaMenu, setShowMediaMenu] = useState(false);
   
     const [activeCall, setActiveCall] = useState(null);
     const [isMuted, setIsMuted] = useState(false);
@@ -2316,8 +2317,36 @@ agoraEngine.current = null;
                   </>
                 )}
                       {(!activeChat || activeChat.status === 'accepted' || activeChat.initiated_by === user?.id || activeChat.is_group) && (
-                        <View style={styles.inputContainer}>
-                          {pendingMedia && (
+                          <View style={styles.inputContainer}>
+                            {showMediaMenu && (
+                              <View style={styles.mediaMenu}>
+                                <TouchableOpacity 
+                                  onPress={() => {
+                                    handlePickMedia('image');
+                                    setShowMediaMenu(false);
+                                  }} 
+                                  style={styles.mediaMenuItem}
+                                >
+                                  <View style={[styles.mediaMenuIcon, { backgroundColor: 'rgba(59, 130, 246, 0.1)' }]}>
+                                    <ImageIcon size={20} color="#3B82F6" />
+                                  </View>
+                                  <Text style={styles.mediaMenuText}>Photo</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity 
+                                  onPress={() => {
+                                    handlePickMedia('video');
+                                    setShowMediaMenu(false);
+                                  }} 
+                                  style={styles.mediaMenuItem}
+                                >
+                                  <View style={[styles.mediaMenuIcon, { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
+                                    <VideoIcon size={20} color="#10B981" />
+                                  </View>
+                                  <Text style={styles.mediaMenuText}>Video</Text>
+                                </TouchableOpacity>
+                              </View>
+                            )}
+                            {pendingMedia && (
                             <View style={styles.pendingMediaContainer}>
                               <Image source={{ uri: pendingMedia.uri }} style={styles.pendingMediaPreview} contentFit="cover" />
                               <TouchableOpacity 
@@ -2359,23 +2388,16 @@ agoraEngine.current = null;
                             </View>
                           </View>
                         ) : (
-                          <View style={styles.inputWrapper}>
-                            <View style={styles.attachmentButtons}>
-                              <TouchableOpacity 
-                                onPress={() => handlePickMedia('image')} 
-                                style={styles.attachBtn}
-                                disabled={isUploading}
-                              >
-                                <ImageIcon size={20} color="rgba(255,255,255,0.6)" />
-                              </TouchableOpacity>
-                              <TouchableOpacity 
-                                onPress={() => handlePickMedia('video')} 
-                                style={styles.attachBtn}
-                                disabled={isUploading}
-                              >
-                                <VideoIcon size={20} color="rgba(255,255,255,0.6)" />
-                              </TouchableOpacity>
-                            </View>
+                            <View style={styles.inputWrapper}>
+                              <View style={styles.attachmentButtons}>
+                                <TouchableOpacity 
+                                  onPress={() => setShowMediaMenu(!showMediaMenu)} 
+                                  style={styles.attachBtn}
+                                  disabled={isUploading}
+                                >
+                                  <Plus size={20} color={showMediaMenu ? theme.colors.primary : "rgba(255,255,255,0.6)"} />
+                                </TouchableOpacity>
+                              </View>
   
                             <TextInput
                               ref={inputRef}
@@ -3411,8 +3433,45 @@ const styles = StyleSheet.create({
       borderRadius: 12,
       backgroundColor: 'rgba(255,255,255,0.03)',
     },
-    groupActionText: {
-      fontSize: 15,
-      fontWeight: '600',
-    },
-  });
+      groupActionText: {
+        fontSize: 15,
+        fontWeight: '600',
+      },
+      mediaMenu: {
+        position: 'absolute',
+        bottom: Platform.OS === 'ios' ? 100 : 76,
+        left: 16,
+        backgroundColor: '#1E293B',
+        borderRadius: 16,
+        padding: 8,
+        flexDirection: 'row',
+        gap: 8,
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+        zIndex: 1000,
+      },
+      mediaMenuItem: {
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        gap: 6,
+      },
+      mediaMenuIcon: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        justifyContent: 'center',
+        alignItems: 'center',
+      },
+      mediaMenuText: {
+        color: '#FFF',
+        fontSize: 12,
+        fontWeight: '600',
+      },
+    });
+
