@@ -129,7 +129,11 @@ const router = useRouter();
     const [nicknameToEdit, setNicknameToEdit] = useState(null);
   const [nicknameValue, setNicknameValue] = useState('');
   
-    const [activeCall, setActiveCall] = useState(null);
+    const [isTyping, setIsTyping] = useState(false);
+  const typingTimeoutRef = useRef(null);
+  const [chatPresence, setChatPresence] = useState({});
+
+  const [activeCall, setActiveCall] = useState(null);
     const [isMuted, setIsMuted] = useState(false);
     const [isSpeakerOn, setIsSpeakerOn] = useState(false);
     const [isNear, setIsNear] = useState(false);
@@ -637,7 +641,25 @@ const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
             }
           }
         )
-        .subscribe();
+        .on('presence', { event: 'sync' }, () => {
+          const state = channel.presenceState();
+          const pMap = {};
+          Object.keys(state).forEach(uid => {
+            if (uid !== user.id) {
+              pMap[uid] = state[uid][0];
+            }
+          });
+          setChatPresence(pMap);
+        })
+        .subscribe(async (status) => {
+          if (status === 'SUBSCRIBED') {
+            await channel.track({
+              user_id: user.id,
+              is_typing: false,
+              is_recording: false,
+            });
+          }
+        });
 
       messageChannelRef.current = channel;
     }
@@ -649,6 +671,64 @@ const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
       }
     };
   }, [activeChat?.id, user?.id]);
+
+  useEffect(() => {
+    if (!messageChannelRef.current || !user) return;
+
+    messageChannelRef.current.track({
+      user_id: user.id,
+      is_typing: isTyping,
+      is_recording: isRecording,
+    });
+  }, [isTyping, isRecording]);
+
+  const handleInputChange = (text) => {
+    setInputText(text);
+    
+    if (text.trim().length > 0) {
+      if (!isTyping) setIsTyping(true);
+      
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        setIsTyping(false);
+      }, 2000);
+    } else {
+      if (isTyping) setIsTyping(false);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    }
+  };
+
+  const PresenceIndicator = () => {
+    const presenceArray = Object.values(chatPresence);
+    const typingUsers = presenceArray.filter(p => p.is_typing);
+    const recordingUsers = presenceArray.filter(p => p.is_recording);
+
+    if (typingUsers.length === 0 && recordingUsers.length === 0) return null;
+
+    const getUsername = (uid) => {
+      if (activeChat?.is_group) {
+        return groupMembers.find(m => m.user_id === uid)?.user?.username || 'Someone';
+      } else {
+        const other = getOtherUser(activeChat);
+        return other?.username || 'Someone';
+      }
+    };
+
+    let text = '';
+    if (recordingUsers.length > 0) {
+      const names = recordingUsers.map(u => getUsername(u.user_id));
+      text = `${names.join(', ')} ${names.length > 1 ? 'are' : 'is'} recording audio...`;
+    } else if (typingUsers.length > 0) {
+      const names = typingUsers.map(u => getUsername(u.user_id));
+      text = `${names.join(', ')} ${names.length > 1 ? 'are' : 'is'} typing...`;
+    }
+
+    return (
+      <View style={styles.presenceIndicator}>
+        <Text style={styles.presenceIndicatorText}>{text}</Text>
+      </View>
+    );
+  };
 
   const loadGroupMembers = async (chatId) => {
     const { data } = await supabase
@@ -2439,10 +2519,12 @@ agoraEngine.current = null;
 
                     style={styles.messagesList}
                     contentContainerStyle={{ padding: 16 }}
-                    onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
-                  />
-                  
-                  {activeChat?.status === 'pending' && activeChat.initiated_by !== user?.id && !activeChat.is_group && (
+                      onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
+                    />
+                    
+                    <PresenceIndicator />
+                    
+                    {activeChat?.status === 'pending' && activeChat.initiated_by !== user?.id && !activeChat.is_group && (
                     <View style={styles.requestActions}>
                       <Text style={styles.requestText}>Do you want to let @{getOtherUser(activeChat)?.username} message you?</Text>
                       <View style={styles.requestButtons}>
@@ -2546,19 +2628,19 @@ agoraEngine.current = null;
                                 </TouchableOpacity>
                               </View>
   
-                            <TextInput
-                              ref={inputRef}
-                              style={styles.input}
-                              placeholder={activeChat?.status === 'pending' && !activeChat?.is_group ? "Waiting for approval..." : "Type a message..."}
-                              value={inputText}
-                              onChangeText={setInputText}
-                              onKeyPress={handleKeyPress}
-                              onSubmitEditing={() => handleSendMessage()}
-                              placeholderTextColor="rgba(255,255,255,0.3)"
-                              multiline
-                              blurOnSubmit={false}
-                              editable={!isUploading && (activeChat?.status === 'accepted' || activeChat?.initiated_by === user?.id || activeChat?.is_group)}
-                            />
+                              <TextInput
+                                ref={inputRef}
+                                style={styles.input}
+                                placeholder={activeChat?.status === 'pending' && !activeChat?.is_group ? "Waiting for approval..." : "Type a message..."}
+                                value={inputText}
+                                onChangeText={handleInputChange}
+                                onKeyPress={handleKeyPress}
+                                onSubmitEditing={() => handleSendMessage()}
+                                placeholderTextColor="rgba(255,255,255,0.3)"
+                                multiline
+                                blurOnSubmit={false}
+                                editable={!isUploading && (activeChat?.status === 'accepted' || activeChat?.initiated_by === user?.id || activeChat?.is_group)}
+                              />
   
                             {inputText.trim() ? (
                               <TouchableOpacity 
@@ -3624,10 +3706,21 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
       },
-      mediaMenuText: {
-        color: '#FFF',
-        fontSize: 12,
-        fontWeight: '600',
-      },
-    });
+        mediaMenuText: {
+          color: '#FFF',
+          fontSize: 12,
+          fontWeight: '600',
+        },
+        presenceIndicator: {
+          paddingHorizontal: 20,
+          paddingVertical: 8,
+          backgroundColor: 'rgba(15, 23, 42, 0.8)',
+        },
+        presenceIndicatorText: {
+          color: theme.colors.primary,
+          fontSize: 12,
+          fontWeight: '600',
+          fontStyle: 'italic',
+        },
+      });
 
