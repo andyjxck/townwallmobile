@@ -61,23 +61,6 @@ export default function CityScreen() {
     const citiesData = await fetchCities();
     setCities(citiesData);
     setLoading(false);
-
-    const globalCity = citiesData.find(c => c.name.toLowerCase() === 'global');
-    if (globalCity) {
-      setCity({
-        id: globalCity.id,
-        name: globalCity.name,
-        source: "auto",
-      });
-      
-      const zones = await fetchZonesForCity(globalCity.id);
-      if (zones && zones.length > 0) {
-        router.push("/onboarding/zones");
-      } else {
-        await setOnboardingComplete(true);
-        router.replace("/");
-      }
-    }
   };
 
   const attemptAutoDetection = async () => {
@@ -138,6 +121,25 @@ export default function CityScreen() {
     setSelectedCity(null);
   };
 
+  const handleNotFromUK = async () => {
+    const globalCity = cities.find(c => c.name.toLowerCase() === 'global');
+    if (globalCity) {
+      setCity({
+        id: globalCity.id,
+        name: globalCity.name,
+        source: "auto",
+      });
+      
+      const zones = await fetchZonesForCity(globalCity.id);
+      if (zones && zones.length > 0) {
+        router.push("/onboarding/zones");
+      } else {
+        await setOnboardingComplete(true);
+        router.replace("/");
+      }
+    }
+  };
+
   const renderCityItem = ({ item }) => (
     <TouchableOpacity
       style={styles.cityItem}
@@ -170,15 +172,30 @@ export default function CityScreen() {
           </Text>
         </View>
 
-        {showNotUKMessage && (
-          <View style={styles.notUKBanner}>
-            <Ionicons name="information-circle" size={20} color="#FFA500" />
-            <Text style={styles.notUKText}>
-              Town Wall currently supports UK communities only.{"\n"}
-              You can still join by choosing a UK town below.
-            </Text>
-          </View>
-        )}
+{showNotUKMessage && (
+            <View style={styles.notUKBanner}>
+              <Ionicons name="information-circle" size={20} color="#FFA500" />
+              <View style={styles.notUKContent}>
+                <Text style={styles.notUKText}>
+                  Are you from the UK?
+                </Text>
+                <View style={styles.notUKButtons}>
+                  <TouchableOpacity
+                    style={styles.notUKButtonYes}
+                    onPress={() => setShowNotUKMessage(false)}
+                  >
+                    <Text style={styles.notUKButtonYesText}>Yes</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.notUKButtonNo}
+                    onPress={handleNotFromUK}
+                  >
+                    <Text style={styles.notUKButtonNoText}>No</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          )}
 
         {detecting && (
           <View style={styles.detectingBanner}>
@@ -297,11 +314,40 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     gap: 10,
   },
-  notUKText: {
+  notUKContent: {
     flex: 1,
+  },
+  notUKText: {
     fontSize: 14,
     color: "#FFA500",
     lineHeight: 20,
+    marginBottom: 12,
+  },
+  notUKButtons: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  notUKButtonYes: {
+    backgroundColor: "#4ADE80",
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
+  notUKButtonYesText: {
+    color: "#000",
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  notUKButtonNo: {
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
+  notUKButtonNoText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 14,
   },
   detectingBanner: {
     flexDirection: "row",
