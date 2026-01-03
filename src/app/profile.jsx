@@ -9,6 +9,7 @@ import {
   Alert,
   ActivityIndicator,
   Dimensions,
+  Platform,
   TextInput as RNTextInput,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
