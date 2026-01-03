@@ -122,6 +122,9 @@ const router = useRouter();
   const [activeAudioUrl, setActiveAudioUrl] = useState(null);
   const [showGroupInfo, setShowGroupInfo] = useState(false);
   const [showMediaMenu, setShowMediaMenu] = useState(false);
+  const [showNicknameModal, setShowNicknameModal] = useState(false);
+  const [nicknameToEdit, setNicknameToEdit] = useState(null);
+  const [nicknameValue, setNicknameValue] = useState('');
   
     const [activeCall, setActiveCall] = useState(null);
     const [isMuted, setIsMuted] = useState(false);
@@ -641,6 +644,29 @@ const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
       .select('*, user:rusers(*)')
       .eq('chat_id', chatId);
     setGroupMembers(data || []);
+  };
+
+  const handleSaveNickname = async () => {
+    if (!nicknameToEdit || !user) return;
+    
+    try {
+      const nickname = nicknameValue.trim();
+      if (nickname === '') {
+        await supabase.from('rnicknames').delete().eq('user_id', nicknameToEdit.id).eq('created_by', user.id);
+      } else {
+        await supabase.from('rnicknames').upsert({
+          user_id: nicknameToEdit.id,
+          created_by: user.id,
+          nickname: nickname
+        });
+      }
+      setShowNicknameModal(false);
+      loadUserAndChats();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (err) {
+      console.error('Error setting nickname:', err);
+      Alert.alert('Error', 'Failed to save nickname');
+    }
   };
 
   const handleLeaveGroup = async () => {
@@ -1872,10 +1898,10 @@ agoraEngine.current = null;
                           key={member.id} 
                           style={styles.memberItem}
                           onPress={() => {
-                            if (member.user?.username) {
+                            if (member.user?.id) {
                               setShowGroupInfo(false);
                               setClose();
-                              router.push(`/profile?username=${member.user.username}`);
+                              router.push(`/profile?userId=${member.user.id}`);
                             }
                           }}
                           onLongPress={() => {
@@ -1996,10 +2022,52 @@ agoraEngine.current = null;
               )}
             </View>
           </View>
+          </Modal>
+
+
+        <Modal visible={showNicknameModal} animationType="fade" transparent>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: '#0F172A', padding: 24 }]}>
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { textAlign: 'left', marginBottom: 0 }]}>Set Nickname</Text>
+                <TouchableOpacity onPress={() => setShowNicknameModal(false)}>
+                  <X size={24} color="#FFF" />
+                </TouchableOpacity>
+              </View>
+              
+              <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 14, marginVertical: 16 }}>
+                Nickname for @{nicknameToEdit?.username} is only visible to you.
+              </Text>
+
+              <TextInput
+                style={[styles.modalInput, { backgroundColor: 'rgba(255,255,255,0.05)', color: '#FFF', fontSize: 18, height: 50, marginBottom: 24 }]}
+                placeholder="Enter nickname..."
+                placeholderTextColor="rgba(255,255,255,0.3)"
+                value={nicknameValue}
+                onChangeText={setNicknameValue}
+                autoFocus
+                autoCapitalize="words"
+              />
+
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <TouchableOpacity 
+                  onPress={() => setShowNicknameModal(false)}
+                  style={[styles.createGroupBtn, { flex: 1, backgroundColor: 'transparent', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }]}
+                >
+                  <Text style={[styles.createGroupBtnText, { color: '#FFF' }]}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  onPress={handleSaveNickname}
+                  style={[styles.createGroupBtn, { flex: 1, backgroundColor: theme.colors.primary }]}
+                >
+                  <Text style={[styles.createGroupBtnText, { color: '#000' }]}>Save</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
         </Modal>
 
-
-          {isOpen && (
+            {isOpen && (
         <Animated.View style={[styles.chatOverlay, { opacity: fadeAnim }]}>
           <TouchableOpacity 
             style={StyleSheet.absoluteFill} 
@@ -2054,65 +2122,37 @@ agoraEngine.current = null;
                       style={styles.headerUserInfo}
                         onPress={() => {
                           const other = getOtherUser(activeChat);
-                          if (other) {
-                            setClose();
-                            router.push(`/profile?username=${other.username}`);
-                          }
-                        }}
-                      >
-                        <View style={styles.avatarWrapper}>
-                          {getOtherUser(activeChat)?.avatar_url ? (
-                            <Image source={{ uri: getOtherUser(activeChat).avatar_url }} style={styles.headerAvatar} />
-                          ) : (
-                            <View style={styles.headerEmojiBg}>
-                              <Text style={styles.headerEmoji}>{getOtherUser(activeChat)?.emoji_icon || "👤"}</Text>
-                            </View>
-                          )}
-                          {onlineUsers[getOtherUser(activeChat)?.id] && <View style={styles.headerStatusDot} />}
-                        </View>
-                          <View style={{ flex: 1 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                              <Text style={styles.headerTitle} numberOfLines={1}>
-                                {getOtherUser(activeChat)?.nickname || `@${getOtherUser(activeChat)?.username}`}
-                              </Text>
-                              <TouchableOpacity onPress={(e) => {
-                                e.stopPropagation();
-                                const other = getOtherUser(activeChat);
-                                Alert.prompt(
-                                  'Set Nickname',
-                                  `This nickname for @${other.username} is only visible to you.`,
-                                  [
-                                    { text: 'Cancel', style: 'cancel' },
-                                    {
-                                      text: 'Save',
-                                      onPress: async (nickname) => {
-                                        if (nickname !== undefined) {
-                                          try {
-                                            if (nickname.trim() === '') {
-                                              await supabase.from('rnicknames').delete().eq('user_id', other.id).eq('created_by', user.id);
-                                            } else {
-                                              await supabase.from('rnicknames').upsert({
-                                                user_id: other.id,
-                                                created_by: user.id,
-                                                nickname: nickname.trim()
-                                              });
-                                            }
-                                            loadUserAndChats();
-                                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                                          } catch (err) {
-                                            console.error('Error setting nickname:', err);
-                                          }
-                                        }
-                                      }
-                                    }
-                                  ],
-                                  'plain-text',
-                                  other.nickname || ''
-                                );
-                              }}>
-                                <Edit size={14} color="rgba(255,255,255,0.4)" />
-                              </TouchableOpacity>
-                            </View>
+                            if (other) {
+                              setClose();
+                              router.push(`/profile?userId=${other.id}`);
+                            }
+                          }}
+                        >
+                          <View style={styles.avatarWrapper}>
+                            {getOtherUser(activeChat)?.avatar_url ? (
+                              <Image source={{ uri: getOtherUser(activeChat).avatar_url }} style={styles.headerAvatar} />
+                            ) : (
+                              <View style={styles.headerEmojiBg}>
+                                <Text style={styles.headerEmoji}>{getOtherUser(activeChat)?.emoji_icon || "👤"}</Text>
+                              </View>
+                            )}
+                            {onlineUsers[getOtherUser(activeChat)?.id] && <View style={styles.headerStatusDot} />}
+                          </View>
+                            <View style={{ flex: 1 }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <Text style={styles.headerTitle} numberOfLines={1}>
+                                  {getOtherUser(activeChat)?.nickname || `@${getOtherUser(activeChat)?.username}`}
+                                </Text>
+                                <TouchableOpacity onPress={(e) => {
+                                  e.stopPropagation();
+                                  const other = getOtherUser(activeChat);
+                                  setNicknameToEdit(other);
+                                  setNicknameValue(other.nickname || '');
+                                  setShowNicknameModal(true);
+                                }}>
+                                  <Edit size={14} color="rgba(255,255,255,0.4)" />
+                                </TouchableOpacity>
+                              </View>
                             <Text style={styles.onlineStatusText}>
                               {onlineUsers[getOtherUser(activeChat)?.id] ? 'Online' : 'Offline'}
                             </Text>
@@ -2240,16 +2280,16 @@ agoraEngine.current = null;
                             
                           return (
                             <View style={[styles.messageBubble, isMyMessage ? styles.myMessage : styles.theirMessage, item.media_url && styles.mediaMessage]}>
-                          {activeChat?.is_group && !isMyMessage && (
-                            <TouchableOpacity onPress={() => {
-                              if (item.sender?.username) {
-                                setClose();
-                                router.push(`/profile?username=${item.sender.username}`);
-                              }
-                            }}>
-                              <Text style={styles.senderName}>@{item.sender?.username}</Text>
-                            </TouchableOpacity>
-                          )}
+                            {activeChat?.is_group && !isMyMessage && (
+                              <TouchableOpacity onPress={() => {
+                                if (item.sender?.id) {
+                                  setClose();
+                                  router.push(`/profile?userId=${item.sender.id}`);
+                                }
+                              }}>
+                                <Text style={styles.senderName}>@{item.sender?.username}</Text>
+                              </TouchableOpacity>
+                            )}
                             
                             {item.media_url && (
                               <MediaPreview url={item.media_url} type={item.media_type} isMyMessage={isMyMessage} />
