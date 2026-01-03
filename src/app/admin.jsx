@@ -322,6 +322,22 @@ export default function ModerationAdmin() {
           is_blurred: action === 'reject',
           is_deleted: action === 'reject'
         };
+      } else if (activeTab === 'reports') {
+        const report = data.find(i => i.id === itemId);
+        if (!report) throw new Error("Report not found");
+
+        if (action === 'approve') {
+          if (report.target_type === 'user') {
+            await supabase.from('rusers').update({ is_banned: true }).eq('id', report.target_id);
+          } else if (report.target_type === 'post') {
+            await supabase.from('rposts').update({ is_deleted: true, deletion_reason: report.reason }).eq('id', report.target_id);
+          }
+          table = 'rmoderation_logs';
+          updateData = { action: 'report_approved' };
+        } else {
+          table = 'rmoderation_logs';
+          updateData = { action: 'report_rejected' };
+        }
       }
 
       const { error } = await supabase.from(table).update(updateData).eq('id', itemId);
@@ -766,18 +782,29 @@ export default function ModerationAdmin() {
                 <Text style={[styles.actionText, { color: '#000' }]}>OVERRIDE - POST IT</Text>
               </TouchableOpacity>
             )}
-            {activeTab !== 'ai' && (
-              <>
-                <TouchableOpacity style={[styles.actionButton, styles.approveButton]} onPress={() => handleAction(item.id, 'approve')}>
-                  <CheckCircle size={18} color="#000000" />
-                  <Text style={styles.actionText}>APPROVE</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.actionButton, styles.rejectButton]} onPress={() => handleAction(item.id, 'reject')}>
-                  <XCircle size={18} color="#FFFFFF" />
-                  <Text style={[styles.actionText, { color: '#FFFFFF' }]}>REJECT</Text>
-                </TouchableOpacity>
-              </>
-            )}
+            {activeTab === 'reports' ? (
+                <>
+                  <TouchableOpacity style={[styles.actionButton, styles.approveButton]} onPress={() => handleAction(item.id, 'approve')}>
+                    <CheckCircle size={18} color="#000000" />
+                    <Text style={styles.actionText}>{item.target_type === 'user' ? 'BAN USER' : 'DELETE POST'}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.actionButton, styles.rejectButton]} onPress={() => handleAction(item.id, 'reject')}>
+                    <XCircle size={18} color="#FFFFFF" />
+                    <Text style={[styles.actionText, { color: '#FFFFFF' }]}>DISMISS</Text>
+                  </TouchableOpacity>
+                </>
+              ) : activeTab !== 'ai' && (
+                <>
+                  <TouchableOpacity style={[styles.actionButton, styles.approveButton]} onPress={() => handleAction(item.id, 'approve')}>
+                    <CheckCircle size={18} color="#000000" />
+                    <Text style={styles.actionText}>APPROVE</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.actionButton, styles.rejectButton]} onPress={() => handleAction(item.id, 'reject')}>
+                    <XCircle size={18} color="#FFFFFF" />
+                    <Text style={[styles.actionText, { color: '#FFFFFF' }]}>REJECT</Text>
+                  </TouchableOpacity>
+                </>
+              )}
           </View>
       </View>
     );
