@@ -983,10 +983,22 @@ const stopRecording = async () => {
           const mediaPrefix = (finalMediaType === 'audio' || finalMediaType === 'image') ? 'an' : 'a';
           const mediaMessageText = `Sent ${mediaPrefix} ${finalMediaType}`;
 
-          await supabase.from('rchats').update({
-            last_message: finalMediaUrl ? mediaMessageText : text,
-            last_message_at: new Date().toISOString()
-          }).eq('id', activeChat.id);
+          const newLastMessage = finalMediaUrl ? mediaMessageText : text;
+            const newLastMessageAt = new Date().toISOString();
+            
+            await supabase.from('rchats').update({
+              last_message: newLastMessage,
+              last_message_at: newLastMessageAt
+            }).eq('id', activeChat.id);
+            
+            setChats(prevChats => {
+              const updated = prevChats.map(c => 
+                c.id === activeChat.id 
+                  ? { ...c, last_message: newLastMessage, last_message_at: newLastMessageAt }
+                  : c
+              );
+              return updated.sort((a, b) => new Date(b.last_message_at || 0) - new Date(a.last_message_at || 0));
+            });
 
           const notificationText = finalMediaUrl ? mediaMessageText : text;
 
@@ -2019,7 +2031,7 @@ agoraEngine.current = null;
                 </View>
               ) : (
                 <View style={styles.headerNav}>
-                    <TouchableOpacity onPress={() => { setShowChatList(true); loadUserAndChats(); }} style={styles.iconBtn}>
+                    <TouchableOpacity onPress={() => setShowChatList(true)} style={styles.iconBtn}>
                       <ChevronLeft size={24} color="#FFF" />
                     </TouchableOpacity>
     {activeChat?.is_group ? (
