@@ -346,7 +346,7 @@ if (isOnline) syncPendingPosts();
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
 <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
           <TouchableOpacity onPress={handleLogoClick} activeOpacity={0.7} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <Image source={require("../../assets/images/icon.png")} style={{ width: 32, height: 32 }} contentFit="contain" />
+              <Image source={require("../../assets/images/icon.png")} style={{ width: 32, height: 32, borderRadius: 10 }} contentFit="contain" />
               <TouchableOpacity onPress={() => setShowLocationPicker(true)} activeOpacity={0.7} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                 <Text style={[styles.cityNameText, { color: theme.colors.text }]}>{getLocationDisplayText()}</Text>
                 <ChevronDown size={16} color={theme.colors.textSecondary} />
