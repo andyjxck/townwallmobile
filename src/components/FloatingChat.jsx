@@ -49,12 +49,14 @@ const EMOJIS = ['👥','🔥','🚀','🎮','🎵','📸','🎥','💬','✨','�
 
 const isExpoGo = Constants.appOwnership === 'expo';
 
-let createAgoraRtcEngine, ChannelProfileType, ClientRoleType;
+let createAgoraRtcEngine, ChannelProfileType, ClientRoleType, AudioProfileType, AudioScenarioType;
 if (!isExpoGo) {
   const agora = require('react-native-agora');
   createAgoraRtcEngine = agora.createAgoraRtcEngine;
   ChannelProfileType = agora.ChannelProfileType;
   ClientRoleType = agora.ClientRoleType;
+  AudioProfileType = agora.AudioProfileType;
+  AudioScenarioType = agora.AudioScenarioType;
 }
 
 const AGORA_APP_ID = process.env.EXPO_PUBLIC_AGORA_APP_ID;
@@ -1140,7 +1142,14 @@ const stopRecording = async () => {
         }
 
         await agoraEngine.current.enableAudio();
+        await agoraEngine.current.enableLocalAudio(true);
+        await agoraEngine.current.muteAllRemoteAudioStreams(false);
+        await agoraEngine.current.setEnableSpeakerphone(true);
         await agoraEngine.current.setClientRole(ClientRoleType.ClientRoleBroadcaster);
+        await agoraEngine.current.setAudioProfile(
+          AudioProfileType.AudioProfileDefault,
+          AudioScenarioType.AudioScenarioChatRoom
+        );
         
         // Fetch token from Supabase Edge Function
         const uid = user.id.hashCode() % 1000000;

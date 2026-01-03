@@ -61,6 +61,23 @@ export default function CityScreen() {
     const citiesData = await fetchCities();
     setCities(citiesData);
     setLoading(false);
+
+    const globalCity = citiesData.find(c => c.name.toLowerCase() === 'global');
+    if (globalCity) {
+      setCity({
+        id: globalCity.id,
+        name: globalCity.name,
+        source: "auto",
+      });
+      
+      const zones = await fetchZonesForCity(globalCity.id);
+      if (zones && zones.length > 0) {
+        router.push("/onboarding/zones");
+      } else {
+        await setOnboardingComplete(true);
+        router.replace("/");
+      }
+    }
   };
 
   const attemptAutoDetection = async () => {
