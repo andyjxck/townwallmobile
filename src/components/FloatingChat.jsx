@@ -1227,8 +1227,8 @@ const stopRecording = async () => {
           AudioScenarioType.AudioScenarioChatRoom
         );
         
-        // Fetch token from Supabase Edge Function
-        const uid = user.id.hashCode() % 1000000;
+// Fetch token from Supabase Edge Function
+          const uid = Math.abs(user.id.split('').reduce((a, b) => ((a << 5) - a) + b.charCodeAt(0), 0)) % 1000000;
         const { data, error } = await supabase.functions.invoke('agora-token', {
           body: {
             channelName: activeCall.id,
