@@ -1238,7 +1238,16 @@ const stopRecording = async () => {
         );
         
           // Fetch token from Supabase Edge Function
-          const uid = (user.id.hashCode()) % 1000000;
+          const hashCode = (str) => {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+              const char = str.charCodeAt(i);
+              hash = ((hash << 5) - hash) + char;
+              hash = hash & hash;
+            }
+            return Math.abs(hash);
+          };
+          const uid = hashCode(user.id) % 1000000;
           const { data, error } = await supabase.functions.invoke('agora-token', {
           body: {
             channelName: activeCall.id,
