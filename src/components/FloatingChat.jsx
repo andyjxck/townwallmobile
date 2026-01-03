@@ -1180,16 +1180,16 @@ const stopRecording = async () => {
     const [remoteUsers, setRemoteUsers] = useState([]);
 
     useEffect(() => {
-      if (activeCall?.status === 'active' && AGORA_APP_ID && !isExpoGo) {
+      if (activeCall?.status === 'active' && AGORA_APP_ID && !isExpoGo && user?.id) {
         setupAgora();
       } else if (!activeCall && isJoined) {
         leaveAgora();
       }
-    }, [activeCall?.status]);
+    }, [activeCall?.status, user?.id]);
 
     const setupAgora = async () => {
-      if (isExpoGo) {
-        console.log('Agora is not supported in Expo Go');
+      if (isExpoGo || !user?.id) {
+        console.log('Agora setup skipped: Expo Go or No user ID');
         return;
       }
       try {
@@ -1237,9 +1237,9 @@ const stopRecording = async () => {
           AudioScenarioType.AudioScenarioChatRoom
         );
         
-// Fetch token from Supabase Edge Function
-          const uid = Math.abs(user.id.split('').reduce((a, b) => ((a << 5) - a) + b.charCodeAt(0), 0)) % 1000000;
-        const { data, error } = await supabase.functions.invoke('agora-token', {
+          // Fetch token from Supabase Edge Function
+          const uid = (user.id.hashCode()) % 1000000;
+          const { data, error } = await supabase.functions.invoke('agora-token', {
           body: {
             channelName: activeCall.id,
             uid: uid,
