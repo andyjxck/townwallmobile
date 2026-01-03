@@ -91,6 +91,7 @@ const router = useRouter();
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [chats, setChats] = useState([]);
+  const [userNicknames, setUserNicknames] = useState({});
   const [showChatList, setShowChatList] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -531,6 +532,20 @@ const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
 
     const allChats = [...(regularChats || []), ...groupChats];
     const filteredChats = allChats.filter(c => c.status !== 'rejected');
+
+    // Fetch nicknames for the current user
+    const { data: nicknamesData } = await supabase
+      .from('rnicknames')
+      .select('user_id, nickname')
+      .eq('created_by', storedUser.id);
+    
+    const nicknameMap = {};
+    if (nicknamesData) {
+      nicknamesData.forEach(n => {
+        nicknameMap[n.user_id] = n.nickname;
+      });
+    }
+    setUserNicknames(nicknameMap);
 
     const chatsWithUnread = await Promise.all(filteredChats.map(async (chat) => {
       const { count } = await supabase
@@ -1032,10 +1047,14 @@ const stopRecording = async () => {
     }
   };
 
-  const getOtherUser = (chat) => {
-    if (!chat || !user) return null;
-    return chat.user1_id === user.id ? chat.user2 : chat.user1;
-  };
+    const getOtherUser = (chat) => {
+      if (!chat || !user) return null;
+      const otherUser = chat.user1_id === user.id ? chat.user2 : chat.user1;
+      if (otherUser && userNicknames[otherUser.id]) {
+        return { ...otherUser, nickname: userNicknames[otherUser.id] };
+      }
+      return otherUser;
+    };
 
   const startCall = async (isGroupCall = false) => {
     if (!activeChat) return;
@@ -2038,14 +2057,53 @@ agoraEngine.current = null;
                           )}
                           {onlineUsers[getOtherUser(activeChat)?.id] && <View style={styles.headerStatusDot} />}
                         </View>
-                        <View>
-                          <Text style={styles.headerTitle}>
-                            @{getOtherUser(activeChat)?.username}
-                          </Text>
-                          <Text style={styles.onlineStatusText}>
-                            {onlineUsers[getOtherUser(activeChat)?.id] ? 'Online' : 'Offline'}
-                          </Text>
-                        </View>
+                          <View style={{ flex: 1 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                              <Text style={styles.headerTitle} numberOfLines={1}>
+                                {getOtherUser(activeChat)?.nickname || `@${getOtherUser(activeChat)?.username}`}
+                              </Text>
+                              <TouchableOpacity onPress={(e) => {
+                                e.stopPropagation();
+                                const other = getOtherUser(activeChat);
+                                Alert.prompt(
+                                  'Set Nickname',
+                                  `This nickname for @${other.username} is only visible to you.`,
+                                  [
+                                    { text: 'Cancel', style: 'cancel' },
+                                    {
+                                      text: 'Save',
+                                      onPress: async (nickname) => {
+                                        if (nickname !== undefined) {
+                                          try {
+                                            if (nickname.trim() === '') {
+                                              await supabase.from('rnicknames').delete().eq('user_id', other.id).eq('created_by', user.id);
+                                            } else {
+                                              await supabase.from('rnicknames').upsert({
+                                                user_id: other.id,
+                                                created_by: user.id,
+                                                nickname: nickname.trim()
+                                              });
+                                            }
+                                            loadUserAndChats();
+                                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                                          } catch (err) {
+                                            console.error('Error setting nickname:', err);
+                                          }
+                                        }
+                                      }
+                                    }
+                                  ],
+                                  'plain-text',
+                                  other.nickname || ''
+                                );
+                              }}>
+                                <Edit size={14} color="rgba(255,255,255,0.4)" />
+                              </TouchableOpacity>
+                            </View>
+                            <Text style={styles.onlineStatusText}>
+                              {onlineUsers[getOtherUser(activeChat)?.id] ? 'Online' : 'Offline'}
+                            </Text>
+                          </View>
                       </TouchableOpacity>
                     )}
                     {activeChat && (activeChat.status === 'accepted' || activeChat.is_group) && (
@@ -2106,12 +2164,12 @@ agoraEngine.current = null;
                       </View>
                       <View style={styles.chatInfo}>
                         <View style={styles.chatInfoTop}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <Text style={styles.chatName}>
-                              {isGroup ? item.group_name : `@${otherUser?.username}`}
-                            </Text>
-                            {isGroup && <Users size={12} color="rgba(255,255,255,0.4)" />}
-                            {isPending && (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                              <Text style={styles.chatName}>
+                                {isGroup ? item.group_name : (otherUser?.nickname || `@${otherUser?.username}`)}
+                              </Text>
+                              {isGroup && <Users size={12} color="rgba(255,255,255,0.4)" />}
+                              {isPending && (
                               <View style={styles.pendingBadge}>
                                 <Text style={styles.pendingBadgeText}>Request</Text>
                               </View>
