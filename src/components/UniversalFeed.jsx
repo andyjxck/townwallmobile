@@ -465,7 +465,7 @@ if (isOnline) syncPendingPosts();
         />
 
         <TouchableOpacity onPress={() => router.push("/post")} style={[styles.fab, { backgroundColor: theme.colors.primary }]}>
-          <Plus color="#000" size={30} />
+          <Plus color="#000" size={28} />
         </TouchableOpacity>
 
         <Modal visible={showLocationPicker} animationType="slide" transparent>
@@ -664,7 +664,21 @@ const styles = StyleSheet.create({
   menu: { position: 'absolute', top: 100, right: 20, width: 180, borderRadius: 10, padding: 10, zIndex: 100, borderWidth: 1, elevation: 5 },
   menuItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 },
   menuText: { fontSize: 16, color: theme.colors.text },
-  fab: { position: 'absolute', bottom: 30, right: 20, width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', elevation: 5 },
+  fab: { 
+    position: 'absolute', 
+    bottom: 30, 
+    right: 20, 
+    width: 60, 
+    height: 60, 
+    borderRadius: 30, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
   empty: { padding: 40, alignItems: 'center' },
   emptyText: { fontSize: 16, color: '#666' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },

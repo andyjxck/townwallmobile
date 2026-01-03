@@ -2368,13 +2368,13 @@ const styles = StyleSheet.create({
   },
   fixedBubbleContainer: {
     position: 'absolute',
-    bottom: 40,
+    bottom: 30,
     left: 20,
     zIndex: 9999,
-    elevation: 10,
+    elevation: 5,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
+    shadowOpacity: 0.3,
     shadowRadius: 8,
   },
   bubbleContainer: {
@@ -2388,10 +2388,8 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
     overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.9)',
+    backgroundColor: theme.colors.primary,
   },
     bubbleUnread: {
       backgroundColor: '#EF4444',
