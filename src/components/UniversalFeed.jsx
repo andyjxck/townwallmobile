@@ -377,17 +377,43 @@ if (isOnline) syncPendingPosts();
         </View>
       </View>
 
-        {showMenu && (
-            <BlurView intensity={80} tint={isHippie || theme.dark ? "dark" : "light"} style={[styles.menu, { backgroundColor: theme.colors.surface + '80', borderColor: theme.colors.border, overflow: 'hidden' }]}>
-              <TouchableOpacity onPress={() => { setShowMenu(false); useChatStore.getState().open(); }} style={styles.menuItem}><MessageCircle size={20} color={theme.colors.text} /><Text style={styles.menuText}>Chat</Text></TouchableOpacity>
-              <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/profile"); }} style={styles.menuItem}><User size={20} color={theme.colors.text} /><Text style={styles.menuText}>Profile</Text></TouchableOpacity>
-              <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/talent"); }} style={styles.menuItem}><Star size={20} color={theme.colors.text} /><Text style={styles.menuText}>Local Talent</Text></TouchableOpacity>
-            <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/businesses"); }} style={styles.menuItem}><Briefcase size={20} color={theme.colors.text} /><Text style={styles.menuText}>Local Business</Text></TouchableOpacity>
-            <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/polls"); }} style={styles.menuItem}><Vote size={20} color={theme.colors.text} /><Text style={styles.menuText}>Polls & Features</Text></TouchableOpacity>
-            {isModerator && <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/admin"); }} style={styles.menuItem}><Shield size={20} color={theme.colors.error} /><Text style={styles.menuText}>Admin</Text></TouchableOpacity>}
-            <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/help"); }} style={styles.menuItem}><Sparkles size={20} color="#FBBF24" /><Text style={styles.menuText}>Towny</Text></TouchableOpacity>
-          </BlurView>
-        )}
+        <AnimatePresence>
+          {showMenu && (
+            <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+              <TouchableOpacity 
+                activeOpacity={1} 
+                style={styles.dropdownOverlay} 
+                onPress={() => setShowMenu(false)} 
+              />
+              <MotiView
+                from={{ translateY: -20, opacity: 0, scale: 0.95 }}
+                animate={{ translateY: 0, opacity: 1, scale: 1 }}
+                exit={{ translateY: -20, opacity: 0, scale: 0.95 }}
+                transition={{ type: 'timing', duration: 200 }}
+                style={[
+                  styles.menu, 
+                  { 
+                    top: insets.top + 60,
+                    backgroundColor: (isHippie ? '#1a1a1a' : theme.colors.surface) + 'CC', 
+                    borderColor: theme.colors.border, 
+                    overflow: 'hidden' 
+                  }
+                ]}
+              >
+                <BlurView intensity={80} tint={isHippie || theme.dark ? "dark" : "light"} style={StyleSheet.absoluteFill} />
+                <View style={{ padding: 10 }}>
+                  <TouchableOpacity onPress={() => { setShowMenu(false); useChatStore.getState().open(); }} style={styles.menuItem}><MessageCircle size={20} color={theme.colors.text} /><Text style={styles.menuText}>Chat</Text></TouchableOpacity>
+                  <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/profile"); }} style={styles.menuItem}><User size={20} color={theme.colors.text} /><Text style={styles.menuText}>Profile</Text></TouchableOpacity>
+                  <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/talent"); }} style={styles.menuItem}><Star size={20} color={theme.colors.text} /><Text style={styles.menuText}>Local Talent</Text></TouchableOpacity>
+                  <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/businesses"); }} style={styles.menuItem}><Briefcase size={20} color={theme.colors.text} /><Text style={styles.menuText}>Local Business</Text></TouchableOpacity>
+                  <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/polls"); }} style={styles.menuItem}><Vote size={20} color={theme.colors.text} /><Text style={styles.menuText}>Polls & Features</Text></TouchableOpacity>
+                  {isModerator && <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/admin"); }} style={styles.menuItem}><Shield size={20} color={theme.colors.error} /><Text style={styles.menuText}>Admin</Text></TouchableOpacity>}
+                  <TouchableOpacity onPress={() => { setShowMenu(false); router.push("/help"); }} style={styles.menuItem}><Sparkles size={20} color="#FBBF24" /><Text style={styles.menuText}>Towny</Text></TouchableOpacity>
+                </View>
+              </MotiView>
+            </View>
+          )}
+        </AnimatePresence>
 
         {!isOnline && (
           <View style={styles.offlineBanner}>
