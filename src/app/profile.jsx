@@ -218,11 +218,12 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
           if (userData) {
             if (!viewingOwnProfile && storedUser?.id) {
               // Check friendship status with current user
-              const { data: rel } = await supabase
+              const { data: relList } = await supabase
                 .from('friends')
                 .select('*')
-                .or(`and(user_id.eq.${storedUser.id},friend_id.eq.${userData.id}),and(user_id.eq.${userData.id},friend_id.eq.${storedUser.id})`)
-                .maybeSingle();
+                .or(`and(user_id.eq.${storedUser.id},friend_id.eq.${userData.id}),and(user_id.eq.${userData.id},friend_id.eq.${storedUser.id})`);
+              
+              const rel = relList?.find(r => r.user_id === storedUser.id) || relList?.[0];
             
             if (rel) {
               setFriendshipStatus({
