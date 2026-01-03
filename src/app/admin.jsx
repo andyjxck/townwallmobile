@@ -718,7 +718,7 @@ export default function ModerationAdmin() {
         <View style={styles.contentPadding}>
           {item.title && <Text style={styles.title}>{item.title}</Text>}
           {item.name && <Text style={styles.title}>{item.name}</Text>}
-          <Text style={styles.description}>{item.suggestion_text || item.text || item.description || item.content}</Text>
+          <Text style={styles.description}>{item.reason || item.suggestion_text || item.text || item.description || item.content}</Text>
           {activeTab === 'ai' && item.moderation_reason && (
             <View style={styles.aiReasonContainer}>
               <Bot size={12} color="#4ADE80" />
