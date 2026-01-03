@@ -641,6 +641,62 @@ export default function ModerationAdmin() {
 
     const Icon = TABS.find(t => t.id === activeTab)?.icon || Shield;
     
+    if (activeTab === 'reports') {
+      const metadata = typeof item.metadata === 'string' ? JSON.parse(item.metadata) : item.metadata;
+      return (
+        <TouchableOpacity 
+          style={styles.card}
+          onPress={() => {
+            if (item.target_type === 'user') {
+              router.push(`/profile/${item.target_id}`);
+            } else if (item.target_type === 'post') {
+              router.push(`/post/${item.target_id}`);
+            }
+          }}
+        >
+          <View style={styles.cardHeader}>
+            <View style={styles.userRow}>
+              <View style={[styles.iconContainer, { backgroundColor: '#EF4444' }]}>
+                <AlertCircle size={14} color="#FFFFFF" />
+              </View>
+              <Text style={styles.username}>
+                {item.target_type === 'user' ? `User Report` : `Post Report`}
+              </Text>
+            </View>
+            <Text style={styles.date}>{new Date(item.created_at).toLocaleDateString()}</Text>
+          </View>
+
+          <View style={styles.contentPadding}>
+            <Text style={styles.reportTarget}>
+              {item.target_type === 'user' ? `@${metadata?.username || 'Unknown User'}` : `Post #${item.target_id}`}
+            </Text>
+            <Text style={styles.description}>Reason: {item.reason}</Text>
+            {metadata?.reported_by && (
+              <Text style={styles.reportedBy}>Reported by user #{metadata.reported_by}</Text>
+            )}
+            <Text style={styles.tapToView}>Tap to view {item.target_type}</Text>
+          </View>
+
+          <View style={styles.actionRow}>
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.approveButton]} 
+              onPress={(e) => { e.stopPropagation(); handleAction(item.id, 'approve'); }}
+            >
+              <CheckCircle size={18} color="#000000" />
+              <Text style={styles.actionText}>{item.target_type === 'user' ? 'BAN USER' : 'DELETE POST'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.rejectButton]} 
+              onPress={(e) => { e.stopPropagation(); handleAction(item.id, 'reject'); }}
+            >
+              <XCircle size={18} color="#FFFFFF" />
+              <Text style={[styles.actionText, { color: '#FFFFFF' }]}>DISMISS</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      );
+    }
+
     if (activeTab === 'help') {
       const isExpanded = expandedChatId === item.display_user_id;
       const transcript = transcripts[item.display_user_id] || [];
@@ -782,18 +838,7 @@ export default function ModerationAdmin() {
                 <Text style={[styles.actionText, { color: '#000' }]}>OVERRIDE - POST IT</Text>
               </TouchableOpacity>
             )}
-            {activeTab === 'reports' ? (
-                <>
-                  <TouchableOpacity style={[styles.actionButton, styles.approveButton]} onPress={() => handleAction(item.id, 'approve')}>
-                    <CheckCircle size={18} color="#000000" />
-                    <Text style={styles.actionText}>{item.target_type === 'user' ? 'BAN USER' : 'DELETE POST'}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[styles.actionButton, styles.rejectButton]} onPress={() => handleAction(item.id, 'reject')}>
-                    <XCircle size={18} color="#FFFFFF" />
-                    <Text style={[styles.actionText, { color: '#FFFFFF' }]}>DISMISS</Text>
-                  </TouchableOpacity>
-                </>
-              ) : activeTab !== 'ai' && (
+              {activeTab !== 'ai' && (
                 <>
                   <TouchableOpacity style={[styles.actionButton, styles.approveButton]} onPress={() => handleAction(item.id, 'approve')}>
                     <CheckCircle size={18} color="#000000" />
@@ -1097,7 +1142,11 @@ const styles = StyleSheet.create({
       repairIconContainer: { width: 120, height: 120, borderRadius: 60, backgroundColor: 'rgba(74, 222, 128, 0.1)', alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
       repairTitle: { color: '#FFFFFF', fontSize: 24, fontWeight: '900', letterSpacing: 2, marginBottom: 16 },
       repairDesc: { color: 'rgba(255,255,255,0.5)', fontSize: 14, textAlign: 'center', lineHeight: 22, marginBottom: 32 },
-      repairButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#4ADE80', paddingHorizontal: 32, paddingVertical: 18, borderRadius: 40, gap: 12 },
-      repairButtonText: { color: '#000', fontSize: 14, fontWeight: '900', letterSpacing: 1 }
-    });
+    repairButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#4ADE80', paddingHorizontal: 32, paddingVertical: 18, borderRadius: 40, gap: 12 },
+    repairButtonText: { color: '#000', fontSize: 14, fontWeight: '900', letterSpacing: 1 },
+    reportTarget: { color: '#FFFFFF', fontSize: 18, fontWeight: '800', marginBottom: 6 },
+    reportedBy: { color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 8 },
+    tapToView: { color: '#4ADE80', fontSize: 11, fontWeight: '700', marginTop: 12, letterSpacing: 1 },
+    label: { color: 'rgba(255,255,255,0.5)', fontSize: 10, fontWeight: '800', letterSpacing: 1, marginBottom: 8 }
+  });
 
