@@ -16,6 +16,8 @@ import { Image } from "expo-image";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { supabase } from "../utils/supabase";
 import { useAuthStore } from "../utils/auth";
+import { useLocationStore } from "../utils/locationStore";
+import { findCityByName } from "../utils/location";
 import { getDeviceId } from "../utils/deviceId";
 import { initUser, mergeAnonDataToUser, checkAnonHasData } from "../utils/user";
 import { ChevronLeft, User, Lock, Save, Trash2 } from "lucide-react-native";
@@ -50,6 +52,7 @@ export default function Auth() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const insets = useSafeAreaInsets();
+  const { setCity } = useLocationStore();
   
   const [isLogin, setIsLogin] = useState(params.mode === "login");
   const [loading, setLoading] = useState(false);
@@ -80,6 +83,16 @@ export default function Auth() {
 
   const handleRecoveryCodesConfirmed = async () => {
     if (pendingUser) {
+      if (params.global === 'true') {
+        const globalCity = await findCityByName('Global');
+        if (globalCity) {
+          setCity({
+            id: globalCity.id,
+            name: globalCity.name,
+            source: "manual",
+          });
+        }
+      }
       useAuthStore.getState().setAuth(pendingUser);
       await initUser();
       router.replace("/");
@@ -97,6 +110,17 @@ export default function Auth() {
       .select('*')
       .eq('id', user.id)
       .single();
+
+    if (params.global === 'true') {
+      const globalCity = await findCityByName('Global');
+      if (globalCity) {
+        setCity({
+          id: globalCity.id,
+          name: globalCity.name,
+          source: "manual",
+        });
+      }
+    }
 
     useAuthStore.getState().setAuth(freshUser || user);
     await initUser();
@@ -708,4 +732,3 @@ const styles = StyleSheet.create({
       fontWeight: '600',
     }
   });
-

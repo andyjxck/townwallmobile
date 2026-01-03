@@ -8,21 +8,36 @@ import * as Haptics from "expo-haptics";
 import { useTheme } from "@/utils/ThemeContext";
 import { LinearGradient } from "expo-linear-gradient";
 import { useChatStore, useAuthStore } from "@/utils/auth";
+import { useLocationStore } from "@/utils/locationStore";
+import { findCityByName } from "@/utils/location";
+import { setOnboardingComplete } from "@/utils/onboarding";
 
 export default function UkCheckScreen() {
   const { isHippie } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const auth = useAuthStore((state) => state.auth);
+  const { setCity } = useLocationStore();
 
   const handleYes = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     router.push("/onboarding/city");
   };
 
-  const handleNo = () => {
+  const handleNo = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (auth) {
+      const globalCity = await findCityByName('Global');
+      if (globalCity) {
+        setCity({
+          id: globalCity.id,
+          name: globalCity.name,
+          source: "manual",
+        });
+        await setOnboardingComplete(true);
+        router.replace("/");
+        return;
+      }
       router.push("/onboarding/city?global=true");
     } else {
       router.push("/auth?global=true");

@@ -25,7 +25,7 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 
 export default function CityScreen() {
   const router = useRouter();
-  const { mode } = useLocalSearchParams();
+  const { mode, global: globalParam } = useLocalSearchParams();
   const { setCity } = useLocationStore();
   
   const [loading, setLoading] = useState(true);
@@ -38,11 +38,31 @@ export default function CityScreen() {
   const [detectedCity, setDetectedCity] = useState(null);
 
   useEffect(() => {
-    loadCities();
-    if (mode !== 'manual') {
-      attemptAutoDetectionOnce();
+    if (globalParam === 'true') {
+      handleAutoSelectGlobal();
+    } else {
+      loadCities();
+      if (mode !== 'manual') {
+        attemptAutoDetectionOnce();
+      }
     }
-  }, [mode]);
+  }, [mode, globalParam]);
+
+  const handleAutoSelectGlobal = async () => {
+    setLoading(true);
+    const globalCity = await findCityByName('Global');
+    if (globalCity) {
+      setCity({
+        id: globalCity.id,
+        name: globalCity.name,
+        source: "manual",
+      });
+      await setOnboardingComplete(true);
+      router.replace("/");
+    } else {
+      loadCities();
+    }
+  };
 
   const attemptAutoDetectionOnce = async () => {
     try {
