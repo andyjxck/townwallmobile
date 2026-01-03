@@ -2019,9 +2019,9 @@ agoraEngine.current = null;
                 </View>
               ) : (
                 <View style={styles.headerNav}>
-                  <TouchableOpacity onPress={() => setShowChatList(true)} style={styles.iconBtn}>
-                    <ChevronLeft size={24} color="#FFF" />
-                  </TouchableOpacity>
+                    <TouchableOpacity onPress={() => { setShowChatList(true); loadUserAndChats(); }} style={styles.iconBtn}>
+                      <ChevronLeft size={24} color="#FFF" />
+                    </TouchableOpacity>
     {activeChat?.is_group ? (
                         <TouchableOpacity style={styles.headerUserInfo} onPress={() => setShowGroupInfo(true)}>
                           <View style={styles.headerEmojiBg}>
