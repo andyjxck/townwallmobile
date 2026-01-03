@@ -661,11 +661,12 @@ const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
                 .eq('chat_id', activeChat.id)
                 .eq('user_id', user.id);
 
-                await supabase.from('rmessages').insert({
-                  chat_id: activeChat.id,
-                  sender_id: user.id,
-                  text: `${user.username || 'Someone'} left the group`
-                });
+                  await supabase.from('rmessages').insert({
+                    chat_id: activeChat.id,
+                    sender_id: user.id,
+                    text: `${user.username || 'Someone'} left the group`,
+                    is_system: true
+                  });
 
               await supabase.from('rchats').update({
                 last_message: `${user.username || 'Someone'} left the group`,
@@ -1345,11 +1346,12 @@ agoraEngine.current = null;
         }))
       );
 
-      await supabase.from('rmessages').insert({
-        chat_id: chat.id,
-        sender_id: user.id,
-        text: `${user.username || 'Someone'} created the group`
-      });
+        await supabase.from('rmessages').insert({
+          chat_id: chat.id,
+          sender_id: user.id,
+          text: `${user.username || 'Someone'} created the group`,
+          is_system: true
+        });
 
       await supabase.from('rchats').update({
         last_message: `${user.username || 'Someone'} created the group`,
@@ -1883,11 +1885,12 @@ agoraEngine.current = null;
                                     style: 'destructive',
                                       onPress: async () => {
                                         await supabase.from('rchat_members').delete().eq('id', member.id);
-                                        await supabase.from('rmessages').insert({
-                                          chat_id: activeChat.id,
-                                          sender_id: user.id,
-                                          text: `${member.user?.username || 'Someone'} was removed from the group`
-                                        });
+                                          await supabase.from('rmessages').insert({
+                                            chat_id: activeChat.id,
+                                            sender_id: user.id,
+                                            text: `${member.user?.username || 'Someone'} was removed from the group`,
+                                            is_system: true
+                                          });
                                         loadGroupMembers(activeChat.id);
                                         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                                       }
@@ -2211,8 +2214,16 @@ agoraEngine.current = null;
                         ref={flatListRef}
                         data={messages}
                         keyExtractor={item => item.id}
-                          renderItem={({ item }) => {
-                            const isMyMessage = item.sender_id === user?.id;
+                            renderItem={({ item }) => {
+                              if (item.is_system) {
+                                return (
+                                  <View style={styles.systemMessageContainer}>
+                                    <Text style={styles.systemMessageText}>{item.text}</Text>
+                                  </View>
+                                );
+                              }
+
+                              const isMyMessage = item.sender_id === user?.id;
                             
                             return (
                               <View style={[styles.messageBubble, isMyMessage ? styles.myMessage : styles.theirMessage, item.media_url && styles.mediaMessage]}>
