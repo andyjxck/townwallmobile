@@ -2238,11 +2238,18 @@ agoraEngine.current = null;
 
                               const isMyMessage = item.sender_id === user?.id;
                             
-                            return (
-                              <View style={[styles.messageBubble, isMyMessage ? styles.myMessage : styles.theirMessage, item.media_url && styles.mediaMessage]}>
-                            {activeChat?.is_group && !isMyMessage && (
+                          return (
+                            <View style={[styles.messageBubble, isMyMessage ? styles.myMessage : styles.theirMessage, item.media_url && styles.mediaMessage]}>
+                          {activeChat?.is_group && !isMyMessage && (
+                            <TouchableOpacity onPress={() => {
+                              if (item.sender?.username) {
+                                setClose();
+                                router.push(`/profile?username=${item.sender.username}`);
+                              }
+                            }}>
                               <Text style={styles.senderName}>@{item.sender?.username}</Text>
-                            )}
+                            </TouchableOpacity>
+                          )}
                             
                             {item.media_url && (
                               <MediaPreview url={item.media_url} type={item.media_type} isMyMessage={isMyMessage} />
@@ -2828,8 +2835,10 @@ const styles = StyleSheet.create({
   attachmentButtons: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     paddingRight: 8,
     gap: 8,
+    alignSelf: 'center',
   },
   attachBtn: {
     padding: 4,
