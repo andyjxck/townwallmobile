@@ -710,7 +710,7 @@ export default function ModerationAdmin() {
             <View style={styles.iconContainer}>
               <Icon size={14} color="#FFFFFF" />
             </View>
-            <Text style={styles.username}>@{item.rusers?.username || 'unknown'}</Text>
+            <Text style={styles.username}>@{item.metadata?.username || item.rusers?.username || 'unknown'}</Text>
           </View>
           <Text style={styles.date}>{new Date(item.created_at).toLocaleDateString()}</Text>
         </View>

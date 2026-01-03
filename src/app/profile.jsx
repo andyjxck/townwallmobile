@@ -91,9 +91,13 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
     const [editingBio, setEditingBio] = useState(false);
     const [editingUsername, setEditingUsername] = useState(false);
     const [editingNickname, setEditingNickname] = useState(false);
+    const [showNicknameModal, setShowNicknameModal] = useState(false);
     const [bioText, setBioText] = useState("");
     const [usernameText, setUsernameText] = useState("");
     const [nicknameText, setNicknameText] = useState("");
+    const [showReportModal, setShowReportModal] = useState(false);
+    const [reportReason, setReportReason] = useState("");
+    const [reportingUser, setReportingUser] = useState(null);
     const shareRef = useRef();
 
   useEffect(() => {
@@ -453,12 +457,12 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
   const handleAcceptFriend = async (requestId, friendId) => {
     try {
       await supabase.from('friends').update({ status: 'accepted' }).eq('id', requestId);
-      await supabase.from('friends').insert({ user_id: user.id, friend_id: friendId, status: 'accepted' });
+      await supabase.from('friends').insert({ user_id: currentUser.id, friend_id: user.id, status: 'accepted' });
       
       await sendFriendAcceptedNotification({
-        acceptorId: user.id,
-        acceptorUsername: user.username,
-        requesterId: friendId
+        acceptorId: currentUser.id,
+        acceptorUsername: currentUser.username,
+        requesterId: user.id
       });
       
       loadData();
@@ -641,23 +645,9 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
     };
 
     const handleReportUser = async (targetUser) => {
-      if (Platform.OS === 'ios' || Platform.OS === 'android') {
-        Alert.prompt(
-          "Report User",
-          "Please provide a reason for reporting this user:",
-          [
-            { text: "Cancel", style: "cancel" },
-            { text: "Report", style: "destructive", onPress: async (reason) => {
-              if (!reason) return;
-              await submitReport(targetUser, reason);
-            }}
-          ],
-          "plain-text"
-        );
-      } else {
-        const reason = window.prompt("Reason for reporting:");
-        if (reason) await submitReport(targetUser, reason);
-      }
+      setReportingUser(targetUser);
+      setReportReason("");
+      setShowReportModal(true);
     };
 
     const submitReport = async (targetUser, reason) => {
@@ -670,6 +660,8 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
           reason: reason,
           metadata: { reported_by: storedUser.id, username: targetUser.username }
         });
+        setShowReportModal(false);
+        setReportingUser(null);
         Alert.alert("Thank you", "Your report has been submitted for review.");
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } catch (error) {
@@ -802,28 +794,14 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
                 {isOnline(user?.last_seen) && <View style={styles.onlineDot} />}
               </View>
 
-              <View style={styles.nicknameSection}>
-                {editingNickname ? (
-                  <View style={styles.editRow}>
-                    <RNTextInput
-                      style={[styles.usernameInput, { color: theme.colors.text, borderColor: theme.colors.border }]}
-                      value={nicknameText}
-                      onChangeText={setNicknameText}
-                      placeholder="Set nickname..."
-                      autoFocus
-                    />
-                    <TouchableOpacity onPress={handleUpdateNickname} style={styles.saveIcon}><Check size={20} color={theme.colors.success} /></TouchableOpacity>
-                    <TouchableOpacity onPress={() => setEditingNickname(false)} style={styles.saveIcon}><XIcon size={20} color={theme.colors.error} /></TouchableOpacity>
-                  </View>
-                ) : (
-                  <TouchableOpacity onPress={() => isOwnProfile && setEditingNickname(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <View style={styles.nicknameSection}>
+                  <TouchableOpacity onPress={() => isOwnProfile && setShowNicknameModal(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <Text style={[styles.nickname, { color: theme.colors.textSecondary }]}>
                       {user?.nickname ? `${user.nickname}` : (isOwnProfile ? "Set nickname" : "")}
                     </Text>
                     {isOwnProfile && <Pencil size={12} color={theme.colors.textSecondary} />}
                   </TouchableOpacity>
-                )}
-              </View>
+                </View>
 
               {user?.is_admin && (
                 <TouchableOpacity onPress={() => router.push('/admin')} style={styles.adminBadge}>
@@ -1086,76 +1064,122 @@ const EMOJIS = ["👤", "🐱", "🐶", "🦊", "🦁", "🐨", "🐸", "🐷", 
 
         <ShareManager ref={shareRef} />
   
-        <Modal
-          visible={showRequestsModal}
-          animationType="fade"
-          transparent={true}
-          onRequestClose={() => setShowRequestsModal(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { backgroundColor: theme.colors.background, maxHeight: '80%' }]}>
-              <View style={styles.modalHeader}>
-                <Text style={[styles.modalTitle, { color: theme.colors.text, marginBottom: 0 }]}>Friend Requests</Text>
-                <TouchableOpacity onPress={() => setShowRequestsModal(false)}>
-                  <XIcon color={theme.colors.text} size={24} />
-                </TouchableOpacity>
-              </View>
-              
-              <ScrollView style={{ marginTop: 20 }}>
-                {pendingRequests.length > 0 ? (
-                  pendingRequests.map(r => (
-                    <View key={r.requestId} style={[styles.requestItem, { borderBottomWidth: 1, borderBottomColor: theme.colors.border, paddingVertical: 12 }]}>
-                      <TouchableOpacity 
-                        style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 }}
-                        onPress={() => {
-                          setShowRequestsModal(false);
-                          router.push(`/profile?userId=${r.id}`);
-                        }}
-                      >
-                        {r.avatar_url ? (
-                          <Image source={{ uri: r.avatar_url }} style={styles.resultAvatar} />
-                        ) : (
-                          <Text style={{ fontSize: 32 }}>{r.emoji_icon || "👤"}</Text>
-                        )}
-                        <View>
-                          <Text style={[styles.requestName, { color: theme.colors.text }]}>@{r.username}</Text>
-                          <Text style={{ color: theme.colors.textSecondary, fontSize: 12 }}>wants to be friends</Text>
+          <Modal visible={showRequestsModal} animationType="fade" transparent={true} onRequestClose={() => setShowRequestsModal(false)}>
+            <View style={styles.modalOverlay}>
+              <View style={[styles.modalContent, { backgroundColor: theme.colors.background, maxHeight: '80%' }]}>
+                <View style={styles.modalHeader}>
+                  <Text style={[styles.modalTitle, { color: theme.colors.text, marginBottom: 0 }]}>Friend Requests</Text>
+                  <TouchableOpacity onPress={() => setShowRequestsModal(false)}>
+                    <XIcon color={theme.colors.text} size={24} />
+                  </TouchableOpacity>
+                </View>
+                
+                <ScrollView style={{ marginTop: 20 }}>
+                  {pendingRequests.length > 0 ? (
+                    pendingRequests.map(r => (
+                      <View key={r.requestId} style={[styles.requestItem, { borderBottomWidth: 1, borderBottomColor: theme.colors.border, paddingVertical: 12 }]}>
+                        <TouchableOpacity 
+                          style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 }}
+                          onPress={() => {
+                            setShowRequestsModal(false);
+                            router.push(`/profile?userId=${r.id}`);
+                          }}
+                        >
+                          {r.avatar_url ? (
+                            <Image source={{ uri: r.avatar_url }} style={styles.resultAvatar} />
+                          ) : (
+                            <Text style={{ fontSize: 32 }}>{r.emoji_icon || "👤"}</Text>
+                          )}
+                          <View>
+                            <Text style={[styles.requestName, { color: theme.colors.text }]}>@{r.username}</Text>
+                            <Text style={{ color: theme.colors.textSecondary, fontSize: 12 }}>wants to be friends</Text>
+                          </View>
+                        </TouchableOpacity>
+                        <View style={styles.requestBtns}>
+                          <TouchableOpacity 
+                            onPress={async () => {
+                              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                              const { success } = await acceptFriendRequest(r.requestId, user.id, r.id, user.username);
+                              if (success) loadData();
+                            }} 
+                            style={[styles.acceptBtn, { backgroundColor: theme.colors.success }]}
+                          >
+                            <Check color="#000" size={18} />
+                          </TouchableOpacity>
+                          <TouchableOpacity 
+                            onPress={async () => {
+                              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                              const { success } = await rejectFriendRequest(r.requestId);
+                              if (success) loadData();
+                            }} 
+                            style={[styles.rejectBtn, { backgroundColor: 'rgba(239, 68, 68, 0.2)', borderWidth: 1, borderColor: '#ef4444' }]}
+                          >
+                            <XIcon color="#ef4444" size={18} />
+                          </TouchableOpacity>
                         </View>
-                      </TouchableOpacity>
-                      <View style={styles.requestBtns}>
-                        <TouchableOpacity 
-                          onPress={async () => {
-                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                            const { success } = await acceptFriendRequest(r.requestId, user.id, r.id, user.username);
-                            if (success) loadData();
-                          }} 
-                          style={[styles.acceptBtn, { backgroundColor: theme.colors.success }]}
-                        >
-                          <Check color="#000" size={18} />
-                        </TouchableOpacity>
-                        <TouchableOpacity 
-                          onPress={async () => {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                            const { success } = await rejectFriendRequest(r.requestId);
-                            if (success) loadData();
-                          }} 
-                          style={[styles.rejectBtn, { backgroundColor: 'rgba(239, 68, 68, 0.2)', borderWidth: 1, borderColor: '#ef4444' }]}
-                        >
-                          <XIcon color="#ef4444" size={18} />
-                        </TouchableOpacity>
                       </View>
+                    ))
+                  ) : (
+                    <View style={{ padding: 40, alignItems: 'center', gap: 10 }}>
+                      <UserCheck size={48} color={theme.colors.textSecondary} opacity={0.2} />
+                      <Text style={{ color: theme.colors.textSecondary, textAlign: 'center' }}>No pending requests</Text>
                     </View>
-                  ))
-                ) : (
-                  <View style={{ padding: 40, alignItems: 'center', gap: 10 }}>
-                    <UserCheck size={48} color={theme.colors.textSecondary} opacity={0.2} />
-                    <Text style={{ color: theme.colors.textSecondary, textAlign: 'center' }}>No pending requests</Text>
-                  </View>
-                )}
-              </ScrollView>
+                  )}
+                </ScrollView>
+              </View>
             </View>
-          </View>
-        </Modal>
+          </Modal>
+
+          <Modal visible={showNicknameModal} animationType="fade" transparent={true} onRequestClose={() => setShowNicknameModal(false)}>
+            <View style={styles.modalOverlay}>
+              <View style={[styles.modalContent, { backgroundColor: '#1E293B', padding: 24, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }]}>
+                <Text style={[styles.modalTitle, { color: '#FFF', textAlign: 'left' }]}>Set Nickname</Text>
+                <Text style={{ color: 'rgba(255,255,255,0.5)', marginBottom: 20 }}>This is how you will appear to others on the wall.</Text>
+                <RNTextInput
+                  style={{ backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: 12, padding: 15, color: '#FFF', fontSize: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', marginBottom: 20 }}
+                  placeholder="Enter nickname..."
+                  placeholderTextColor="rgba(255,255,255,0.3)"
+                  value={nicknameText}
+                  onChangeText={setNicknameText}
+                  autoFocus
+                />
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <TouchableOpacity onPress={() => setShowNicknameModal(false)} style={{ flex: 1, padding: 15, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.05)', alignItems: 'center' }}>
+                    <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={handleUpdateNickname} style={{ flex: 1, padding: 15, borderRadius: 12, backgroundColor: theme.colors.primary, alignItems: 'center' }}>
+                    <Text style={{ color: '#000', fontWeight: 'bold' }}>Save</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+
+          <Modal visible={showReportModal} animationType="fade" transparent={true} onRequestClose={() => setShowReportModal(false)}>
+            <View style={styles.modalOverlay}>
+              <View style={[styles.modalContent, { backgroundColor: '#1E293B', padding: 24, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }]}>
+                <Text style={[styles.modalTitle, { color: '#FFF', textAlign: 'left' }]}>Report @{reportingUser?.username}</Text>
+                <Text style={{ color: 'rgba(255,255,255,0.5)', marginBottom: 20 }}>Please provide a reason for reporting this user. Our moderation team will review it.</Text>
+                <RNTextInput
+                  style={{ backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: 12, padding: 15, color: '#FFF', fontSize: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', marginBottom: 20, minHeight: 100, textAlignVertical: 'top' }}
+                  placeholder="Reason for reporting..."
+                  placeholderTextColor="rgba(255,255,255,0.3)"
+                  value={reportReason}
+                  onChangeText={setReportReason}
+                  multiline
+                  autoFocus
+                />
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <TouchableOpacity onPress={() => setShowReportModal(false)} style={{ flex: 1, padding: 15, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.05)', alignItems: 'center' }}>
+                    <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => submitReport(reportingUser, reportReason)} style={{ flex: 1, padding: 15, borderRadius: 12, backgroundColor: '#EF4444', alignItems: 'center' }}>
+                    <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Report</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
       </View>
     );
   }

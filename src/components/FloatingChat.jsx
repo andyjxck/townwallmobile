@@ -121,9 +121,11 @@ const router = useRouter();
   const [pendingMedia, setPendingMedia] = useState(null);
   const [activeAudioUrl, setActiveAudioUrl] = useState(null);
   const [showGroupInfo, setShowGroupInfo] = useState(false);
-  const [showMediaMenu, setShowMediaMenu] = useState(false);
-  const [showNicknameModal, setShowNicknameModal] = useState(false);
-  const [nicknameToEdit, setNicknameToEdit] = useState(null);
+    const [showMediaMenu, setShowMediaMenu] = useState(false);
+    const [showNicknameModal, setShowNicknameModal] = useState(false);
+    const [showGroupRenameModal, setShowGroupRenameModal] = useState(false);
+    const [groupRenameValue, setGroupRenameValue] = useState('');
+    const [nicknameToEdit, setNicknameToEdit] = useState(null);
   const [nicknameValue, setNicknameValue] = useState('');
   
     const [activeCall, setActiveCall] = useState(null);
@@ -646,7 +648,23 @@ const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
     setGroupMembers(data || []);
   };
 
-  const handleSaveNickname = async () => {
+    const handleGroupRename = async () => {
+      const newName = groupRenameValue.trim();
+      if (newName && activeChat) {
+        try {
+          await supabase.from('rchats').update({ group_name: newName }).eq('id', activeChat.id);
+          setActiveChat(prev => ({ ...prev, group_name: newName }));
+          setShowGroupRenameModal(false);
+          loadUserAndChats();
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } catch (error) {
+          console.error('Error renaming group:', error);
+          Alert.alert('Error', 'Failed to rename group');
+        }
+      }
+    };
+
+    const handleSaveNickname = async () => {
     if (!nicknameToEdit || !user) return;
     
     try {
@@ -1962,25 +1980,13 @@ agoraEngine.current = null;
                   <View style={styles.groupActions}>
                       {(activeChat?.owner_id === user?.id || groupMembers.find(m => m.user_id === user?.id)?.is_owner) && (
                         <>
-                          <TouchableOpacity style={styles.groupActionBtn} onPress={() => {
-                            Alert.prompt(
-                              'Change Group Name',
-                              'Enter new group name',
-                              async (newName) => {
-                                if (newName && newName.trim()) {
-                                  await supabase.from('rchats').update({ group_name: newName.trim() }).eq('id', activeChat.id);
-                                  setActiveChat(prev => ({ ...prev, group_name: newName.trim() }));
-                                  loadUserAndChats();
-                                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                                }
-                              },
-                              'plain-text',
-                              activeChat?.group_name
-                            );
-                          }}>
-                            <Settings size={20} color={theme.colors.primary} />
-                            <Text style={[styles.groupActionText, { color: theme.colors.primary }]}>Change Group Name</Text>
-                          </TouchableOpacity>
+                            <TouchableOpacity style={styles.groupActionBtn} onPress={() => {
+                              setGroupRenameValue(activeChat?.group_name || '');
+                              setShowGroupRenameModal(true);
+                            }}>
+                              <Settings size={20} color={theme.colors.primary} />
+                              <Text style={[styles.groupActionText, { color: theme.colors.primary }]}>Change Group Name</Text>
+                            </TouchableOpacity>
                           <TouchableOpacity style={styles.groupActionBtn} onPress={() => {
                             Alert.alert(
                               'Close Group',
@@ -2025,7 +2031,48 @@ agoraEngine.current = null;
           </Modal>
 
 
-        <Modal visible={showNicknameModal} animationType="fade" transparent>
+          <Modal visible={showGroupRenameModal} animationType="fade" transparent>
+            <View style={styles.modalOverlay}>
+              <View style={[styles.modalContent, { backgroundColor: '#0F172A', padding: 24 }]}>
+                <View style={styles.modalHeader}>
+                  <Text style={[styles.modalTitle, { textAlign: 'left', marginBottom: 0 }]}>Rename Group</Text>
+                  <TouchableOpacity onPress={() => setShowGroupRenameModal(false)}>
+                    <X size={24} color="#FFF" />
+                  </TouchableOpacity>
+                </View>
+                
+                <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 14, marginVertical: 16 }}>
+                  Enter a new name for the group chat.
+                </Text>
+  
+                <TextInput
+                  style={[styles.modalInput, { backgroundColor: 'rgba(255,255,255,0.05)', color: '#FFF', fontSize: 18, height: 50, marginBottom: 24 }]}
+                  placeholder="Group name..."
+                  placeholderTextColor="rgba(255,255,255,0.3)"
+                  value={groupRenameValue}
+                  onChangeText={setGroupRenameValue}
+                  autoFocus
+                />
+  
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <TouchableOpacity 
+                    onPress={() => setShowGroupRenameModal(false)}
+                    style={[styles.createGroupBtn, { flex: 1, backgroundColor: 'transparent', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }]}
+                  >
+                    <Text style={[styles.createGroupBtnText, { color: '#FFF' }]}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    onPress={handleGroupRename}
+                    style={[styles.createGroupBtn, { flex: 1, backgroundColor: theme.colors.primary }]}
+                  >
+                    <Text style={[styles.createGroupBtnText, { color: '#000' }]}>Save</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+
+          <Modal visible={showNicknameModal} animationType="fade" transparent>
           <View style={styles.modalOverlay}>
             <View style={[styles.modalContent, { backgroundColor: '#0F172A', padding: 24 }]}>
               <View style={styles.modalHeader}>
