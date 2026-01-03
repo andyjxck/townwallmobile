@@ -648,9 +648,9 @@ export default function ModerationAdmin() {
           style={styles.card}
           onPress={() => {
             if (item.target_type === 'user') {
-              router.push(`/profile/${item.target_id}`);
+              router.push(`/profile?userId=${item.target_id}`);
             } else if (item.target_type === 'post') {
-              router.push(`/post/${item.target_id}`);
+              router.push(`/post?id=${item.target_id}`);
             }
           }}
         >
