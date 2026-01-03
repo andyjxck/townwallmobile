@@ -607,11 +607,11 @@ const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
           async (payload) => {
             const newMsg = payload.new;
             if (newMsg.sender_id !== user?.id) {
-              const { data: msgWithSender } = await supabase
-                .from('rmessages')
-                .select('*, sender:rusers(id, username, emoji_icon, avatar_url), is_system')
-                .eq('id', newMsg.id)
-                .single();
+                const { data: msgWithSender } = await supabase
+                  .from('rmessages')
+                  .select('*, sender:rusers(id, username, emoji_icon, avatar_url)')
+                  .eq('id', newMsg.id)
+                  .single();
               
               if (msgWithSender) {
                 setMessages(prev => [...prev, msgWithSender]);
@@ -661,12 +661,11 @@ const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
                 .eq('chat_id', activeChat.id)
                 .eq('user_id', user.id);
 
-              await supabase.from('rmessages').insert({
-                chat_id: activeChat.id,
-                sender_id: user.id,
-                text: `${user.username || 'Someone'} left the group`,
-                is_system: true
-              });
+                await supabase.from('rmessages').insert({
+                  chat_id: activeChat.id,
+                  sender_id: user.id,
+                  text: `${user.username || 'Someone'} left the group`
+                });
 
               await supabase.from('rchats').update({
                 last_message: `${user.username || 'Someone'} left the group`,
@@ -724,7 +723,7 @@ const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
     
     let query = supabase
       .from('rmessages')
-      .select('*, sender:rusers(id, username, emoji_icon, avatar_url), is_system')
+      .select('*, sender:rusers(id, username, emoji_icon, avatar_url)')
       .eq('chat_id', chatId)
       .order('created_at', { ascending: true });
     
@@ -965,15 +964,15 @@ const stopRecording = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     try {
-        const { data, error } = await supabase
-          .from('rmessages')
-          .insert({
-            chat_id: activeChat.id,
-            sender_id: user.id,
-            text: text || '',
-            media_url: finalMediaUrl,
-            media_type: finalMediaType
-          }).select('*, sender:rusers(id, username, emoji_icon, avatar_url), is_system').single();
+          const { data, error } = await supabase
+            .from('rmessages')
+            .insert({
+              chat_id: activeChat.id,
+              sender_id: user.id,
+              text: text || '',
+              media_url: finalMediaUrl,
+              media_type: finalMediaType
+            }).select('*, sender:rusers(id, username, emoji_icon, avatar_url)').single();
 
         if (error) throw error;
 
@@ -1349,8 +1348,7 @@ agoraEngine.current = null;
       await supabase.from('rmessages').insert({
         chat_id: chat.id,
         sender_id: user.id,
-        text: `${user.username || 'Someone'} created the group`,
-        is_system: true
+        text: `${user.username || 'Someone'} created the group`
       });
 
       await supabase.from('rchats').update({
@@ -1883,18 +1881,17 @@ agoraEngine.current = null;
                                   { 
                                     text: 'Kick from Group', 
                                     style: 'destructive',
-                                    onPress: async () => {
-                                      await supabase.from('rchat_members').delete().eq('id', member.id);
-                                      await supabase.from('rmessages').insert({
-                                        chat_id: activeChat.id,
-                                        sender_id: user.id,
-                                        text: `${member.user?.username || 'Someone'} was removed from the group`,
-                                        is_system: true
-                                      });
-                                      loadGroupMembers(activeChat.id);
-                                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                                    }
-                                  },
+                                      onPress: async () => {
+                                        await supabase.from('rchat_members').delete().eq('id', member.id);
+                                        await supabase.from('rmessages').insert({
+                                          chat_id: activeChat.id,
+                                          sender_id: user.id,
+                                          text: `${member.user?.username || 'Someone'} was removed from the group`
+                                        });
+                                        loadGroupMembers(activeChat.id);
+                                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                                      }
+                                    },
                                 ]
                               );
                             }
@@ -2214,19 +2211,11 @@ agoraEngine.current = null;
                         ref={flatListRef}
                         data={messages}
                         keyExtractor={item => item.id}
-                        renderItem={({ item }) => {
-                          const isMyMessage = item.sender_id === user?.id;
-                          
-                          if (item.is_system) {
+                          renderItem={({ item }) => {
+                            const isMyMessage = item.sender_id === user?.id;
+                            
                             return (
-                              <View style={styles.systemMessageContainer}>
-                                <Text style={styles.systemMessageText}>{item.text}</Text>
-                              </View>
-                            );
-                          }
-                          
-                          return (
-                            <View style={[styles.messageBubble, isMyMessage ? styles.myMessage : styles.theirMessage, item.media_url && styles.mediaMessage]}>
+                              <View style={[styles.messageBubble, isMyMessage ? styles.myMessage : styles.theirMessage, item.media_url && styles.mediaMessage]}>
                             {activeChat?.is_group && !isMyMessage && (
                               <Text style={styles.senderName}>@{item.sender?.username}</Text>
                             )}
