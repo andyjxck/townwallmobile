@@ -18,7 +18,7 @@ import {
   ScrollView,
   Alert
 } from 'react-native';
-import { MessageCircle, X, Send, ChevronLeft, MoreHorizontal, User, Users, Check, CheckCheck, Settings, Plus, UserPlus, Mic, MicOff, Phone as PhoneIcon, PhoneOff as PhoneOffIcon, PhoneIncoming, PhoneOutgoing, Phone, Volume2, VolumeX, Image as ImageIcon, Video as VideoIcon, Film, Play, Maximize2, Camera, Sparkles, Trash2, Square, Pause, LogOut, Flag, Edit } from 'lucide-react-native';
+import { MessageCircle, X, Send, ChevronLeft, MoreHorizontal, User, Users, Check, CheckCheck, Settings, Plus, UserPlus, Mic, MicOff, Phone as PhoneIcon, PhoneOff as PhoneOffIcon, PhoneIncoming, PhoneOutgoing, Phone, Volume2, VolumeX, Image as ImageIcon, Video as VideoIcon, Film, Play, Maximize2, Camera, Sparkles, Trash2, Square, Pause, LogOut, Flag, Edit, RefreshCw } from 'lucide-react-native';
 import Slider from '@react-native-community/slider';
 import { supabase } from '../utils/supabase';
 import { getStoredUser } from '../utils/user';
@@ -99,6 +99,7 @@ const router = useRouter();
   const [onlineUsers, setOnlineUsers] = useState({});
   const [readReceiptsEnabled, setReadReceiptsEnabled] = useState(true);
   const [totalUnreadCount, setTotalUnreadCount] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
     const [showNewGroupModal, setShowNewGroupModal] = useState(false);
     const [groupName, setGroupName] = useState('');
@@ -248,6 +249,7 @@ useEffect(() => {
   
     useEffect(() => {
       if (isOpen) {
+        loadUserAndChats();
         Animated.parallel([
           Animated.timing(fadeAnim, {
             toValue: 1,
@@ -437,6 +439,7 @@ useEffect(() => {
           clearInterval(callTimerRef.current);
           callTimerRef.current = null;
         }
+        loadUserAndChats();
       };
 
 
@@ -568,6 +571,13 @@ const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
     const total = chatsWithUnread.reduce((sum, c) => sum + (c.unread_count || 0), 0);
     setTotalUnreadCount(total);
     setChats(chatsWithUnread);
+  };
+
+  const handleRefreshChats = async () => {
+    setIsRefreshing(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await loadUserAndChats();
+    setIsRefreshing(false);
   };
 
   const handleStatusUpdate = async (chatId, newStatus) => {
@@ -2137,6 +2147,9 @@ agoraEngine.current = null;
                 <View style={styles.headerNav}>
                   <Text style={styles.headerTitle}>Messages</Text>
                   <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <TouchableOpacity onPress={handleRefreshChats} style={styles.iconBtn} disabled={isRefreshing}>
+                      <RefreshCw size={20} color="#FFF" style={isRefreshing ? { opacity: 0.5 } : undefined} />
+                    </TouchableOpacity>
                     <TouchableOpacity onPress={() => setShowNewGroupModal(true)} style={styles.iconBtn}>
                       <Users size={20} color="#FFF" />
                     </TouchableOpacity>
