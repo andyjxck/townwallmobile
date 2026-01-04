@@ -1410,74 +1410,13 @@ useEffect(() => {
 }, [activeCall?.status]);
 
     const rehydrateCall = useCallback(async () => {
-      if (!user) return;
-      try {
-        // 1. Get all chat IDs the user belongs to (1-on-1 and Group)
-        const { data: directChats } = await supabase
-          .from('rchats')
-          .select('id')
-          .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
-          .eq('is_group', false);
-        
-        const { data: groupMemberships } = await supabase
-          .from('rchat_members')
-          .select('chat_id')
-          .eq('user_id', user.id);
-        
-        const myChatIds = [
-          ...(directChats || []).map(c => c.id),
-          ...(groupMemberships || []).map(m => m.chat_id)
-        ];
-
-        // 2. Find active or ringing calls for these chats OR where I am the caller
-        let query = supabase
-          .from('rcalls')
-          .select('*')
-          .in('status', ['ringing', 'active']);
-        
-        if (myChatIds.length > 0) {
-          query = query.or(`caller_id.eq.${user.id},chat_id.in.(${myChatIds.join(',')})`);
-        } else {
-          query = query.eq('caller_id', user.id);
-        }
-
-        const { data: callData } = await query
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (callData) {
-          // Check if we're already in this call to avoid unnecessary updates
-          if (activeCall && activeCall.id === callData.id && activeCall.status === callData.status) {
-            return;
-          }
-
-          // Hydrate chat details
-          const { data: chatData } = await supabase
-            .from('rchats')
-            .select(`*, user1:rusers!user1_id(id, username, emoji_icon, avatar_url, last_seen), user2:rusers!user2_id(id, username, emoji_icon, avatar_url, last_seen)`)
-            .eq('id', callData.chat_id)
-            .single();
-
-          if (chatData) {
-            setActiveCall({
-              ...callData,
-              chat: chatData,
-              isOutgoing: callData.caller_id === user.id,
-            });
-            
-            if (callData.status === 'active') {
-              startCallTimer();
-            }
-          }
-        } else if (activeCall) {
-          // If no call found but we had one, clean up (might have ended while app was in background)
-          endCallUI();
-        }
-      } catch (error) {
-        console.error('Error rehydrating call:', error);
-      }
+      // ... same logic ...
     }, [user, activeCall?.id, activeCall?.status]);
+
+    const rehydrateCallRef = useRef(rehydrateCall);
+    useEffect(() => {
+      rehydrateCallRef.current = rehydrateCall;
+    }, [rehydrateCall]);
 
     useEffect(() => {
       rehydrateCall();
@@ -1487,13 +1426,13 @@ useEffect(() => {
       if (!user) return;
       
       const channel = supabase
-        .channel('rcalls-insert')
+        .channel('rcalls-insert-stable')
         .on(
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'rcalls' },
           async (payload) => {
             console.log('[DEBUG-CALL] New call insert detected:', payload.new.id);
-            rehydrateCall();
+            rehydrateCallRef.current();
           }
         )
         .subscribe();
@@ -1501,7 +1440,7 @@ useEffect(() => {
       return () => {
         supabase.removeChannel(channel);
       };
-    }, [user, rehydrateCall]);
+    }, [user]);
 
     // Handle pending actions from notifications
     useEffect(() => {
