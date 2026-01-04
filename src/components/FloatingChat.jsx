@@ -1328,22 +1328,33 @@ const stopRecording = async () => {
             return Math.abs(hash);
           };
           const uid = hashCode(user.id) % 1000000;
+          console.log('[Agora] Requesting token for channel:', activeCall.id, 'UID:', uid);
+          
           const { data, error } = await supabase.functions.invoke('agora-token', {
-          body: {
-            channelName: activeCall.id,
-            uid: uid,
-            role: 'publisher'
+            body: {
+              channelName: activeCall.id,
+              uid: uid,
+              role: 'publisher'
+            }
+          });
+
+          console.log('[Agora] Function response:', { data, error });
+
+          if (error) {
+            console.error('Error fetching Agora token:', error);
+            Alert.alert('Call Error', 'Failed to initialize secure call connection.');
+            return;
           }
-        });
 
-        if (error) {
-          console.error('Error fetching Agora token:', error);
-          Alert.alert('Call Error', 'Failed to initialize secure call connection.');
-          return;
-        }
+          if (!data || !data.token) {
+            console.error('No token returned from function');
+            Alert.alert('Call Error', 'No security token received.');
+            return;
+          }
 
-if (!activeCall?.id) return;
-await agoraEngine.current.joinChannel(data.token, activeCall.id, uid, {});
+          if (!activeCall?.id) return;
+          console.log('[Agora] Joining channel with token:', data.token);
+          await agoraEngine.current.joinChannel(data.token, activeCall.id, uid, {});
       } catch (e) {
         console.error('Agora setup error:', e);
       }

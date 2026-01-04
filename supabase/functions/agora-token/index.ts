@@ -15,6 +15,7 @@ Deno.serve(async (req) => {
       JSON.stringify({ 
         ok: true, 
         message: "Function reachable!",
+        token: "dummy_token_for_testing",
         timestamp: new Date().toISOString(),
         note: "This is a simplified test version. Once reachability is confirmed, we can restore the full token logic."
       }),
