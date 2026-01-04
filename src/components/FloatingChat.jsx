@@ -520,7 +520,7 @@ const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
 
     const { data: regularChats } = await supabase
       .from('rchats')
-      .select(`*, user1:rusers!user1_id(id, username, emoji_icon, avatar_url), user2:rusers!user2_id(id, username, emoji_icon, avatar_url)`)
+      .select(`*, user1:rusers!user1_id(id, username, emoji_icon, avatar_url, last_seen), user2:rusers!user2_id(id, username, emoji_icon, avatar_url, last_seen)`)
       .or(`user1_id.eq.${storedUser.id},user2_id.eq.${storedUser.id}`)
       .eq('is_group', false)
       .order('last_message_at', { ascending: false });
@@ -2398,34 +2398,34 @@ agoraEngine.current = null;
                           }}
                         >
                           <View style={styles.avatarWrapper}>
-                            {getOtherUser(activeChat)?.avatar_url ? (
-                              <Image source={{ uri: getOtherUser(activeChat).avatar_url }} style={styles.headerAvatar} />
-                            ) : (
-                              <View style={styles.headerEmojiBg}>
-                                <Text style={styles.headerEmoji}>{getOtherUser(activeChat)?.emoji_icon || "👤"}</Text>
-                              </View>
-                            )}
-                            {onlineUsers[getOtherUser(activeChat)?.id] && <View style={styles.headerStatusDot} />}
-                          </View>
-                            <View style={{ flex: 1 }}>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                <Text style={styles.headerTitle} numberOfLines={1}>
-                                  {getOtherUser(activeChat)?.nickname || `@${getOtherUser(activeChat)?.username}`}
-                                </Text>
-                                <TouchableOpacity onPress={(e) => {
-                                  e.stopPropagation();
-                                  const other = getOtherUser(activeChat);
-                                  setNicknameToEdit(other);
-                                  setNicknameValue(other.nickname || '');
-                                  setShowNicknameModal(true);
-                                }}>
-                                  <Edit size={14} color="rgba(255,255,255,0.4)" />
-                                </TouchableOpacity>
-                              </View>
-                            <Text style={styles.onlineStatusText}>
-                              {onlineUsers[getOtherUser(activeChat)?.id] ? 'Online' : 'Offline'}
-                            </Text>
-                          </View>
+                              {getOtherUser(activeChat)?.avatar_url ? (
+                                <Image source={{ uri: getOtherUser(activeChat).avatar_url }} style={styles.headerAvatar} />
+                              ) : (
+                                <View style={styles.headerEmojiBg}>
+                                  <Text style={styles.headerEmoji}>{getOtherUser(activeChat)?.emoji_icon || "👤"}</Text>
+                                </View>
+                              )}
+                              {(onlineUsers[getOtherUser(activeChat)?.id] || isOnline(getOtherUser(activeChat)?.last_seen)) && <View style={styles.headerStatusDot} />}
+                            </View>
+                              <View style={{ flex: 1 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                  <Text style={styles.headerTitle} numberOfLines={1}>
+                                    {getOtherUser(activeChat)?.nickname || `@${getOtherUser(activeChat)?.username}`}
+                                  </Text>
+                                  <TouchableOpacity onPress={(e) => {
+                                    e.stopPropagation();
+                                    const other = getOtherUser(activeChat);
+                                    setNicknameToEdit(other);
+                                    setNicknameValue(other.nickname || '');
+                                    setShowNicknameModal(true);
+                                  }}>
+                                    <Edit size={14} color="rgba(255,255,255,0.4)" />
+                                  </TouchableOpacity>
+                                </View>
+                              <Text style={styles.onlineStatusText}>
+                                {(onlineUsers[getOtherUser(activeChat)?.id] || isOnline(getOtherUser(activeChat)?.last_seen)) ? 'Online' : 'Offline'}
+                              </Text>
+                            </View>
                       </TouchableOpacity>
                     )}
                     {activeChat && (activeChat.status === 'accepted' || activeChat.is_group) && (
@@ -2458,32 +2458,32 @@ agoraEngine.current = null;
               <FlatList
                 data={chats}
                 keyExtractor={item => item.id}
-                renderItem={({ item }) => {
-                  const isGroup = item.is_group;
-                  const otherUser = !isGroup ? getOtherUser(item) : null;
-                  const isOnline = !isGroup && onlineUsers[otherUser?.id];
-                  const isPending = item.status === 'pending';
-                  
-                  return (
-                    <TouchableOpacity onPress={() => selectChat(item)} style={styles.chatListItem}>
-                        <View style={styles.avatarWrapper}>
-                          {isGroup ? (
+                  renderItem={({ item }) => {
+                    const isGroup = item.is_group;
+                    const otherUser = !isGroup ? getOtherUser(item) : null;
+                    const userIsOnline = !isGroup && (onlineUsers[otherUser?.id] || isOnline(otherUser?.last_seen));
+                    const isPending = item.status === 'pending';
+                    
+                    return (
+                      <TouchableOpacity onPress={() => selectChat(item)} style={styles.chatListItem}>
+                          <View style={styles.avatarWrapper}>
+                            {isGroup ? (
+                              <View style={styles.listEmojiBg}>
+                                {item.group_icon?.startsWith('http') ? (
+                                  <Image source={{ uri: item.group_icon }} style={styles.listAvatar} />
+                                ) : (
+                                  <Text style={styles.listEmoji}>{item.group_icon || '👥'}</Text>
+                                )}
+                              </View>
+                            ) : otherUser?.avatar_url ? (
+                            <Image source={{ uri: otherUser.avatar_url }} style={styles.listAvatar} />
+                          ) : (
                             <View style={styles.listEmojiBg}>
-                              {item.group_icon?.startsWith('http') ? (
-                                <Image source={{ uri: item.group_icon }} style={styles.listAvatar} />
-                              ) : (
-                                <Text style={styles.listEmoji}>{item.group_icon || '👥'}</Text>
-                              )}
+                              <Text style={styles.listEmoji}>{otherUser?.emoji_icon || "👤"}</Text>
                             </View>
-                          ) : otherUser?.avatar_url ? (
-                          <Image source={{ uri: otherUser.avatar_url }} style={styles.listAvatar} />
-                        ) : (
-                          <View style={styles.listEmojiBg}>
-                            <Text style={styles.listEmoji}>{otherUser?.emoji_icon || "👤"}</Text>
-                          </View>
-                        )}
-                        {isOnline && <View style={styles.statusDot} />}
-                      </View>
+                          )}
+                          {userIsOnline && <View style={styles.statusDot} />}
+                        </View>
                       <View style={styles.chatInfo}>
                         <View style={styles.chatInfoTop}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
