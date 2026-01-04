@@ -285,10 +285,8 @@ useEffect(() => {
     
     const playSound = async (type) => {
       try {
-        // If already loading this sound, don't start another one
         if (loadingSounds.current[type]) return;
 
-        // If sound already exists, stop and unload it first
         if (soundObjects.current[type]) {
           try {
             await soundObjects.current[type].stopAsync();
@@ -304,19 +302,26 @@ useEffect(() => {
           SOUNDS[type],
           { shouldPlay: true, isLooping: type === 'ringing' }
         );
+        
+        if (!loadingSounds.current[type]) {
+          await sound.unloadAsync();
+          return;
+        }
+
         soundObjects.current[type] = sound;
-        delete loadingSounds.current[type];
+        loadingSounds.current[type] = false;
       } catch (error) {
-        delete loadingSounds.current[type];
+        loadingSounds.current[type] = false;
         console.error('Error playing sound:', error);
       }
     };
 
     const stopSound = async (type) => {
+      loadingSounds.current[type] = false;
       try {
         if (soundObjects.current[type]) {
           const sound = soundObjects.current[type];
-          delete soundObjects.current[type]; // Delete reference first to prevent race conditions
+          delete soundObjects.current[type];
           await sound.stopAsync();
           await sound.unloadAsync();
         }
@@ -373,41 +378,45 @@ useEffect(() => {
       return () => stopSound('ringing');
     }, [activeCall?.status, activeCall?.id]);
 
-    useEffect(() => {
-      if (!user) return;
+      useEffect(() => {
+        if (!user || !activeCall?.id) return;
 
-      const channel = supabase
-        .channel('rcalls')
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'rcalls',
-          },
-          (payload) => {
-            if (payload.new.status === 'ended' || payload.new.status === 'declined') {
-              stopSound('ringing');
-              playSound('disconnect');
-              endCallUI();
-            } else if (payload.new.status === 'active') {
-              stopSound('ringing');
-              playSound('connect');
-              startCallTimer();
-              setActiveCall(prev => prev ? { ...prev, ...payload.new } : payload.new);
+        const channel = supabase
+          .channel(`rcall-updates-${activeCall.id}`)
+          .on(
+            'postgres_changes',
+            {
+              event: 'UPDATE',
+              schema: 'public',
+              table: 'rcalls',
+              filter: `id=eq.${activeCall.id}`,
+            },
+            (payload) => {
+              console.log('[DEBUG-CALL] Call status update received:', payload.new.status);
+              if (payload.new.status === 'ended' || payload.new.status === 'declined') {
+                stopSound('ringing');
+                playSound('disconnect');
+                endCallUI();
+              } else if (payload.new.status === 'active' && activeCall.status === 'ringing') {
+                stopSound('ringing');
+                playSound('connect');
+                startCallTimer();
+                setActiveCall(prev => prev ? { ...prev, ...payload.new } : payload.new);
+              } else if (payload.new.status === 'active') {
+                setActiveCall(prev => prev ? { ...prev, ...payload.new } : payload.new);
+              }
             }
+          )
+          .subscribe();
+
+        callSubRef.current = channel;
+
+        return () => {
+          if (callSubRef.current) {
+            supabase.removeChannel(callSubRef.current);
           }
-        )
-        .subscribe();
-
-      callSubRef.current = channel;
-
-      return () => {
-        if (callSubRef.current) {
-          supabase.removeChannel(callSubRef.current);
-        }
-      };
-    }, [user, activeCall?.id]);
+        };
+      }, [user, activeCall?.id]);
 
     const leaveAgora = async () => {
       if (isExpoGo) return;
@@ -1399,35 +1408,78 @@ useEffect(() => {
   }
 }, [activeCall?.status]);
 
-  const rehydrateCall = useCallback(async () => {
-    if (!user) return;
-    try {
-      const { data } = await supabase
-        .from('rcalls')
-        .select(`
-          *,
-          rcall_participants!inner(user_id)
-        `)
-        .eq('rcall_participants.user_id', user.id)
-        .in('status', ['ringing', 'active'])
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+    const rehydrateCall = useCallback(async () => {
+      if (!user) return;
+      try {
+        const { data: callData } = await supabase
+          .from('rcalls')
+          .select(`
+            *,
+            rcall_participants!inner(user_id)
+          `)
+          .eq('rcall_participants.user_id', user.id)
+          .in('status', ['ringing', 'active'])
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-      if (data) {
-        setActiveCall({
-          ...data,
-          isOutgoing: data.caller_id === user.id,
-        });
+        if (callData) {
+          // Hydrate chat details
+          const { data: chatData } = await supabase
+            .from('rchats')
+            .select(`*, user1:rusers!user1_id(id, username, emoji_icon, avatar_url, last_seen), user2:rusers!user2_id(id, username, emoji_icon, avatar_url, last_seen)`)
+            .eq('id', callData.chat_id)
+            .single();
+
+          if (chatData) {
+            setActiveCall({
+              ...callData,
+              chat: chatData,
+              isOutgoing: callData.caller_id === user.id,
+            });
+            
+            if (callData.status === 'active') {
+              startCallTimer();
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error rehydrating call:', error);
       }
-    } catch (error) {
-      console.error('Error rehydrating call:', error);
-    }
-  }, [user]);
+    }, [user]);
 
-  useEffect(() => {
-    rehydrateCall();
-  }, [rehydrateCall]);
+    useEffect(() => {
+      rehydrateCall();
+    }, [rehydrateCall]);
+
+    useEffect(() => {
+      if (!user) return;
+      
+      const channel = supabase
+        .channel('rcalls-insert')
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'rcalls' },
+          async (payload) => {
+            // Check if I'm a participant in this new call
+            const { data: participant } = await supabase
+              .from('rcall_participants')
+              .select('id')
+              .eq('call_id', payload.new.id)
+              .eq('user_id', user.id)
+              .maybeSingle();
+              
+            if (participant) {
+              rehydrateCall();
+            }
+          }
+        )
+        .subscribe();
+        
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }, [user, rehydrateCall]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState) => {
