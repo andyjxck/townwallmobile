@@ -77,13 +77,14 @@ if (!String.prototype.hashCode) {
 
 export default function FloatingChat() {
     const {
-  isOpen,
-  open: setOpen,
-  close: setClose,
-  activeChatId,
-  setActiveChatId,
-  pendingCallUserId,
-} = useChatStore();
+    isOpen,
+    open: setOpen,
+    close: setClose,
+    activeChatId,
+    setActiveChatId,
+    pendingCallUserId,
+    pendingCallAction,
+  } = useChatStore();
 const { auth: user } = useAuthStore();
 const [activeChat, setActiveChat] = useState(null);
 const presenceChannelRef = useRef(null);
@@ -1411,19 +1412,46 @@ useEffect(() => {
     const rehydrateCall = useCallback(async () => {
       if (!user) return;
       try {
-        const { data: callData } = await supabase
+        // 1. Get all chat IDs the user belongs to (1-on-1 and Group)
+        const { data: directChats } = await supabase
+          .from('rchats')
+          .select('id')
+          .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
+          .eq('is_group', false);
+        
+        const { data: groupMemberships } = await supabase
+          .from('rchat_members')
+          .select('chat_id')
+          .eq('user_id', user.id);
+        
+        const myChatIds = [
+          ...(directChats || []).map(c => c.id),
+          ...(groupMemberships || []).map(m => m.chat_id)
+        ];
+
+        // 2. Find active or ringing calls for these chats OR where I am the caller
+        let query = supabase
           .from('rcalls')
-          .select(`
-            *,
-            rcall_participants!inner(user_id)
-          `)
-          .eq('rcall_participants.user_id', user.id)
-          .in('status', ['ringing', 'active'])
+          .select('*')
+          .in('status', ['ringing', 'active']);
+        
+        if (myChatIds.length > 0) {
+          query = query.or(`caller_id.eq.${user.id},chat_id.in.(${myChatIds.join(',')})`);
+        } else {
+          query = query.eq('caller_id', user.id);
+        }
+
+        const { data: callData } = await query
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
 
         if (callData) {
+          // Check if we're already in this call to avoid unnecessary updates
+          if (activeCall && activeCall.id === callData.id && activeCall.status === callData.status) {
+            return;
+          }
+
           // Hydrate chat details
           const { data: chatData } = await supabase
             .from('rchats')
@@ -1442,11 +1470,14 @@ useEffect(() => {
               startCallTimer();
             }
           }
+        } else if (activeCall) {
+          // If no call found but we had one, clean up (might have ended while app was in background)
+          endCallUI();
         }
       } catch (error) {
         console.error('Error rehydrating call:', error);
       }
-    }, [user]);
+    }, [user, activeCall?.id, activeCall?.status]);
 
     useEffect(() => {
       rehydrateCall();
@@ -1461,15 +1492,28 @@ useEffect(() => {
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'rcalls' },
           async (payload) => {
-            // Check if I'm a participant in this new call
-            const { data: participant } = await supabase
-              .from('rcall_participants')
+            const newCall = payload.new;
+            
+            // Check if I belong to the chat of this new call
+            const { data: isMember } = await supabase
+              .from('rchat_members')
               .select('id')
-              .eq('call_id', payload.new.id)
+              .eq('chat_id', newCall.chat_id)
               .eq('user_id', user.id)
               .maybeSingle();
-              
-            if (participant) {
+            
+            let isDirectMember = false;
+            if (!isMember) {
+              const { data: chat } = await supabase
+                .from('rchats')
+                .select('id')
+                .eq('id', newCall.chat_id)
+                .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
+                .maybeSingle();
+              isDirectMember = !!chat;
+            }
+
+            if (isMember || isDirectMember || newCall.caller_id === user.id) {
               rehydrateCall();
             }
           }
@@ -1480,6 +1524,18 @@ useEffect(() => {
         supabase.removeChannel(channel);
       };
     }, [user, rehydrateCall]);
+
+    // Handle pending actions from notifications
+    useEffect(() => {
+      if (activeCall && pendingCallAction) {
+        if (pendingCallAction === 'accept' && activeCall.status === 'ringing' && !activeCall.isOutgoing) {
+          answerCall();
+        } else if (pendingCallAction === 'decline' && activeCall.status === 'ringing' && !activeCall.isOutgoing) {
+          declineCall();
+        }
+        useChatStore.setState({ pendingCallAction: null });
+      }
+    }, [activeCall?.id, activeCall?.status, pendingCallAction]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState) => {
