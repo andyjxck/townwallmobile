@@ -21,7 +21,7 @@ import {
 import { MessageCircle, X, Send, ChevronLeft, MoreHorizontal, User, Users, Check, CheckCheck, Settings, Plus, UserPlus, Mic, MicOff, Phone as PhoneIcon, PhoneOff as PhoneOffIcon, PhoneIncoming, PhoneOutgoing, Phone, Volume2, VolumeX, Image as ImageIcon, Video as VideoIcon, Film, Play, Maximize2, Camera, Sparkles, Trash2, Square, Pause, LogOut, Flag, Edit, RefreshCw } from 'lucide-react-native';
 import Slider from '@react-native-community/slider';
 import { supabase } from '../utils/supabase';
-import { getStoredUser } from '../utils/user';
+import { getStoredUser, isOnline } from '../utils/user';
 import { theme } from '../utils/theme';
 import { sendNotification, sendMessageNotification, sendCallNotification } from '../utils/notifications';
 import { useChatStore, useAuthStore } from '../utils/auth';
