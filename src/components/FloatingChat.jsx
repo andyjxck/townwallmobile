@@ -1299,6 +1299,9 @@ const stopRecording = async () => {
             onJoinChannelSuccess: (connection, elapsed) => {
               console.log('Successfully joined channel:', connection.channelId);
               setIsJoined(true);
+              if (agoraEngine.current) {
+                agoraEngine.current.muteLocalAudioStream(isMuted);
+              }
             },
             onUserJoined: (connection, remoteUid) => {
               console.log('Remote user joined:', remoteUid);
@@ -1321,18 +1324,27 @@ const stopRecording = async () => {
             playsInSilentModeIOS: true,
             playThroughEarpieceAndroid: false,
             staysActiveInBackground: true,
+            shouldRouteAudioToReceiverIOS: false,
+            interruptionModeIOS: 1, // DoNotMix
+            interruptionModeAndroid: 1, // DoNotMix
           });
 
           await agoraEngine.current.enableAudio();
           await agoraEngine.current.enableLocalAudio(true);
+          await agoraEngine.current.muteLocalAudioStream(false);
           await agoraEngine.current.muteAllRemoteAudioStreams(false);
           await agoraEngine.current.setEnableSpeakerphone(true);
+          await agoraEngine.current.setDefaultAudioRouteToSpeakerphone(true);
+          
           setIsSpeakerOn(true);
           await agoraEngine.current.setClientRole(ClientRoleType.ClientRoleBroadcaster);
-        await agoraEngine.current.setAudioProfile(
-          AudioProfileType.AudioProfileDefault,
-          AudioScenarioType.AudioScenarioChatRoom
-        );
+          await agoraEngine.current.setAudioProfile(
+            AudioProfileType.AudioProfileDefault,
+            AudioScenarioType.AudioScenarioDefault
+          );
+          
+          await agoraEngine.current.adjustRecordingSignalVolume(100);
+          await agoraEngine.current.adjustPlaybackSignalVolume(100);
         
           // Fetch token from Supabase Edge Function
           const hashCode = (str) => {
@@ -1897,6 +1909,9 @@ agoraEngine.current = null;
       playsInSilentModeIOS: true,
       playThroughEarpieceAndroid: !next,
       staysActiveInBackground: true,
+      shouldRouteAudioToReceiverIOS: !next,
+      interruptionModeIOS: 1, // DoNotMix
+      interruptionModeAndroid: 1, // DoNotMix
     });
 
     if (agoraEngine.current) {
