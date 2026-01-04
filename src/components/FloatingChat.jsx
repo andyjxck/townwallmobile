@@ -1414,26 +1414,26 @@ useEffect(() => {
       
       console.log('[DEBUG-CALL] Rehydrating call state...');
       
-      try {
-        const fortySecondsAgo = new Date(Date.now() - 40 * 1000).toISOString();
-        
-        // Optimize: Use a single query to find relevant calls
-        // We look for calls where user is either caller or a member of the chat
-        const { data: calls, error } = await supabase
-          .from('rcalls')
-          .select(`
-            *,
-            chat:rchats!inner(
+        try {
+          const fifteenSecondsAgo = new Date(Date.now() - 15 * 1000).toISOString();
+          
+          // Optimize: Use a single query to find relevant calls
+          // We look for calls where user is either caller or a member of the chat
+          const { data: calls, error } = await supabase
+            .from('rcalls')
+            .select(`
               *,
-              user1:rusers!user1_id(id, username, emoji_icon, avatar_url, last_seen),
-              user2:rusers!user2_id(id, username, emoji_icon, avatar_url, last_seen),
-              members:rchat_members!inner(user_id)
-            )
-          `)
-          .in('status', ['ringing', 'active'])
-          .gt('started_at', fortySecondsAgo)
-          .eq('chat.members.user_id', user.id)
-          .order('started_at', { ascending: false });
+              chat:rchats!inner(
+                *,
+                user1:rusers!user1_id(id, username, emoji_icon, avatar_url, last_seen),
+                user2:rusers!user2_id(id, username, emoji_icon, avatar_url, last_seen),
+                members:rchat_members!inner(user_id)
+              )
+            `)
+            .in('status', ['ringing', 'active'])
+            .gt('started_at', fifteenSecondsAgo)
+            .eq('chat.members.user_id', user.id)
+            .order('started_at', { ascending: false });
 
         if (error) {
           console.error('[DEBUG-CALL] Error fetching calls:', error);
@@ -1902,10 +1902,26 @@ useEffect(() => {
         </View>
       )}
 
-            {activeCall?.id && (activeCall.status === 'ringing' || activeCall.status === 'active') && (
-                <Modal visible={true} animationType="fade" transparent onRequestClose={endCall}>
-                  <View style={styles.callOverlay}>
-                  <BlurView intensity={100} style={StyleSheet.absoluteFill} tint="dark" />
+              {activeCall?.id && (activeCall.status === 'ringing' || activeCall.status === 'active') && (
+                  <Modal 
+                    visible={true} 
+                    animationType="fade" 
+                    transparent 
+                    onRequestClose={() => endCall()}
+                  >
+                    <View style={styles.callOverlay} pointerEvents="box-none">
+                    <BlurView intensity={100} style={StyleSheet.absoluteFill} tint="dark" />
+                    
+                    {/* Add a safety escape hatch for ghost calls */}
+                    <TouchableOpacity 
+                      style={{ position: 'absolute', top: 50, right: 20, zIndex: 1000, padding: 10 }}
+                      onPress={() => {
+                        console.log('[DEBUG-CALL] User triggered safety escape hatch');
+                        endCallUI();
+                      }}
+                    >
+                      <X size={24} color="rgba(255,255,255,0.3)" />
+                    </TouchableOpacity>
                   
                       {activeCall.status === 'active' && isExpoGo && (
                         <View style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', padding: 40, zIndex: 100 }]}>
