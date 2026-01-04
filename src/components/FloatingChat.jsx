@@ -1410,8 +1410,79 @@ useEffect(() => {
 }, [activeCall?.status]);
 
     const rehydrateCall = useCallback(async () => {
-      // ... same logic ...
-    }, [user, activeCall?.id, activeCall?.status]);
+      if (!user) return;
+      
+      console.log('[DEBUG-CALL] Rehydrating call state...');
+      
+      try {
+        const { data: calls, error } = await supabase
+          .from('rcalls')
+          .select(`
+            *,
+            chat:rchats(
+              *,
+              user1:rusers!user1_id(id, username, emoji_icon, avatar_url, last_seen),
+              user2:rusers!user2_id(id, username, emoji_icon, avatar_url, last_seen)
+            )
+          `)
+          .in('status', ['ringing', 'active'])
+          .order('started_at', { ascending: false });
+
+        if (error) {
+          console.error('[DEBUG-CALL] Error fetching calls:', error);
+          return;
+        }
+
+        if (!calls || calls.length === 0) {
+          if (activeCall) {
+            console.log('[DEBUG-CALL] No active calls found, clearing state');
+            setActiveCall(null);
+          }
+          return;
+        }
+
+        for (const call of calls) {
+          const chat = call.chat;
+          if (!chat) continue;
+
+          let isParticipant = false;
+          if (!chat.is_group) {
+            isParticipant = chat.user1_id === user.id || chat.user2_id === user.id;
+          } else {
+            const { data: member } = await supabase
+              .from('rchat_members')
+              .select('id')
+              .eq('chat_id', chat.id)
+              .eq('user_id', user.id)
+              .maybeSingle();
+            if (member) isParticipant = true;
+          }
+
+          if (isParticipant) {
+            console.log('[DEBUG-CALL] Active call found for user:', call.id);
+            const isOutgoing = call.caller_id === user.id;
+            
+            setActiveCall(prev => {
+              if (prev?.id === call.id) {
+                return { ...prev, ...call, isOutgoing };
+              }
+              return { ...call, isOutgoing };
+            });
+
+            if (call.status === 'active' && !callTimerRef.current) {
+              startCallTimer();
+            }
+            return;
+          }
+        }
+
+        if (activeCall) {
+          setActiveCall(null);
+        }
+      } catch (err) {
+        console.error('[DEBUG-CALL] Rehydrate error:', err);
+      }
+    }, [user?.id, activeCall?.id]);
 
     const rehydrateCallRef = useRef(rehydrateCall);
     useEffect(() => {
