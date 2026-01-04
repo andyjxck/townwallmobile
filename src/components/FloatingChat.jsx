@@ -341,13 +341,13 @@ useEffect(() => {
       };
     }, []);
 
-    const startCallTimer = () => {
+    const startCallTimer = useCallback(() => {
       if (callTimerRef.current) clearInterval(callTimerRef.current);
       setCallDuration(0);
       callTimerRef.current = setInterval(() => {
         setCallDuration(prev => prev + 1);
       }, 1000);
-    };
+    }, []);
 
     useEffect(() => {
       if (activeCall?.status === 'ringing') {
@@ -1438,10 +1438,13 @@ useEffect(() => {
         }
 
         if (!calls || calls.length === 0) {
-          if (activeCall) {
-            console.log('[DEBUG-CALL] No active calls found, clearing state');
-            setActiveCall(null);
-          }
+          setActiveCall(prev => {
+            if (prev) {
+              console.log('[DEBUG-CALL] No active calls found, clearing state');
+              return null;
+            }
+            return prev;
+          });
           return;
         }
 
@@ -1468,6 +1471,9 @@ useEffect(() => {
             
             setActiveCall(prev => {
               if (prev?.id === call.id) {
+                if (prev.status === call.status && prev.isOutgoing === isOutgoing) {
+                  return prev;
+                }
                 return { ...prev, ...call, isOutgoing };
               }
               return { ...call, isOutgoing };
@@ -1480,13 +1486,11 @@ useEffect(() => {
           }
         }
 
-        if (activeCall) {
-          setActiveCall(null);
-        }
+        setActiveCall(prev => prev ? null : prev);
       } catch (err) {
         console.error('[DEBUG-CALL] Rehydrate error:', err);
       }
-    }, [user?.id, activeCall?.id]);
+    }, [user?.id, startCallTimer]);
 
     const rehydrateCallRef = useRef(rehydrateCall);
     useEffect(() => {
