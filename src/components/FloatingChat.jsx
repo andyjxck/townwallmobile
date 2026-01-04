@@ -1414,39 +1414,52 @@ useEffect(() => {
       
       console.log('[DEBUG-CALL] Rehydrating call state...');
       
-        try {
-          const fifteenSecondsAgo = new Date(Date.now() - 15 * 1000).toISOString();
-          
-          // Optimize: Use a single query to find relevant calls
-          // We look for calls where user is either caller or a member of the chat
-          const { data: calls, error } = await supabase
-            .from('rcalls')
-            .select(`
-              *,
-              chat:rchats!inner(
+          try {
+            const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+            const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+            
+            // Optimize: Use a single query to find relevant calls
+            // We look for calls where user is either caller or a member of the chat
+            const { data: calls, error } = await supabase
+              .from('rcalls')
+              .select(`
                 *,
-                user1:rusers!user1_id(id, username, emoji_icon, avatar_url, last_seen),
-                user2:rusers!user2_id(id, username, emoji_icon, avatar_url, last_seen),
-                members:rchat_members!inner(user_id)
-              )
-            `)
-            .in('status', ['ringing', 'active'])
-            .gt('started_at', fifteenSecondsAgo)
-            .eq('chat.members.user_id', user.id)
-            .order('started_at', { ascending: false });
+                chat:rchats!inner(
+                  *,
+                  user1:rusers!user1_id(id, username, emoji_icon, avatar_url, last_seen),
+                  user2:rusers!user2_id(id, username, emoji_icon, avatar_url, last_seen),
+                  members:rchat_members!inner(user_id)
+                )
+              `)
+              .in('status', ['ringing', 'active'])
+              .gt('started_at', twoHoursAgo)
+              .eq('chat.members.user_id', user.id)
+              .order('started_at', { ascending: false });
 
-        if (error) {
-          console.error('[DEBUG-CALL] Error fetching calls:', error);
-          return;
-        }
+          if (error) {
+            console.error('[DEBUG-CALL] Error fetching calls:', error);
+            return;
+          }
 
-        if (!calls || calls.length === 0) {
-          setActiveCall(prev => prev ? null : null);
-          return;
-        }
+          // Filter calls: 
+          // 1. 'active' calls within 2 hours are valid
+          // 2. 'ringing' calls within 5 minutes are valid
+          const validCalls = (calls || []).filter(c => {
+            if (c.status === 'active') return true; // already filtered by gt(twoHoursAgo)
+            if (c.status === 'ringing') {
+              return new Date(c.started_at) > new Date(Date.now() - 5 * 60 * 1000);
+            }
+            return false;
+          });
 
-        // Take the latest valid call
-        const call = calls[0];
+          if (validCalls.length === 0) {
+            setActiveCall(prev => prev ? null : null);
+            return;
+          }
+
+          // Take the latest valid call
+          const call = validCalls[0];
+
         const isOutgoing = call.caller_id === user.id;
         
         setActiveCall(prev => {
