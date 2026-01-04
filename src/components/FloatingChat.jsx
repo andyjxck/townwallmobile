@@ -1418,45 +1418,44 @@ useEffect(() => {
       
       console.log('[DEBUG-CALL] Rehydrating call state...');
       
-      try {
-        const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
-        
-        // Use chat IDs we already know about to simplify the query
-        const chatIds = chats.map(c => c.id);
-        if (chatIds.length === 0) {
-          // If chats not loaded yet, we can't accurately rehydrate by chat members
-          // But we can still look for calls we are participants of
-          const { data: participation } = await supabase
-            .from('rcall_participants')
-            .select('call_id')
-            .eq('user_id', user.id);
+        try {
+          const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
           
-          const pCallIds = (participation || []).map(p => p.call_id);
-          if (pCallIds.length === 0 && !activeCall) return; // nothing to do
-        }
-
-        let query = supabase
-          .from('rcalls')
-          .select(`
-            *,
-            chat:rchats(
+          let query = supabase
+            .from('rcalls')
+            .select(`
               *,
-              user1:rusers!user1_id(id, username, emoji_icon, avatar_url, last_seen),
-              user2:rusers!user2_id(id, username, emoji_icon, avatar_url, last_seen)
-            )
-          `)
-          .in('status', ['ringing', 'active'])
-          .gt('started_at', twoHoursAgo);
+              chat:rchats(
+                *,
+                user1:rusers!user1_id(id, username, emoji_icon, avatar_url, last_seen),
+                user2:rusers!user2_id(id, username, emoji_icon, avatar_url, last_seen)
+              )
+            `)
+            .in('status', ['ringing', 'active'])
+            .gt('started_at', twoHoursAgo);
 
-        // If we have chats, filter by those IDs
-        if (chatIds.length > 0) {
-          query = query.in('chat_id', chatIds);
-        } else {
-          // Otherwise at least filter by caller or participation if we can
-          query = query.eq('caller_id', user.id);
-        }
+          // Use chat IDs if we have them for precision
+          const chatIds = chats.map(c => c.id);
+          if (chatIds.length > 0) {
+            query = query.in('chat_id', chatIds);
+          } else {
+            // FALLBACK: If chats haven't loaded yet, we need to find calls where we are either 
+            // the caller OR a participant. Since we can't easily join-filter in a single query 
+            // without complex RPC, we first check for calls we are participants of.
+            const { data: participation } = await supabase
+              .from('rcall_participants')
+              .select('call_id')
+              .eq('user_id', user.id);
+            
+            const pCallIds = (participation || []).map(p => p.call_id);
+            const filterParts = [`caller_id.eq.${user.id}`];
+            if (pCallIds.length > 0) {
+              filterParts.push(`id.in.(${pCallIds.join(',')})`);
+            }
+            query = query.or(filterParts.join(','));
+          }
 
-        const { data: calls, error } = await query.order('started_at', { ascending: false });
+          const { data: calls, error } = await query.order('started_at', { ascending: false });
 
         if (error) {
           console.error('[DEBUG-CALL] Error fetching calls:', error);
@@ -2052,40 +2051,32 @@ useEffect(() => {
                     {activeCall.status === 'active' && !isJoined && (
                       <View style={{ alignItems: 'center', marginTop: 8 }}>
                         <ActivityIndicator size="small" color={theme.colors.primary} />
-                        <Text style={[styles.callStatusText, { color: 'rgba(255,255,255,0.6)', fontSize: 12, marginTop: 4 }]}>
-                          {isJoining ? 'Connecting to channel...' : 'Preparing connection...'}
-                        </Text>
-                        {debugStatus ? (
-                          <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, marginTop: 2 }}>
-                            {debugStatus}
+                          <Text style={[styles.callStatusText, { color: 'rgba(255,255,255,0.6)', fontSize: 12, marginTop: 4 }]}>
+                            {isJoining ? 'Connecting...' : 'Securely connecting...'}
                           </Text>
-                        ) : null}
-                      </View>
-                    )}
-                    {activeCall.status === 'active' && isJoined && remoteUsers.length === 0 && (
-                      <View style={{ alignItems: 'center', marginTop: 8 }}>
-                        <Text style={[styles.callStatusText, { color: '#F87171', fontSize: 12 }]}>
-                          Waiting for other user to connect...
+                        </View>
+                      )}
+                      {activeCall.status === 'active' && isJoined && remoteUsers.length === 0 && (
+                        <View style={{ alignItems: 'center', marginTop: 8 }}>
+                          <Text style={[styles.callStatusText, { color: 'rgba(255,255,255,0.4)', fontSize: 12 }]}>
+                            Waiting for other user...
+                          </Text>
+                          <TouchableOpacity 
+                            onPress={() => {
+                              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                              leaveAgora().then(() => setupAgora());
+                            }}
+                            style={{ marginTop: 10, padding: 8, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 8 }}
+                          >
+                            <Text style={{ color: '#FFF', fontSize: 12 }}>Reconnect</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                      {activeCall.status === 'active' && isJoined && remoteUsers.length > 0 && (
+                        <Text style={[styles.callStatusText, { color: '#4ADE80', fontSize: 12, marginTop: 8 }]}>
+                          Voice Connected
                         </Text>
-                        <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, marginTop: 2 }}>
-                          Channel: {activeCall.id.split('-')[0]}...
-                        </Text>
-                        <TouchableOpacity 
-                          onPress={() => {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                            leaveAgora().then(() => setupAgora());
-                          }}
-                          style={{ marginTop: 10, padding: 8, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 8 }}
-                        >
-                          <Text style={{ color: '#FFF', fontSize: 12 }}>Reconnect</Text>
-                        </TouchableOpacity>
-                      </View>
-                    )}
-                    {activeCall.status === 'active' && isJoined && remoteUsers.length > 0 && (
-                      <Text style={[styles.callStatusText, { color: '#4ADE80', fontSize: 12, marginTop: 8 }]}>
-                        Voice Connected ({remoteUsers.length} remote)
-                      </Text>
-                    )}
+                      )}
 
                 </View>
 
