@@ -33,7 +33,7 @@
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
-	<string>36</string>
+	<string>37</string>
 	<key>GADApplicationIdentifier</key>
 	<string>ca-app-pub-1505977777207758~6195707754</string>
 	<key>GADDelayAppMeasurementInit</key>
@@ -98,7 +98,6 @@
 	<array>
 		<string>audio</string>
 		<string>remote-notification</string>
-		<string>fetch</string>
 	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>SplashScreen</string>
