@@ -1415,8 +1415,8 @@ useEffect(() => {
       console.log('[DEBUG-CALL] Rehydrating call state...');
       
         try {
-          // Only fetch calls from the last 2 minutes to avoid stale ringing
-          const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+          // Only fetch calls from the last 40 seconds to avoid stale ringing
+          const fortySecondsAgo = new Date(Date.now() - 40 * 1000).toISOString();
           
           const { data: calls, error } = await supabase
             .from('rcalls')
@@ -1429,7 +1429,7 @@ useEffect(() => {
               )
             `)
             .in('status', ['ringing', 'active'])
-            .gt('started_at', twoMinutesAgo)
+            .gt('started_at', fortySecondsAgo)
             .order('started_at', { ascending: false });
 
         if (error) {
