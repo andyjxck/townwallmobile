@@ -50,7 +50,7 @@ const EMOJIS = ['👥','🔥','🚀','🎮','🎵','📸','🎥','💬','✨','�
 
 const isExpoGo = Constants.appOwnership === 'expo';
 
-let createAgoraRtcEngine, ChannelProfileType, ClientRoleType, AudioProfileType, AudioScenarioType;
+let createAgoraRtcEngine, ChannelProfileType, ClientRoleType, AudioProfileType, AudioScenarioType, AgoraVideoView, VideoSourceType, RenderModeType;
 if (!isExpoGo) {
   const agora = require('react-native-agora');
   createAgoraRtcEngine = agora.createAgoraRtcEngine;
@@ -58,6 +58,9 @@ if (!isExpoGo) {
   ClientRoleType = agora.ClientRoleType;
   AudioProfileType = agora.AudioProfileType;
   AudioScenarioType = agora.AudioScenarioType;
+  AgoraVideoView = agora.AgoraVideoView;
+  VideoSourceType = agora.VideoSourceType;
+  RenderModeType = agora.RenderModeType;
 }
 
 const AGORA_APP_ID = process.env.EXPO_PUBLIC_AGORA_APP_ID;
@@ -135,8 +138,10 @@ const router = useRouter();
   const typingTimeoutRef = useRef(null);
   const [chatPresence, setChatPresence] = useState({});
 
-  const [activeCall, setActiveCall] = useState(null);
+    const [activeCall, setActiveCall] = useState(null);
     const [isMuted, setIsMuted] = useState(false);
+    const [isCameraOn, setIsCameraOn] = useState(false);
+    const [remoteVideoMap, setRemoteVideoMap] = useState({});
     const [isSpeakerOn, setIsSpeakerOn] = useState(false);
     const [isNear, setIsNear] = useState(false);
     const [callDuration, setCallDuration] = useState(0);
@@ -396,18 +401,23 @@ useEffect(() => {
             },
             (payload) => {
               console.log('[DEBUG-CALL] Call status update received:', payload.new.status);
-              if (payload.new.status === 'ended' || payload.new.status === 'declined') {
-                stopSound('ringing');
-                playSound('disconnect');
-                endCallUI();
-              } else if (payload.new.status === 'active' && activeCall.status === 'ringing') {
-                stopSound('ringing');
-                playSound('connect');
-                startCallTimer();
-                setActiveCall(prev => prev ? { ...prev, ...payload.new } : payload.new);
-              } else if (payload.new.status === 'active') {
-                setActiveCall(prev => prev ? { ...prev, ...payload.new } : payload.new);
-              }
+                if (payload.new.status === 'ended' || payload.new.status === 'declined') {
+                  stopSound('ringing');
+                  playSound('disconnect');
+                  endCallUI();
+                } else if (payload.new.status === 'active' && activeCall.status === 'ringing') {
+                  stopSound('ringing');
+                  playSound('connect');
+                  startCallTimer();
+                  setActiveCall(prev => prev ? { ...prev, ...payload.new } : payload.new);
+                } else if (payload.new.status === 'active' || payload.new.call_type !== activeCall.call_type) {
+                  // Handle call type change (audio <-> video)
+                  if (payload.new.call_type === 'video' && activeCall.call_type === 'audio') {
+                    // Other side switched to video, we should probably auto-enable or just show their video
+                    agoraEngine.current?.enableVideo();
+                  }
+                  setActiveCall(prev => prev ? { ...prev, ...payload.new } : payload.new);
+                }
             }
           )
           .subscribe();
@@ -441,6 +451,8 @@ useEffect(() => {
       stopSound('ringing');
       setActiveCall(null);
       setIsMuted(false);
+      setIsCameraOn(false);
+      setRemoteVideoMap({});
       setCallDuration(0);
       if (callTimerRef.current) {
         clearInterval(callTimerRef.current);
@@ -1218,7 +1230,7 @@ const stopRecording = async () => {
       return otherUser;
     };
 
-  const startCall = async (isGroupCall = false) => {
+  const startCall = async (isGroupCall = false, type = 'audio') => {
     if (!activeChat) return;
     
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
@@ -1229,7 +1241,7 @@ const stopRecording = async () => {
         chat_id: activeChat.id,
         caller_id: user.id,
         status: 'ringing',
-        call_type: 'audio',
+        call_type: type,
         is_group_call: isGroupCall
       })
       .select()
@@ -1244,6 +1256,7 @@ const stopRecording = async () => {
         });
 
         setActiveCall({ ...call, chat: activeChat, isOutgoing: true });
+        setIsCameraOn(type === 'video');
       
       if (activeChat.is_group) {
           for (const member of groupMembers) {
@@ -1291,12 +1304,20 @@ const stopRecording = async () => {
       try {
         setIsJoining(true);
         setDebugStatus('Requesting permissions...');
-        const permission = await Audio.requestPermissionsAsync();
-        if (permission.status !== 'granted') {
-          setDebugStatus('Permission denied');
+        const audioPermission = await Audio.requestPermissionsAsync();
+        const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
+
+        if (audioPermission.status !== 'granted') {
+          setDebugStatus('Audio permission denied');
           Alert.alert('Permission Denied', 'Microphone access is required for calls.');
           setIsJoining(false);
           return;
+        }
+
+        if (activeCall.call_type === 'video' && cameraPermission.status !== 'granted') {
+          setDebugStatus('Camera permission denied');
+          Alert.alert('Permission Denied', 'Camera access is required for video calls.');
+          // Don't return, fallback to audio? Actually let's just let it fail or join as audio.
         }
 
         if (!agoraEngine.current) {
@@ -1314,9 +1335,13 @@ const stopRecording = async () => {
               setIsJoining(false);
               setDebugStatus('Joined successfully');
               
-              // Apply initial mute state
+              // Apply initial states
               if (agoraEngine.current) {
                 agoraEngine.current.muteLocalAudioStream(isMutedRef.current);
+                if (activeCall.call_type === 'video') {
+                  agoraEngine.current.enableLocalVideo(true);
+                  agoraEngine.current.startPreview();
+                }
               }
             },
             onUserJoined: (connection, remoteUid) => {
@@ -1329,12 +1354,33 @@ const stopRecording = async () => {
             onUserOffline: (connection, remoteUid) => {
               console.log('[DEBUG-CALL] Remote user offline:', remoteUid);
               setRemoteUsers(prev => prev.filter(id => id !== remoteUid));
+              setRemoteVideoMap(prev => {
+                const next = { ...prev };
+                delete next[remoteUid];
+                return next;
+              });
+            },
+            onUserVideoMuted: (connection, remoteUid, muted) => {
+              console.log('[DEBUG-CALL] Remote user video muted:', remoteUid, muted);
+              setRemoteVideoMap(prev => ({
+                ...prev,
+                [remoteUid]: !muted
+              }));
+            },
+            onRemoteVideoStateChanged: (connection, remoteUid, state, reason, elapsed) => {
+              console.log('[DEBUG-CALL] Remote video state changed:', remoteUid, state);
+              // state 1: Starting, 2: Decoding (Running), 0: Stopped, 3: Frozen, 4: Failed
+              setRemoteVideoMap(prev => ({
+                ...prev,
+                [remoteUid]: state === 2
+              }));
             },
             onLeaveChannel: (connection, stats) => {
               console.log('[DEBUG-CALL] Left channel');
               setIsJoined(false);
               setIsJoining(false);
               setRemoteUsers([]);
+              setRemoteVideoMap({});
               setDebugStatus('Left channel');
             },
             onError: (err, msg) => {
@@ -1344,7 +1390,7 @@ const stopRecording = async () => {
           });
         }
 
-        setDebugStatus('Configuring audio...');
+        setDebugStatus('Configuring media...');
         await Audio.setAudioModeAsync({
           allowsRecordingIOS: true,
           playsInSilentModeIOS: true,
@@ -1356,6 +1402,11 @@ const stopRecording = async () => {
         });
 
         await agoraEngine.current.enableAudio();
+        
+        if (activeCall.call_type === 'video') {
+          await agoraEngine.current.enableVideo();
+        }
+
         await agoraEngine.current.setEnableSpeakerphone(true);
         await agoraEngine.current.setDefaultAudioRouteToSpeakerphone(true);
         
@@ -1570,8 +1621,9 @@ useEffect(() => {
     
     stopSound('ringing');
     playSound('connect');
-    setActiveCall(prev => ({ ...prev, status: 'active' }));
-    startCallTimer();
+      setActiveCall(prev => ({ ...prev, status: 'active' }));
+      setIsCameraOn(activeCall.call_type === 'video');
+      startCallTimer();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
@@ -1634,17 +1686,71 @@ useEffect(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   };
 
-  const toggleMute = () => {
-  const next = !isMuted;
-  setIsMuted(next);
+    const toggleMute = () => {
+    const next = !isMuted;
+    setIsMuted(next);
+  if (agoraEngine.current && isJoined) {
+    agoraEngine.current.muteLocalAudioStream(next);
+  }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
 
- if (agoraEngine.current && isJoined) {
-  agoraEngine.current.muteLocalAudioStream(next);
-}
+  const toggleCamera = async () => {
+    if (!agoraEngine.current || !isJoined) return;
+    
+    const next = !isCameraOn;
+    setIsCameraOn(next);
+    
+    try {
+      if (next) {
+        await agoraEngine.current.enableLocalVideo(true);
+        await agoraEngine.current.startPreview();
+      } else {
+        await agoraEngine.current.enableLocalVideo(false);
+        await agoraEngine.current.stopPreview();
+      }
+      
+      // Update DB so other side knows we changed video state
+      await supabase.from('rcalls').update({ 
+        call_type: next ? 'video' : 'audio' 
+      }).eq('id', activeCall.id);
+      
+    } catch (e) {
+      console.error('Toggle camera error:', e);
+    }
+    
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
 
+  const switchCallType = async () => {
+    const nextType = activeCall.call_type === 'video' ? 'audio' : 'video';
+    
+    try {
+      if (nextType === 'video') {
+        const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
+        if (cameraPermission.status !== 'granted') {
+          Alert.alert('Permission Denied', 'Camera access is required for video.');
+          return;
+        }
+        await agoraEngine.current?.enableVideo();
+        await agoraEngine.current?.enableLocalVideo(true);
+        await agoraEngine.current?.startPreview();
+        setIsCameraOn(true);
+      } else {
+        await agoraEngine.current?.enableLocalVideo(false);
+        await agoraEngine.current?.stopPreview();
+        setIsCameraOn(false);
+      }
 
-  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-};
+      await supabase.from('rcalls').update({ call_type: nextType }).eq('id', activeCall.id);
+      setActiveCall(prev => ({ ...prev, call_type: nextType }));
+      
+    } catch (e) {
+      console.error('Switch call type error:', e);
+    }
+    
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  };
 
   const searchForUsers = async (query) => {
     if (!query.trim()) {
@@ -2010,133 +2116,202 @@ useEffect(() => {
             <View style={[styles.callBgCircle, { top: -100, left: -50, backgroundColor: theme.colors.primary + '20' }]} />
             <View style={[styles.callBgCircle, { bottom: -100, right: -50, backgroundColor: '#4ADE8020' }]} />
 
-            <View style={styles.callContent}>
-              <Animated.View style={[
-                styles.callAvatarLarge,
-                { transform: [{ scale: pulseAnim }] },
-                activeCall.status === 'ringing' && styles.callAvatarRinging
-              ]}>
-                  {activeCall.chat?.is_group ? (
-                    <View style={styles.callEmojiBg}>
-                      {activeCall.chat.group_icon?.startsWith('http') ? (
-                        <Image source={{ uri: activeCall.chat.group_icon }} style={styles.callAvatarImg} />
+              <View style={styles.callContent}>
+                {activeCall.call_type === 'video' && isJoined ? (
+                  <View style={styles.videoContainer}>
+                    {/* Remote Video(s) */}
+                    {remoteUsers.length > 0 ? (
+                      <View style={styles.remoteVideoGrid}>
+                        {remoteUsers.map(remoteUid => (
+                          <View key={remoteUid} style={styles.remoteVideoWrapper}>
+                            {remoteVideoMap[remoteUid] ? (
+                              <AgoraVideoView
+                                style={styles.remoteVideo}
+                                canvas={{
+                                  uid: remoteUid,
+                                  renderMode: RenderModeType.RenderModeHidden,
+                                  sourceType: VideoSourceType.VideoSourceRemote,
+                                }}
+                              />
+                            ) : (
+                              <View style={styles.remoteVideoPlaceholder}>
+                                <View style={styles.callAvatarSmall}>
+                                  <Text style={styles.callEmojiSmall}>👤</Text>
+                                </View>
+                                <Text style={styles.remoteStatusText}>Camera Off</Text>
+                              </View>
+                            )}
+                          </View>
+                        ))}
+                      </View>
+                    ) : (
+                      <View style={styles.waitingContainer}>
+                        <Text style={styles.waitingText}>Waiting for other user...</Text>
+                      </View>
+                    )}
+
+                    {/* Local Video Preview */}
+                    <View style={styles.localVideoContainer}>
+                      {isCameraOn ? (
+                        <AgoraVideoView
+                          style={styles.localVideo}
+                          canvas={{
+                            uid: 0,
+                            renderMode: RenderModeType.RenderModeHidden,
+                            sourceType: VideoSourceType.VideoSourceCamera,
+                          }}
+                        />
                       ) : (
-                        <Text style={styles.callEmoji}>{activeCall.chat.group_icon || '👥'}</Text>
+                        <View style={styles.localVideoPlaceholder}>
+                          <Camera size={20} color="rgba(255,255,255,0.4)" />
+                        </View>
                       )}
                     </View>
-                  ) : getOtherUser(activeCall.chat)?.avatar_url ? (
-                  <Image source={{ uri: getOtherUser(activeCall.chat).avatar_url }} style={styles.callAvatarImg} />
-                ) : (
-                  <View style={styles.callEmojiBg}>
-                    <Text style={styles.callEmoji}>{getOtherUser(activeCall.chat)?.emoji_icon || '👤'}</Text>
                   </View>
+                ) : (
+                  <Animated.View style={[
+                    styles.callAvatarLarge,
+                    { transform: [{ scale: pulseAnim }] },
+                    activeCall.status === 'ringing' && styles.callAvatarRinging
+                  ]}>
+                      {activeCall.chat?.is_group ? (
+                        <View style={styles.callEmojiBg}>
+                          {activeCall.chat.group_icon?.startsWith('http') ? (
+                            <Image source={{ uri: activeCall.chat.group_icon }} style={styles.callAvatarImg} />
+                          ) : (
+                            <Text style={styles.callEmoji}>{activeCall.chat.group_icon || '👥'}</Text>
+                          )}
+                        </View>
+                      ) : getOtherUser(activeCall.chat)?.avatar_url ? (
+                      <Image source={{ uri: getOtherUser(activeCall.chat).avatar_url }} style={styles.callAvatarImg} />
+                    ) : (
+                      <View style={styles.callEmojiBg}>
+                        <Text style={styles.callEmoji}>{getOtherUser(activeCall.chat)?.emoji_icon || '👤'}</Text>
+                      </View>
+                    )}
+                  </Animated.View>
                 )}
-              </Animated.View>
 
-              <Text style={styles.callName}>
-                {activeCall.chat?.is_group ? activeCall.chat.group_name : `@${getOtherUser(activeCall.chat)?.username}`}
-              </Text>
-              
-                <View style={styles.callStatusContainer}>
-                  {activeCall.status === 'ringing' ? (
-                    <Text style={styles.callStatusText}>
-                      {activeCall.isOutgoing ? 'Calling...' : 'Incoming call'}
-                    </Text>
-                  ) : (
-                    <View style={styles.callDurationContainer}>
-                      <View style={styles.activeDot} />
-                      <Text style={styles.callDurationText}>{formatCallDuration(callDuration)}</Text>
-                    </View>
-                  )}
-                    {activeCall.status === 'active' && !isJoined && (
-                      <View style={{ alignItems: 'center', marginTop: 8 }}>
-                        <ActivityIndicator size="small" color={theme.colors.primary} />
-                          <Text style={[styles.callStatusText, { color: 'rgba(255,255,255,0.6)', fontSize: 12, marginTop: 4 }]}>
-                            {isJoining ? 'Connecting...' : 'Securely connecting...'}
-                          </Text>
-                        </View>
-                      )}
-                      {activeCall.status === 'active' && isJoined && remoteUsers.length === 0 && (
+                <Text style={styles.callName}>
+                  {activeCall.chat?.is_group ? activeCall.chat.group_name : `@${getOtherUser(activeCall.chat)?.username}`}
+                </Text>
+                
+                  <View style={styles.callStatusContainer}>
+                    {activeCall.status === 'ringing' ? (
+                      <Text style={styles.callStatusText}>
+                        {activeCall.isOutgoing ? 'Calling...' : 'Incoming call'}
+                      </Text>
+                    ) : (
+                      <View style={styles.callDurationContainer}>
+                        <View style={styles.activeDot} />
+                        <Text style={styles.callDurationText}>{formatCallDuration(callDuration)}</Text>
+                      </View>
+                    )}
+                      {activeCall.status === 'active' && !isJoined && (
                         <View style={{ alignItems: 'center', marginTop: 8 }}>
-                          <Text style={[styles.callStatusText, { color: 'rgba(255,255,255,0.4)', fontSize: 12 }]}>
-                            Waiting for other user...
+                          <ActivityIndicator size="small" color={theme.colors.primary} />
+                            <Text style={[styles.callStatusText, { color: 'rgba(255,255,255,0.6)', fontSize: 12, marginTop: 4 }]}>
+                              {isJoining ? 'Connecting...' : 'Securely connecting...'}
+                            </Text>
+                          </View>
+                        )}
+                        {activeCall.status === 'active' && isJoined && remoteUsers.length === 0 && (
+                          <View style={{ alignItems: 'center', marginTop: 8 }}>
+                            <Text style={[styles.callStatusText, { color: 'rgba(255,255,255,0.4)', fontSize: 12 }]}>
+                              Waiting for other user...
+                            </Text>
+                            <TouchableOpacity 
+                              onPress={() => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                leaveAgora().then(() => setupAgora());
+                              }}
+                              style={{ marginTop: 10, padding: 8, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 8 }}
+                            >
+                              <Text style={{ color: '#FFF', fontSize: 12 }}>Reconnect</Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
+                        {activeCall.status === 'active' && isJoined && remoteUsers.length > 0 && (
+                          <Text style={[styles.callStatusText, { color: '#4ADE80', fontSize: 12, marginTop: 8 }]}>
+                            {activeCall.call_type === 'video' ? 'Video Connected' : 'Voice Connected'}
                           </Text>
-                          <TouchableOpacity 
-                            onPress={() => {
-                              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                              leaveAgora().then(() => setupAgora());
-                            }}
-                            style={{ marginTop: 10, padding: 8, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 8 }}
-                          >
-                            <Text style={{ color: '#FFF', fontSize: 12 }}>Reconnect</Text>
-                          </TouchableOpacity>
-                        </View>
-                      )}
-                      {activeCall.status === 'active' && isJoined && remoteUsers.length > 0 && (
-                        <Text style={[styles.callStatusText, { color: '#4ADE80', fontSize: 12, marginTop: 8 }]}>
-                          Voice Connected
-                        </Text>
-                      )}
+                        )}
 
-                </View>
-
-              <View style={styles.callActions}>
-                {activeCall.status === 'ringing' && !activeCall.isOutgoing ? (
-                  <View style={styles.incomingActions}>
-                    <TouchableOpacity onPress={declineCall} style={[styles.callBtn, styles.callBtnDecline]}>
-                      <PhoneOffIcon size={32} color="#FFF" />
-                      <Text style={styles.callBtnLabel}>Decline</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={answerCall} style={[styles.callBtn, styles.callBtnAnswer]}>
-                      <PhoneIcon size={32} color="#FFF" />
-                      <Text style={styles.callBtnLabel}>Answer</Text>
-                    </TouchableOpacity>
                   </View>
-                ) : (
-                    <View style={styles.activeActions}>
-                      <TouchableOpacity onPress={toggleMute} style={[styles.callBtn, isMuted && styles.callBtnMuted]}>
-                        <View style={styles.iconCircle}>
-                          {isMuted ? <MicOff size={24} color="#FFF" /> : <Mic size={24} color="#FFF" />}
-                        </View>
-                        <Text style={styles.callBtnLabel}>{isMuted ? 'Unmute' : 'Mute'}</Text>
+
+                <View style={styles.callActions}>
+                  {activeCall.status === 'ringing' && !activeCall.isOutgoing ? (
+                    <View style={styles.incomingActions}>
+                      <TouchableOpacity onPress={declineCall} style={[styles.callBtn, styles.callBtnDecline]}>
+                        <PhoneOffIcon size={32} color="#FFF" />
+                        <Text style={styles.callBtnLabel}>Decline</Text>
                       </TouchableOpacity>
-                      
-                        <TouchableOpacity onPress={async () => {
-    const next = !isSpeakerOn;
-    setIsSpeakerOn(next);
-
-    await Audio.setAudioModeAsync({
-      allowsRecordingIOS: true,
-      playsInSilentModeIOS: true,
-      playThroughEarpieceAndroid: !next,
-      staysActiveInBackground: true,
-      shouldRouteAudioToReceiverIOS: !next,
-      interruptionModeIOS: 1, // DoNotMix
-      interruptionModeAndroid: 1, // DoNotMix
-    });
-
-    if (agoraEngine.current) {
-      await agoraEngine.current.setEnableSpeakerphone(next);
-    }
-
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-}}
- style={styles.callBtn}>
-                        <View style={[styles.iconCircle, isSpeakerOn && { backgroundColor: theme.colors.primary }]}>
-                          <Volume2 size={24} color={isSpeakerOn ? "#000" : "#FFF"} />
-                        </View>
-                        <Text style={styles.callBtnLabel}>{isSpeakerOn ? 'Speaker On' : 'Speaker Off'}</Text>
-                      </TouchableOpacity>
-                      
-                      <TouchableOpacity onPress={endCall} style={[styles.callBtn, styles.callBtnEnd]}>
-                        <View style={[styles.iconCircle, { backgroundColor: '#EF4444' }]}>
-                          <PhoneOffIcon size={28} color="#FFF" />
-                        </View>
-                        <Text style={styles.callBtnLabel}>End</Text>
+                      <TouchableOpacity onPress={answerCall} style={[styles.callBtn, styles.callBtnAnswer]}>
+                        <PhoneIcon size={32} color="#FFF" />
+                        <Text style={styles.callBtnLabel}>Answer</Text>
                       </TouchableOpacity>
                     </View>
-                  )}
-                </View>
+                  ) : (
+                      <View style={styles.activeActions}>
+                        <TouchableOpacity onPress={toggleMute} style={[styles.callBtn, isMuted && styles.callBtnMuted]}>
+                          <View style={styles.iconCircle}>
+                            {isMuted ? <MicOff size={24} color="#FFF" /> : <Mic size={24} color="#FFF" />}
+                          </View>
+                          <Text style={styles.callBtnLabel}>{isMuted ? 'Unmute' : 'Mute'}</Text>
+                        </TouchableOpacity>
+                        
+                        {activeCall.call_type === 'video' ? (
+                          <TouchableOpacity onPress={toggleCamera} style={styles.callBtn}>
+                            <View style={[styles.iconCircle, isCameraOn && { backgroundColor: theme.colors.primary }]}>
+                              {isCameraOn ? <VideoIcon size={24} color="#000" /> : <VideoIcon size={24} color="#FFF" style={{ opacity: 0.5 }} />}
+                            </View>
+                            <Text style={styles.callBtnLabel}>{isCameraOn ? 'Cam On' : 'Cam Off'}</Text>
+                          </TouchableOpacity>
+                        ) : (
+                          <TouchableOpacity onPress={async () => {
+                            const next = !isSpeakerOn;
+                            setIsSpeakerOn(next);
+
+                            await Audio.setAudioModeAsync({
+                              allowsRecordingIOS: true,
+                              playsInSilentModeIOS: true,
+                              playThroughEarpieceAndroid: !next,
+                              staysActiveInBackground: true,
+                              shouldRouteAudioToReceiverIOS: !next,
+                              interruptionModeIOS: 1, // DoNotMix
+                              interruptionModeAndroid: 1, // DoNotMix
+                            });
+
+                            if (agoraEngine.current) {
+                              await agoraEngine.current.setEnableSpeakerphone(next);
+                            }
+
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          }}
+                          style={styles.callBtn}>
+                            <View style={[styles.iconCircle, isSpeakerOn && { backgroundColor: theme.colors.primary }]}>
+                              <Volume2 size={24} color={isSpeakerOn ? "#000" : "#FFF"} />
+                            </View>
+                            <Text style={styles.callBtnLabel}>{isSpeakerOn ? 'Speaker On' : 'Speaker Off'}</Text>
+                          </TouchableOpacity>
+                        )}
+
+                        <TouchableOpacity onPress={switchCallType} style={styles.callBtn}>
+                          <View style={styles.iconCircle}>
+                            {activeCall.call_type === 'video' ? <Mic size={24} color="#FFF" /> : <VideoIcon size={24} color="#FFF" />}
+                          </View>
+                          <Text style={styles.callBtnLabel}>{activeCall.call_type === 'video' ? 'To Audio' : 'To Video'}</Text>
+                        </TouchableOpacity>
+                        
+                        <TouchableOpacity onPress={endCall} style={[styles.callBtn, styles.callBtnEnd]}>
+                          <View style={[styles.iconCircle, { backgroundColor: '#EF4444' }]}>
+                            <PhoneOffIcon size={28} color="#FFF" />
+                          </View>
+                          <Text style={styles.callBtnLabel}>End</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
                 
                     {isNear && (
                       <View style={styles.proximityOverlay} pointerEvents="none" />
@@ -2588,11 +2763,16 @@ useEffect(() => {
                             </View>
                       </TouchableOpacity>
                     )}
-                    {activeChat && (activeChat.status === 'accepted' || activeChat.is_group) && (
-                      <TouchableOpacity onPress={() => startCall(activeChat.is_group)} style={styles.iconBtn}>
-                        <Phone size={20} color="#FFF" />
-                      </TouchableOpacity>
-                    )}
+                      {activeChat && (activeChat.status === 'accepted' || activeChat.is_group) && (
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                          <TouchableOpacity onPress={() => startCall(activeChat.is_group, 'audio')} style={styles.iconBtn}>
+                            <Phone size={20} color="#FFF" />
+                          </TouchableOpacity>
+                          <TouchableOpacity onPress={() => startCall(activeChat.is_group, 'video')} style={styles.iconBtn}>
+                            <VideoIcon size={20} color="#FFF" />
+                          </TouchableOpacity>
+                        </View>
+                      )}
                   </View>
                 )}
                 <TouchableOpacity onPress={() => setClose()} style={styles.iconBtn}>
@@ -3486,13 +3666,96 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.85)',
   },
-  callBgCircle: {
-    position: 'absolute',
-    width: 300,
-    height: 300,
-    borderRadius: 150,
-  },
-  callContent: {
+    callBgCircle: {
+      position: 'absolute',
+      width: 300,
+      height: 300,
+      borderRadius: 150,
+    },
+    videoContainer: {
+      width: width,
+      height: height * 0.6,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 20,
+    },
+    remoteVideoGrid: {
+      flex: 1,
+      width: '100%',
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    remoteVideoWrapper: {
+      width: '100%',
+      height: '100%',
+      backgroundColor: '#1E293B',
+      borderRadius: 20,
+      overflow: 'hidden',
+    },
+    remoteVideo: {
+      flex: 1,
+    },
+    remoteVideoPlaceholder: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      gap: 12,
+    },
+    callAvatarSmall: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: 'rgba(255,255,255,0.1)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    callEmojiSmall: {
+      fontSize: 32,
+    },
+    remoteStatusText: {
+      color: 'rgba(255,255,255,0.4)',
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    waitingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    waitingText: {
+      color: 'rgba(255,255,255,0.4)',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    localVideoContainer: {
+      position: 'absolute',
+      bottom: 20,
+      right: 20,
+      width: 100,
+      height: 150,
+      borderRadius: 12,
+      backgroundColor: '#000',
+      borderWidth: 2,
+      borderColor: 'rgba(255,255,255,0.2)',
+      overflow: 'hidden',
+      elevation: 10,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.5,
+      shadowRadius: 8,
+    },
+    localVideo: {
+      flex: 1,
+    },
+    localVideoPlaceholder: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: 'rgba(255,255,255,0.05)',
+    },
+    callContent: {
     alignItems: 'center',
     width: '100%',
     padding: 20,
