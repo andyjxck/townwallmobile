@@ -1266,29 +1266,33 @@ const stopRecording = async () => {
 
     const agoraEngine = useRef(null);
     const [isJoined, setIsJoined] = useState(false);
+    const [isJoining, setIsJoining] = useState(false);
     const [remoteUsers, setRemoteUsers] = useState([]);
+    const [debugStatus, setDebugStatus] = useState('');
 
-    useEffect(() => {
-      if (activeCall?.status === 'active' && AGORA_APP_ID && !isExpoGo && user?.id) {
-        setupAgora();
-      } else if (!activeCall && isJoined) {
-        leaveAgora();
-      }
-    }, [activeCall?.status, user?.id]);
+    // Refs to avoid stale closures in event handlers
+    const isMutedRef = useRef(isMuted);
+    useEffect(() => { isMutedRef.current = isMuted; }, [isMuted]);
 
     const setupAgora = async () => {
-      if (isExpoGo || !user?.id) {
-        console.log('Agora setup skipped: Expo Go or No user ID');
+      if (isExpoGo || !user?.id || !activeCall?.id) {
+        console.log('Agora setup skipped: Expo Go or No user/call ID');
         return;
       }
+      
       try {
+        setIsJoining(true);
+        setDebugStatus('Requesting permissions...');
         const permission = await Audio.requestPermissionsAsync();
         if (permission.status !== 'granted') {
+          setDebugStatus('Permission denied');
           Alert.alert('Permission Denied', 'Microphone access is required for calls.');
+          setIsJoining(false);
           return;
         }
 
         if (!agoraEngine.current) {
+          setDebugStatus('Initializing engine...');
           agoraEngine.current = createAgoraRtcEngine();
           agoraEngine.current.initialize({
             appId: AGORA_APP_ID,
@@ -1299,16 +1303,18 @@ const stopRecording = async () => {
             onJoinChannelSuccess: (connection, elapsed) => {
               console.log('[DEBUG-CALL] Successfully joined channel:', connection.channelId, 'UID:', connection.localUid);
               setIsJoined(true);
+              setIsJoining(false);
+              setDebugStatus('Joined successfully');
+              
+              // Apply initial mute state
               if (agoraEngine.current) {
-                agoraEngine.current.muteLocalAudioStream(isMuted);
+                agoraEngine.current.muteLocalAudioStream(isMutedRef.current);
               }
             },
             onUserJoined: (connection, remoteUid) => {
               console.log('[DEBUG-CALL] Remote user joined:', remoteUid);
               setRemoteUsers(prev => [...prev, remoteUid]);
-              // Explicitly ensure remote audio is unmuted when someone joins
               if (agoraEngine.current) {
-                console.log('[DEBUG-CALL] Explicitly unmuting remote audio for:', remoteUid);
                 agoraEngine.current.muteRemoteAudioStream(remoteUid, false);
               }
             },
@@ -1319,99 +1325,75 @@ const stopRecording = async () => {
             onLeaveChannel: (connection, stats) => {
               console.log('[DEBUG-CALL] Left channel');
               setIsJoined(false);
+              setIsJoining(false);
               setRemoteUsers([]);
-            },
-            onRemoteAudioStateChanged: (connection, remoteUid, state, reason, elapsed) => {
-              console.log('[DEBUG-CALL] Remote audio state changed:', { remoteUid, state, reason, elapsed });
-            },
-            onAudioVolumeIndication: (connection, speakers, speakerNumber, totalVolume) => {
-              if (totalVolume > 0) {
-                // Log only if there's actual sound to avoid spamming
-                console.log('[DEBUG-CALL] Audio volume indication:', { totalVolume, speakerNumber });
-              }
+              setDebugStatus('Left channel');
             },
             onError: (err, msg) => {
               console.error('[DEBUG-CALL] Agora Error:', err, msg);
+              setDebugStatus(`Error: ${err}`);
             }
           });
         }
 
-          console.log('[DEBUG-CALL] Setting up Audio Mode...');
-          await Audio.setAudioModeAsync({
-            allowsRecordingIOS: true,
-            playsInSilentModeIOS: true,
-            playThroughEarpieceAndroid: false,
-            staysActiveInBackground: true,
-            shouldRouteAudioToReceiverIOS: false,
-            interruptionModeIOS: 1, // DoNotMix
-            interruptionModeAndroid: 1, // DoNotMix
-          });
+        setDebugStatus('Configuring audio...');
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: true,
+          playsInSilentModeIOS: true,
+          playThroughEarpieceAndroid: false,
+          staysActiveInBackground: true,
+          shouldRouteAudioToReceiverIOS: false,
+          interruptionModeIOS: 1, // DoNotMix
+          interruptionModeAndroid: 1, // DoNotMix
+        });
 
-          console.log('[DEBUG-CALL] Enabling Agora Audio...');
-          await agoraEngine.current.enableAudio();
-          await agoraEngine.current.enableLocalAudio(true);
-          await agoraEngine.current.muteLocalAudioStream(false);
-          await agoraEngine.current.muteAllRemoteAudioStreams(false);
-          await agoraEngine.current.setEnableSpeakerphone(true);
-          await agoraEngine.current.setDefaultAudioRouteToSpeakerphone(true);
-          
-          // Enable volume indication
-          await agoraEngine.current.enableAudioVolumeIndication(200, 3, true);
-          
-          setIsSpeakerOn(true);
-          console.log('[DEBUG-CALL] Setting Client Role & Profile...');
-          await agoraEngine.current.setClientRole(ClientRoleType.ClientRoleBroadcaster);
-          await agoraEngine.current.setAudioProfile(
-            AudioProfileType.AudioProfileDefault,
-            AudioScenarioType.AudioScenarioDefault
-          );
-          
-          console.log('[DEBUG-CALL] Adjusting Volumes...');
-          await agoraEngine.current.adjustRecordingSignalVolume(100);
-          await agoraEngine.current.adjustPlaybackSignalVolume(100);
+        await agoraEngine.current.enableAudio();
+        await agoraEngine.current.setEnableSpeakerphone(true);
+        await agoraEngine.current.setDefaultAudioRouteToSpeakerphone(true);
         
-          // Fetch token from Supabase Edge Function
-          const hashCode = (str) => {
-            let hash = 0;
-            for (let i = 0; i < str.length; i++) {
-              const char = str.charCodeAt(i);
-              hash = ((hash << 5) - hash) + char;
-              hash = hash & hash;
-            }
-            return Math.abs(hash);
-          };
-          const uid = hashCode(user.id) % 1000000;
-          console.log('[Agora] Requesting token for channel:', activeCall.id, 'UID:', uid);
-          
-          const { data, error } = await supabase.functions.invoke('agora-token', {
-            body: {
-              channelName: activeCall.id,
-              uid: uid,
-              role: 'publisher'
-            }
-          });
-
-          console.log('[Agora] Function response:', { data, error });
-
-          if (error) {
-            console.error('Error fetching Agora token:', error);
-            Alert.alert('Call Error', 'Failed to initialize secure call connection.');
-            return;
+        // Use Communication profile settings
+        await agoraEngine.current.setAudioProfile(
+          AudioProfileType.AudioProfileDefault,
+          AudioScenarioType.AudioScenarioDefault
+        );
+        
+        setDebugStatus('Fetching token...');
+        const uid = hashCode(user.id) % 1000000;
+        const { data, error } = await supabase.functions.invoke('agora-token', {
+          body: {
+            channelName: activeCall.id,
+            uid: uid,
+            role: 'publisher'
           }
+        });
 
-          if (!data || !data.token) {
-            console.error('No token returned from function');
-            Alert.alert('Call Error', 'No security token received.');
-            return;
-          }
+        if (error || !data?.token) {
+          console.error('Token error:', error || 'No token');
+          setDebugStatus('Token failed');
+          Alert.alert('Call Error', 'Failed to secure call connection.');
+          setIsJoining(false);
+          return;
+        }
 
-          if (!activeCall?.id) return;
-          console.log('[Agora] Joining channel with token:', data.token);
-          await agoraEngine.current.joinChannel(data.token, activeCall.id, uid, {});
+        setDebugStatus('Joining channel...');
+        await agoraEngine.current.joinChannel(data.token, activeCall.id, uid, {});
       } catch (e) {
         console.error('Agora setup error:', e);
+        setDebugStatus('Setup failed');
+        setIsJoining(false);
       }
     };
+
+    const hashCode = (str) => {
+      let hash = 0;
+      for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
+      }
+      return Math.abs(hash);
+    };
+
 
     const leaveAgora = async () => {
       if (isExpoGo) return;
@@ -1901,16 +1883,44 @@ agoraEngine.current = null;
                       <Text style={styles.callDurationText}>{formatCallDuration(callDuration)}</Text>
                     </View>
                   )}
-                  {activeCall.status === 'active' && remoteUsers.length === 0 && (
-                    <Text style={[styles.callStatusText, { color: '#F87171', fontSize: 10, marginTop: 4 }]}>
-                      Waiting for other user to connect...
-                    </Text>
-                  )}
-                  {activeCall.status === 'active' && remoteUsers.length > 0 && (
-                    <Text style={[styles.callStatusText, { color: '#4ADE80', fontSize: 10, marginTop: 4 }]}>
-                      Voice Connected ({remoteUsers.length} remote)
-                    </Text>
-                  )}
+                    {activeCall.status === 'active' && !isJoined && (
+                      <View style={{ alignItems: 'center', marginTop: 8 }}>
+                        <ActivityIndicator size="small" color={theme.colors.primary} />
+                        <Text style={[styles.callStatusText, { color: 'rgba(255,255,255,0.6)', fontSize: 12, marginTop: 4 }]}>
+                          {isJoining ? 'Connecting to channel...' : 'Preparing connection...'}
+                        </Text>
+                        {debugStatus ? (
+                          <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, marginTop: 2 }}>
+                            {debugStatus}
+                          </Text>
+                        ) : null}
+                      </View>
+                    )}
+                    {activeCall.status === 'active' && isJoined && remoteUsers.length === 0 && (
+                      <View style={{ alignItems: 'center', marginTop: 8 }}>
+                        <Text style={[styles.callStatusText, { color: '#F87171', fontSize: 12 }]}>
+                          Waiting for other user to connect...
+                        </Text>
+                        <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, marginTop: 2 }}>
+                          Channel: {activeCall.id.split('-')[0]}...
+                        </Text>
+                        <TouchableOpacity 
+                          onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            leaveAgora().then(() => setupAgora());
+                          }}
+                          style={{ marginTop: 10, padding: 8, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 8 }}
+                        >
+                          <Text style={{ color: '#FFF', fontSize: 12 }}>Reconnect</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                    {activeCall.status === 'active' && isJoined && remoteUsers.length > 0 && (
+                      <Text style={[styles.callStatusText, { color: '#4ADE80', fontSize: 12, marginTop: 8 }]}>
+                        Voice Connected ({remoteUsers.length} remote)
+                      </Text>
+                    )}
+
                 </View>
 
               <View style={styles.callActions}>
