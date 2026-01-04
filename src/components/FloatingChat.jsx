@@ -1902,7 +1902,7 @@ useEffect(() => {
         </View>
       )}
 
-            {activeCall?.id && (
+            {activeCall?.id && (activeCall.status === 'ringing' || activeCall.status === 'active') && (
                 <Modal visible={true} animationType="fade" transparent onRequestClose={endCall}>
                   <View style={styles.callOverlay}>
                   <BlurView intensity={100} style={StyleSheet.absoluteFill} tint="dark" />
@@ -2089,9 +2089,9 @@ useEffect(() => {
                   )}
                 </View>
                 
-                  {isNear && (
-                    <View style={styles.proximityOverlay} />
-                  )}
+                    {isNear && (
+                      <View style={styles.proximityOverlay} pointerEvents="none" />
+                    )}
                 </View>
               </View>
             </Modal>
