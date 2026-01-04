@@ -1297,28 +1297,46 @@ const stopRecording = async () => {
 
           agoraEngine.current.registerEventHandler({
             onJoinChannelSuccess: (connection, elapsed) => {
-              console.log('Successfully joined channel:', connection.channelId);
+              console.log('[DEBUG-CALL] Successfully joined channel:', connection.channelId, 'UID:', connection.localUid);
               setIsJoined(true);
               if (agoraEngine.current) {
                 agoraEngine.current.muteLocalAudioStream(isMuted);
               }
             },
             onUserJoined: (connection, remoteUid) => {
-              console.log('Remote user joined:', remoteUid);
+              console.log('[DEBUG-CALL] Remote user joined:', remoteUid);
               setRemoteUsers(prev => [...prev, remoteUid]);
+              // Explicitly ensure remote audio is unmuted when someone joins
+              if (agoraEngine.current) {
+                console.log('[DEBUG-CALL] Explicitly unmuting remote audio for:', remoteUid);
+                agoraEngine.current.muteRemoteAudioStream(remoteUid, false);
+              }
             },
             onUserOffline: (connection, remoteUid) => {
-              console.log('Remote user offline:', remoteUid);
+              console.log('[DEBUG-CALL] Remote user offline:', remoteUid);
               setRemoteUsers(prev => prev.filter(id => id !== remoteUid));
             },
             onLeaveChannel: (connection, stats) => {
-              console.log('Left channel');
+              console.log('[DEBUG-CALL] Left channel');
               setIsJoined(false);
               setRemoteUsers([]);
             },
+            onRemoteAudioStateChanged: (connection, remoteUid, state, reason, elapsed) => {
+              console.log('[DEBUG-CALL] Remote audio state changed:', { remoteUid, state, reason, elapsed });
+            },
+            onAudioVolumeIndication: (connection, speakers, speakerNumber, totalVolume) => {
+              if (totalVolume > 0) {
+                // Log only if there's actual sound to avoid spamming
+                console.log('[DEBUG-CALL] Audio volume indication:', { totalVolume, speakerNumber });
+              }
+            },
+            onError: (err, msg) => {
+              console.error('[DEBUG-CALL] Agora Error:', err, msg);
+            }
           });
         }
 
+          console.log('[DEBUG-CALL] Setting up Audio Mode...');
           await Audio.setAudioModeAsync({
             allowsRecordingIOS: true,
             playsInSilentModeIOS: true,
@@ -1329,6 +1347,7 @@ const stopRecording = async () => {
             interruptionModeAndroid: 1, // DoNotMix
           });
 
+          console.log('[DEBUG-CALL] Enabling Agora Audio...');
           await agoraEngine.current.enableAudio();
           await agoraEngine.current.enableLocalAudio(true);
           await agoraEngine.current.muteLocalAudioStream(false);
@@ -1336,13 +1355,18 @@ const stopRecording = async () => {
           await agoraEngine.current.setEnableSpeakerphone(true);
           await agoraEngine.current.setDefaultAudioRouteToSpeakerphone(true);
           
+          // Enable volume indication
+          await agoraEngine.current.enableAudioVolumeIndication(200, 3, true);
+          
           setIsSpeakerOn(true);
+          console.log('[DEBUG-CALL] Setting Client Role & Profile...');
           await agoraEngine.current.setClientRole(ClientRoleType.ClientRoleBroadcaster);
           await agoraEngine.current.setAudioProfile(
             AudioProfileType.AudioProfileDefault,
             AudioScenarioType.AudioScenarioDefault
           );
           
+          console.log('[DEBUG-CALL] Adjusting Volumes...');
           await agoraEngine.current.adjustRecordingSignalVolume(100);
           await agoraEngine.current.adjustPlaybackSignalVolume(100);
         
@@ -1866,18 +1890,28 @@ agoraEngine.current = null;
                 {activeCall.chat?.is_group ? activeCall.chat.group_name : `@${getOtherUser(activeCall.chat)?.username}`}
               </Text>
               
-              <View style={styles.callStatusContainer}>
-                {activeCall.status === 'ringing' ? (
-                  <Text style={styles.callStatusText}>
-                    {activeCall.isOutgoing ? 'Calling...' : 'Incoming call'}
-                  </Text>
-                ) : (
-                  <View style={styles.callDurationContainer}>
-                    <View style={styles.activeDot} />
-                    <Text style={styles.callDurationText}>{formatCallDuration(callDuration)}</Text>
-                  </View>
-                )}
-              </View>
+                <View style={styles.callStatusContainer}>
+                  {activeCall.status === 'ringing' ? (
+                    <Text style={styles.callStatusText}>
+                      {activeCall.isOutgoing ? 'Calling...' : 'Incoming call'}
+                    </Text>
+                  ) : (
+                    <View style={styles.callDurationContainer}>
+                      <View style={styles.activeDot} />
+                      <Text style={styles.callDurationText}>{formatCallDuration(callDuration)}</Text>
+                    </View>
+                  )}
+                  {activeCall.status === 'active' && remoteUsers.length === 0 && (
+                    <Text style={[styles.callStatusText, { color: '#F87171', fontSize: 10, marginTop: 4 }]}>
+                      Waiting for other user to connect...
+                    </Text>
+                  )}
+                  {activeCall.status === 'active' && remoteUsers.length > 0 && (
+                    <Text style={[styles.callStatusText, { color: '#4ADE80', fontSize: 10, marginTop: 4 }]}>
+                      Voice Connected ({remoteUsers.length} remote)
+                    </Text>
+                  )}
+                </View>
 
               <View style={styles.callActions}>
                 {activeCall.status === 'ringing' && !activeCall.isOutgoing ? (
