@@ -50,7 +50,7 @@ const EMOJIS = ['👥','🔥','🚀','🎮','🎵','📸','🎥','💬','✨','�
 
 const isExpoGo = Constants.appOwnership === 'expo';
 
-let createAgoraRtcEngine, ChannelProfileType, ClientRoleType, AudioProfileType, AudioScenarioType, AgoraVideoView, VideoSourceType, RenderModeType;
+let createAgoraRtcEngine, ChannelProfileType, ClientRoleType, AudioProfileType, AudioScenarioType, RtcSurfaceView, VideoSourceType, RenderModeType;
 if (!isExpoGo) {
   const agora = require('react-native-agora');
   createAgoraRtcEngine = agora.createAgoraRtcEngine;
@@ -58,7 +58,7 @@ if (!isExpoGo) {
   ClientRoleType = agora.ClientRoleType;
   AudioProfileType = agora.AudioProfileType;
   AudioScenarioType = agora.AudioScenarioType;
-  AgoraVideoView = agora.AgoraVideoView;
+  RtcSurfaceView = agora.RtcSurfaceView;
   VideoSourceType = agora.VideoSourceType;
   RenderModeType = agora.RenderModeType;
 }
@@ -1417,7 +1417,7 @@ const stopRecording = async () => {
         );
         
         setDebugStatus('Fetching token...');
-        const uid = hashCode(String(user.id)) % 1000000;
+        const uid = String(user.id).hashCode() % 1000000;
         const { data, error } = await supabase.functions.invoke('agora-token', {
           body: {
             channelName: activeCall.id,
@@ -1441,16 +1441,6 @@ const stopRecording = async () => {
         setDebugStatus('Setup failed');
         setIsJoining(false);
       }
-    };
-
-    const hashCode = (str) => {
-      let hash = 0;
-      for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash;
-      }
-      return Math.abs(hash);
     };
 
 useEffect(() => {
@@ -2124,16 +2114,16 @@ useEffect(() => {
                       <View style={styles.remoteVideoGrid}>
                         {remoteUsers.map(remoteUid => (
                           <View key={remoteUid} style={styles.remoteVideoWrapper}>
-                            {remoteVideoMap[remoteUid] ? (
-                              <AgoraVideoView
-                                style={styles.remoteVideo}
-                                canvas={{
-                                  uid: remoteUid,
-                                  renderMode: RenderModeType.RenderModeHidden,
-                                  sourceType: VideoSourceType.VideoSourceRemote,
-                                }}
-                              />
-                            ) : (
+                              {remoteVideoMap[remoteUid] ? (
+                                <RtcSurfaceView
+                                  style={styles.remoteVideo}
+                                  canvas={{
+                                    uid: remoteUid,
+                                    renderMode: RenderModeType.RenderModeHidden,
+                                    sourceType: VideoSourceType.VideoSourceRemote,
+                                  }}
+                                />
+                              ) : (
                               <View style={styles.remoteVideoPlaceholder}>
                                 <View style={styles.callAvatarSmall}>
                                   <Text style={styles.callEmojiSmall}>👤</Text>
@@ -2153,7 +2143,7 @@ useEffect(() => {
                     {/* Local Video Preview */}
                     <View style={styles.localVideoContainer}>
                       {isCameraOn ? (
-                        <AgoraVideoView
+                        <RtcSurfaceView
                           style={styles.localVideo}
                           canvas={{
                             uid: 0,
