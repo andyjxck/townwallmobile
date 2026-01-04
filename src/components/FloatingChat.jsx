@@ -1414,23 +1414,26 @@ useEffect(() => {
       
       console.log('[DEBUG-CALL] Rehydrating call state...');
       
-        try {
-          // Only fetch calls from the last 40 seconds to avoid stale ringing
-          const fortySecondsAgo = new Date(Date.now() - 40 * 1000).toISOString();
-          
-          const { data: calls, error } = await supabase
-            .from('rcalls')
-            .select(`
+      try {
+        const fortySecondsAgo = new Date(Date.now() - 40 * 1000).toISOString();
+        
+        // Optimize: Use a single query to find relevant calls
+        // We look for calls where user is either caller or a member of the chat
+        const { data: calls, error } = await supabase
+          .from('rcalls')
+          .select(`
+            *,
+            chat:rchats!inner(
               *,
-              chat:rchats(
-                *,
-                user1:rusers!user1_id(id, username, emoji_icon, avatar_url, last_seen),
-                user2:rusers!user2_id(id, username, emoji_icon, avatar_url, last_seen)
-              )
-            `)
-            .in('status', ['ringing', 'active'])
-            .gt('started_at', fortySecondsAgo)
-            .order('started_at', { ascending: false });
+              user1:rusers!user1_id(id, username, emoji_icon, avatar_url, last_seen),
+              user2:rusers!user2_id(id, username, emoji_icon, avatar_url, last_seen),
+              members:rchat_members!inner(user_id)
+            )
+          `)
+          .in('status', ['ringing', 'active'])
+          .gt('started_at', fortySecondsAgo)
+          .eq('chat.members.user_id', user.id)
+          .order('started_at', { ascending: false });
 
         if (error) {
           console.error('[DEBUG-CALL] Error fetching calls:', error);
@@ -1438,55 +1441,25 @@ useEffect(() => {
         }
 
         if (!calls || calls.length === 0) {
-          setActiveCall(prev => {
-            if (prev) {
-              console.log('[DEBUG-CALL] No active calls found, clearing state');
-              return null;
-            }
-            return prev;
-          });
+          setActiveCall(prev => prev ? null : null);
           return;
         }
 
-        for (const call of calls) {
-          const chat = call.chat;
-          if (!chat) continue;
-
-          let isParticipant = false;
-          if (!chat.is_group) {
-            isParticipant = chat.user1_id === user.id || chat.user2_id === user.id;
-          } else {
-            const { data: member } = await supabase
-              .from('rchat_members')
-              .select('id')
-              .eq('chat_id', chat.id)
-              .eq('user_id', user.id)
-              .maybeSingle();
-            if (member) isParticipant = true;
+        // Take the latest valid call
+        const call = calls[0];
+        const isOutgoing = call.caller_id === user.id;
+        
+        setActiveCall(prev => {
+          if (prev?.id === call.id && prev.status === call.status && prev.isOutgoing === isOutgoing) {
+            return prev;
           }
+          console.log('[DEBUG-CALL] Setting active call:', call.id);
+          return { ...call, isOutgoing };
+        });
 
-          if (isParticipant) {
-            console.log('[DEBUG-CALL] Active call found for user:', call.id);
-            const isOutgoing = call.caller_id === user.id;
-            
-            setActiveCall(prev => {
-              if (prev?.id === call.id) {
-                if (prev.status === call.status && prev.isOutgoing === isOutgoing) {
-                  return prev;
-                }
-                return { ...prev, ...call, isOutgoing };
-              }
-              return { ...call, isOutgoing };
-            });
-
-            if (call.status === 'active' && !callTimerRef.current) {
-              startCallTimer();
-            }
-            return;
-          }
+        if (call.status === 'active' && !callTimerRef.current) {
+          startCallTimer();
         }
-
-        setActiveCall(prev => prev ? null : prev);
       } catch (err) {
         console.error('[DEBUG-CALL] Rehydrate error:', err);
       }
@@ -1498,8 +1471,8 @@ useEffect(() => {
     }, [rehydrateCall]);
 
     useEffect(() => {
-      rehydrateCall();
-    }, [rehydrateCall, pendingCallAction]);
+      rehydrateCallRef.current();
+    }, [user?.id, pendingCallAction]);
 
     useEffect(() => {
       if (!user) return;
@@ -1519,7 +1492,7 @@ useEffect(() => {
       return () => {
         supabase.removeChannel(channel);
       };
-    }, [user]);
+    }, [user?.id]);
 
     // Handle pending actions from notifications
     useEffect(() => {
@@ -1929,9 +1902,9 @@ useEffect(() => {
         </View>
       )}
 
-          {activeCall && (
-              <Modal visible={true} animationType="fade" transparent>
-                <View style={styles.callOverlay}>
+            {activeCall?.id && (
+                <Modal visible={true} animationType="fade" transparent onRequestClose={endCall}>
+                  <View style={styles.callOverlay}>
                   <BlurView intensity={100} style={StyleSheet.absoluteFill} tint="dark" />
                   
                       {activeCall.status === 'active' && isExpoGo && (
@@ -2468,8 +2441,11 @@ useEffect(() => {
           </View>
         </Modal>
 
-            {isOpen && (
-        <Animated.View style={[styles.chatOverlay, { opacity: fadeAnim }]}>
+              {isOpen && (
+          <Animated.View 
+            style={[styles.chatOverlay, { opacity: fadeAnim }]}
+            pointerEvents={isOpen ? "auto" : "none"}
+          >
           <TouchableOpacity 
             style={StyleSheet.absoluteFill} 
             activeOpacity={1} 
