@@ -16,7 +16,8 @@ import {
   Switch,
   Modal,
   ScrollView,
-  Alert
+  Alert,
+  AppState
 } from 'react-native';
 import { MessageCircle, X, Send, ChevronLeft, MoreHorizontal, User, Users, Check, CheckCheck, Settings, Plus, UserPlus, Mic, MicOff, Phone as PhoneIcon, PhoneOff as PhoneOffIcon, PhoneIncoming, PhoneOutgoing, Phone, Volume2, VolumeX, Image as ImageIcon, Video as VideoIcon, Film, Play, Maximize2, Camera, Sparkles, Trash2, Square, Pause, LogOut, Flag, Edit, RefreshCw } from 'lucide-react-native';
 import Slider from '@react-native-community/slider';
@@ -364,35 +365,39 @@ useEffect(() => {
     }, [activeCall?.status]);
 
     useEffect(() => {
+      if (activeCall?.status === 'ringing') {
+        playSound('ringing');
+      } else {
+        stopSound('ringing');
+      }
+      return () => stopSound('ringing');
+    }, [activeCall?.status, activeCall?.id]);
+
+    useEffect(() => {
       if (!user) return;
 
       const channel = supabase
         .channel('rcalls')
-       .on(
-  'postgres_changes',
-  {
-    event: 'UPDATE',
-    schema: 'public',
-    table: 'rcalls',
-  },
-  (payload) => {
-    // 🔥 ALWAYS handle terminal states
-    if (payload.new.status === 'ended' || payload.new.status === 'declined') {
-      stopSound('ringing');
-      playSound('disconnect');
-      endCallUI();
-      return;
-    }
-
-    // Handle activation
-    if (payload.new.status === 'active') {
-      stopSound('ringing');
-      playSound('connect');
-      startCallTimer();
-      setActiveCall(prev => prev ? { ...prev, ...payload.new } : payload.new);
-    }
-  }
-)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'rcalls',
+          },
+          (payload) => {
+            if (payload.new.status === 'ended' || payload.new.status === 'declined') {
+              stopSound('ringing');
+              playSound('disconnect');
+              endCallUI();
+            } else if (payload.new.status === 'active') {
+              stopSound('ringing');
+              playSound('connect');
+              startCallTimer();
+              setActiveCall(prev => prev ? { ...prev, ...payload.new } : payload.new);
+            }
+          }
+        )
         .subscribe();
 
       callSubRef.current = channel;
@@ -404,26 +409,45 @@ useEffect(() => {
       };
     }, [user, activeCall?.id]);
 
-      const endCallUI = () => {
-        stopSound('ringing');
-        setActiveCall(null);
-        setIsMuted(false);
-        setCallDuration(0);
-        if (callTimerRef.current) {
-          clearInterval(callTimerRef.current);
-          callTimerRef.current = null;
+    const leaveAgora = async () => {
+      if (isExpoGo) return;
+      try {
+        if (agoraEngine.current) {
+          await agoraEngine.current.disableAudio();
+          await agoraEngine.current.leaveChannel();
+          await agoraEngine.current.release();
+          agoraEngine.current = null;
+          setIsJoined(false);
+          setIsJoining(false);
         }
-        
-        // Reset audio mode
-        Audio.setAudioModeAsync({
-          allowsRecordingIOS: false,
-          playsInSilentModeIOS: true,
-          playThroughEarpieceAndroid: false,
-          staysActiveInBackground: true,
-        }).catch(err => console.error('Error resetting audio mode:', err));
+      } catch (e) {
+        console.error('Agora leave error:', e);
+      }
+    };
 
-        loadUserAndChats();
-      };
+    const endCallUI = () => {
+      stopSound('ringing');
+      setActiveCall(null);
+      setIsMuted(false);
+      setCallDuration(0);
+      if (callTimerRef.current) {
+        clearInterval(callTimerRef.current);
+        callTimerRef.current = null;
+      }
+      
+      leaveAgora();
+      
+      // Reset audio mode
+      Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        playThroughEarpieceAndroid: false,
+        staysActiveInBackground: true,
+      }).catch(err => console.error('Error resetting audio mode:', err));
+
+      loadUserAndChats();
+    };
+
 
 
   const formatCallDuration = (seconds) => {
@@ -1375,49 +1399,47 @@ useEffect(() => {
   }
 }, [activeCall?.status]);
 
-useEffect(() => {
-  if (!user) return;
+  const rehydrateCall = useCallback(async () => {
+    if (!user) return;
+    try {
+      const { data } = await supabase
+        .from('rcalls')
+        .select(`
+          *,
+          rcall_participants!inner(user_id)
+        `)
+        .eq('rcall_participants.user_id', user.id)
+        .in('status', ['ringing', 'active'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-  const rehydrateCall = async () => {
-    const { data } = await supabase
-      .from('rcalls')
-      .select(`
-        *,
-        rcall_participants!inner(user_id)
-      `)
-      .eq('rcall_participants.user_id', user.id)
-      .in('status', ['ringing', 'active'])
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
-
-    if (data) {
-      setActiveCall({
-        ...data,
-        isOutgoing: data.caller_id === user.id,
-      });
-    }
-  };
-
-  rehydrateCall();
-}, [user]);
-
-
-
-    const leaveAgora = async () => {
-      if (isExpoGo) return;
-      try {
-        if (agoraEngine.current) {
-       await agoraEngine.current.disableAudio();
-await agoraEngine.current.leaveChannel();
-await agoraEngine.current.release();
-agoraEngine.current = null;
-
-        }
-      } catch (e) {
-        console.error('Agora leave error:', e);
+      if (data) {
+        setActiveCall({
+          ...data,
+          isOutgoing: data.caller_id === user.id,
+        });
       }
-    };
+    } catch (error) {
+      console.error('Error rehydrating call:', error);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    rehydrateCall();
+  }, [rehydrateCall]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        rehydrateCall();
+      }
+    });
+    return () => subscription.remove();
+  }, [rehydrateCall]);
+
+
+
 
     const answerCall = async () => {
       if (!activeCall) return;
