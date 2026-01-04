@@ -2114,13 +2114,13 @@ useEffect(() => {
                       <View style={styles.remoteVideoGrid}>
                         {remoteUsers.map(remoteUid => (
                           <View key={remoteUid} style={styles.remoteVideoWrapper}>
-                              {remoteVideoMap[remoteUid] ? (
+                              {remoteVideoMap[remoteUid] && RtcSurfaceView ? (
                                 <RtcSurfaceView
                                   style={styles.remoteVideo}
                                   canvas={{
                                     uid: remoteUid,
-                                    renderMode: RenderModeType.RenderModeHidden,
-                                    sourceType: VideoSourceType.VideoSourceRemote,
+                                    renderMode: RenderModeType?.RenderModeHidden,
+                                    sourceType: VideoSourceType?.VideoSourceRemote,
                                   }}
                                 />
                               ) : (
@@ -2142,13 +2142,13 @@ useEffect(() => {
 
                     {/* Local Video Preview */}
                     <View style={styles.localVideoContainer}>
-                      {isCameraOn ? (
+                      {isCameraOn && RtcSurfaceView ? (
                         <RtcSurfaceView
                           style={styles.localVideo}
                           canvas={{
                             uid: 0,
-                            renderMode: RenderModeType.RenderModeHidden,
-                            sourceType: VideoSourceType.VideoSourceCamera,
+                            renderMode: RenderModeType?.RenderModeHidden,
+                            sourceType: VideoSourceType?.VideoSourceCamera,
                           }}
                         />
                       ) : (
