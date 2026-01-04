@@ -151,6 +151,8 @@ const router = useRouter();
     const isSendingRef = useRef(false);
     const inputRef = useRef(null);
     const callSubRef = useRef(null);
+    const lastLocalCallId = useRef(null);
+    const lastLocalCallTime = useRef(0);
 
     useEffect(() => {
       if (pendingCallUserId && user && chats.length > 0 && !activeCall) {
@@ -1233,13 +1235,15 @@ const stopRecording = async () => {
       .select()
       .single();
 
-    if (call) {
-      await supabase.from('rcall_participants').insert({
-        call_id: call.id,
-        user_id: user.id
-      });
+      if (call) {
+        lastLocalCallId.current = call.id;
+        lastLocalCallTime.current = Date.now();
+        await supabase.from('rcall_participants').insert({
+          call_id: call.id,
+          user_id: user.id
+        });
 
-      setActiveCall({ ...call, chat: activeChat, isOutgoing: true });
+        setActiveCall({ ...call, chat: activeChat, isOutgoing: true });
       
       if (activeChat.is_group) {
           for (const member of groupMembers) {
@@ -1362,7 +1366,7 @@ const stopRecording = async () => {
         );
         
         setDebugStatus('Fetching token...');
-        const uid = hashCode(user.id) % 1000000;
+        const uid = hashCode(String(user.id)) % 1000000;
         const { data, error } = await supabase.functions.invoke('agora-token', {
           body: {
             channelName: activeCall.id,
@@ -1414,59 +1418,80 @@ useEffect(() => {
       
       console.log('[DEBUG-CALL] Rehydrating call state...');
       
-          try {
-            const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-            const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
-            
-            // Optimize: Use a single query to find relevant calls
-            // We look for calls where user is either caller or a member of the chat
-            const { data: calls, error } = await supabase
-              .from('rcalls')
-              .select(`
-                *,
-                chat:rchats!inner(
-                  *,
-                  user1:rusers!user1_id(id, username, emoji_icon, avatar_url, last_seen),
-                  user2:rusers!user2_id(id, username, emoji_icon, avatar_url, last_seen),
-                  members:rchat_members!inner(user_id)
-                )
-              `)
-              .in('status', ['ringing', 'active'])
-              .gt('started_at', twoHoursAgo)
-              .eq('chat.members.user_id', user.id)
-              .order('started_at', { ascending: false });
+      try {
+        const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+        
+        // Use chat IDs we already know about to simplify the query
+        const chatIds = chats.map(c => c.id);
+        if (chatIds.length === 0) {
+          // If chats not loaded yet, we can't accurately rehydrate by chat members
+          // But we can still look for calls we are participants of
+          const { data: participation } = await supabase
+            .from('rcall_participants')
+            .select('call_id')
+            .eq('user_id', user.id);
+          
+          const pCallIds = (participation || []).map(p => p.call_id);
+          if (pCallIds.length === 0 && !activeCall) return; // nothing to do
+        }
 
-          if (error) {
-            console.error('[DEBUG-CALL] Error fetching calls:', error);
+        let query = supabase
+          .from('rcalls')
+          .select(`
+            *,
+            chat:rchats(
+              *,
+              user1:rusers!user1_id(id, username, emoji_icon, avatar_url, last_seen),
+              user2:rusers!user2_id(id, username, emoji_icon, avatar_url, last_seen)
+            )
+          `)
+          .in('status', ['ringing', 'active'])
+          .gt('started_at', twoHoursAgo);
+
+        // If we have chats, filter by those IDs
+        if (chatIds.length > 0) {
+          query = query.in('chat_id', chatIds);
+        } else {
+          // Otherwise at least filter by caller or participation if we can
+          query = query.eq('caller_id', user.id);
+        }
+
+        const { data: calls, error } = await query.order('started_at', { ascending: false });
+
+        if (error) {
+          console.error('[DEBUG-CALL] Error fetching calls:', error);
+          return;
+        }
+
+        const validCalls = (calls || []).filter(c => {
+          if (c.status === 'active') return true;
+          if (c.status === 'ringing') {
+            // Ringing calls expire after 5 minutes
+            return new Date(c.started_at) > new Date(Date.now() - 5 * 60 * 1000);
+          }
+          return false;
+        });
+
+        if (validCalls.length === 0) {
+          // PROTECTION: Don't clear if we just started a call locally
+          const isVeryRecent = Date.now() - lastLocalCallTime.current < 15000;
+          if (isVeryRecent && activeCall) {
+            console.log('[DEBUG-CALL] Skipping clear: fresh local call detected');
             return;
           }
-
-          // Filter calls: 
-          // 1. 'active' calls within 2 hours are valid
-          // 2. 'ringing' calls within 5 minutes are valid
-          const validCalls = (calls || []).filter(c => {
-            if (c.status === 'active') return true; // already filtered by gt(twoHoursAgo)
-            if (c.status === 'ringing') {
-              return new Date(c.started_at) > new Date(Date.now() - 5 * 60 * 1000);
-            }
-            return false;
-          });
-
-          if (validCalls.length === 0) {
-            setActiveCall(prev => prev ? null : null);
-            return;
+          
+          if (activeCall) {
+            console.log('[DEBUG-CALL] No valid calls found, clearing state');
+            setActiveCall(null);
           }
+          return;
+        }
 
-          // Take the latest valid call
-          const call = validCalls[0];
-
+        const call = validCalls[0];
         const isOutgoing = call.caller_id === user.id;
         
         setActiveCall(prev => {
-          if (prev?.id === call.id && prev.status === call.status && prev.isOutgoing === isOutgoing) {
-            return prev;
-          }
-          console.log('[DEBUG-CALL] Setting active call:', call.id);
+          if (prev?.id === call.id && prev.status === call.status) return prev;
           return { ...call, isOutgoing };
         });
 
@@ -1476,7 +1501,7 @@ useEffect(() => {
       } catch (err) {
         console.error('[DEBUG-CALL] Rehydrate error:', err);
       }
-    }, [user?.id, startCallTimer]);
+    }, [user?.id, chats, activeCall?.id, startCallTimer]);
 
     const rehydrateCallRef = useRef(rehydrateCall);
     useEffect(() => {
@@ -1487,20 +1512,24 @@ useEffect(() => {
       rehydrateCallRef.current();
     }, [user?.id, pendingCallAction]);
 
-    useEffect(() => {
-      if (!user) return;
-      
-      const channel = supabase
-        .channel('rcalls-insert-stable')
-        .on(
-          'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'rcalls' },
-          async (payload) => {
-            console.log('[DEBUG-CALL] New call insert detected:', payload.new.id);
-            rehydrateCallRef.current();
-          }
-        )
-        .subscribe();
+      useEffect(() => {
+        if (!user) return;
+        
+        const channel = supabase
+          .channel('rcalls-insert-stable')
+          .on(
+            'postgres_changes',
+            { event: 'INSERT', schema: 'public', table: 'rcalls' },
+            async (payload) => {
+              console.log('[DEBUG-CALL] New call insert detected:', payload.new.id);
+              if (payload.new.caller_id === user.id) {
+                console.log('[DEBUG-CALL] Skipping rehydrate for own call');
+                return;
+              }
+              rehydrateCallRef.current();
+            }
+          )
+          .subscribe();
         
       return () => {
         supabase.removeChannel(channel);
