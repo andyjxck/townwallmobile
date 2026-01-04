@@ -1481,7 +1481,7 @@ useEffect(() => {
 
     useEffect(() => {
       rehydrateCall();
-    }, [rehydrateCall]);
+    }, [rehydrateCall, pendingCallAction]);
 
     useEffect(() => {
       if (!user) return;
@@ -1492,30 +1492,8 @@ useEffect(() => {
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'rcalls' },
           async (payload) => {
-            const newCall = payload.new;
-            
-            // Check if I belong to the chat of this new call
-            const { data: isMember } = await supabase
-              .from('rchat_members')
-              .select('id')
-              .eq('chat_id', newCall.chat_id)
-              .eq('user_id', user.id)
-              .maybeSingle();
-            
-            let isDirectMember = false;
-            if (!isMember) {
-              const { data: chat } = await supabase
-                .from('rchats')
-                .select('id')
-                .eq('id', newCall.chat_id)
-                .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
-                .maybeSingle();
-              isDirectMember = !!chat;
-            }
-
-            if (isMember || isDirectMember || newCall.caller_id === user.id) {
-              rehydrateCall();
-            }
+            console.log('[DEBUG-CALL] New call insert detected:', payload.new.id);
+            rehydrateCall();
           }
         )
         .subscribe();
@@ -1747,7 +1725,7 @@ useEffect(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
-  if (!user || (!isVisible && !isOpen)) return null;
+  if (!user || (!isVisible && !isOpen && !activeCall)) return null;
 
   const hasUnread = totalUnreadCount > 0;
 
