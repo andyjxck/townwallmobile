@@ -21,7 +21,7 @@ import {
 import { MessageCircle, X, Send, ChevronLeft, MoreHorizontal, User, Users, Check, CheckCheck, Settings, Plus, UserPlus, Mic, MicOff, Phone as PhoneIcon, PhoneOff as PhoneOffIcon, PhoneIncoming, PhoneOutgoing, Phone, Volume2, VolumeX, Image as ImageIcon, Video as VideoIcon, Film, Play, Maximize2, Camera, Sparkles, Trash2, Square, Pause, LogOut, Flag, Edit, RefreshCw } from 'lucide-react-native';
 import Slider from '@react-native-community/slider';
 import { supabase } from '../utils/supabase';
-import { getStoredUser, isOnline } from '../utils/user';
+import { getStoredUser, isOnline as isUserOnline } from '../utils/user';
 import { theme } from '../utils/theme';
 import { sendNotification, sendMessageNotification, sendCallNotification } from '../utils/notifications';
 import { useChatStore, useAuthStore } from '../utils/auth';
@@ -368,61 +368,31 @@ useEffect(() => {
 
       const channel = supabase
         .channel('rcalls')
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'rcalls',
-          },
-          async (payload) => {
-            if (payload.new.caller_id !== user.id) {
-              const { data: participants } = await supabase
-                .from('rcall_participants')
-                .select('*')
-                .eq('call_id', payload.new.id);
-              
-              const isParticipant = payload.new.is_group_call 
-                ? (await supabase.from('rchat_members').select('*').eq('chat_id', payload.new.chat_id).eq('user_id', user.id)).data?.length > 0
-                : payload.new.caller_id !== user.id;
+       .on(
+  'postgres_changes',
+  {
+    event: 'UPDATE',
+    schema: 'public',
+    table: 'rcalls',
+  },
+  (payload) => {
+    // 🔥 ALWAYS handle terminal states
+    if (payload.new.status === 'ended' || payload.new.status === 'declined') {
+      stopSound('ringing');
+      playSound('disconnect');
+      endCallUI();
+      return;
+    }
 
-              if (isParticipant) {
-                const { data: chat } = await supabase
-                  .from('rchats')
-                  .select(`*, user1:rusers!user1_id(id, username, emoji_icon, avatar_url), user2:rusers!user2_id(id, username, emoji_icon, avatar_url)`)
-                  .eq('id', payload.new.chat_id)
-                  .single();
-                
-                setActiveCall({ ...payload.new, chat, isOutgoing: false });
-                playSound('ringing');
-              }
-            }
-          }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'rcalls',
-          },
-          (payload) => {
-            if (activeCall && activeCall.id === payload.new.id) {
-              if (payload.new.status === 'ended' || payload.new.status === 'declined') {
-                stopSound('ringing');
-                playSound('disconnect');
-                endCallUI();
-              } else if (payload.new.status === 'active') {
-                stopSound('ringing');
-                if (activeCall.status !== 'active') {
-                  playSound('connect');
-                  startCallTimer();
-                }
-                setActiveCall(prev => ({ ...prev, ...payload.new }));
-              }
-            }
-          }
-        )
+    // Handle activation
+    if (payload.new.status === 'active') {
+      stopSound('ringing');
+      playSound('connect');
+      startCallTimer();
+      setActiveCall(prev => prev ? { ...prev, ...payload.new } : payload.new);
+    }
+  }
+)
         .subscribe();
 
       callSubRef.current = channel;
@@ -1393,6 +1363,45 @@ const stopRecording = async () => {
       }
       return Math.abs(hash);
     };
+
+useEffect(() => {
+  if (
+    activeCall?.status === 'active' &&
+    !isJoined &&
+    !isJoining &&
+    !isExpoGo
+  ) {
+    setupAgora();
+  }
+}, [activeCall?.status]);
+
+useEffect(() => {
+  if (!user) return;
+
+  const rehydrateCall = async () => {
+    const { data } = await supabase
+      .from('rcalls')
+      .select(`
+        *,
+        rcall_participants!inner(user_id)
+      `)
+      .eq('rcall_participants.user_id', user.id)
+      .in('status', ['ringing', 'active'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (data) {
+      setActiveCall({
+        ...data,
+        isOutgoing: data.caller_id === user.id,
+      });
+    }
+  };
+
+  rehydrateCall();
+}, [user]);
+
 
 
     const leaveAgora = async () => {
@@ -2405,7 +2414,7 @@ agoraEngine.current = null;
                                   <Text style={styles.headerEmoji}>{getOtherUser(activeChat)?.emoji_icon || "👤"}</Text>
                                 </View>
                               )}
-                              {(onlineUsers[getOtherUser(activeChat)?.id] || isOnline(getOtherUser(activeChat)?.last_seen)) && <View style={styles.headerStatusDot} />}
+                              {(onlineUsers[getOtherUser(activeChat)?.id] || isUserOnline(getOtherUser(activeChat)?.last_seen)) && <View style={styles.headerStatusDot} />}
                             </View>
                               <View style={{ flex: 1 }}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -2423,7 +2432,7 @@ agoraEngine.current = null;
                                   </TouchableOpacity>
                                 </View>
                               <Text style={styles.onlineStatusText}>
-                                {(onlineUsers[getOtherUser(activeChat)?.id] || isOnline(getOtherUser(activeChat)?.last_seen)) ? 'Online' : 'Offline'}
+                                {(onlineUsers[getOtherUser(activeChat)?.id] || isUserOnline(getOtherUser(activeChat)?.last_seen)) ? 'Online' : 'Offline'}
                               </Text>
                             </View>
                       </TouchableOpacity>
@@ -2461,7 +2470,7 @@ agoraEngine.current = null;
                   renderItem={({ item }) => {
                     const isGroup = item.is_group;
                     const otherUser = !isGroup ? getOtherUser(item) : null;
-                    const userIsOnline = !isGroup && (onlineUsers[otherUser?.id] || isOnline(otherUser?.last_seen));
+                    const userIsOnline = !isGroup && (onlineUsers[otherUser?.id] || isUserOnline(otherUser?.last_seen));
                     const isPending = item.status === 'pending';
                     
                     return (
