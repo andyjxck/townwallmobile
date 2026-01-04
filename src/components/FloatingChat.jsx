@@ -876,18 +876,18 @@ const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
       .eq('chat_id', chatId)
       .order('created_at', { ascending: true });
     
-    if (isGroup && user?.id) {
-      const { data: memberData } = await supabase
-        .from('rchat_members')
-        .select('created_at')
-        .eq('chat_id', chatId)
-        .eq('user_id', user.id)
-        .single();
-      
-      if (memberData?.created_at) {
-        query = query.gte('created_at', memberData.created_at);
+      if (isGroup && user?.id) {
+        const { data: memberData } = await supabase
+          .from('rchat_members')
+          .select('joined_at')
+          .eq('chat_id', chatId)
+          .eq('user_id', user.id)
+          .single();
+        
+        if (memberData?.joined_at) {
+          query = query.gte('created_at', memberData.joined_at);
+        }
       }
-    }
     
     const { data, error } = await query;
     if (error) {
@@ -1414,19 +1414,23 @@ useEffect(() => {
       
       console.log('[DEBUG-CALL] Rehydrating call state...');
       
-      try {
-        const { data: calls, error } = await supabase
-          .from('rcalls')
-          .select(`
-            *,
-            chat:rchats(
+        try {
+          // Only fetch calls from the last 2 minutes to avoid stale ringing
+          const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+          
+          const { data: calls, error } = await supabase
+            .from('rcalls')
+            .select(`
               *,
-              user1:rusers!user1_id(id, username, emoji_icon, avatar_url, last_seen),
-              user2:rusers!user2_id(id, username, emoji_icon, avatar_url, last_seen)
-            )
-          `)
-          .in('status', ['ringing', 'active'])
-          .order('started_at', { ascending: false });
+              chat:rchats(
+                *,
+                user1:rusers!user1_id(id, username, emoji_icon, avatar_url, last_seen),
+                user2:rusers!user2_id(id, username, emoji_icon, avatar_url, last_seen)
+              )
+            `)
+            .in('status', ['ringing', 'active'])
+            .gt('started_at', twoMinutesAgo)
+            .order('started_at', { ascending: false });
 
         if (error) {
           console.error('[DEBUG-CALL] Error fetching calls:', error);
