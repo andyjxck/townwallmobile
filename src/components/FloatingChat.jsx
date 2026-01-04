@@ -443,6 +443,15 @@ useEffect(() => {
           clearInterval(callTimerRef.current);
           callTimerRef.current = null;
         }
+        
+        // Reset audio mode
+        Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+          playsInSilentModeIOS: true,
+          playThroughEarpieceAndroid: false,
+          staysActiveInBackground: true,
+        }).catch(err => console.error('Error resetting audio mode:', err));
+
         loadUserAndChats();
       };
 
@@ -1307,11 +1316,19 @@ const stopRecording = async () => {
           });
         }
 
-        await agoraEngine.current.enableAudio();
-        await agoraEngine.current.enableLocalAudio(true);
-        await agoraEngine.current.muteAllRemoteAudioStreams(false);
-        await agoraEngine.current.setEnableSpeakerphone(true);
-        await agoraEngine.current.setClientRole(ClientRoleType.ClientRoleBroadcaster);
+          await Audio.setAudioModeAsync({
+            allowsRecordingIOS: true,
+            playsInSilentModeIOS: true,
+            playThroughEarpieceAndroid: false,
+            staysActiveInBackground: true,
+          });
+
+          await agoraEngine.current.enableAudio();
+          await agoraEngine.current.enableLocalAudio(true);
+          await agoraEngine.current.muteAllRemoteAudioStreams(false);
+          await agoraEngine.current.setEnableSpeakerphone(true);
+          setIsSpeakerOn(true);
+          await agoraEngine.current.setClientRole(ClientRoleType.ClientRoleBroadcaster);
         await agoraEngine.current.setAudioProfile(
           AudioProfileType.AudioProfileDefault,
           AudioScenarioType.AudioScenarioChatRoom
@@ -1871,18 +1888,22 @@ agoraEngine.current = null;
                         <Text style={styles.callBtnLabel}>{isMuted ? 'Unmute' : 'Mute'}</Text>
                       </TouchableOpacity>
                       
-                      <TouchableOpacity onPress={async () => {
-  const next = !isSpeakerOn;
-  setIsSpeakerOn(next);
+                        <TouchableOpacity onPress={async () => {
+    const next = !isSpeakerOn;
+    setIsSpeakerOn(next);
 
-  await Audio.setAudioModeAsync({
-    allowsRecordingIOS: false,
-    playsInSilentModeIOS: true,
-    playThroughEarpieceAndroid: !next,
-    staysActiveInBackground: true,
-  });
+    await Audio.setAudioModeAsync({
+      allowsRecordingIOS: true,
+      playsInSilentModeIOS: true,
+      playThroughEarpieceAndroid: !next,
+      staysActiveInBackground: true,
+    });
 
-  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (agoraEngine.current) {
+      await agoraEngine.current.setEnableSpeakerphone(next);
+    }
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 }}
  style={styles.callBtn}>
                         <View style={[styles.iconCircle, isSpeakerOn && { backgroundColor: theme.colors.primary }]}>
