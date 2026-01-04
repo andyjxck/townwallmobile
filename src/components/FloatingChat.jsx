@@ -671,9 +671,10 @@ const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
         .on('presence', { event: 'sync' }, () => {
           const state = channel.presenceState();
           const pMap = {};
-          Object.keys(state).forEach(uid => {
-            if (uid !== user.id) {
-              pMap[uid] = state[uid][0];
+          Object.keys(state).forEach(key => {
+            const presence = state[key][0];
+            if (presence && presence.user_id !== user.id) {
+              pMap[key] = presence;
             }
           });
           setChatPresence(pMap);
@@ -725,21 +726,22 @@ const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
     }
   };
 
-  const PresenceIndicator = () => {
-    const presenceArray = Object.values(chatPresence);
-    const typingUsers = presenceArray.filter(p => p.is_typing);
-    const recordingUsers = presenceArray.filter(p => p.is_recording);
+    const PresenceIndicator = () => {
+      const presenceArray = Object.values(chatPresence);
+      const typingUsers = presenceArray.filter(p => p.is_typing && p.user_id !== user.id);
+      const recordingUsers = presenceArray.filter(p => p.is_recording && p.user_id !== user.id);
 
-    if (typingUsers.length === 0 && recordingUsers.length === 0) return null;
+      if (typingUsers.length === 0 && recordingUsers.length === 0) return null;
 
-    const getUsername = (uid) => {
-      if (activeChat?.is_group) {
-        return groupMembers.find(m => m.user_id === uid)?.user?.username || 'Someone';
-      } else {
-        const other = getOtherUser(activeChat);
-        return other?.username || 'Someone';
-      }
-    };
+      const getUsername = (uid) => {
+        if (activeChat?.is_group) {
+          return groupMembers.find(m => m.user_id === uid)?.user?.username || 'Someone';
+        } else {
+          const other = getOtherUser(activeChat);
+          if (other && (other.id === uid || uid === other.user_id)) return other.username;
+          return 'Someone';
+        }
+      };
 
     let text = '';
     if (recordingUsers.length > 0) {
