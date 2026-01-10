@@ -9,10 +9,6 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "platforms": ["ios", "android", "web"],
-"web": {
-  "bundler": "metro",
-  "output": "static"
-},
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.andysocial.townwall",
@@ -147,10 +143,11 @@
       ],
       "expo-asset"
     ],
-    "web": {
-      "bundler": "metro",
-      "favicon": "./assets/images/favicon.png"
-    },
+   "web": {
+  "bundler": "metro",
+  "output": "static",
+  "favicon": "./assets/images/favicon.png"
+},
     "experiments": {
       "typedRoutes": true,
       "tsconfigPaths": true,
