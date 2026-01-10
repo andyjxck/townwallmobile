@@ -3,11 +3,14 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
-    "postinstall": "patch-package",
-    "android": "expo run:android",
-    "ios": "expo run:ios",
-    "lint": "expo lint"
-  },
+  "postinstall": "patch-package",
+  "start": "expo start",
+  "web": "expo start --web",
+  "build:web": "expo export --platform web",
+  "android": "expo run:android",
+  "ios": "expo run:ios",
+  "lint": "expo lint"
+},
   "dependencies": {
     "@amplitude/analytics-react-native": "1.4.13",
     "@config-plugins/react-native-webrtc": "^13.0.0",
