@@ -8,6 +8,11 @@
     "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "platforms": ["ios", "android", "web"],
+"web": {
+  "bundler": "metro",
+  "output": "static"
+},
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.andysocial.townwall",
